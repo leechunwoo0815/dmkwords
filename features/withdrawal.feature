@@ -1,4 +1,5 @@
 # language: zh-CN
+@draft
 # FEAT-028 退会申请 | 锚点: R-311
 功能: 退会申请
   作为家长

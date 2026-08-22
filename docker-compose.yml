@@ -15,7 +15,7 @@ services:
       - --collation-server=utf8mb4_unicode_ci
       - --default-time-zone=+08:00
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:

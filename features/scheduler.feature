@@ -1,4 +1,5 @@
 # language: zh-CN
+@draft
 # FEAT-068 定时任务 | 锚点: R-319, ADR-008
 功能: 定时任务集
   作为系统

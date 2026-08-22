@@ -1,4 +1,5 @@
 # language: zh-CN
+@draft
 # FEAT-056 收藏夹 | 锚点: R-314
 功能: 收藏夹
   作为孩子和家长

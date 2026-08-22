@@ -1,4 +1,5 @@
 # language: zh-CN
+@draft
 # FEAT-051 里程碑 | 锚点: V1.1 §7.4
 功能: 里程碑
   作为孩子

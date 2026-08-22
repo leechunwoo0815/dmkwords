@@ -1,4 +1,5 @@
 # language: zh-CN
+@draft
 # FEAT-049 积分 | 锚点: V1.1 §7.2
 功能: 积分
   作为孩子

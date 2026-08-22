@@ -1,4 +1,5 @@
 # language: zh-CN
+@draft
 # FEAT-069 数据看板 | 锚点: V1.1 §11.2
 功能: 数据看板
   作为店长

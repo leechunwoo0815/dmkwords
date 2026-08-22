@@ -1,4 +1,5 @@
 # language: zh-CN
+@draft
 # FEAT-067 通知中心 | 锚点: R-319
 功能: 消息通知
   作为家长

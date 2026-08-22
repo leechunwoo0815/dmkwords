@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     # 数据库（MySQL 8.0 only，单一数据库铁律）
     DB_HOST: str = "127.0.0.1"
-    DB_PORT: int = 3306
+    DB_PORT: int = 3307
     DB_USER: str = "root"
     DB_PASSWORD: str = ""
     DB_NAME: str = "dmkwords"
