@@ -84,7 +84,7 @@ stop() {
       # 杀进程组（vite 会 spawn 子进程）
       pkill -P "$pid" 2>/dev/null || true
       kill "$pid" 2>/dev/null || true
-      echo "已停止 pid $pid（$pid_file）"
+      echo "已停止 pid ${pid}（${pid_file}）"
     fi
     rm -f "$pid_file"
   done
