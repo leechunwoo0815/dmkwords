@@ -39,6 +39,17 @@ start() {
   .venv/bin/python -m backend.seeds.seed_configs | head -1
 
   echo "===== [3/4] 后端 API（:8002） ====="
+  # 端口防呆：8002 被"非 pid 文件管理"的进程占用时，新进程会绑定失败退出，
+  # 而健康检查会打到旧进程上假装 OK（假绿）——必须先暴露出来
+  if [ ! -s "$BACKEND_PID_FILE" ] || ! is_running "$BACKEND_PID_FILE"; then
+    port_pid=$(lsof -ti :8002 2>/dev/null | head -1)
+    if [ -n "$port_pid" ]; then
+      echo "✗ 端口 8002 被进程 ${port_pid} 占用（不是 dev.sh 管理的后端，代码可能是旧的）"
+      echo "  这会导致新代码不生效、接口 404。处理方式："
+      echo "    kill ${port_pid} && bash scripts/dev.sh start"
+      exit 1
+    fi
+  fi
   if is_running "$BACKEND_PID_FILE"; then
     echo "⚠ 后端已在运行（pid $(cat "$BACKEND_PID_FILE")）——运行的是启动时的代码，不会自动加载新提交"
     echo "  拉取/修改过代码后请执行: bash scripts/dev.sh restart"
