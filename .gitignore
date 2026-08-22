@@ -15,3 +15,4 @@ backups/
 gate-runs/
 .DS_Store
 .dev-logs/
+*.tsbuildinfo
