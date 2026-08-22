@@ -71,7 +71,7 @@ class ConfigService:
         raw = self.get_value(key, str(default) if default is not None else None)
         return int(raw)
 
-    def update_config(self, admin: AdminUser, key: str, value: str, reason: str) -> SystemConfig:
+    def update_config(self, admin, key: str, value: str, reason: str) -> SystemConfig:
         config = (
             self._db.query(SystemConfig)
             .filter(SystemConfig.config_key == key, SystemConfig.is_deleted == 0)
