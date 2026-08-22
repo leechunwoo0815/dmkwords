@@ -209,3 +209,63 @@ class AuditService:
         action: str | None = None,
     ) -> tuple[list[AuditLog], int]:
         return self.audit_repo.list_with_filters(page, page_size, actor_id, action)
+
+
+class DashboardService:
+    """仪表盘运行数据（WM1：全部真实可查；业务指标随模块交付扩展）。"""
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.user_repo = AdminUserRepository(db)
+        self.config_repo = SystemConfigRepository(db)
+        self.audit_repo = AuditLogRepository(db)
+
+    def overview(self) -> dict:
+        from datetime import datetime
+
+        from sqlalchemy import func
+
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        admin_count = self.db.query(func.count(AdminUser.id)).filter(
+            AdminUser.is_deleted == 0, AdminUser.status == AdminUser.STATUS_ACTIVE
+        ).scalar() or 0
+        today_logins = self.db.query(func.count(AuditLog.id)).filter(
+            AuditLog.action == AuditLog.ACTION_LOGIN,
+            AuditLog.created_at >= today_start,
+        ).scalar() or 0
+        config_count = self.db.query(func.count(SystemConfig.id)).filter(
+            SystemConfig.is_deleted == 0
+        ).scalar() or 0
+
+        recent_changes = (
+            self.db.query(AuditLog)
+            .filter(
+                AuditLog.action == AuditLog.ACTION_CONFIG_UPDATE,
+                AuditLog.is_deleted == 0,
+            )
+            .order_by(AuditLog.created_at.desc())
+            .limit(5)
+            .all()
+        )
+
+        def _fmt(entry: AuditLog) -> dict:
+            config = self.config_repo.get_by_key(entry.target_id)
+            name = config.display_name or config.description if config else entry.target_id
+            try:
+                detail = json.loads(entry.detail or "{}")
+                change = f"{detail.get('old', '?')} → {detail.get('new', '?')}"
+            except (ValueError, TypeError):
+                change = entry.detail or ""
+            return {
+                "config_name": name or entry.target_id,
+                "change": change,
+                "actor_name": entry.actor_name,
+                "created_at": entry.created_at.strftime("%m-%d %H:%M") if entry.created_at else "",
+            }
+
+        return {
+            "admin_count": admin_count,
+            "today_logins": today_logins,
+            "config_count": config_count,
+            "recent_config_changes": [_fmt(e) for e in recent_changes],
+        }

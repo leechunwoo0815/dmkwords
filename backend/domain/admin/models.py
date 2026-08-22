@@ -44,7 +44,8 @@ class SystemConfig(BaseModel):
     TYPE_BOOL = "bool"
     TYPE_STRING = "string"
 
-    config_key = Column(String(191), unique=True, nullable=False, index=True, comment="配置键")
+    config_key = Column(String(191), unique=True, nullable=False, index=True, comment="配置键（系统标识）")
+    display_name = Column(String(100), nullable=False, default="", comment="中文显示名（店长视角）")
     config_value = Column(String(500), nullable=False, comment="配置值（字符串存储，按类型解析）")
     default_value = Column(String(500), nullable=False, default="", comment="默认值")
     value_type = Column(String(10), nullable=False, default=TYPE_STRING, comment="值类型")

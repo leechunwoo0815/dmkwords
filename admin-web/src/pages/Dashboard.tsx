@@ -1,45 +1,173 @@
-import { Card, Col, Row, Tag, Typography } from "antd";
+import { useEffect, useState } from "react";
+import {
+  BookOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  ReloadOutlined,
+  TeamOutlined,
+} from "@ant-design/icons";
+import { Button, Card, Col, Row, Spin, Tag, Typography } from "antd";
 
-import { useAuth } from "../auth";
+import { apiDashboardOverview } from "../api/admin";
+import type { components } from "../api/schema";
 
-const MODULES = [
-  { name: "WM1 平台基座", status: "已交付", color: "green" },
-  { name: "WM2 图书资产", status: "待开发", color: "default" },
-  { name: "WM3 会员与订单", status: "待开发", color: "default" },
-  { name: "WM4 押金与赔偿", status: "待开发", color: "default" },
-  { name: "WM5 借阅操作台", status: "待开发", color: "default" },
-  { name: "WM6 小程序与阅读链", status: "待开发", color: "default" },
-  { name: "WM7 测验与成长", status: "待开发", color: "default" },
-  { name: "WM8 榜单报告护照", status: "待开发", color: "default" },
-  { name: "WM9 线下活动", status: "待开发", color: "default" },
-  { name: "WM10 退款退会转让", status: "待开发", color: "default" },
-  { name: "WM11 通知任务看板", status: "待开发", color: "default" },
-  { name: "WM12 支付与收尾", status: "待开发", color: "default" },
+type Overview = components["schemas"]["DashboardOverviewResponse"];
+
+/** 经营看板格子：随模块交付逐格点亮（置灰格显示待哪个模块） */
+const BUSINESS_CELLS = [
+  { label: "总藏书量", value: null as number | null, unit: "本", module: "图书模块" },
+  { label: "在馆 / 借出", value: null as number | null, unit: "本", module: "图书模块" },
+  { label: "今日借出", value: null as number | null, unit: "本", module: "借阅模块" },
+  { label: "今日归还", value: null as number | null, unit: "本", module: "借阅模块" },
+  { label: "当前逾期", value: null as number | null, unit: "本", module: "借阅模块" },
+  { label: "会员总数", value: null as number | null, unit: "人", module: "会员模块" },
+  { label: "本周新增会员", value: null as number | null, unit: "人", module: "会员模块" },
+  { label: "近期活动报名", value: null as number | null, unit: "人次", module: "活动模块" },
 ];
 
+const moduleTag = (mod: string) => `待${mod}交付`;
+
 export default function Dashboard() {
-  const { user } = useAuth();
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = () => {
+    setLoading(true);
+    apiDashboardOverview()
+      .then(setOverview)
+      .catch(() => undefined)
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
-      <Typography.Title level={4} style={{ fontFamily: "Georgia, 'Songti SC', serif" }}>
-        欢迎回来，{user?.display_name || user?.username}
-      </Typography.Title>
-      <Typography.Paragraph type="secondary">
-        各业务模块（图书 / 会员 / 借阅 / 活动…）将按交付顺序陆续出现在左侧菜单。
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+        <Typography.Title level={4} style={{ fontFamily: "Georgia, 'Songti SC', serif", marginBottom: 0 }}>
+          今日概览
+        </Typography.Title>
+        <Button icon={<ReloadOutlined />} size="small" type="text" onClick={load}>
+          刷新
+        </Button>
+      </div>
+      <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
+        门店运营实时数据；下方经营看板将随各业务模块上线逐步点亮。
       </Typography.Paragraph>
-      <Row gutter={[12, 12]}>
-        {MODULES.map((m) => (
-          <Col key={m.name} xs={24} sm={12} lg={6}>
-            <Card size="small" styles={{ body: { padding: "12px 16px" } }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Typography.Text>{m.name}</Typography.Text>
-                <Tag color={m.color}>{m.status}</Tag>
+
+      <Spin spinning={loading}>
+        <Row gutter={[12, 12]}>
+          <Col xs={24} sm={8}>
+            <Card size="small" styles={{ body: { padding: "14px 16px" } }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <TeamOutlined style={{ fontSize: 22, color: "#2c4a6e" }} />
+                <div>
+                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "Georgia, 'Songti SC', serif" }}>
+                    {overview?.admin_count ?? "—"}
+                  </div>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    后台账号（个）
+                  </Typography.Text>
+                </div>
               </div>
             </Card>
           </Col>
-        ))}
-      </Row>
+          <Col xs={24} sm={8}>
+            <Card size="small" styles={{ body: { padding: "14px 16px" } }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <ClockCircleOutlined style={{ fontSize: 22, color: "#2c4a6e" }} />
+                <div>
+                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "Georgia, 'Songti SC', serif" }}>
+                    {overview?.today_logins ?? "—"}
+                  </div>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    今日登录（次）
+                  </Typography.Text>
+                </div>
+              </div>
+            </Card>
+          </Col>
+          <Col xs={24} sm={8}>
+            <Card size="small" styles={{ body: { padding: "14px 16px" } }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <CheckCircleOutlined style={{ fontSize: 22, color: "#35703c" }} />
+                <div>
+                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "Georgia, 'Songti SC', serif" }}>
+                    {overview?.config_count ?? "—"}
+                  </div>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    业务配置项（项）
+                  </Typography.Text>
+                </div>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+
+        <Typography.Title
+          level={5}
+          style={{ fontFamily: "Georgia, 'Songti SC', serif", marginTop: 20, marginBottom: 8 }}
+        >
+          最近配置变更
+        </Typography.Title>
+        <Card size="small" styles={{ body: { padding: "4px 16px" } }}>
+          {(overview?.recent_config_changes ?? []).length === 0 ? (
+            <Typography.Text type="secondary">暂无变更记录</Typography.Text>
+          ) : (
+            (overview?.recent_config_changes ?? []).map((c, i) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "8px 0",
+                  borderBottom: i < (overview?.recent_config_changes.length ?? 0) - 1 ? "1px dashed #e4dcc8" : "none",
+                }}
+              >
+                <span>
+                  <Typography.Text strong>{c.config_name}</Typography.Text>
+                  <Typography.Text
+                    code
+                    style={{ marginLeft: 8 }}
+                  >
+                    {c.change}
+                  </Typography.Text>
+                </span>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  {c.actor_name} · {c.created_at}
+                </Typography.Text>
+              </div>
+            ))
+          )}
+        </Card>
+
+        <Typography.Title
+          level={5}
+          style={{ fontFamily: "Georgia, 'Songti SC', serif", marginTop: 20, marginBottom: 8 }}
+        >
+          经营看板
+        </Typography.Title>
+        <Row gutter={[12, 12]}>
+          {BUSINESS_CELLS.map((cell) => (
+            <Col key={cell.label} xs={12} sm={6}>
+              <Card
+                size="small"
+                style={{ opacity: 0.55, background: "#f6f2e9", borderColor: "#e4dcc8" }}
+                styles={{ body: { padding: "12px 16px" } }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <Typography.Text type="secondary">{cell.label}</Typography.Text>
+                  <BookOutlined style={{ color: "#a39a86" }} />
+                </div>
+                <div style={{ marginTop: 6, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <Typography.Text type="secondary">—</Typography.Text>
+                  <Tag style={{ fontSize: 11 }}>{moduleTag(cell.module)}</Tag>
+                </div>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      </Spin>
     </>
   );
 }

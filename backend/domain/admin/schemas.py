@@ -31,6 +31,7 @@ class MeResponse(BaseSchema):
 class SystemConfigResponse(BaseSchema):
     id: int
     config_key: str
+    display_name: str
     config_value: str
     default_value: str
     value_type: str
@@ -55,3 +56,17 @@ class AuditLogResponse(BaseSchema):
     detail: str
     reason: str
     created_at: datetime
+
+
+class DashboardRecentChange(BaseSchema):
+    config_name: str
+    change: str
+    actor_name: str
+    created_at: str
+
+
+class DashboardOverviewResponse(BaseSchema):
+    admin_count: int
+    today_logins: int
+    config_count: int
+    recent_config_changes: list[DashboardRecentChange]

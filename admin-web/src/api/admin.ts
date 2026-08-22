@@ -40,3 +40,7 @@ export function apiListAuditLogs(params: {
   if (params.action) query.set("action", params.action);
   return request(`/api/admin/audit-logs?${query.toString()}`);
 }
+
+export function apiDashboardOverview(): Promise<components["schemas"]["DashboardOverviewResponse"]> {
+  return request("/api/admin/dashboard");
+}

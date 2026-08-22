@@ -8,6 +8,7 @@ from backend.domain.admin.models import AdminUser
 from backend.domain.admin.schemas import (
     AdminUserResponse,
     AuditLogResponse,
+    DashboardOverviewResponse,
     LoginRequest,
     LoginResponse,
     MeResponse,
@@ -18,6 +19,7 @@ from backend.domain.admin.service import (
     AuditService,
     AuthService,
     ConfigService,
+    DashboardService,
     permissions_for_role,
 )
 from backend.middleware.admin_auth import get_current_admin
@@ -78,3 +80,11 @@ def list_audit_logs(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/dashboard", response_model=DashboardOverviewResponse)
+def dashboard_overview(
+    admin: AdminUser = Depends(require_perm("dashboard.view")),
+    db: Session = Depends(get_db),
+):
+    return DashboardOverviewResponse.model_validate(DashboardService(db).overview())
