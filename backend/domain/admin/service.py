@@ -226,16 +226,25 @@ class DashboardService:
         from sqlalchemy import func
 
         today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        admin_count = self.db.query(func.count(AdminUser.id)).filter(
-            AdminUser.is_deleted == 0, AdminUser.status == AdminUser.STATUS_ACTIVE
-        ).scalar() or 0
-        today_logins = self.db.query(func.count(AuditLog.id)).filter(
-            AuditLog.action == AuditLog.ACTION_LOGIN,
-            AuditLog.created_at >= today_start,
-        ).scalar() or 0
-        config_count = self.db.query(func.count(SystemConfig.id)).filter(
-            SystemConfig.is_deleted == 0
-        ).scalar() or 0
+        admin_count = (
+            self.db.query(func.count(AdminUser.id))
+            .filter(AdminUser.is_deleted == 0, AdminUser.status == AdminUser.STATUS_ACTIVE)
+            .scalar()
+            or 0
+        )
+        today_logins = (
+            self.db.query(func.count(AuditLog.id))
+            .filter(
+                AuditLog.action == AuditLog.ACTION_LOGIN,
+                AuditLog.created_at >= today_start,
+            )
+            .scalar()
+            or 0
+        )
+        config_count = (
+            self.db.query(func.count(SystemConfig.id)).filter(SystemConfig.is_deleted == 0).scalar()
+            or 0
+        )
 
         recent_changes = (
             self.db.query(AuditLog)
