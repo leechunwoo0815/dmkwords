@@ -12,7 +12,7 @@ from pydantic import Field
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
-from backend.common.exceptions import UnauthorizedError, ValidationError
+from backend.common.exceptions import NotFoundError, UnauthorizedError, ValidationError
 from backend.database import get_db
 from backend.domain.catalog.models import Book
 from backend.domain.identity.models import Child, Parent
@@ -41,15 +41,13 @@ def _parent_token(parent_id: int) -> str:
     return pyjwt.encode(payload, get_settings().SECRET_KEY, algorithm="HS256")
 
 
-def get_current_parent(
-    authorization: str = Header(...), db: Session = Depends(get_db)
-) -> tuple[Parent, Session]:
+def _parent_from_token(token: str, db: Session) -> Parent:
+    """query-token 鉴权（音频/图片等组件无法携带 Authorization 头时用）。"""
     import jwt as pyjwt
 
     from backend.config import get_settings
 
     try:
-        token = authorization.replace("Bearer ", "")
         payload = pyjwt.decode(token, get_settings().SECRET_KEY, algorithms=["HS256"])
     except pyjwt.PyJWTError as e:
         raise UnauthorizedError("请先登录") from e
@@ -60,7 +58,14 @@ def get_current_parent(
     )
     if not parent:
         raise UnauthorizedError("账号不存在")
-    return parent, db
+    return parent
+
+
+def get_current_parent(
+    authorization: str = Header(...), db: Session = Depends(get_db)
+) -> tuple[Parent, Session]:
+    token = authorization.replace("Bearer ", "")
+    return _parent_from_token(token, db), db
 
 
 class LoginRequest(BaseSchema):
@@ -118,25 +123,7 @@ def list_books(
         q = q.filter(Book.title.like(like) | Book.author.like(like))
     total = q.count()
     books = q.order_by(Book.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
-    return {
-        "total": total,
-        "items": [
-            {
-                "id": b.id,
-                "title": b.title,
-                "author": b.author,
-                "isbn": b.isbn,
-                "word_count": b.word_count,
-                "ar_level": b.ar_level,
-                "topic": b.topic,
-                "cover_url": f"/api/miniapp/covers/{b.id}" if b.cover_path else None,
-                "has_audio": bool(b.audio_path),
-                "audio_duration": b.audio_duration_seconds,
-                "audio_url": f"/api/miniapp/books/{b.id}/audio" if b.audio_path else None,
-            }
-            for b in books
-        ],
-    }
+    return {"total": total, "items": [_book_view(b) for b in books]}
 
 
 @router.get("/books/{book_id}/progress")
@@ -204,6 +191,72 @@ def cancel_reservation(
         raise ValidationError("孩子不存在")
     res = ReservationService(db).cancel(child, reservation_id)
     return {"id": res.id, "status": res.status}
+
+
+def _book_view(b: Book) -> dict:
+    return {
+        "id": b.id,
+        "title": b.title,
+        "author": b.author,
+        "isbn": b.isbn,
+        "word_count": b.word_count,
+        "ar_level": b.ar_level,
+        "topic": b.topic,
+        "grade": b.grade,
+        "description": b.description,
+        "cover_url": f"/api/miniapp/covers/{b.id}" if b.cover_path else None,
+        "has_audio": bool(b.audio_path),
+        "audio_duration": b.audio_duration_seconds,
+        "audio_url": f"/api/miniapp/books/{b.id}/audio" if b.audio_path else None,
+        "off_shelf": b.status != Book.STATUS_ON,
+    }
+
+
+@router.get("/books/{book_id}")
+def book_detail(book_id: int, auth: Any = Depends(get_current_parent)):
+    """书目详情（书架收藏/在借进入时补全 audio_url 等字段）。"""
+    _, db = auth
+    book = db.query(Book).filter(Book.id == book_id, Book.is_deleted == 0).first()
+    if not book:
+        raise NotFoundError("图书不存在")
+    return _book_view(book)
+
+
+@router.get("/books/{book_id}/audio")
+def book_audio(book_id: int, token: str = "", db: Session = Depends(get_db)):
+    """音频流（query token：innerAudioContext 无法携带 Authorization 头）。"""
+    import os
+
+    from fastapi.responses import FileResponse
+
+    from backend.config import get_settings
+
+    _parent_from_token(token, db)
+    book = db.query(Book).filter(Book.id == book_id, Book.is_deleted == 0).first()
+    if not book or not book.audio_path:
+        raise NotFoundError("音频不存在")
+    root = os.path.abspath(get_settings().UPLOADS_DIR)
+    full = os.path.abspath(os.path.join(root, book.audio_path))
+    if not full.startswith(root) or not os.path.isfile(full):
+        raise NotFoundError("音频不存在")
+    return FileResponse(full, media_type="audio/mpeg")
+
+
+@router.get("/observation-images/{path:path}")
+def observation_image(path: str, token: str = "", db: Session = Depends(get_db)):
+    """观察期评估报告图片（仅限 observation/ 目录；query token 鉴权）。"""
+    import os
+
+    from fastapi.responses import FileResponse
+
+    from backend.config import get_settings
+
+    _parent_from_token(token, db)
+    root = os.path.abspath(get_settings().UPLOADS_DIR)
+    full = os.path.abspath(os.path.join(root, "observation", path))
+    if not full.startswith(os.path.join(root, "observation")) or not os.path.isfile(full):
+        raise NotFoundError("图片不存在")
+    return FileResponse(full, media_type="image/jpeg")
 
 
 @router.get("/covers/{book_id}")

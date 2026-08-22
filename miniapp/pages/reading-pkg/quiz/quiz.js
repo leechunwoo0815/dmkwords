@@ -55,7 +55,9 @@ Page({
       wx.showToast({ title: '先选一个答案', icon: 'none' }); return
     }
     if (this.data.current < this.data.questions.length - 1) {
-      this.setData({ current: this.data.current + 1, selected: this.data.answers[this.data.current + 1] ?? null })
+      const next = this.data.current + 1
+      const saved = this.data.answers[next]
+      this.setData({ current: next, selected: saved === undefined ? null : saved })
     } else {
       this.setData({ showConfirm: true })
     }
@@ -63,7 +65,9 @@ Page({
 
   onPrev() {
     if (this.data.current > 0) {
-      this.setData({ current: this.data.current - 1, selected: this.data.answers[this.data.current - 1] ?? null })
+      const prev = this.data.current - 1
+      const saved = this.data.answers[prev]
+      this.setData({ current: prev, selected: saved === undefined ? null : saved })
     }
   },
 

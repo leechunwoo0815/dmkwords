@@ -17,8 +17,8 @@
     </view>
     <view class="cal-grid">
       <view wx:for="{{days}}" wx:key="index"
-        class="cal-day {{item.blank ? 'blank' : ''}} {{item.checked ? 'checked' : ''}} {{item.isToday ? 'today' : ''}}">
-        {{item.blank ? '' : item.day}}
+        class="cal-day {{item.blank ? 'empty' : ''}} {{item.checked ? 'checked' : ''}} {{item.isToday ? 'today' : ''}}">
+        <text class="cal-day-text">{{item.blank ? '' : item.day}}</text>
       </view>
     </view>
   </view>

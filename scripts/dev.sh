@@ -40,7 +40,8 @@ start() {
 
   echo "===== [3/4] 后端 API（:8002） ====="
   if is_running "$BACKEND_PID_FILE"; then
-    echo "后端已在运行（pid $(cat "$BACKEND_PID_FILE")）"
+    echo "⚠ 后端已在运行（pid $(cat "$BACKEND_PID_FILE")）——运行的是启动时的代码，不会自动加载新提交"
+    echo "  拉取/修改过代码后请执行: bash scripts/dev.sh restart"
   else
     nohup .venv/bin/uvicorn backend.main:app --port 8002 > "$LOG_DIR/backend.log" 2>&1 < /dev/null &
     echo $! > "$BACKEND_PID_FILE"
@@ -99,6 +100,7 @@ status() {
 case "${1:-start}" in
   start) start ;;
   stop) stop ;;
+  restart) stop; start ;;
   status) status ;;
-  *) echo "用法: bash scripts/dev.sh [start|stop|status]"; exit 1 ;;
+  *) echo "用法: bash scripts/dev.sh [start|stop|restart|status]"; exit 1 ;;
 esac

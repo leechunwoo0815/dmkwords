@@ -8,6 +8,9 @@ module.exports = {
   },
 
   // 书目
+  getBookDetail(bookId) {
+    return req.get(`/api/miniapp/books/${bookId}`)
+  },
   listBooks(keyword, page, pageSize) {
     return req.get('/api/miniapp/books', null, {
       params: { keyword: keyword || '', page: page || 1, page_size: pageSize || 20 },
@@ -119,9 +122,17 @@ module.exports = {
 
   // 生词本 / 收藏 / 书架（WM8）
   lookupWord(word, childId, bookId) {
-    return req.get('/api/miniapp/vocabulary/lookup', null, {
-      params: { word, child_id: childId, book_id: bookId || '' },
-    })
+    const params = { word, child_id: childId }
+    if (bookId) params.book_id = bookId
+    return req.get('/api/miniapp/vocabulary/lookup', null, { params })
+  },
+
+  // 评估报告图片 URL（query token：image 组件无法带头）
+  observationImageUrl(relPath) {
+    const token = wx.getStorageSync('token')
+    const app = getApp()
+    const sub = relPath.replace(/^observation\//, '')
+    return `${app.globalData.baseURL}/api/miniapp/observation-images/${sub}?token=${encodeURIComponent(token)}`
   },
   listVocabulary(childId) {
     return req.get('/api/miniapp/vocabulary', null, { params: { child_id: childId } })

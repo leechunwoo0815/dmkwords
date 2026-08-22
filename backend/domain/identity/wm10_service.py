@@ -95,6 +95,9 @@ class RefundService:
             raise NotFoundError("订单不存在")
         if order.status != Order.STATUS_PAID:
             raise ValidationError(f"订单状态 {order.status}，不可申请退款")
+        # 红线（V1.1 §3.5）：押金退款不能单独申请，跟退会/转让流程一起办
+        if order.order_type in (Order.TYPE_DEPOSIT, Order.TYPE_DEPOSIT_SUPPLEMENT):
+            raise ValidationError("押金退款不能单独申请（随退会/权益转让流程自动发起）")
         return order
 
     # ---------- 家长申请 ----------

@@ -19,7 +19,16 @@ Page({
       childId: options.child_id ? Number(options.child_id) : null,
       childName: options.child_name ? decodeURIComponent(options.child_name) : '',
     })
+    this.loadDetail()
     this.loadProgress()
+  },
+
+  async loadDetail() {
+    // 以服务端详情为准（书架收藏/在借进入时 URL 参数缺 audio_url 等字段）
+    try {
+      const fresh = await api.getBookDetail(this.data.book.id)
+      this.setData({ book: { ...this.data.book, ...fresh } })
+    } catch (e) { /* 保留传入数据兜底 */ }
   },
 
   async loadProgress() {

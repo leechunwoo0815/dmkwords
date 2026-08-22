@@ -19,7 +19,12 @@ Page({
     this.setData({ loading: true })
     try {
       const reports = await api.observationReports(this._childId)
-      this.setData({ reports: reports || [] })
+      this.setData({
+        reports: (reports || []).map((r) => ({
+          ...r,
+          imageUrls: (r.images || []).map((img) => api.observationImageUrl(img)),
+        })),
+      })
     } catch (e) { /* toast 已弹 */ }
     finally { this.setData({ loading: false }) }
   },

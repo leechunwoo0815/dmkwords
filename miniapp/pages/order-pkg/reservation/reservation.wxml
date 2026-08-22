@@ -12,8 +12,8 @@
         <view class="reservation-title">{{item.title}}</view>
         <view class="reservation-author">{{item.author || '佚名'}}</view>
         <view class="reservation-time">预约于 {{item.expires_at}}</view>
-        <view wx:if="{{item.status === 'active' && item.remainMs > 0}}" class="countdown-row">
-          <text class="countdown">剩余 {{Math.floor(item.remainMs / 3600000) > 0 ? Math.floor(item.remainMs / 3600000) + ' 小时' : Math.max(1, Math.floor(item.remainMs / 60000)) + ' 分钟'}}</text>
+        <view wx:if="{{item.remainText}}" class="countdown-row">
+          <text class="countdown">{{item.remainText}}</text>
         </view>
         <view wx:if="{{item.status === 'checked_out'}}" class="queue-badge">已到店借出</view>
         <view wx:if="{{item.status === 'expired'}}" class="expired-badge">超时已释放</view>

@@ -44,7 +44,7 @@ Page({
       if (r.order_id) {
         wx.showModal({
           title: '报名成功（待收款）',
-          content: '名额已保留，请到店支付 50 元完成报名（馆员确认收款后入场券生效）。',
+          content: `名额已保留，请到店支付 ${this.data.activity.fee_display} 完成报名（馆员确认收款后入场券生效）。`,
           showCancel: false,
         })
       } else {

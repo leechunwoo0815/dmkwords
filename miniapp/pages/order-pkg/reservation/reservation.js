@@ -32,12 +32,21 @@ Page({
     this.setData({ loading: true })
     try {
       const res = await api.listReservations(this._childId)
-      const items = (res || []).map((r) => ({
-        ...r,
-        statusText: STATUS_TEXT[r.status] || r.status,
-        canCancel: r.status === 'active',
-        remainMs: r.status === 'active' ? new Date(r.expires_at).getTime() - Date.now() : 0,
-      }))
+      const items = (res || []).map((r) => {
+        const remainMs = r.status === 'active' ? new Date(r.expires_at).getTime() - Date.now() : 0
+        let remainText = ''
+        if (remainMs > 0) {
+          const hours = Math.floor(remainMs / 3600000)
+          remainText = hours > 0 ? `剩余 ${hours} 小时` : `剩余 ${Math.max(1, Math.floor(remainMs / 60000))} 分钟`
+        }
+        return {
+          ...r,
+          statusText: STATUS_TEXT[r.status] || r.status,
+          canCancel: r.status === 'active',
+          remainMs,
+          remainText,
+        }
+      })
       this.setData({ items })
     } catch (e) {
       this.setData({ items: [] })

@@ -22,7 +22,7 @@
       {{item.remark}}
     </view>
     <view style="display:flex;flex-wrap:wrap;gap:12rpx;">
-      <image wx:for="{{item.images}}" wx:for-item="img" wx:key="*this"
+      <image wx:for="{{item.imageUrls}}" wx:for-item="img" wx:key="*this"
         src="{{img}}" mode="aspectFill"
         style="width:200rpx;height:200rpx;border-radius:12rpx;background:var(--border);"
         data-src="{{img}}" bindtap="onPreview" />
