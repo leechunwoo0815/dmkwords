@@ -416,29 +416,14 @@ class EventBus:
                     session.close()
 
     def _record_dead_letter(self, event: DomainEvent, handler_name: str, error: str) -> None:
-        """记录死信事件到数据库"""
-        try:
-            from backend.database import get_session
-
-            session = get_session()()
-            try:
-                import json
-
-                from backend.common.dead_letter_model import DeadLetterEvent
-
-                dl = DeadLetterEvent(
-                    event_type=event.event_type,
-                    event_data=json.dumps(event.__dict__, default=str),
-                    handler_name=handler_name,
-                    error_message=str(error)[:2000],
-                )
-                session.add(dl)
-                session.commit()
-                logger.warning(f"Dead letter recorded: {event.event_type} -> {handler_name}")
-            finally:
-                session.close()
-        except Exception as dl_err:
-            logger.error(f"Failed to record dead letter: {dl_err}", exc_info=True)
+        """死信兜底：新项目无死信表（WM11 通知任务中心再定形态），仅结构化日志留痕。"""
+        logger.error(
+            "Dead letter (no table in new project, logged only): event=%s handler=%s error=%s data=%s",
+            event.event_type,
+            handler_name,
+            str(error)[:2000],
+            {k: str(v)[:200] for k, v in event.__dict__.items()},
+        )
 
     def clear(self) -> None:
         """清空所有处理器（测试用）"""

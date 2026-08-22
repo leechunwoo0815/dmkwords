@@ -2,7 +2,7 @@
 # ============================================================
 # DmkWords binlog 增量备份脚本
 # 用途: 每小时备份 binlog 文件，用于 PITR (Point-in-Time Recovery)
-# 用法: crontab -e → 0 * * * * /path/to/librio/scripts/backup_binlog.sh
+# 用法: crontab -e → 0 * * * * /path/to/dmkwords/scripts/backup_binlog.sh
 # 依赖: mysqlbinlog (Homebrew MySQL 自带)
 # ============================================================
 

@@ -2,7 +2,7 @@
 # ============================================================
 # DmkWords 数据库全量备份脚本
 # 用途: mysqldump 每日全量备份，保留 30 天
-# 用法: crontab -e → 0 2 * * * /path/to/librio/scripts/backup_db.sh
+# 用法: crontab -e → 0 2 * * * /path/to/dmkwords/scripts/backup_db.sh
 # 依赖: mysqldump (Homebrew MySQL 自带)
 # ============================================================
 
