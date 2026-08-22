@@ -1,0 +1,31 @@
+<view class="page-bg">
+  <view class="nav-bar">
+    <view class="search-wrap">
+      <view class="search-icon-wrap"><text class="search-icon-svg">🔍</text></view>
+      <input class="search-input" placeholder="搜书名 / 作者" confirm-type="search"
+        value="{{keyword}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" />
+      <view wx:if="{{keyword}}" class="search-clear" bindtap="onClearSearch">✕</view>
+    </view>
+  </view>
+
+  <view class="book-list">
+    <view wx:for="{{books}}" wx:key="id" class="book-item" data-book="{{item}}" bindtap="goDetail">
+      <view class="book-card">
+        <view class="book-info">
+          <view class="book-title">{{item.title}}</view>
+          <view class="book-author">{{item.author || '佚名'}}</view>
+          <view class="book-meta">
+            <text class="tag-words">{{item.word_count}} 词</text>
+            <text wx:if="{{item.ar_level}}" class="tag-ar">AR {{item.ar_level}}</text>
+            <text wx:if="{{item.has_audio}}" class="audio-tag">🎧 音频 {{item.audio_duration}}s</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="no-more">加载中…</view>
+  <empty-state wx:if="{{loaded && !books.length}}" icon="📭" title="没有找到书目"
+    desc="换个关键词试试，或到店请馆员录入" />
+  <view wx:if="{{books.length}}" class="no-more">共 {{total}} 本</view>
+</view>

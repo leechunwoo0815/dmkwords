@@ -1,0 +1,4 @@
+<view class="page-bg" style="min-height:100vh;display:flex;flex-direction:column;justify-content:center;">
+  <empty-state icon="📚" title="书架即将上线"
+    desc="收藏夹与想读清单将在后续模块开放，敬请期待" />
+</view>

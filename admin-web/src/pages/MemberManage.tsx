@@ -2,8 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import {
   App as AntdApp,
   Button,
+  Descriptions,
+  Drawer,
   Form,
   Input,
+  List,
   Modal,
   Popconfirm,
   Radio,
@@ -16,6 +19,10 @@ import {
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 
+import {
+  apiGetChildReading,
+  type ChildReadingProfile,
+} from "../api/reservations";
 import {
   apiCancelOrder,
   apiConfirmPayment,
@@ -76,6 +83,9 @@ export default function MemberManage() {
   const [confirmOrder, setConfirmOrder] = useState<Order | null>(null);
   const [parentForm] = Form.useForm();
   const [childForm] = Form.useForm();
+  const [readingChild, setReadingChild] = useState<Child | null>(null);
+  const [readingProfile, setReadingProfile] = useState<ChildReadingProfile | null>(null);
+  const [readingLoading, setReadingLoading] = useState(false);
   const [orderForm] = Form.useForm();
   const [confirmForm] = Form.useForm();
 
@@ -100,6 +110,16 @@ export default function MemberManage() {
   );
 
   useEffect(() => { if (tab === "children") loadChildren(childPage); }, [loadChildren, childPage, tab]);
+
+  const openReadingProfile = useCallback((child: Child) => {
+    setReadingChild(child);
+    setReadingProfile(null);
+    setReadingLoading(true);
+    apiGetChildReading(child.id)
+      .then(setReadingProfile)
+      .catch((e: Error) => message.error(e.message))
+      .finally(() => setReadingLoading(false));
+  }, [message]);
   useEffect(() => { if (tab === "orders") loadOrders(orderPage); }, [loadOrders, orderPage, tab]);
 
   return (
@@ -166,6 +186,7 @@ export default function MemberManage() {
                       orderForm.setFieldsValue({ child_id: r.id, order_type: r.member_status === "none" ? "observation_fee" : "formal_fee" });
                       setOrderOpen(true);
                     }}>创建订单</Button>
+                    <Button type="link" size="small" onClick={() => openReadingProfile(r)}>阅读档案</Button>
                   </Space>
                 ),
               },
@@ -357,6 +378,38 @@ export default function MemberManage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Drawer
+        title={readingChild ? `${readingChild.name} 的阅读档案` : "阅读档案"}
+        width={520} open={!!readingChild}
+        onClose={() => { setReadingChild(null); setReadingProfile(null); }}
+      >
+        {readingLoading && <Typography.Text type="secondary">加载中…</Typography.Text>}
+        {readingProfile && (
+          <>
+            <Descriptions column={2} size="small" bordered style={{ marginBottom: 16 }}>
+              <Descriptions.Item label="已读完">{readingProfile.total_finished} 本</Descriptions.Item>
+              <Descriptions.Item label="阅读时长">{readingProfile.total_reading_minutes} 分钟</Descriptions.Item>
+              <Descriptions.Item label="打卡天数">{readingProfile.total_checkin_days} 天</Descriptions.Item>
+              <Descriptions.Item label="当前连续">{readingProfile.current_streak} 天</Descriptions.Item>
+            </Descriptions>
+            <Typography.Title level={5}>完播书单</Typography.Title>
+            <List
+              size="small"
+              dataSource={readingProfile.finished_books}
+              locale={{ emptyText: "还没有听完的书" }}
+              renderItem={(b) => (
+                <List.Item>
+                  <List.Item.Meta
+                    title={`${b.title}（${b.word_count ?? "?"} 词）`}
+                    description={`${b.finished_at.slice(0, 16).replace("T", " ")} · 时长 ${b.reading_minutes} 分钟`}
+                  />
+                </List.Item>
+              )}
+            />
+          </>
+        )}
+      </Drawer>
     </>
   );
 }

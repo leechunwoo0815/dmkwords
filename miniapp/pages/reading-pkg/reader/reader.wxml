@@ -1,0 +1,58 @@
+<view class="reader-page" wx:if="{{book}}">
+  <view class="book-header">
+    <view class="book-title">{{book.title}}</view>
+    <view class="book-author">{{childName}} 正在听 · {{book.author || '佚名'}}</view>
+    <view class="book-meta">
+      <text class="meta-tag">已覆盖 {{coveragePercent}}%</text>
+      <text wx:if="{{finished}}" class="meta-tag" style="color: var(--success)">✅ 已读完</text>
+    </view>
+  </view>
+
+  <view class="player-section">
+    <view class="progress-area">
+      <text class="progress-times">{{displayTime}}</text>
+      <slider class="audio-slider" min="0" max="{{sliderMax}}" value="{{sliderValue}}"
+        activeColor="#2c4a6e" backgroundColor="#e4dcc8" block-size="20"
+        bindchanging="onSliderChanging" bindchange="onSliderChange" />
+      <text class="progress-times">{{displayDuration}}</text>
+    </view>
+
+    <view class="playback-controls">
+      <view class="ctrl-skip" bindtap="onSkipBack">↺ 15s</view>
+      <view class="ctrl-play" bindtap="onTogglePlay">{{playing ? '⏸' : '▶'}}</view>
+      <view class="ctrl-skip" style="opacity:0.3">15s ↻</view>
+    </view>
+
+    <view class="speed-row">
+      <view wx:for="{{speeds}}" wx:key="*this"
+        class="speed-chip {{speed === item ? 'speed-chip-active' : ''}}"
+        data-rate="{{item}}" bindtap="onSpeedTap">{{item}}x</view>
+    </view>
+
+    <view wx:if="{{anomalyMsg}}" class="no-audio">
+      <text class="no-audio-icon">⚠️</text>
+      <text class="no-audio-text">{{anomalyMsg}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{showCompletion && completion}}" class="completion-overlay" catchtap="onCloseCompletion">
+    <view class="completion-card" catchtap="onCloseCompletion">
+      <view class="popup-emoji">🎉</view>
+      <view class="popup-title">这本书听完啦！</view>
+      <view class="popup-sub">有效覆盖 ≥95%，阅读时长 {{completion.minutes}} 分钟已记录</view>
+      <view class="popup-stats">
+        <view class="popup-stat">
+          <view class="num">{{completion.checkedIn ? '✓' : '—'}}</view>
+          <view class="lbl">今日打卡</view>
+        </view>
+        <view class="popup-stat">
+          <view class="num">{{completion.streak}}</view>
+          <view class="lbl">连续天数</view>
+        </view>
+      </view>
+      <view class="popup-actions">
+        <view class="popup-btn" catchtap="onCloseCompletion">继续听别的书</view>
+      </view>
+    </view>
+  </view>
+</view>

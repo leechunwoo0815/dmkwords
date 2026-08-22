@@ -96,17 +96,7 @@ class CirculationService:
         if not child:
             raise NotFoundError("孩子不存在")
 
-        # 同书未还禁借（先于副本定位——单副本时也会命中）
-        dup = (
-            self.db.query(func.count(BorrowRecord.id))
-            .filter(
-                BorrowRecord.child_id == child_id,
-                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
-                BorrowRecord.is_deleted == 0,
-            )
-            .scalar()
-        )
-        # 重复借阅精确判定需 book_id；isbn 路径先查书目
+        # 同书未还禁借（重复借阅精确判定需 book_id；isbn/copy 路径先解析书目）
         _dup_book_id = None
         if isbn:
             _b = self.db.query(Book).filter(Book.isbn == isbn, Book.is_deleted == 0).first()

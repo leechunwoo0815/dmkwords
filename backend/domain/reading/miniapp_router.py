@@ -1,0 +1,223 @@
+# backend/domain/reading/miniapp_router.py — 小程序家长端 API（/api/miniapp）
+"""开发期登录简化：手机号 + 验证码（固定 1234，上线前接微信 code2session）。
+家长 token = JWT（type=parent）。"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+from fastapi import APIRouter, Depends, Header
+from pydantic import Field
+from sqlalchemy.orm import Session
+
+from backend.common.base_schema import BaseSchema
+from backend.common.exceptions import UnauthorizedError, ValidationError
+from backend.database import get_db
+from backend.domain.catalog.models import Book
+from backend.domain.identity.models import Child, Parent
+from backend.domain.reading.service import ReadingService, ReservationService
+
+router = APIRouter(tags=["miniapp"])
+
+
+def _parent_token(parent_id: int) -> str:
+    import jwt as pyjwt
+
+    from backend.common.security import decode_admin_token  # noqa: F401 — 复用密钥
+    from backend.config import get_settings
+
+    payload = {
+        "sub": str(parent_id),
+        "type": "parent",
+        "exp": datetime.now(UTC) + timedelta(days=30),
+    }
+    return pyjwt.encode(payload, get_settings().SECRET_KEY, algorithm="HS256")
+
+
+def get_current_parent(
+    authorization: str = Header(...), db: Session = Depends(get_db)
+) -> tuple[Parent, Session]:
+    import jwt as pyjwt
+
+    from backend.config import get_settings
+
+    try:
+        token = authorization.replace("Bearer ", "")
+        payload = pyjwt.decode(token, get_settings().SECRET_KEY, algorithms=["HS256"])
+    except pyjwt.PyJWTError as e:
+        raise UnauthorizedError("请先登录") from e
+    if payload.get("type") != "parent":
+        raise UnauthorizedError("无效的家长凭证")
+    parent = (
+        db.query(Parent).filter(Parent.id == int(payload["sub"]), Parent.is_deleted == 0).first()
+    )
+    if not parent:
+        raise UnauthorizedError("账号不存在")
+    return parent, db
+
+
+class LoginRequest(BaseSchema):
+    phone: str = Field(..., pattern=r"^\d{11}$")
+    code: str = Field(..., description="短信验证码（开发期固定 1234）")
+
+
+class ProgressReportRequest(BaseSchema):
+    child_id: int
+    book_id: int
+    position: int = Field(..., ge=0)
+    session_start: int | None = Field(None, ge=0)
+
+
+@router.post("/login")
+def login(body: LoginRequest, db: Session = Depends(get_db)):
+    if body.code != "1234":
+        raise ValidationError("验证码错误（开发期固定 1234）")
+    parent = db.query(Parent).filter(Parent.phone == body.phone, Parent.is_deleted == 0).first()
+    if not parent:
+        raise ValidationError("该手机号未注册（请到店建档）")
+    children = (
+        db.query(Child)
+        .filter(Child.parent_id == parent.id, Child.is_deleted == 0)
+        .order_by(Child.id)
+        .all()
+    )
+    return {
+        "token": _parent_token(parent.id),
+        "parent": {"id": parent.id, "name": parent.name, "phone": parent.phone},
+        "children": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "english_name": c.english_name,
+                "member_status": c.member_status,
+                "avatar": c.avatar,
+            }
+            for c in children
+        ],
+    }
+
+
+@router.get("/books")
+def list_books(
+    keyword: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+    auth: Any = Depends(get_current_parent),
+):
+    _, db = auth
+    q = db.query(Book).filter(Book.is_deleted == 0, Book.status == Book.STATUS_ON)
+    if keyword:
+        like = f"%{keyword}%"
+        q = q.filter(Book.title.like(like) | Book.author.like(like))
+    total = q.count()
+    books = q.order_by(Book.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": b.id,
+                "title": b.title,
+                "author": b.author,
+                "isbn": b.isbn,
+                "word_count": b.word_count,
+                "ar_level": b.ar_level,
+                "topic": b.topic,
+                "cover_url": f"/api/miniapp/covers/{b.id}" if b.cover_path else None,
+                "has_audio": bool(b.audio_path),
+                "audio_duration": b.audio_duration_seconds,
+                "audio_url": f"/api/miniapp/books/{b.id}/audio" if b.audio_path else None,
+            }
+            for b in books
+        ],
+    }
+
+
+@router.get("/books/{book_id}/progress")
+def get_progress(book_id: int, child_id: int, auth: Any = Depends(get_current_parent)):
+    _, db = auth
+    child = db.query(Child).filter(Child.id == child_id).first()
+    if not child:
+        raise ValidationError("孩子不存在")
+    return ReadingService(db).get_progress(child, book_id)
+
+
+@router.post("/reading/progress")
+def report_progress(body: ProgressReportRequest, auth: Any = Depends(get_current_parent)):
+    _, db = auth
+    child = db.query(Child).filter(Child.id == body.child_id).first()
+    if not child:
+        raise ValidationError("孩子不存在")
+    return ReadingService(db).report_progress(
+        child, body.book_id, body.position, body.session_start
+    )
+
+
+@router.get("/checkins")
+def checkin_calendar(child_id: int, days: int = 30, auth: Any = Depends(get_current_parent)):
+    _, db = auth
+    child = db.query(Child).filter(Child.id == child_id).first()
+    if not child:
+        raise ValidationError("孩子不存在")
+    return ReadingService(db).checkin_calendar(child, days)
+
+
+@router.get("/reservations")
+def list_reservations(child_id: int, auth: Any = Depends(get_current_parent)):
+    _, db = auth
+    child = db.query(Child).filter(Child.id == child_id).first()
+    return ReservationService(db).list_mine(child)
+
+
+class ReservationCreateRequest(BaseSchema):
+    child_id: int
+    book_id: int
+
+
+class ReservationCancelRequest(BaseSchema):
+    child_id: int
+
+
+@router.post("/reservations")
+def create_reservation(body: ReservationCreateRequest, auth: Any = Depends(get_current_parent)):
+    _, db = auth
+    child = db.query(Child).filter(Child.id == body.child_id).first()
+    if not child:
+        raise ValidationError("孩子不存在")
+    res = ReservationService(db).create(child, body.book_id)
+    return {"id": res.id, "expires_at": str(res.expires_at), "status": res.status}
+
+
+@router.post("/reservations/{reservation_id}/cancel")
+def cancel_reservation(
+    reservation_id: int, body: ReservationCancelRequest, auth: Any = Depends(get_current_parent)
+):
+    _, db = auth
+    child = db.query(Child).filter(Child.id == body.child_id).first()
+    if not child:
+        raise ValidationError("孩子不存在")
+    res = ReservationService(db).cancel(child, reservation_id)
+    return {"id": res.id, "status": res.status}
+
+
+@router.get("/covers/{book_id}")
+def book_cover(book_id: int, auth: Any = Depends(get_current_parent)):
+    _, db = auth
+    import os
+
+    from fastapi.responses import FileResponse
+
+    from backend.config import get_settings
+
+    book = db.query(Book).filter(Book.id == book_id).first()
+    if not book or not book.cover_path:
+        from backend.common.exceptions import NotFoundError
+
+        raise NotFoundError("封面不存在")
+    root = os.path.abspath(get_settings().UPLOADS_DIR)
+    full = os.path.abspath(os.path.join(root, book.cover_path))
+    if not full.startswith(root) or not os.path.isfile(full):
+        from backend.common.exceptions import NotFoundError
+
+        raise NotFoundError("封面不存在")
+    return FileResponse(full)

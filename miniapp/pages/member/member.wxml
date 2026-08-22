@@ -1,0 +1,41 @@
+<view class="page-bg">
+  <view class="profile-header">
+    <view class="profile-avatar">👩</view>
+    <view class="profile-info">
+      <view class="profile-name">{{parent.name || '家长'}}</view>
+      <view class="profile-level">{{parent.phone}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{children.length > 1}}" class="section-card" style="margin: 24rpx;">
+    <view class="child-switcher-label">切换孩子</view>
+    <view class="child-switcher-scroll">
+      <view wx:for="{{children}}" wx:key="id"
+        class="child-switcher-chip {{currentChild && currentChild.id === item.id ? 'active' : ''}}"
+        data-id="{{item.id}}" bindtap="onSwitchChild">
+        {{item.name}} · {{item.statusText}}
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{currentChild}}" class="section-card" style="margin: 24rpx;">
+    <view class="section-title">{{currentChild.name}}（{{statusText}}）</view>
+    <view class="func-grid">
+      <view class="func-item" bindtap="goCheckin">
+        <text class="fi-icon">📅</text>
+        <text class="fi-label">打卡日历</text>
+      </view>
+      <view class="func-item" bindtap="goReservation">
+        <text class="fi-icon">🔖</text>
+        <text class="fi-label">我的预约</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="bottom-links">
+    <view class="link-item" bindtap="onLogout">
+      <view class="lk-left"><text class="lk-icon">🚪</text><text class="lk-text">退出登录</text></view>
+      <text class="lk-arrow">›</text>
+    </view>
+  </view>
+</view>

@@ -17,6 +17,7 @@ from backend.database import Base  # noqa: E402
 from backend.domain.admin.models import AdminUser, AuditLog, SystemConfig  # noqa: E402, F401
 from backend.domain.catalog.models import Book, BookCopy, QuizQuestion  # noqa: E402, F401
 from backend.domain.circulation.models import BorrowRecord  # noqa: E402, F401
+from backend.domain.reading.models import CheckIn, ReadingProgress, Reservation  # noqa: E402, F401
 from backend.domain.billing.models import Deposit, DepositLedger  # noqa: E402, F401
 from backend.domain.identity.models import Child, Order, Parent  # noqa: E402, F401
 

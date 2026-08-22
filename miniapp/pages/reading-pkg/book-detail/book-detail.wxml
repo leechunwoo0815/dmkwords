@@ -1,0 +1,39 @@
+<view class="page-bg" wx:if="{{book}}">
+  <view class="book-hero">
+    <view class="hero-info">
+      <view class="hero-title">{{book.title}}</view>
+      <view class="hero-author">{{book.author || '佚名'}}</view>
+      <view class="hero-tags">
+        <text class="tag-words">{{book.word_count}} 词</text>
+        <text wx:if="{{book.ar_level}}" class="tag-ar">AR {{book.ar_level}}</text>
+        <text wx:if="{{book.has_audio}}" class="tag-time">🎧 {{book.audio_duration}}s</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{childName}}" class="section-card">
+    <view class="section-card-title">{{childName}} 的阅读进度</view>
+    <view wx:if="{{progress && progress.coverage_seconds > 0}}" class="progress-section">
+      <view class="reading-progress">
+        <view class="rp-bar"><view class="rp-fill" style="width: {{progress.coverage_percent}}%"></view></view>
+        <text>已听 {{progress.coverage_percent}}%</text>
+      </view>
+      <view wx:if="{{progress.finished}}" class="quiz-tag">✅ 已读完 · 测验已解锁</view>
+    </view>
+    <view wx:else style="color: var(--muted); font-size: 26rpx;">还没开始听，从第一秒开始吧</view>
+  </view>
+
+  <view class="section-card" wx:if="{{childName}}">
+    <view class="section-card-title">借阅与预约</view>
+    <view style="color: var(--muted); font-size: 26rpx; margin-bottom: 20rpx;">
+      预约后副本为你保留 72 小时，到店取书核销转借阅。
+    </view>
+  </view>
+
+  <view class="action-bar">
+    <button class="action-secondary" bindtap="onReserve" disabled="{{reserving}}">
+      {{reserving ? '预约中…' : '🔖 预约此书'}}
+    </button>
+    <button class="action-primary" bindtap="onPlay">▶ 开始听</button>
+  </view>
+</view>

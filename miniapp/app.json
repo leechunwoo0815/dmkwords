@@ -4,9 +4,7 @@
     "pages/books/books",
     "pages/shelf/shelf",
     "pages/member/member",
-    "pages/login/login",
-    "pages/agreement/service-agreement/service-agreement",
-    "pages/agreement/privacy-policy/privacy-policy"
+    "pages/login/login"
   ],
   "subPackages": [
     {
@@ -14,50 +12,21 @@
       "name": "reading",
       "pages": [
         "reader/reader",
-        "book-detail/book-detail",
-        "quiz/quiz",
-        "quiz-result/quiz-result",
-        "vocabulary/vocabulary",
-        "word-detail/word-detail"
+        "book-detail/book-detail"
       ]
     },
     {
       "root": "pages/member-pkg",
       "name": "member-pkg",
       "pages": [
-        "checkin/checkin",
-        "reading-stats/reading-stats",
-        "learning-report/learning-report",
-        "observation-report/observation-report",
-        "profile-card/profile-card",
-        "certificate/certificate",
-        "achievement/achievement",
-        "leaderboard/leaderboard",
-        "offline-guide/offline-guide"
+        "checkin/checkin"
       ]
     },
     {
       "root": "pages/order-pkg",
       "name": "order",
       "pages": [
-        "order-history/order-history",
-        "observation/observation",
-        "official/official",
-        "refund-apply/refund-apply",
-        "benefit-transfer/benefit-transfer",
-        "messages/messages",
-        "child-manage/child-manage",
-        "deposit/deposit",
-        "borrow-history/borrow-history",
         "reservation/reservation"
-      ]
-    },
-    {
-      "root": "pages/activity-pkg",
-      "name": "activity",
-      "pages": [
-        "activity-list/activity-list",
-        "activity-detail/activity-detail"
       ]
     }
   ],
@@ -78,16 +47,16 @@
   },
   "window": {
     "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#5560cf",
+    "navigationBarBackgroundColor": "#2c4a6e",
     "navigationBarTitleText": "DmkWords",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#f5f5f5"
+    "backgroundColor": "#f6f2e9"
   },
   "tabBar": {
     "custom": true,
-    "color": "#999999",
-    "selectedColor": "#5560cf",
-    "backgroundColor": "#ffffff",
+    "color": "#6f685a",
+    "selectedColor": "#2c4a6e",
+    "backgroundColor": "#fffefa",
     "borderStyle": "black",
     "list": [
       {

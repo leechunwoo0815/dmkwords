@@ -1,0 +1,32 @@
+<view class="page-bg">
+  <view class="section-label">{{childName}} 的预约</view>
+
+  <view wx:if="{{loading}}" class="loading-state">加载中…</view>
+
+  <empty-state wx:if="{{!loading && !items.length}}" icon="🔖" title="还没有预约"
+    desc="在图书馆里选一本书，点「预约此书」，副本会为你保留 72 小时" />
+
+  <view class="reservation-list">
+    <view wx:for="{{items}}" wx:key="id" class="reservation-card">
+      <view class="reservation-info">
+        <view class="reservation-title">{{item.title}}</view>
+        <view class="reservation-author">{{item.author || '佚名'}}</view>
+        <view class="reservation-time">预约于 {{item.expires_at}}</view>
+        <view wx:if="{{item.status === 'active' && item.remainMs > 0}}" class="countdown-row">
+          <text class="countdown">剩余 {{Math.floor(item.remainMs / 3600000) > 0 ? Math.floor(item.remainMs / 3600000) + ' 小时' : Math.max(1, Math.floor(item.remainMs / 60000)) + ' 分钟'}}</text>
+        </view>
+        <view wx:if="{{item.status === 'checked_out'}}" class="queue-badge">已到店借出</view>
+        <view wx:if="{{item.status === 'expired'}}" class="expired-badge">超时已释放</view>
+        <view wx:if="{{item.status === 'cancelled'}}" class="expired-badge">已取消</view>
+      </view>
+      <view class="reservation-actions" wx:if="{{item.canCancel}}">
+        <view class="cancel-btn" data-id="{{item.id}}" bindtap="onCancel">取消预约</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{items.length}}" class="tip-banner">
+    预约副本保留 72 小时；到店后请馆员在借阅台核销转借阅
+  </view>
+  <view class="safe-bottom"></view>
+</view>

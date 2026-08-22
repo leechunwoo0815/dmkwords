@@ -106,10 +106,10 @@ def get_deposit_ledgers(
 ):
     _, ledgers = DepositService(db).get_by_child(child_id)
     out = []
-    for l in ledgers:
-        item = DepositLedgerResponse.model_validate(l)
-        item.amount = str(l.amount)
-        item.balance_after = str(l.balance_after)
+    for entry in ledgers:
+        item = DepositLedgerResponse.model_validate(entry)
+        item.amount = str(entry.amount)
+        item.balance_after = str(entry.balance_after)
         out.append(item)
     return out
 

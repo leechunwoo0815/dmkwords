@@ -82,7 +82,7 @@ def test_deduct_and_supplement(client: TestClient):
     assert dep["supplemented_total"] == "68.00"
     # 流水可查
     ledgers = client.get(f"/api/admin/deposits/children/{c['id']}/ledgers", headers=h).json()
-    types = [l["entry_type"] for l in ledgers]
+    types = [entry["entry_type"] for entry in ledgers]
     assert "pay" in types and "deduct" in types and "supplement" in types
 
 

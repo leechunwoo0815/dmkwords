@@ -36,6 +36,8 @@ from backend.domain.billing.router import router as billing_router  # noqa: E402
 from backend.domain.catalog.router import router as catalog_router  # noqa: E402
 from backend.domain.circulation.router import router as circulation_router  # noqa: E402
 from backend.domain.identity.router import router as identity_router  # noqa: E402
+from backend.domain.reading.miniapp_router import router as miniapp_router  # noqa: E402
+from backend.domain.reading.router import router as reading_router  # noqa: E402
 
 register_audit_handlers()
 
@@ -44,3 +46,5 @@ app.include_router(catalog_router, prefix="/api/admin")
 app.include_router(circulation_router, prefix="/api/admin")
 app.include_router(identity_router, prefix="/api/admin")
 app.include_router(billing_router, prefix="/api/admin")
+app.include_router(miniapp_router, prefix="/api/miniapp")
+app.include_router(reading_router, prefix="/api/admin")

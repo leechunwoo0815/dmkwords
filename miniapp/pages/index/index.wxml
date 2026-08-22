@@ -1,0 +1,54 @@
+<view class="page-root">
+  <view class="top-bar">
+    <view class="logo">
+      <view class="logo-icon">📚</view>
+      <text class="logo-text">DmkWords</text>
+    </view>
+  </view>
+
+  <view wx:if="{{!currentChild}}" class="login-prompt">
+    <text>还没有孩子档案，请到店建档</text>
+  </view>
+
+  <view wx:if="{{children.length > 1}}" class="child-switcher">
+    <view wx:for="{{children}}" wx:key="id" class="child-chip {{currentChild.id === item.id ? 'child-chip-active' : ''}}"
+      data-id="{{item.id}}" bindtap="onSwitchChild">
+      <text>{{item.name}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{currentChild}}" class="section-block">
+    <view class="section-title">正在陪伴：{{currentChild.name}}（{{statusText}}）</view>
+    <view class="stat-cards">
+      <view class="stat-item">
+        <view class="stat-num">{{currentStreak}}</view>
+        <view class="stat-label">连续打卡（天）</view>
+      </view>
+      <view class="stat-item">
+        <view class="stat-num">{{todayChecked ? '✓' : '—'}}</view>
+        <view class="stat-label">今日打卡</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-block">
+    <view class="section-title">快捷入口</view>
+    <view class="entry-grid">
+      <view class="entry-item" bindtap="goBooks">
+        <view class="entry-icon-wrap"><text class="entry-icon">📖</text></view>
+        <view class="entry-title">图书馆</view>
+        <view class="entry-desc">听音频 · 完播打卡</view>
+      </view>
+      <view class="entry-item" bindtap="goCheckin">
+        <view class="entry-icon-wrap"><text class="entry-icon">📅</text></view>
+        <view class="entry-title">打卡日历</view>
+        <view class="entry-desc">坚持的力量</view>
+      </view>
+      <view class="entry-item" bindtap="goReservation">
+        <view class="entry-icon-wrap"><text class="entry-icon">🔖</text></view>
+        <view class="entry-title">我的预约</view>
+        <view class="entry-desc">到店取书</view>
+      </view>
+    </view>
+  </view>
+</view>
