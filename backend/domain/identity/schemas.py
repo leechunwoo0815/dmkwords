@@ -1,1 +1,87 @@
-"""identity 域 schemas（F 系列开发时按四件套模板实现）。"""
+# backend/domain/identity/schemas.py
+from datetime import date, datetime
+
+from pydantic import Field, field_validator
+
+from backend.common.base_schema import BaseSchema
+
+
+class ParentCreateRequest(BaseSchema):
+    name: str = Field(..., min_length=1, max_length=64)
+    phone: str = Field(..., pattern=r"^\d{11}$", description="手机号（11位）")
+    remark: str = Field("", max_length=200)
+
+
+class ParentResponse(BaseSchema):
+    id: int
+    name: str
+    phone: str
+    remark: str
+
+
+class ChildCreateRequest(BaseSchema):
+    name: str = Field(..., min_length=1, max_length=64)
+    english_name: str | None = Field(None, max_length=64)
+    gender: int | None = Field(None, ge=1, le=2)
+    birthday: date | None = None
+    grade: str = Field("", max_length=50)
+
+
+class ChildResponse(BaseSchema):
+    id: int
+    parent_id: int
+    name: str
+    english_name: str | None
+    gender: int | None
+    birthday: date | None
+    grade: str
+    member_status: str
+    member_start: date | None
+    member_expire: date | None
+
+
+class ChildWithParentResponse(ChildResponse):
+    parent_name: str = ""
+    parent_phone: str = ""
+
+
+class OrderCreateRequest(BaseSchema):
+    order_type: str = Field(..., pattern="^(first_activity_fee|observation_fee|formal_fee)$")
+    child_id: int
+    remark: str = Field("", max_length=200)
+
+
+class OrderConfirmRequest(BaseSchema):
+    pay_method: str = Field(
+        ..., pattern="^(scan|alipay|transfer|card|cash|wechat)$", description="收款方式"
+    )
+    remark: str = Field("", max_length=200, description="凭证说明（留痕）")
+
+
+class OrderResponse(BaseSchema):
+    id: int
+    order_no: str
+    order_type: str
+    parent_id: int
+    child_id: int | None
+    amount: str
+    status: str
+    pay_method: str | None
+    paid_at: datetime | None
+    remark: str
+    created_at: datetime = Field(alias="create_time")
+    child_name: str | None = None
+    parent_name: str | None = None
+
+    @field_validator("amount", mode="before")
+    @classmethod
+    def _amount_to_str(cls, v):
+        return str(v)
+
+
+class ChildCardResponse(ChildWithParentResponse):
+    """借阅操作台的孩子卡片（WM5 也用）。"""
+
+    active_borrows: int = Field(0, description="当前在借数")
+    overdue_count: int = Field(0, description="逾期未还数")
+    deposit_status: str | None = Field(None, description="押金状态（WM4 填充）")
