@@ -56,6 +56,11 @@ Page({
   goTransfer() {
     wx.navigateTo({ url: '/pages/order-pkg/benefit-transfer/benefit-transfer' })
   },
+  goVocabulary() {
+    const c = this.data.currentChild
+    if (!c) return
+    wx.navigateTo({ url: `/pages/reading-pkg/vocabulary/vocabulary?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
+  },
   goObservation() {
     const c = this.data.currentChild
     if (!c) return

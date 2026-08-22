@@ -14,10 +14,10 @@
 | WM4 | 押金与赔偿 | MANUAL_TEST | gate.sh full exit 0（提交 74efe86）| 押金状态机/扣除/补缴/待结清；等手动验收 |
 | WM5 | 借阅操作台 | MANUAL_TEST | gate.sh full exit 0（提交 7b5a8ee）| 借/还/续/逾期扣减/人工放行/未入会开关；等手动验收 |
 | WM6 | 小程序与阅读链 + 预约 | MANUAL_TEST | gate.sh full exit 0（73 pytest + 架构关 + 覆盖率 60.73%）| 防刷按 R-151 墙上时钟重写；miniapp 9 页 + admin 预约管理/核销/阅读档案；等手动验收 |
-| WM7 | 测验与成长 | PENDING | — | |
-| WM8 | 榜单报告护照 | PENDING | — | |
-| WM9 | 线下活动 | PENDING | — | |
-| WM10 | 退款退会转让 | PENDING | — | |
+| WM7 | 测验与成长 | MANUAL_TEST | gate.sh full exit 0（提交 4f7a985；81 pytest）| Quiz/词数/积分/等级/里程碑；等手动验收 |
+| WM8 | 榜单报告护照 | MANUAL_TEST | gate.sh full exit 0（提交 077a2eb；90 pytest）| 五榜单/护照/周月报图片/生词本/收藏夹；等手动验收 |
+| WM9 | 线下活动 | MANUAL_TEST | gate.sh full exit 0（提交 73e76d6；97 pytest）| 发布/报名/入场券/签到/退款矩阵/99 元链；等手动验收 |
+| WM10 | 退款退会转让 | MANUAL_TEST | gate.sh full exit 0（提交 e6dadd3；104 pytest，覆盖率 69.6%）| 退款中心/退会/权益转让/评估报告；等手动验收 |
 | WM11 | 通知任务看板 | PENDING | — | |
 | WM12 | 微信支付与收尾 | PENDING | — | |
 

@@ -46,3 +46,9 @@ export function apiConfirmPayment(orderId: number, body: { pay_method: string; r
 export function apiCancelOrder(orderId: number): Promise<Order> {
   return request(`/api/admin/orders/${orderId}/cancel`, { method: "POST" });
 }
+
+export function apiRefundOrder(orderId: number, remark: string): Promise<{ id: number; status: string }> {
+  return request(`/api/admin/orders/${orderId}/refund`, {
+    method: "POST", body: JSON.stringify({ remark }),
+  });
+}

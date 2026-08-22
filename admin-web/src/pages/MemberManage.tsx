@@ -18,13 +18,19 @@ import {
   Typography,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
+import { Upload } from "antd";
+import type { UploadFile } from "antd";
+
+import { useAuth } from "../auth";
 
 import {
   apiGetChildReading,
   type ChildReadingProfile,
 } from "../api/reservations";
+import { apiUploadObservation } from "../api/observation";
 import {
   apiCancelOrder,
+  apiRefundOrder,
   apiConfirmPayment,
   apiCreateChild,
   apiCreateOrder,
@@ -63,6 +69,7 @@ const PAY_METHOD_OPTIONS = [
 
 export default function MemberManage() {
   const { message } = AntdApp.useApp();
+  const { user } = useAuth();
   const [tab, setTab] = useState("children");
   // 孩子列表
   const [children, setChildren] = useState<Child[]>([]);
@@ -83,6 +90,9 @@ export default function MemberManage() {
   const [confirmOrder, setConfirmOrder] = useState<Order | null>(null);
   const [parentForm] = Form.useForm();
   const [childForm] = Form.useForm();
+  const [obsChild, setObsChild] = useState<Child | null>(null);
+  const [obsFileList, setObsFileList] = useState<UploadFile[]>([]);
+  const [obsRemark, setObsRemark] = useState("");
   const [readingChild, setReadingChild] = useState<Child | null>(null);
   const [readingProfile, setReadingProfile] = useState<ChildReadingProfile | null>(null);
   const [readingLoading, setReadingLoading] = useState(false);
@@ -110,6 +120,50 @@ export default function MemberManage() {
   );
 
   useEffect(() => { if (tab === "children") loadChildren(childPage); }, [loadChildren, childPage, tab]);
+
+  const onRefundOrder = (o: Order) => {
+    let remarkInput = "";
+    Modal.confirm({
+      title: "订单退款执行",
+      content: (
+        <div>
+          <div style={{ marginBottom: 8 }}>
+            {o.order_no} · ￥{Number(o.amount).toLocaleString()}（仅超管；99 元资格随退款恢复）
+          </div>
+          <Input.TextArea rows={2} onChange={(e) => { remarkInput = e.target.value; }} placeholder="退款说明（留痕）" />
+        </div>
+      ),
+      okText: "确认退款",
+      onOk: async () => {
+        try {
+          await apiRefundOrder(o.id, remarkInput || "退款执行");
+          message.success("订单已退款");
+          loadOrders(orderPage);
+        } catch (e) {
+          message.error((e as Error).message);
+        }
+      },
+    });
+  };
+
+  const onUploadObservation = async () => {
+    if (!obsFileList.length) {
+      message.warning("请先选择图片（≤9 张）");
+      return;
+    }
+    const fd = new FormData();
+    obsFileList.forEach((f) => {
+      if (f.originFileObj) fd.append("files", f.originFileObj);
+    });
+    fd.append("remark", obsRemark);
+    try {
+      const r = await apiUploadObservation(obsChild!.id, fd);
+      message.success(`已上传 ${r.images.length} 张，家长端可见`);
+      setObsChild(null);
+    } catch (e) {
+      message.error((e as Error).message);
+    }
+  };
 
   const openReadingProfile = useCallback((child: Child) => {
     setReadingChild(child);
@@ -187,6 +241,7 @@ export default function MemberManage() {
                       setOrderOpen(true);
                     }}>创建订单</Button>
                     <Button type="link" size="small" onClick={() => openReadingProfile(r)}>阅读档案</Button>
+                    <Button type="link" size="small" onClick={() => { setObsChild(r); setObsFileList([]); setObsRemark(""); }}>评估报告</Button>
                   </Space>
                 ),
               },
@@ -233,6 +288,9 @@ export default function MemberManage() {
                           <Button type="link" size="small" danger>取消</Button>
                         </Popconfirm>
                       </>
+                    )}
+                    {r.status === "paid" && user?.role === "superadmin" && (
+                      <Button type="link" size="small" danger onClick={() => onRefundOrder(r)}>退款</Button>
                     )}
                   </Space>
                 ),
@@ -377,6 +435,26 @@ export default function MemberManage() {
             <Input.TextArea rows={2} placeholder="如：转账截图已存档 / 备注家长姓名" />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title={obsChild ? `为 ${obsChild.name} 上传评估报告` : ""}
+        open={!!obsChild} okText="上传" cancelText="取消" destroyOnClose
+        onOk={onUploadObservation} onCancel={() => setObsChild(null)}
+      >
+        <Upload
+          listType="picture-card" fileList={obsFileList}
+          beforeUpload={() => false}
+          onChange={({ fileList: fl }) => setObsFileList(fl.slice(0, 9))}
+          accept=".png,.jpg,.jpeg"
+        >
+          {obsFileList.length < 9 ? "+ 图片" : null}
+        </Upload>
+        <Input.TextArea
+          rows={2} style={{ marginTop: 12 }} value={obsRemark}
+          onChange={(e) => setObsRemark(e.target.value)}
+          placeholder="评估备注（如：第一阶段听力优秀）"
+        />
       </Modal>
 
       <Drawer
