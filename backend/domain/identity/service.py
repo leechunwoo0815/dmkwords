@@ -126,7 +126,7 @@ class OrderService:
         self.db = db
 
     def _config_decimal(self, key: str) -> Decimal:
-        from backend.domain.admin.service import ConfigService
+        from backend.common.config_service import ConfigService
 
         return Decimal(ConfigService(self.db).get_value(key))
 
