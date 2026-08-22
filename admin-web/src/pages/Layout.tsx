@@ -2,6 +2,7 @@ import {
   AuditOutlined,
   BookOutlined,
   TeamOutlined,
+  WalletOutlined,
   DashboardOutlined,
   SettingOutlined,
 } from "@ant-design/icons";
@@ -21,6 +22,7 @@ export default function Layout() {
     { key: "/", icon: <DashboardOutlined />, label: "仪表盘", perm: "dashboard.view" },
     { key: "/books", icon: <BookOutlined />, label: "图书管理", perm: "book.manage" },
     { key: "/members", icon: <TeamOutlined />, label: "会员管理", perm: "member.manage" },
+    { key: "/deposits", icon: <WalletOutlined />, label: "押金与赔偿", perm: "member.manage" },
     { key: "/configs", icon: <SettingOutlined />, label: "系统配置", perm: "config.view" },
     { key: "/audit-logs", icon: <AuditOutlined />, label: "审计日志", perm: "audit.view" },
   ].filter((item) => hasPermission(permissions, item.perm));

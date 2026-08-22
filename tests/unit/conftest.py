@@ -17,6 +17,8 @@ ADMIN_TABLES = [
     "quiz_questions",
     "book_copies",
     "books",
+    "deposit_ledgers",
+    "deposits",
     "orders",
     "children",
     "parents",

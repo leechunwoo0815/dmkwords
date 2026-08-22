@@ -438,6 +438,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/deposits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Deposits */
+        get: operations["list_deposits_api_admin_deposits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/deposits/children/{child_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Deposit */
+        get: operations["get_deposit_api_admin_deposits_children__child_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/deposits/children/{child_id}/ledgers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Deposit Ledgers */
+        get: operations["get_deposit_ledgers_api_admin_deposits_children__child_id__ledgers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/deposits/children/{child_id}/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Deposit Order */
+        post: operations["create_deposit_order_api_admin_deposits_children__child_id__orders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/deposits/children/{child_id}/supplement-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Supplement Order */
+        post: operations["create_supplement_order_api_admin_deposits_children__child_id__supplement_orders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/deposits/children/{child_id}/deduct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deduct Deposit */
+        post: operations["deduct_deposit_api_admin_deposits_children__child_id__deduct_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -710,6 +812,68 @@ export interface components {
             /** Created At */
             created_at: string;
         };
+        /** DeductRequest */
+        DeductRequest: {
+            /**
+             * Amount
+             * @description 赔偿金额（元）
+             */
+            amount: string;
+            /**
+             * Reason
+             * @description 事由（关联图书等，留痕）
+             */
+            reason: string;
+            /**
+             * Copy Id
+             * @description 关联副本ID
+             */
+            copy_id?: number | null;
+        };
+        /** DepositLedgerResponse */
+        DepositLedgerResponse: {
+            /** Id */
+            id: number;
+            /** Entry Type */
+            entry_type: string;
+            /** Amount */
+            amount: string;
+            /** Balance After */
+            balance_after: string;
+            /** Reason */
+            reason: string;
+            /** Related Copy Id */
+            related_copy_id: number | null;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+        };
+        /** DepositResponse */
+        DepositResponse: {
+            /** Id */
+            id: number;
+            /** Child Id */
+            child_id: number;
+            /**
+             * Child Name
+             * @default
+             */
+            child_name: string;
+            /** Amount */
+            amount: string;
+            /** Available Amount */
+            available_amount: string;
+            /** Deducted Amount */
+            deducted_amount: string;
+            /** Supplemented Total */
+            supplemented_total: string;
+            /** Status */
+            status: string;
+            /** Unpaid Balance */
+            unpaid_balance: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -877,6 +1041,38 @@ export interface components {
              * @description 数据列表
              */
             items?: components["schemas"]["ChildWithParentResponse"][];
+            /**
+             * Total
+             * @description 总数
+             * @default 0
+             */
+            total: number;
+            /**
+             * Page
+             * @description 当前页码
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @description 每页数量
+             * @default 20
+             */
+            page_size: number;
+            /**
+             * Has Next
+             * @description 是否有下一页
+             * @default false
+             */
+            has_next: boolean;
+        };
+        /** PaginatedResponse[DepositResponse] */
+        PaginatedResponse_DepositResponse_: {
+            /**
+             * Items
+             * @description 数据列表
+             */
+            items?: components["schemas"]["DepositResponse"][];
             /**
              * Total
              * @description 总数
@@ -2015,6 +2211,199 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_deposits_api_admin_deposits_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                status?: string | null;
+                keyword?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedResponse_DepositResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_deposit_api_admin_deposits_children__child_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositResponse"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_deposit_ledgers_api_admin_deposits_children__child_id__ledgers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositLedgerResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_deposit_order_api_admin_deposits_children__child_id__orders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_supplement_order_api_admin_deposits_children__child_id__supplement_orders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deduct_deposit_api_admin_deposits_children__child_id__deduct_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeductRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositResponse"];
                 };
             };
             /** @description Validation Error */

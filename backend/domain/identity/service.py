@@ -239,6 +239,13 @@ class OrderService:
             child.member_expire = base + timedelta(days=365)
         elif order.order_type == Order.TYPE_FIRST_ACTIVITY:
             child = None  # 99 元不开会员（获客单）
+        else:
+            child = None  # 活动费：不动会员状态
+            # 押金类订单联动押金账户（billing 域；同进程同事务）
+            if order.order_type in (Order.TYPE_DEPOSIT, Order.TYPE_DEPOSIT_SUPPLEMENT):
+                from backend.domain.billing.service import DepositService
+
+                DepositService(self.db).on_deposit_order_paid(admin, order)
 
         publish_audit(
             self.db,
