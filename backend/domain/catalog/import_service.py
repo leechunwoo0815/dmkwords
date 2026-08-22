@@ -4,14 +4,12 @@
 from __future__ import annotations
 
 import io
-import json
 import re
 
 from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
-from backend.domain.admin.models import AuditLog
-from backend.domain.admin.repository import AuditLogRepository
+from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.catalog.models import Book, BookCopy
 from backend.domain.catalog.repository import BookCopyRepository, BookRepository
 
@@ -48,7 +46,6 @@ def import_books(db: Session, admin, file_bytes: bytes) -> dict:
     ws = wb.active
     book_repo = BookRepository(db)
     copy_repo = BookCopyRepository(db)
-    audit_repo = AuditLogRepository(db)
 
     errors: list[str] = []
     success = 0
@@ -132,23 +129,18 @@ def import_books(db: Session, admin, file_bytes: bytes) -> dict:
         success += 1
 
     if created_books or added_copies:
-        audit_repo.create(
-            AuditLog(
-                actor_id=admin.id,
-                actor_name=admin.display_name or admin.username,
-                action="book.import",
-                target_type="book",
-                target_id="batch",
-                detail=json.dumps(
-                    {
-                        "created": len(created_books),
-                        "copies_added": len(added_copies),
-                        "failed": len(errors),
-                    },
-                    ensure_ascii=False,
-                ),
-                reason="Excel 批量导入",
-            )
+        publish_audit(
+            db,
+            admin=admin,
+            action="book.import",
+            target_type="book",
+            target_id="batch",
+            detail={
+                "created": len(created_books),
+                "copies_added": len(added_copies),
+                "failed": len(errors),
+            },
+            reason="Excel 批量导入",
         )
     db.commit()
     wb.close()

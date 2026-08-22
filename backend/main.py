@@ -30,8 +30,11 @@ def health() -> dict:
     return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
 
 
+from backend.domain.admin.audit_handlers import register_audit_handlers  # noqa: E402
 from backend.domain.admin.router import router as admin_router  # noqa: E402
 from backend.domain.catalog.router import router as catalog_router  # noqa: E402
+
+register_audit_handlers()
 
 app.include_router(admin_router, prefix="/api/admin")
 app.include_router(catalog_router, prefix="/api/admin")

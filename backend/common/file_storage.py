@@ -7,7 +7,6 @@ import os
 import struct
 
 from backend.config import get_settings
-from backend.domain.catalog.models import Book
 
 ALLOWED_COVER_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
@@ -18,7 +17,7 @@ def _uploads_root() -> str:
     return root
 
 
-def save_cover_jpg(book: Book, data: bytes, ext: str) -> str:
+def save_cover_jpg(book, data: bytes, ext: str) -> str:
     """封面存储：统一转 JPG（Pillow）；路径 cover/{isbn前4位}/{code}.jpg；无 ISBN 走 local/。"""
     ext = ext.lower()
     if ext and ext not in ALLOWED_COVER_EXTS:
@@ -84,7 +83,7 @@ def _mp3_duration(data: bytes) -> int:
     return 0
 
 
-def save_audio_mp3(book: Book, data: bytes) -> int:
+def save_audio_mp3(book, data: bytes) -> int:
     """音频存储：book_audio/{code}/audio.mp3；返回时长（秒）。"""
     rel = os.path.join("book_audio", book.book_code, "audio.mp3")
     abs_path = os.path.join(_uploads_root(), rel)

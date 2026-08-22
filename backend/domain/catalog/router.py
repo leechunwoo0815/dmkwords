@@ -1,5 +1,6 @@
 # backend/domain/catalog/router.py — 图书资产 API
 import os
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import FileResponse
@@ -8,7 +9,10 @@ from sqlalchemy.orm import Session
 from backend.common.base_schema import PaginatedResponse
 from backend.config import get_settings
 from backend.database import get_db
-from backend.domain.admin.models import AdminUser
+
+if TYPE_CHECKING:
+    pass
+
 from backend.domain.catalog.import_service import import_books
 from backend.domain.catalog.schemas import (
     BookCreateRequest,
@@ -53,7 +57,7 @@ def list_books(
     keyword: str | None = Query(None),
     ar_pending: bool = Query(False),
     status: int | None = Query(None),
-    admin: AdminUser = Depends(require_perm("book.manage")),
+    admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
     books, counts, total = BookService(db).list_books(page, page_size, keyword, ar_pending, status)
@@ -68,7 +72,7 @@ def list_books(
 @router.post("/books", response_model=BookResponse)
 def create_book(
     body: BookCreateRequest,
-    admin: AdminUser = Depends(require_perm("book.manage")),
+    admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
     book = BookService(db).create_book(admin, body)
@@ -78,7 +82,7 @@ def create_book(
 @router.get("/books/{book_id}", response_model=BookResponse)
 def get_book(
     book_id: int,
-    admin: AdminUser = Depends(require_perm("book.manage")),
+    admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
     book, copies = BookService(db).get_book(book_id)
@@ -89,7 +93,7 @@ def get_book(
 def update_book(
     book_id: int,
     body: BookUpdateRequest,
-    admin: AdminUser = Depends(require_perm("book.manage")),
+    admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
     book = BookService(db).update_book(admin, book_id, body)
@@ -101,7 +105,7 @@ def update_book(
 def add_copies(
     book_id: int,
     count: int = Query(..., ge=1, le=99),
-    admin: AdminUser = Depends(require_perm("book.manage")),
+    admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
     copies = BookService(db).add_copies(admin, book_id, count)
@@ -111,7 +115,7 @@ def add_copies(
 @router.get("/books/{book_id}/copies", response_model=list[CopyResponse])
 def list_copies(
     book_id: int,
-    admin: AdminUser = Depends(require_perm("book.manage")),
+    admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
     _, copies = BookService(db).get_book(book_id)
@@ -121,7 +125,7 @@ def list_copies(
 @router.post("/books/{book_id}/toggle-status", response_model=BookResponse)
 def toggle_book_status(
     book_id: int,
-    admin: AdminUser = Depends(require_perm("book.manage")),
+    admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
     book = BookService(db).toggle_status(admin, book_id)
@@ -133,7 +137,7 @@ def toggle_book_status(
 def update_copy_status(
     copy_id: int,
     body: CopyStatusUpdateRequest,
-    admin: AdminUser = Depends(require_perm("book.manage")),
+    admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
     copy = BookService(db).update_copy_status(admin, copy_id, body.status, body.reason)
@@ -144,7 +148,7 @@ def update_copy_status(
 async def upload_cover(
     book_id: int,
     file: UploadFile = File(...),
-    admin: AdminUser = Depends(require_perm("book.manage")),
+    admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
     data = await file.read()
@@ -157,7 +161,7 @@ async def upload_cover(
 async def upload_audio(
     book_id: int,
     file: UploadFile = File(...),
-    admin: AdminUser = Depends(require_perm("audio.manage")),
+    admin: Any = Depends(require_perm("audio.manage")),
     db: Session = Depends(get_db),
 ):
     data = await file.read()
@@ -168,7 +172,7 @@ async def upload_audio(
 @router.post("/books/import", response_model=ImportResultResponse)
 async def import_books_excel(
     file: UploadFile = File(...),
-    admin: AdminUser = Depends(require_perm("book.manage")),
+    admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
     data = await file.read()
@@ -177,7 +181,7 @@ async def import_books_excel(
 
 
 @router.get("/uploads/{path:path}")
-def serve_upload(path: str, admin: AdminUser = Depends(require_perm("book.manage"))):
+def serve_upload(path: str, admin: Any = Depends(require_perm("book.manage"))):
     """上传文件访问（鉴权下发；封面后续小程序端另行开放只读路由）。"""
     root = os.path.abspath(get_settings().UPLOADS_DIR)
     full = os.path.abspath(os.path.join(root, path))
@@ -196,7 +200,7 @@ def serve_upload(path: str, admin: AdminUser = Depends(require_perm("book.manage
 @router.get("/books/{book_id}/questions", response_model=list[QuizQuestionResponse])
 def list_questions(
     book_id: int,
-    admin: AdminUser = Depends(require_perm("quiz.manage")),
+    admin: Any = Depends(require_perm("quiz.manage")),
     db: Session = Depends(get_db),
 ):
     questions = QuizQuestionService(db).list_by_book(book_id)
@@ -207,7 +211,7 @@ def list_questions(
 def create_question(
     book_id: int,
     body: QuizQuestionCreateRequest,
-    admin: AdminUser = Depends(require_perm("quiz.manage")),
+    admin: Any = Depends(require_perm("quiz.manage")),
     db: Session = Depends(get_db),
 ):
     q = QuizQuestionService(db).create(admin, book_id, body)
@@ -217,7 +221,7 @@ def create_question(
 @router.post("/questions/{question_id}/toggle-active", response_model=QuizQuestionResponse)
 def toggle_question(
     question_id: int,
-    admin: AdminUser = Depends(require_perm("quiz.manage")),
+    admin: Any = Depends(require_perm("quiz.manage")),
     db: Session = Depends(get_db),
 ):
     q = QuizQuestionService(db).toggle_active(admin, question_id)
@@ -227,7 +231,7 @@ def toggle_question(
 @router.delete("/questions/{question_id}")
 def delete_question(
     question_id: int,
-    admin: AdminUser = Depends(require_perm("quiz.manage")),
+    admin: Any = Depends(require_perm("quiz.manage")),
     db: Session = Depends(get_db),
 ):
     QuizQuestionService(db).delete(admin, question_id)

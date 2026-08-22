@@ -10,8 +10,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from backend.common.exceptions import ConflictError, ValidationError
-from backend.domain.admin.models import AuditLog
-from backend.domain.admin.repository import AuditLogRepository
+from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.catalog.models import Book, BookCopy, QuizQuestion
 from backend.domain.catalog.repository import (
     BookCopyRepository,
@@ -28,7 +27,6 @@ class BookService:
         self.db = db
         self.book_repo = BookRepository(db)
         self.copy_repo = BookCopyRepository(db)
-        self.audit_repo = AuditLogRepository(db)
 
     def _max_copy_seq(self, book: Book) -> int:
         prefix = f"C{(book.isbn or book.internal_code or 'BK')[-8:]}-"
@@ -46,16 +44,14 @@ class BookService:
         return best
 
     def _audit(self, admin, action: str, target: str, detail: dict, reason: str = "") -> None:
-        self.audit_repo.create(
-            AuditLog(
-                actor_id=admin.id,
-                actor_name=admin.display_name or admin.username,
-                action=action,
-                target_type="book",
-                target_id=target,
-                detail=json.dumps(detail, ensure_ascii=False),
-                reason=reason or "图书管理",
-            )
+        publish_audit(
+            self.db,
+            admin=admin,
+            action=action,
+            target_type="book",
+            target_id=target,
+            detail=detail,
+            reason=reason or "图书管理",
         )
 
     def list_books(
@@ -214,7 +210,6 @@ class QuizQuestionService:
     def __init__(self, db: Session):
         self.db = db
         self.question_repo = QuizQuestionRepository(db)
-        self.audit_repo = AuditLogRepository(db)
 
     def list_by_book(self, book_id: int) -> list[QuizQuestion]:
         return self.question_repo.list_by_book(book_id, active_only=False)
