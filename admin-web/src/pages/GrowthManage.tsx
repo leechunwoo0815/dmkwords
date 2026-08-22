@@ -1,14 +1,15 @@
 // 成长与测验管理（WM7：词数流水/积分明细/测验重置/积分调整/等级重算）
 import { useCallback, useEffect, useState } from "react";
 import {
-  App as AntdApp, Button, Descriptions, Drawer, Form, Input, InputNumber,
+  App as AntdApp, Button, Descriptions, Drawer, Form, Image, Input, InputNumber,
   Modal, Space, Table, Tabs, Tag, Typography,
 } from "antd";
 
 import {
-  apiAdjustPoints, apiCheckMilestones, apiGetChildGrowth,
-  apiRecalcLevels, apiResetQuizAttempts, type ChildGrowth,
+  apiAdjustPoints, apiCheckMilestones, apiGenerateReport, apiGetChildGrowth,
+  apiRecalcLevels, apiResetQuizAttempts, type ChildGrowth, type ReportData,
 } from "../api/growth";
+import { getToken } from "../api/client";
 import { apiListChildren, type Child } from "../api/members";
 
 const REASON_LABEL: Record<string, string> = {
@@ -28,6 +29,8 @@ export default function GrowthManage() {
   const [resetTarget, setResetTarget] = useState<{ book_id: number; title: string } | null>(null);
   const [adjustForm] = Form.useForm();
   const [resetForm] = Form.useForm();
+  const [report, setReport] = useState<{ url: string; data: ReportData } | null>(null);
+  const [reportUrl, setReportUrl] = useState<string>("");
 
   const load = useCallback(() => {
     apiListChildren({ page: 1, page_size: 50, keyword: keyword || undefined })
@@ -70,6 +73,23 @@ export default function GrowthManage() {
       setResetTarget(null);
       resetForm.resetFields();
       openGrowth(growChild!);
+    } catch (e) {
+      message.error((e as Error).message);
+    }
+  };
+
+  const onGenerateReport = async (kind: "weekly" | "monthly") => {
+    try {
+      const r = await apiGenerateReport(growChild!.id, kind);
+      // uploads 需鉴权头，img 标签带不了 → blob + objectURL
+      const token = getToken();
+      const res = await fetch(r.url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!res.ok) throw new Error("报告图片加载失败");
+      const blob = await res.blob();
+      if (reportUrl) URL.revokeObjectURL(reportUrl);
+      const url = URL.createObjectURL(blob);
+      setReportUrl(url);
+      setReport({ url, data: r.data });
     } catch (e) {
       message.error((e as Error).message);
     }
@@ -159,9 +179,11 @@ export default function GrowthManage() {
                   : "暂无"}
               </Descriptions.Item>
             </Descriptions>
-            <Space style={{ marginBottom: 16 }}>
+            <Space style={{ marginBottom: 16 }} wrap>
               <Button size="small" onClick={() => setAdjustOpen(true)}>积分人工调整</Button>
               <Button size="small" onClick={onCheckMilestones}>里程碑核对补发</Button>
+              <Button size="small" onClick={() => onGenerateReport("weekly")}>生成周报图片</Button>
+              <Button size="small" onClick={() => onGenerateReport("monthly")}>生成月报图片</Button>
             </Space>
 
             <Tabs
@@ -223,6 +245,24 @@ export default function GrowthManage() {
           </>
         )}
       </Drawer>
+
+      <Modal
+        title={report ? `${report.data.child_name} 的${report.data.kind === "weekly" ? "周报" : "月报"}` : "报告"}
+        open={!!report} footer={null} width={480}
+        onCancel={() => setReport(null)}
+      >
+        {report && (
+          <>
+            <Typography.Paragraph type="secondary">
+              {report.data.period_label} · 读 {report.data.books} 本 · {report.data.words} 词 · 打卡 {report.data.checkin_days} 天
+            </Typography.Paragraph>
+            <Image src={report.url} width="100%" />
+            <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+              家长端小程序「报告」入口也可查看与保存。
+            </Typography.Paragraph>
+          </>
+        )}
+      </Modal>
 
       <Modal
         title="积分人工调整" open={adjustOpen} okText="确认调整" cancelText="取消" destroyOnClose

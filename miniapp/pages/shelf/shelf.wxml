@@ -1,4 +1,49 @@
-<view class="page-bg" style="min-height:100vh;display:flex;flex-direction:column;justify-content:center;">
-  <empty-state icon="📚" title="书架即将上线"
-    desc="收藏夹与想读清单将在后续模块开放，敬请期待" />
+<view class="page-bg" style="min-height:100vh;padding:24rpx;">
+  <view class="tabs">
+    <view class="tab-btn {{tab === 'borrowed' ? 'active' : ''}}" data-tab="borrowed" bindtap="onTab">
+      在借（{{borrows.length}}）
+    </view>
+    <view class="tab-btn {{tab === 'favorites' ? 'active' : ''}}" data-tab="favorites" bindtap="onTab">
+      收藏（{{favorites.length}}）
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" style="text-align:center;color:var(--muted);padding:60rpx;">加载中…</view>
+
+  <block wx:if="{{!loading && tab === 'borrowed'}}">
+    <view wx:if="{{!borrows.length}}" class="empty-state">
+      <view class="empty-emoji">📚</view>
+      <view class="empty-title">书架还是空的</view>
+      <view class="empty-desc">到店借书后会自动上架，到期时间一目了然</view>
+    </view>
+    <view wx:for="{{borrows}}" wx:key="record_id" class="book-row" data-book="{{item}}" bindtap="goDetail">
+      <view class="book-row-cover">{{item.has_audio ? '🎧' : '📘'}}</view>
+      <view class="book-row-info">
+        <view class="br-title">{{item.title}}</view>
+        <view class="br-meta">
+          <text wx:if="{{item.overdue}}" style="color:var(--error);">已逾期 · {{item.due_at}}</text>
+          <text wx:else>应还 {{item.due_at}}</text>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <block wx:if="{{!loading && tab === 'favorites'}}">
+    <view wx:if="{{!favorites.length}}" class="empty-state">
+      <view class="empty-emoji">⭐</view>
+      <view class="empty-title">收藏夹是空的</view>
+      <view class="empty-desc">在书籍详情页点「收藏」，标记想读的书（不占借阅额度）</view>
+    </view>
+    <view wx:for="{{favorites}}" wx:key="id" class="book-row">
+      <view class="book-row-cover">{{item.off_shelf ? '📦' : '⭐'}}</view>
+      <view class="book-row-info" data-book="{{item}}" bindtap="goDetail">
+        <view class="br-title">{{item.title}}{{item.off_shelf ? '（已下架）' : ''}}</view>
+        <view class="br-meta">
+          <text>{{item.word_count}} 词</text>
+          <text wx:if="{{item.ar_level}}"> · AR {{item.ar_level}}</text>
+        </view>
+      </view>
+      <view class="card-remove-btn" data-id="{{item.book_id}}" catchtap="onCancelFav">取消</view>
+    </view>
+  </block>
 </view>

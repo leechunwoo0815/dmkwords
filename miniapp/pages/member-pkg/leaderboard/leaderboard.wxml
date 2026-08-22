@@ -1,0 +1,36 @@
+<view class="page-bg" style="min-height:100vh;">
+  <view class="period-tabs" wx:if="{{board}}">
+    <view wx:for="{{periods}}" wx:key="key"
+      class="period-tab {{period === item.key ? 'active' : ''}}"
+      data-key="{{item.key}}" bindtap="onPeriod">{{item.label}}</view>
+  </view>
+
+  <view class="rules-card" wx:if="{{board}}">
+    <view class="rules-title">{{board.title}}</view>
+    <view class="rules-text" wx:if="{{period === 'progress'}}">本周比上周多读 ≥ {{board.progress_min_increment}} 词才上榜；只展示进步的孩子</view>
+    <view class="rules-text" wx:elif="{{period === 'total'}}">历史荣誉榜：已过期/已退会的孩子以"历史学员"身份留榜</view>
+    <view class="rules-text" wx:else>仅展示当前有效会员；英文名/昵称展示，保护隐私</view>
+  </view>
+
+  <view wx:if="{{loading}}" style="text-align:center;color:var(--muted);padding:40rpx;">加载中…</view>
+
+  <view class="rank-list" wx:if="{{board && board.entries.length}}">
+    <view wx:for="{{board.entries}}" wx:key="child_id"
+      class="rank-item {{item.is_me ? 'rank-item-me' : ''}}">
+      <view class="rank-num">{{index + 1}}</view>
+      <view class="rank-avatar">{{item.is_history ? '👤' : '🧒'}}</view>
+      <view class="rank-info">
+        <view class="rank-name">
+          {{item.name}}
+          <text wx:if="{{item.is_me}}" style="color:var(--accent);font-size:22rpx;margin-left:8rpx;">（我）</text>
+          <text wx:if="{{item.is_history}}" style="color:var(--muted);font-size:22rpx;margin-left:8rpx;">历史学员</text>
+        </view>
+        <view class="rank-words">{{item.words}} 词</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{board && !board.entries.length && !loading}}" style="text-align:center;color:var(--muted);padding:80rpx 40rpx;">
+    本期还没有孩子上榜\n继续听书测验，第一名就是你！
+  </view>
+</view>

@@ -16,7 +16,13 @@ from backend.common.exceptions import UnauthorizedError, ValidationError
 from backend.database import get_db
 from backend.domain.catalog.models import Book
 from backend.domain.identity.models import Child, Parent
-from backend.domain.reading.service import ReadingService, ReservationService
+from backend.domain.reading.service import (
+    FavoriteService,
+    ReadingService,
+    ReservationService,
+    ShelfService,
+    VocabularyService,
+)
 
 router = APIRouter(tags=["miniapp"])
 
@@ -221,3 +227,80 @@ def book_cover(book_id: int, auth: Any = Depends(get_current_parent)):
 
         raise NotFoundError("封面不存在")
     return FileResponse(full)
+
+
+# ---------- 生词本与查词（WM8） ----------
+
+
+def _child_of_parent(db: Session, parent_id: int, child_id: int) -> Child:
+    child = (
+        db.query(Child)
+        .filter(Child.id == child_id, Child.parent_id == parent_id, Child.is_deleted == 0)
+        .first()
+    )
+    if not child:
+        raise ValidationError("孩子不存在")
+    return child
+
+
+@router.get("/vocabulary/lookup")
+def vocabulary_lookup(
+    word: str,
+    child_id: int,
+    book_id: int | None = None,
+    auth: Any = Depends(get_current_parent),
+):
+    """查词（命中自动进生词本；播放页下半屏查询不中断音频）。"""
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, child_id)
+    return VocabularyService(db).lookup(child, word, book_id)
+
+
+@router.get("/vocabulary")
+def vocabulary_list(child_id: int, auth: Any = Depends(get_current_parent)):
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, child_id)
+    return VocabularyService(db).list_words(child)
+
+
+@router.delete("/vocabulary/{vocabulary_id}")
+def vocabulary_remove(vocabulary_id: int, child_id: int, auth: Any = Depends(get_current_parent)):
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, child_id)
+    VocabularyService(db).remove(child, vocabulary_id)
+    return {"detail": "已删除"}
+
+
+# ---------- 收藏夹（WM8） ----------
+
+
+@router.get("/favorites")
+def favorites_list(child_id: int, auth: Any = Depends(get_current_parent)):
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, child_id)
+    return FavoriteService(db).list_mine(child)
+
+
+@router.post("/favorites")
+def favorites_add(body: dict, auth: Any = Depends(get_current_parent)):
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, int(body.get("child_id") or 0))
+    return FavoriteService(db).add(child, int(body.get("book_id") or 0))
+
+
+@router.delete("/favorites/{book_id}")
+def favorites_remove(book_id: int, child_id: int, auth: Any = Depends(get_current_parent)):
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, child_id)
+    FavoriteService(db).remove(child, book_id)
+    return {"detail": "已取消收藏"}
+
+
+# ---------- 书架（当前在借，WM8） ----------
+
+
+@router.get("/borrows")
+def current_borrows(child_id: int, auth: Any = Depends(get_current_parent)):
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, child_id)
+    return ShelfService(db).current_borrows(child)

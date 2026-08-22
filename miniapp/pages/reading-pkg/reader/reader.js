@@ -16,6 +16,10 @@ function fmt(sec) {
 Page({
   data: {
     book: null,
+    dictWord: '',
+    dictResult: null,
+    dictError: '',
+    showDict: false,
     childId: null,
     childName: '',
     playing: false,
@@ -220,5 +224,33 @@ Page({
 
   onCloseCompletion() {
     this.setData({ showCompletion: false })
+  },
+
+  // ---------- 查词（WM8：上半屏播放不受影响） ----------
+  onDictInput(e) {
+    this.setData({ dictWord: e.detail.value })
+  },
+
+  async onDictSearch() {
+    const w = (this.data.dictWord || '').trim()
+    if (!w) return
+    try {
+      const r = await api.lookupWord(w, this.data.childId, this.data.book.id)
+      this.setData({
+        dictResult: r,
+        dictError: '',
+        showDict: true,
+      })
+    } catch (e) {
+      this.setData({
+        dictResult: null,
+        dictError: (e && e.message) || '查询失败',
+        showDict: true,
+      })
+    }
+  },
+
+  onToggleDict() {
+    this.setData({ showDict: !this.data.showDict })
   },
 })

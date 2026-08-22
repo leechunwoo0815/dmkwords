@@ -1,0 +1,24 @@
+<view class="page-bg" style="min-height:100vh;padding:24rpx;">
+  <view style="font-size:28rpx;color:var(--muted);margin-bottom:20rpx;">
+    {{childName}} 的生词本 · 听书时查过的词自动记录，配合原书语境复习
+  </view>
+
+  <view wx:if="{{loading}}" class="loading">加载中…</view>
+
+  <view wx:if="{{!loading && !words.length}}" class="empty-state">
+    <view class="empty-icon">📖</view>
+    <view style="color:var(--muted);">还没有生词，播放页下半屏查词会自动收录</view>
+  </view>
+
+  <view class="word-list" wx:if="{{words.length}}">
+    <view wx:for="{{words}}" wx:key="id" class="word-item">
+      <view class="word-main">
+        <text class="word-tag" wx:if="{{item.source_title}}">{{item.source_title}}</text>
+        <text>{{item.word}}</text>
+      </view>
+      <view class="word-actions">
+        <text class="action-btn" data-id="{{item.id}}" data-word="{{item.word}}" bindtap="onRemove">删除</text>
+      </view>
+    </view>
+  </view>
+</view>

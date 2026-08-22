@@ -1,7 +1,7 @@
 # backend/domain/reading/models.py — 播放进度 / 打卡 / 预约
 from datetime import datetime
 
-from sqlalchemy import Column, Date, DateTime, Integer, String, Text
+from sqlalchemy import Column, Date, DateTime, Index, Integer, String, Text
 
 from backend.common.base_model import BaseModel
 
@@ -63,3 +63,37 @@ class Reservation(BaseModel):
     copy_id = Column(Integer, nullable=False)
     expires_at = Column(DateTime, nullable=False, comment="锁定截止（72h）")
     status = Column(String(20), nullable=False, default=STATUS_ACTIVE, index=True)
+
+
+class DictionaryWord(BaseModel):
+    """词典（FEAT-055：精确查询；全量 ECDICT 后续导入，结构已对齐）。"""
+
+    __tablename__ = "dictionary_words"
+
+    word = Column(String(64), nullable=False, index=True, comment="词条（小写）")
+    phonetic = Column(String(128), nullable=True, comment="音标")
+    definition = Column(Text, nullable=True, comment="英文释义")
+    translation = Column(Text, nullable=True, comment="中文翻译")
+
+
+class Vocabulary(BaseModel):
+    """生词本（查词自动收录；同词唯一；记来源书目）。"""
+
+    __tablename__ = "vocabularies"
+    __table_args__ = (Index("uq_vocab_child_word", "child_id", "word", unique=True),)
+
+    child_id = Column(Integer, nullable=False, index=True)
+    word = Column(String(64), nullable=False, comment="单词")
+    book_id = Column(Integer, nullable=True, comment="来源书目（查词时正在听的书）")
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+
+
+class Favorite(BaseModel):
+    """收藏夹（想读清单；纯标记不占额度；任何状态可用）。"""
+
+    __tablename__ = "favorites"
+    __table_args__ = (Index("uq_fav_child_book", "child_id", "book_id", unique=True),)
+
+    child_id = Column(Integer, nullable=False, index=True)
+    book_id = Column(Integer, nullable=False, comment="书目")
+    created_at = Column(DateTime, nullable=False, default=datetime.now)

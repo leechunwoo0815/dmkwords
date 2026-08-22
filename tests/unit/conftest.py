@@ -14,6 +14,9 @@ from backend.domain.admin.service import invalidate_config_cache
 from backend.main import app
 
 ADMIN_TABLES = [
+    "vocabularies",
+    "favorites",
+    "dictionary_words",
     "checkin_streak_awards",
     "milestone_awards",
     "child_growth_states",
@@ -46,9 +49,11 @@ def clean_db():
             conn.execute(text(f"TRUNCATE TABLE {table}"))
     from backend.seeds.seed_admin import seed as seed_admin
     from backend.seeds.seed_configs import seed as seed_configs
+    from backend.seeds.seed_dictionary import seed as seed_dictionary
 
     seed_admin()
     seed_configs()
+    seed_dictionary()
     invalidate_config_cache()
     yield
 

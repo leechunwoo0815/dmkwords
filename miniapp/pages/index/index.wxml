@@ -54,6 +54,16 @@
         <view class="entry-title">等级勋章</view>
         <view class="entry-desc">词数 · 积分</view>
       </view>
+      <view class="entry-item" bindtap="goLeaderboard">
+        <view class="entry-icon-wrap"><text class="entry-icon">🏅</text></view>
+        <view class="entry-title">排行榜</view>
+        <view class="entry-desc">五榜 · 进步可见</view>
+      </view>
+      <view class="entry-item" bindtap="goPassport">
+        <view class="entry-icon-wrap"><text class="entry-icon">🪪</text></view>
+        <view class="entry-title">阅读护照</view>
+        <view class="entry-desc">成长档案</view>
+      </view>
     </view>
   </view>
 </view>

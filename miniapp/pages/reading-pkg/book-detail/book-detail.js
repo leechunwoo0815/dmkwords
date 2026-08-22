@@ -42,6 +42,15 @@ Page({
     finally { this.setData({ reserving: false }) }
   },
 
+  async onFav() {
+    const { book, childId } = this.data
+    if (!childId) { wx.showToast({ title: '请先选择孩子', icon: 'none' }); return }
+    try {
+      await api.addFavorite(childId, book.id)
+      wx.showToast({ title: '已加入收藏夹（想读）', icon: 'none' })
+    } catch (e) { /* toast 已弹（重复收藏等） */ }
+  },
+
   onQuiz() {
     const { book, childId, childName, progress } = this.data
     if (!childId) { wx.showToast({ title: '请先选择孩子', icon: 'none' }); return }

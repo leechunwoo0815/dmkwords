@@ -44,6 +44,47 @@ module.exports = {
     return req.get('/api/miniapp/points', null, { params: { child_id: childId } })
   },
 
+  // 榜单 / 护照 / 报告（WM8）
+  leaderboard(period, childId) {
+    return req.get('/api/miniapp/leaderboard', null, { params: { period, child_id: childId } })
+  },
+  passport(childId) {
+    return req.get('/api/miniapp/passport', null, { params: { child_id: childId } })
+  },
+  report(kind, childId) {
+    return req.get(`/api/miniapp/reports/${kind}`, null, { params: { child_id: childId } })
+  },
+  reportImageUrl(kind, childId) {
+    const token = wx.getStorageSync('token')
+    const app = getApp()
+    return `${app.globalData.baseURL}/api/miniapp/reports/${kind}/image?child_id=${childId}&token=${encodeURIComponent(token)}`
+  },
+
+  // 生词本 / 收藏 / 书架（WM8）
+  lookupWord(word, childId, bookId) {
+    return req.get('/api/miniapp/vocabulary/lookup', null, {
+      params: { word, child_id: childId, book_id: bookId || '' },
+    })
+  },
+  listVocabulary(childId) {
+    return req.get('/api/miniapp/vocabulary', null, { params: { child_id: childId } })
+  },
+  removeVocabulary(id, childId) {
+    return req.del(`/api/miniapp/vocabulary/${id}`, null, { params: { child_id: childId } })
+  },
+  listFavorites(childId) {
+    return req.get('/api/miniapp/favorites', null, { params: { child_id: childId } })
+  },
+  addFavorite(childId, bookId) {
+    return req.post('/api/miniapp/favorites', { child_id: childId, book_id: bookId })
+  },
+  removeFavorite(bookId, childId) {
+    return req.del(`/api/miniapp/favorites/${bookId}`, null, { params: { child_id: childId } })
+  },
+  currentBorrows(childId) {
+    return req.get('/api/miniapp/borrows', null, { params: { child_id: childId } })
+  },
+
   // 打卡
   getCheckins(childId, days) {
     return req.get('/api/miniapp/checkins', null, { params: { child_id: childId, days: days || 60 } })

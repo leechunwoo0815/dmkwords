@@ -14,7 +14,8 @@
         "reader/reader",
         "book-detail/book-detail",
         "quiz/quiz",
-        "quiz-result/quiz-result"
+        "quiz-result/quiz-result",
+        "vocabulary/vocabulary"
       ]
     },
     {
@@ -22,7 +23,9 @@
       "name": "member-pkg",
       "pages": [
         "checkin/checkin",
-        "achievement/achievement"
+        "achievement/achievement",
+        "leaderboard/leaderboard",
+        "profile-card/profile-card"
       ]
     },
     {
@@ -98,4 +101,4 @@
     "empty-state": "/components/empty-state/empty-state",
     "loading-skeleton": "/components/loading-skeleton/loading-skeleton"
   }
-}\n
+}

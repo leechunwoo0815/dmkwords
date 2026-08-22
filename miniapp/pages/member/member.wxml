@@ -33,6 +33,14 @@
         <text class="fi-icon">🏆</text>
         <text class="fi-label">等级勋章</text>
       </view>
+      <view class="func-item" bindtap="goLeaderboard">
+        <text class="fi-icon">🏅</text>
+        <text class="fi-label">排行榜</text>
+      </view>
+      <view class="func-item" bindtap="goPassport">
+        <text class="fi-icon">🪪</text>
+        <text class="fi-label">阅读护照</text>
+      </view>
     </view>
   </view>
 

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
 from backend.database import get_db
+from backend.domain.growth.report_service import ReportAdminService
 from backend.domain.growth.service import GrowthService, QuizService
 from backend.middleware.admin_rbac import require_perm, require_super_admin
 
@@ -74,3 +75,14 @@ def check_milestones(
 ):
     """里程碑补发核对（节点配置调低后用）。"""
     return {"new_nodes": GrowthService(db).check_milestones_now(admin, child_id)}
+
+
+@router.post("/children/{child_id}/reports/{kind}/generate")
+def generate_report(
+    child_id: int,
+    kind: str,
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """生成周报/月报图片（管理端触发，走 uploads 静态下发）。"""
+    return ReportAdminService(db).generate_for_admin(admin, child_id, kind)

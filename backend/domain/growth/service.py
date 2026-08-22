@@ -215,9 +215,6 @@ class GrowthService:
         threshold = int(ConfigService(self.db).get_value("level_up_books"))
         letters = LEVEL_LETTERS
         level_idx = letters.index(state.level) if state.level in letters else 0
-        progress_in_level = (
-            state.books_total - (level_idx * threshold) if level_idx < len(letters) - 1 else 0
-        )
         nodes = [
             int(n)
             for n in ConfigService(self.db).get_value("milestone_nodes").split(",")
@@ -230,16 +227,32 @@ class GrowthService:
             .order_by(MilestoneAward.node_words)
             .all()
         ]
+        # 词数/本数/积分以流水为唯一事实源（避免 state 与 ledger 漂移）
+        agg = (
+            self.db.query(
+                func.coalesce(func.sum(WordsLedger.word_count), 0), func.count(WordsLedger.id)
+            )
+            .filter(WordsLedger.child_id == child.id, WordsLedger.is_deleted == 0)
+            .one()
+        )
+        words_total, books_total = int(agg[0]), int(agg[1])
+        points_total = (
+            self.db.query(func.coalesce(func.sum(PointLedger.points), 0))
+            .filter(PointLedger.child_id == child.id, PointLedger.is_deleted == 0)
+            .scalar()
+        )
         return {
             "child_id": child.id,
             "child_name": child.name,
-            "words_total": state.words_total,
-            "books_total": state.books_total,
-            "points_total": state.points_total,
+            "words_total": words_total,
+            "books_total": books_total,
+            "points_total": int(points_total),
             "words_remainder": state.words_remainder,
             "level": state.level,
             "level_books_threshold": threshold,
-            "progress_in_level": max(0, progress_in_level),
+            "progress_in_level": max(
+                0, books_total - (level_idx * threshold) if level_idx < len(letters) - 1 else 0
+            ),
             "milestone_nodes": nodes,
             "milestones_awarded": awarded_nodes,
             "is_z_capped": state.level == letters[-1],

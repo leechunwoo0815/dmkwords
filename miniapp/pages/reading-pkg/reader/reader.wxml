@@ -35,6 +35,24 @@
     </view>
   </view>
 
+  <!-- 查词（下半屏；音频不中断） -->
+  <view class="lookup-section">
+    <view class="dict-input-row">
+      <input class="dict-input" placeholder="遇到生词？输入查一查（自动进生词本）"
+        value="{{dictWord}}" bindinput="onDictInput" confirm-type="search" bindconfirm="onDictSearch" />
+      <view class="lookup-btn" bindtap="onDictSearch">查</view>
+    </view>
+    <view wx:if="{{showDict && dictResult}}" class="dict-result">
+      <view class="dr-word">{{dictResult.word}}</view>
+      <view class="dr-phonetic">{{dictResult.phonetic}}</view>
+      <view class="dr-def">{{dictResult.translation}}</view>
+      <view class="dr-def" style="color:var(--muted);font-size:22rpx;">{{dictResult.definition}}</view>
+    </view>
+    <view wx:if="{{showDict && dictError}}" class="dict-result">
+      <view class="dr-def" style="color:var(--error);">{{dictError}}</view>
+    </view>
+  </view>
+
   <view wx:if="{{showCompletion && completion}}" class="completion-overlay" catchtap="onCloseCompletion">
     <view class="completion-card" catchtap="onCloseCompletion">
       <view class="popup-emoji">🎉</view>

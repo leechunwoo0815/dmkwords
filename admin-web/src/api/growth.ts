@@ -75,3 +75,23 @@ export function apiRecalcLevels(): Promise<{
 export function apiCheckMilestones(childId: number): Promise<{ new_nodes: number[] }> {
   return request(`/api/admin/children/${childId}/milestones/check`, { method: "POST" });
 }
+
+export interface ReportData {
+  kind: string;
+  period_label: string;
+  child_name: string;
+  books: number;
+  words: number;
+  checkin_days: number;
+  quiz_count: number;
+  quiz_avg_percent: number | null;
+  total_words: number;
+  level: string;
+  points_total: number;
+}
+
+export function apiGenerateReport(childId: number, kind: string): Promise<{
+  path: string; url: string; data: ReportData;
+}> {
+  return request(`/api/admin/children/${childId}/reports/${kind}/generate`, { method: "POST" });
+}

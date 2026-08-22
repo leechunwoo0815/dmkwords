@@ -48,6 +48,16 @@ Page({
     wx.navigateTo({ url: `/pages/member-pkg/checkin/checkin?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
 
+  goLeaderboard() {
+    const c = this.data.currentChild
+    if (!c) return
+    wx.navigateTo({ url: `/pages/member-pkg/leaderboard/leaderboard?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
+  },
+  goPassport() {
+    const c = this.data.currentChild
+    if (!c) return
+    wx.navigateTo({ url: `/pages/member-pkg/profile-card/profile-card?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
+  },
   goAchievement() {
     const c = this.data.currentChild
     if (!c) return

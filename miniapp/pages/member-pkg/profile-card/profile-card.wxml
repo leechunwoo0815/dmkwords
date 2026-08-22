@@ -1,0 +1,68 @@
+<view class="page" wx:if="{{passport}}">
+  <view class="profile-card">
+    <view class="card-header">
+      <view class="card-avatar">{{passport.read_only ? '📚' : '🧒'}}</view>
+      <view class="card-identity">
+        <view class="card-en-name">{{passport.english_name || passport.child_name}}</view>
+        <view class="card-cn-name">{{passport.child_name}} 的阅读护照</view>
+        <view class="card-date">累计有效阅读 · 永不丢失</view>
+      </view>
+      <view class="level-badge-icon">
+        <text style="font-size:44rpx;font-weight:700;">{{passport.level}}</text>
+      </view>
+    </view>
+
+    <view class="stats-row">
+      <view class="stat-item">
+        <view class="stat-val">{{passport.words_total}}</view>
+        <view class="stat-label">有效词数</view>
+      </view>
+      <view class="stat-item">
+        <view class="stat-val">{{passport.books_total}}</view>
+        <view class="stat-label">读完本数</view>
+      </view>
+      <view class="stat-item">
+        <view class="stat-val">{{passport.points_total}}</view>
+        <view class="stat-label">积分</view>
+      </view>
+      <view class="stat-item">
+        <view class="stat-val">{{passport.total_checkin_days}}</view>
+        <view class="stat-label">打卡天数</view>
+      </view>
+    </view>
+
+    <view class="card-divider"></view>
+
+    <view class="level-section">
+      <view class="level-title">成长等级 {{passport.level}} 级</view>
+      <view class="level-subtitle">
+        {{passport.is_z_capped ? '已达 Z 级封顶，继续累计' : '每 ' + passport.level_books_threshold + ' 本升一级，只升不降'}}
+      </view>
+    </view>
+
+    <view class="achievements">
+      <view class="ach-item" wx:for="{{passport.milestone_nodes}}" wx:key="*this">
+        <text class="ach-icon">{{passport.milestones_awarded.indexOf(item) !== -1 ? '🏆' : '🔒'}}</text>
+        <text class="ach-name">{{item >= 10000 ? (item / 10000) + '万词' : item + '词'}}</text>
+      </view>
+    </view>
+
+    <view class="card-footer">
+      <text>DmkWords · 分级阅读听见成长</text>
+    </view>
+  </view>
+
+  <view wx:if="{{passport.read_only}}" class="tip" style="margin:24rpx;text-align:center;color:var(--muted);">
+    已退会：护照为只读历史（词数等级永不回收）
+  </view>
+
+  <view wx:if="{{passport.recent_books.length}}" style="margin:24rpx;">
+    <view style="font-size:28rpx;font-weight:600;margin-bottom:16rpx;color:var(--fg);">最近读完</view>
+    <view wx:for="{{passport.recent_books}}" wx:key="id" style="background:var(--surface);border-radius:16rpx;padding:20rpx 24rpx;margin-bottom:12rpx;display:flex;justify-content:space-between;">
+      <text>《{{item.title}}》</text>
+      <text style="color:var(--accent);font-weight:600;">+{{item.word_count}} 词</text>
+    </view>
+  </view>
+
+  <button class="btn-primary" style="margin:24rpx;" open-type="share" wx:if="{{!passport.read_only}}">分享这份成长</button>
+</view>
