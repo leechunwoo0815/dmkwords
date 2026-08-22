@@ -1,0 +1,9 @@
+<!-- frontend/components/empty-state/empty-state.wxml -->
+<view class="empty-state">
+  <view class="empty-icon">{{icon}}</view>
+  <view class="empty-title">{{title}}</view>
+  <view class="empty-desc" wx:if="{{desc}}">{{desc}}</view>
+  <button class="empty-btn" wx:if="{{btnText}}" bindtap="onAction">
+    <text>{{btnText}}</text>
+  </button>
+</view>

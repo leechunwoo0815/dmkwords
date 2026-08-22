@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  MOCK_PAYMENT: "true"
+  MOCK_SMS: "true"
+  DEBUG: "true"
+  SECRET_KEY: "ci-test-key-short"
+  DATABASE_URL: "sqlite:///:memory:"
+  ENABLE_TEST_TOKEN: "true"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install ruff==0.15.16
+      - run: ruff check backend/ tests/
+      - run: ruff check features/ scripts/
+      - run: ruff format --check .
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt pytest pytest-asyncio httpx behave PyHamcrest
+      - run: python -m pytest tests/ -x -q --tb=short
+      - run: python -m behave features/ --no-capture -q
+      - run: python -m scripts.verify_api_contract
+
+  model-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m scripts.check_model_consistency
+
+  data-action-wiring:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m scripts.verify_action_wiring --strict
+      - run: PYTHONPATH=. python scripts/gen_config_doc.py --check

@@ -1,0 +1,334 @@
+/* login.wxss — aligned with design/user-end/login.html */
+
+.login-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80rpx 48rpx;
+}
+
+.logo-area {
+  text-align: center;
+  margin-bottom: 96rpx;
+}
+
+.logo-icon {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 40rpx;
+  margin: 0 auto 32rpx;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 16rpx 48rpx rgba(44, 74, 110, 0.25);
+}
+
+.logo-emoji {
+  font-size: 80rpx;
+}
+
+.app-name {
+  font-family: var(--font-display);
+  font-size: 48rpx;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.app-slogan {
+  font-size: 28rpx;
+  color: var(--muted);
+  margin-top: 12rpx;
+}
+
+.login-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.wx-login-btn {
+  width: 100%;
+  padding: 28rpx;
+  border-radius: var(--radius);
+  background: #07C160; /* intentional: WeChat brand green */
+  color: var(--surface);
+  font-size: 32rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  border: none;
+  line-height: 1.4;
+  min-height: auto;
+}
+
+.wx-login-btn::after {
+  border: none;
+}
+
+.wx-login-btn:active {
+  opacity: 0.85;
+}
+
+.wx-login-btn.disabled {
+  opacity: 0.5;
+}
+
+/* 隐私弹窗 */
+.privacy-mask {
+  position: fixed;
+    box-sizing: border-box;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 999;
+  box-sizing: border-box;
+}
+
+.privacy-popup {
+  position: fixed;
+    box-sizing: border-box;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 48rpx 40rpx;
+  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
+  z-index: 1000;
+  box-shadow: 0 -8rpx 32rpx rgba(0,0,0,0.1);
+  box-sizing: border-box;
+}
+
+.privacy-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 24rpx;
+  color: var(--fg);
+}
+
+.privacy-content {
+  font-size: 28rpx;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 40rpx;
+}
+
+.privacy-detail {
+  display: block;
+  color: var(--accent);
+  margin-top: 16rpx;
+  text-decoration: underline;
+}
+
+.privacy-actions {
+  display: flex;
+  gap: 24rpx;
+}
+
+.privacy-btn {
+  flex: 1;
+  height: 88rpx;
+  border-radius: var(--radius);
+  font-size: 30rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  line-height: 1.4;
+  min-height: auto;
+}
+
+.privacy-btn::after {
+  border: none;
+}
+
+.privacy-btn-agree {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.privacy-btn-disagree {
+  background: var(--bg);
+  color: var(--muted);
+  border: 2rpx solid var(--border);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 32rpx 0;
+  color: var(--muted);
+  font-size: 26rpx;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1rpx;
+  background: var(--border);
+}
+
+.divider text {
+  padding: 0 24rpx;
+}
+
+.phone-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.input-row {
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: 0 24rpx;
+  border: 2rpx solid var(--border);
+  height: 88rpx;
+}
+
+.input-icon {
+  font-size: 32rpx;
+  margin-right: 16rpx;
+}
+
+.input-field {
+  flex: 1;
+  height: 100%;
+  font-size: 30rpx;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--fg);
+}
+
+.sms-row {
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.sms-row .input-row {
+  flex: 1;
+}
+
+.sms-btn {
+  flex-shrink: 0;
+  height: 88rpx;
+  padding: 0 24rpx;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 26rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  line-height: 1.4;
+  min-height: auto;
+  white-space: nowrap;
+}
+
+.sms-btn::after {
+  border: none;
+}
+
+.sms-btn.disabled {
+  background: var(--border);
+  color: var(--muted);
+}
+
+.phone-login-btn {
+  width: 100%;
+  padding: 28rpx;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 32rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  line-height: 1.4;
+  min-height: auto;
+}
+
+.phone-login-btn::after {
+  border: none;
+}
+
+.phone-login-btn.disabled {
+  opacity: 0.5;
+}
+
+.toggle-form {
+  text-align: center;
+  margin-top: 16rpx;
+}
+
+.toggle-form text {
+  font-size: 28rpx;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.privacy-checkbox-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 40rpx;
+  font-size: 24rpx;
+}
+
+.privacy-checkbox {
+  width: 32rpx;
+  height: 32rpx;
+  border: 2rpx solid var(--border);
+  border-radius: 6rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.privacy-checkbox.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--surface);
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.privacy-checkbox-label {
+  color: var(--muted);
+}
+
+.agreement-link {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.agreement-link:active {
+  opacity: 0.7;
+}
+
+.agreement-sep {
+  color: var(--border);
+}
+

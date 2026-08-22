@@ -1,0 +1,420 @@
+/* frontend/pages/profile-card/profile-card.wxss */
+
+.page {
+  background: var(--bg);
+  min-height: 100vh;
+  padding-bottom: 80rpx;
+}
+
+/* Nav Bar */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 24rpx 32rpx;
+  background: var(--surface);
+  border-bottom: 2rpx solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.nav-bar .back {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20rpx;
+}
+
+.nav-bar .back-icon {
+  font-size: 40rpx;
+  color: var(--fg);
+}
+
+.nav-bar .title {
+  font-family: var(--font-display);
+  font-size: 34rpx;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.nav-bar .spacer {
+  flex: 1;
+}
+
+/* Card Wrapper */
+.card-wrapper {
+  padding: 40rpx 32rpx 32rpx;
+}
+
+/* Profile Card */
+.profile-card {
+  background: linear-gradient(160deg, var(--accent) 0%, var(--accent-dark) 45%, var(--accent-darker) 100%);
+  border-radius: 40rpx;
+  padding: 56rpx 48rpx 48rpx;
+  color: var(--surface);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 16rpx 64rpx rgba(var(--accent-rgb), 0.25);
+}
+
+/* Decorative circles (replacing CSS pseudo-elements) */
+.deco-circle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.deco-top {
+  top: -80rpx;
+  right: -60rpx;
+  width: 280rpx;
+  height: 280rpx;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.deco-bottom {
+  bottom: -40rpx;
+  left: -40rpx;
+  width: 200rpx;
+  height: 200rpx;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Card Header */
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 32rpx;
+  margin-bottom: 40rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.card-avatar {
+  width: 136rpx;
+  height: 136rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: 6rpx solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64rpx;
+  flex-shrink: 0;
+}
+
+.card-identity {
+  flex: 1;
+}
+
+.card-cn-name {
+  font-family: var(--font-display);
+  font-size: 44rpx;
+  font-weight: 700;
+  color: var(--surface);
+  display: block;
+}
+
+.card-en-name {
+  font-size: 28rpx;
+  opacity: 0.8;
+  margin-top: 4rpx;
+  font-weight: 500;
+  color: var(--surface);
+  display: block;
+}
+
+/* Level Badge */
+.level-section {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-bottom: 40rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.level-badge-icon {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 44rpx;
+  font-weight: 800;
+  color: var(--surface);
+  box-shadow: 0 8rpx 24rpx rgba(var(--warning-rgb), 0.35);
+}
+
+.level-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.level-title {
+  font-family: var(--font-display);
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--surface);
+}
+
+.level-subtitle {
+  font-size: 24rpx;
+  opacity: 0.7;
+  margin-top: 2rpx;
+  color: var(--surface);
+}
+
+/* Stats Row */
+.stats-row {
+  display: flex;
+  gap: 0;
+  margin-bottom: 40rpx;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 32rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.stat-item {
+  flex: 1;
+  text-align: center;
+  padding: 28rpx 16rpx;
+  border-right: 2rpx solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-item:last-child {
+  border-right: none;
+}
+
+.stat-val {
+  font-family: var(--font-display);
+  font-size: 44rpx;
+  font-weight: 700;
+  color: var(--surface);
+  display: block;
+}
+
+.stat-label {
+  font-size: 22rpx;
+  opacity: 0.75;
+  margin-top: 4rpx;
+  color: var(--surface);
+  display: block;
+}
+
+/* Achievements */
+.achievements {
+  display: flex;
+  gap: 20rpx;
+  margin-bottom: 40rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.ach-item {
+  flex: 1;
+  text-align: center;
+  padding: 20rpx 12rpx;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20rpx;
+}
+
+.ach-icon {
+  font-size: 56rpx;
+  margin-bottom: 8rpx;
+  display: block;
+}
+
+.ach-name {
+  font-size: 22rpx;
+  opacity: 0.85;
+  color: var(--surface);
+}
+
+/* Divider */
+.card-divider {
+  height: 2rpx;
+  background: rgba(255, 255, 255, 0.12);
+  margin-bottom: 32rpx;
+  position: relative;
+  z-index: 1;
+}
+
+/* QR Section */
+.qr-section {
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.qr-code {
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 16rpx;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8rpx;
+
+.qr-image {
+  width: 100%;
+  height: 100%;
+  border-radius: 8rpx;
+}
+  flex-shrink: 0;
+}
+
+.qr-placeholder-text {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.qr-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.qr-heading {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--surface);
+}
+
+.qr-desc {
+  font-size: 24rpx;
+  opacity: 0.7;
+  color: var(--surface);
+  line-height: 1.6;
+}
+
+/* Brand Footer */
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 32rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.brand-icon {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 12rpx;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: 800;
+  color: var(--surface);
+}
+
+.brand-name {
+  font-family: var(--font-display);
+  font-size: 28rpx;
+  font-weight: 700;
+  opacity: 0.9;
+  color: var(--surface);
+}
+
+.card-date {
+  font-size: 22rpx;
+  opacity: 0.5;
+  color: var(--surface);
+}
+
+/* Action Buttons */
+.action-btns {
+  padding: 40rpx 32rpx 0;
+  display: flex;
+  gap: 20rpx;
+}
+
+.btn {
+  flex: 1;
+  padding: 28rpx;
+  border-radius: 32rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+}
+
+.btn-icon {
+  font-size: 36rpx;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.btn-outline {
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  color: var(--fg);
+}
+
+.btn-primary:active {
+  background: var(--accent-hover);
+}
+
+.btn-outline:active {
+  background: var(--bg);
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+    box-sizing: border-box;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(38, 36, 25, 0.8);
+  padding: 28rpx 48rpx;
+  border-radius: 32rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+  color: var(--surface);
+  box-sizing: border-box;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.toast.show {
+  opacity: 1;
+}
+
+/* Tip */
+.tip {
+  text-align: center;
+  padding: 32rpx;
+  font-size: 24rpx;
+  color: var(--muted);
+}
+

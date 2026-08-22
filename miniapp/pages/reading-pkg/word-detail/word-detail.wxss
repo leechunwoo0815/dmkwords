@@ -1,0 +1,258 @@
+/* word-detail.wxss — aligned with design/user-end/word-detail.html */
+
+.page-bg {
+  background: var(--bg);
+  min-height: 100vh;
+  padding-bottom: 48rpx;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 400rpx;
+  color: var(--muted);
+  font-size: 28rpx;
+}
+
+/* Nav Bar */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 24rpx 32rpx;
+  background: var(--surface);
+  border-bottom: 2rpx solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.nav-bar .back {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20rpx;
+}
+
+.nav-bar .title {
+  font-family: var(--font-display);
+  font-size: 34rpx;
+  font-weight: 600;
+}
+
+/* Word Hero */
+.word-hero {
+  margin: 32rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 48rpx;
+  text-align: center;
+}
+
+.word-hero .big-word {
+  font-family: var(--font-display);
+  font-size: 72rpx;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.word-hero .phonetic {
+  font-size: 32rpx;
+  color: var(--muted);
+  margin: 8rpx 0 16rpx;
+}
+
+.word-hero .pos-tag {
+  display: inline-block;
+  padding: 8rpx 24rpx;
+  border-radius: 999rpx;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 24rpx;
+  font-weight: 500;
+}
+
+.play-btn {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 24rpx auto 0;
+}
+
+.play-btn:active {
+  transform: scale(0.97);
+}
+
+.play-btn.audio-playing {
+  background: var(--accent-hover);
+}
+
+.play-icon {
+  width: 44rpx;
+  height: 44rpx;
+}
+
+/* Definition Card */
+.def-card {
+  margin: 0 32rpx 24rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 32rpx;
+}
+
+.def-card-header {
+  margin-bottom: 16rpx;
+}
+
+.def-card-title {
+  font-family: var(--font-display);
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.def-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.def-item {
+  font-size: 30rpx;
+  line-height: 1.5;
+}
+
+.def-item .def-num {
+  color: var(--muted);
+  font-size: 24rpx;
+  margin-right: 8rpx;
+}
+
+.example {
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  color: var(--muted);
+  font-style: italic;
+  padding-left: 24rpx;
+  border-left: 4rpx solid var(--accent-soft);
+}
+
+.example .ex-bold {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.synonyms {
+  display: flex;
+  gap: 12rpx;
+  flex-wrap: wrap;
+  margin-top: 16rpx;
+}
+
+.syn-tag {
+  padding: 8rpx 20rpx;
+  background: var(--secondary-soft);
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  color: var(--success);
+}
+
+/* Source Card */
+.source-card {
+  margin: 0 32rpx 24rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 32rpx;
+}
+
+.source-card-header {
+  margin-bottom: 16rpx;
+}
+
+.source-card-title {
+  font-family: var(--font-display);
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.source-item {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 16rpx 0;
+}
+
+.source-item + .source-item {
+  border-top: 2rpx solid var(--border);
+}
+
+.source-item-info {
+  flex: 1;
+}
+
+.source-item .s-book {
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+.source-item .s-context {
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+/* Action Bar */
+.action-bar {
+  margin: 0 32rpx;
+  display: flex;
+  gap: 16rpx;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 28rpx;
+  border-radius: 20rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+}
+
+.action-btn:active {
+  transform: scale(0.97);
+}
+
+.action-btn.primary {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.action-btn.secondary {
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  color: var(--fg);
+}
+
+.action-btn.danger {
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  color: var(--error);
+}
+
+.btn-disabled {
+  opacity: 0.5;
+}
+

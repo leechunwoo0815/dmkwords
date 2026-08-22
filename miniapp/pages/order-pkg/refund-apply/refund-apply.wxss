@@ -1,0 +1,411 @@
+/* refund-apply.wxss — aligned with design/user-end/refund-apply.html */
+
+.page-bg {
+  background: var(--bg);
+  min-height: 100vh;
+  padding-bottom: 200rpx;
+}
+
+/* Nav Bar */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 24rpx 32rpx;
+  background: var(--surface);
+  border-bottom: 2rpx solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.nav-bar .back {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20rpx;
+  font-size: 40rpx;
+  color: var(--fg);
+}
+
+.nav-title {
+  font-family: var(--font-display);
+  font-size: 34rpx;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+/* Loading & Empty */
+.loading-state {
+  text-align: center;
+  padding: 120rpx 40rpx;
+  color: var(--muted);
+  font-size: 28rpx;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 120rpx 40rpx;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.empty-icon {
+  font-size: 96rpx;
+  margin-bottom: 24rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+}
+
+/* Shared card label */
+.card-label {
+  display: block;
+  font-size: 26rpx;
+  color: var(--muted);
+  margin-bottom: 16rpx;
+  font-weight: 500;
+}
+
+.card-h3 {
+  font-family: var(--font-display);
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 24rpx;
+  color: var(--fg);
+}
+
+/* Selector */
+.selector-card {
+  margin: 32rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 32rpx;
+}
+
+.picker-field {
+  height: 80rpx;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 0 24rpx;
+  font-size: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--fg);
+}
+
+.picker-arrow {
+  font-size: 28rpx;
+  color: var(--muted);
+}
+
+/* Info Card */
+.info-card {
+  margin: 32rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 32rpx;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 0;
+  font-size: 28rpx;
+}
+
+.info-label {
+  color: var(--muted);
+}
+
+.info-value {
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.info-row-total {
+  border-top: 2rpx solid var(--border);
+  margin-top: 8rpx;
+  padding-top: 24rpx;
+}
+
+.info-value-total {
+  font-family: var(--font-display);
+  font-size: 40rpx;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* Days Input */
+.days-card {
+  margin: 0 32rpx 32rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 32rpx;
+}
+
+.days-input {
+  width: 100%;
+  height: 80rpx;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 0 24rpx;
+  font-size: 28rpx;
+  box-sizing: border-box;
+  color: var(--fg);
+}
+
+/* Calc Card */
+.calc-card {
+  margin: 0 32rpx 32rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 32rpx;
+}
+
+.calc-step {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 20rpx 0;
+  font-size: 28rpx;
+}
+
+.calc-dot {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.calc-dot-n {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.calc-dot-minus {
+  background: var(--error-soft);
+  color: var(--error);
+}
+
+.calc-dot-result {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.calc-desc {
+  flex: 1;
+  color: var(--muted);
+}
+
+.calc-amount {
+  font-weight: 600;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.calc-result {
+  margin-top: 16rpx;
+  padding-top: 24rpx;
+  border-top: 2rpx dashed var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.calc-result-label {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.calc-result-amount {
+  font-family: var(--font-display);
+  font-size: 48rpx;
+  font-weight: 700;
+  color: var(--success);
+}
+
+/* Reason Card */
+.reason-card {
+  margin: 0 32rpx 32rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 32rpx;
+}
+
+.reason-textarea {
+  width: 100%;
+  min-height: 200rpx;
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 24rpx;
+  font-size: 28rpx;
+  box-sizing: border-box;
+  line-height: 1.6;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+.reason-textarea:focus {
+  border-color: var(--accent);
+}
+
+/* Tip Card */
+.tip-card {
+  margin: 0 32rpx 32rpx;
+  padding: 24rpx 32rpx;
+  background: var(--warning-soft);
+  border-radius: 20rpx;
+  font-size: 26rpx;
+  color: var(--warning);
+  display: flex;
+  gap: 16rpx;
+  align-items: flex-start;
+}
+
+.tip-icon {
+  font-size: 36rpx;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.tip-text {
+  flex: 1;
+  line-height: 1.5;
+}
+
+/* Submit */
+.submit-wrap {
+  position: fixed;
+    box-sizing: border-box;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  padding: 24rpx 32rpx 56rpx;
+  padding-bottom: calc(56rpx + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 2rpx solid var(--border);
+  box-sizing: border-box;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 28rpx;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 30rpx;
+  font-weight: 600;
+  text-align: center;
+}
+
+.submit-btn:active {
+  opacity: 0.85;
+}
+
+/* Info Card headings & row variants */
+
+.info-row .label {
+  color: var(--muted);
+}
+
+.info-row .value {
+  font-weight: 500;
+}
+
+.info-row.total {
+  border-top: 2rpx solid var(--border);
+  margin-top: 8rpx;
+  padding-top: 24rpx;
+}
+
+.info-row.total .value {
+  font-family: var(--font-display);
+  font-size: 40rpx;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* Calc step dot variants */
+.calc-step .dot {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.calc-step .dot.n {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.calc-step .dot.minus {
+  background: var(--error-soft);
+  color: var(--error);
+}
+
+.calc-step .dot.result {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.calc-step .desc {
+  flex: 1;
+  color: var(--muted);
+}
+
+.calc-step .amount {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.calc-result .label {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.calc-result .amount {
+  font-family: var(--font-display);
+  font-size: 48rpx;
+  font-weight: 700;
+  color: var(--success);
+}
+
+/* Reason textarea placeholder */
+.reason-textarea::placeholder {
+  color: var(--muted);
+}
+
+/* Tip card text color (prototype uses specific muted warning) */
+.tip-card .tip-text {
+  color: var(--warning);
+}
+
+.btn-disabled {
+  opacity: 0.5;
+}
+

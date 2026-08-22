@@ -1,0 +1,396 @@
+/* frontend/pages/leaderboard/leaderboard.wxss */
+
+/* 页面背景 */
+.page-bg {
+  background: var(--bg);
+  min-height: 100vh;
+  padding-bottom: 160rpx;
+}
+
+/* Nav bar */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 24rpx 32rpx;
+  background: var(--surface);
+  border-bottom: 2rpx solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.nav-bar .back {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20rpx;
+}
+
+.nav-bar .title {
+  font-family: var(--font-display);
+  font-size: 34rpx;
+  font-weight: 600;
+}
+
+.nav-bar .spacer {
+  flex: 1;
+}
+
+/* 周期标签 */
+.period-tabs {
+  background: var(--surface);
+  border-bottom: 2rpx solid var(--border);
+}
+.period-scroll {
+  white-space: nowrap;
+  padding: 24rpx 32rpx;
+  overflow-x: auto;
+  scrollbar-width: none;
+  display: flex;
+}
+.period-scroll::-webkit-scrollbar {
+  display: none;
+}
+.period-tab {
+  display: inline-block;
+  padding: 14rpx 32rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--bg);
+  border: 2rpx solid var(--border);
+  margin-right: 12rpx;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.period-tab.active {
+  background: var(--accent);
+  color: var(--surface);
+  border-color: var(--accent);
+}
+
+/* 级别筛选 */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 32rpx 24rpx;
+  background: var(--surface);
+  border-bottom: 2rpx solid var(--border);
+}
+.filter-label {
+  font-size: 24rpx;
+  color: var(--muted);
+}
+.level-select {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 12rpx 24rpx;
+  border-radius: var(--radius-sm);
+  border: 2rpx solid var(--border);
+  background: var(--bg);
+  font-size: 26rpx;
+  color: var(--fg);
+}
+.filter-arrow {
+  font-size: 20rpx;
+  opacity: 0.5;
+}
+
+/* 领奖台 */
+.podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 24rpx;
+  padding: 48rpx 32rpx 0;
+}
+.podium-card {
+  flex: 1;
+  max-width: 240rpx;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 32rpx 16rpx 28rpx;
+  text-align: center;
+  border: 2rpx solid var(--border);
+  position: relative;
+}
+.podium-card .rank-badge {
+  position: absolute;
+  top: -20rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 48rpx;
+  line-height: 1;
+}
+.podium-avatar {
+  width: 104rpx;
+  height: 104rpx;
+  border-radius: 50%;
+  margin: 16rpx auto 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48rpx;
+  border: 4rpx solid var(--border);
+  background: var(--bg);
+}
+.podium-name {
+  font-family: var(--font-display);
+  font-size: 28rpx;
+  font-weight: 600;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.podium-words {
+  font-size: 24rpx;
+  color: var(--muted);
+  margin-top: 4rpx;
+  display: block;
+}
+.podium-score {
+  font-family: var(--font-display);
+  font-size: 32rpx;
+  font-weight: 700;
+  margin-top: 8rpx;
+  color: var(--accent);
+  display: block;
+}
+
+/* 金牌 */
+.podium-card.gold {
+  border-color: rgba(141, 102, 16, 0.5);
+  background: linear-gradient(180deg, rgba(141, 102, 16, 0.08) 0%, var(--surface) 100%);
+  box-shadow: 0 8rpx 40rpx rgba(141, 102, 16, 0.15);
+  padding-top: 44rpx;
+}
+.podium-card.gold .podium-avatar {
+  width: 128rpx;
+  height: 128rpx;
+  font-size: 60rpx;
+  border-color: rgba(141, 102, 16, 0.4);
+  background: rgba(141, 102, 16, 0.08);
+}
+.podium-card.gold .podium-name {
+  font-size: 30rpx;
+}
+.podium-card.gold .podium-score {
+  color: rgba(141, 102, 16, 0.85);
+}
+
+/* 银牌 */
+.podium-card.silver {
+  border-color: rgba(184, 176, 160, 0.5);
+  background: linear-gradient(180deg, rgba(184, 176, 160, 0.06) 0%, var(--surface) 100%);
+}
+.podium-card.silver .podium-avatar {
+  border-color: rgba(184, 176, 160, 0.4);
+  background: rgba(184, 176, 160, 0.08);
+}
+.podium-card.silver .podium-score {
+  color: rgba(163, 154, 134, 0.7);
+}
+
+/* 铜牌 */
+.podium-card.bronze {
+  border-color: rgba(201, 162, 39, 0.4);
+  background: linear-gradient(180deg, rgba(201, 162, 39, 0.06) 0%, var(--surface) 100%);
+}
+.podium-card.bronze .podium-avatar {
+  border-color: rgba(201, 162, 39, 0.4);
+  background: rgba(201, 162, 39, 0.06);
+}
+.podium-card.bronze .podium-score {
+  color: rgba(139, 113, 23, 0.8);
+}
+
+/* 分区标签 */
+.section-label {
+  font-family: var(--font-display);
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 16rpx 32rpx 8rpx;
+}
+
+/* 排行列表 */
+.rank-list {
+  padding: 8rpx 32rpx;
+}
+.rank-item {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+}
+.rank-item-me {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.rank-num {
+  width: 56rpx;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.rank-avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  background: var(--bg);
+  border: 2rpx solid var(--border);
+  flex-shrink: 0;
+}
+.rank-info {
+  flex: 1;
+  min-width: 0;
+}
+.rank-name {
+  font-family: var(--font-display);
+  font-size: 28rpx;
+  font-weight: 600;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rank-words {
+  font-size: 24rpx;
+  color: var(--muted);
+  display: block;
+}
+.rank-score {
+  font-family: var(--font-display);
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* 规则卡片 */
+.rules-card {
+  margin: 16rpx 32rpx 32rpx;
+  padding: 28rpx 32rpx;
+  background: rgba(44, 74, 110, 0.06);
+  border-radius: var(--radius);
+  font-size: 24rpx;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.rules-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 12rpx;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+.rules-text {
+  display: block;
+}
+
+/* 底部我的排名 */
+.my-rank-bar {
+  position: fixed;
+    box-sizing: border-box;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 2rpx solid var(--border);
+  padding: 24rpx 40rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom, 24rpx));
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  z-index: 20;
+  box-sizing: border-box;
+}
+.my-avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  background: rgba(44, 74, 110, 0.1);
+  border: 4rpx solid var(--accent);
+  flex-shrink: 0;
+}
+.my-info {
+  flex: 1;
+}
+.my-label {
+  font-size: 22rpx;
+  color: var(--muted);
+  display: block;
+}
+.my-detail {
+  font-family: var(--font-display);
+  font-size: 28rpx;
+  font-weight: 600;
+  display: block;
+}
+.my-highlight {
+  color: var(--accent);
+}
+.my-position {
+  font-family: var(--font-display);
+  font-size: 40rpx;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* 底部导航（隐藏，用 my-rank-bar 替代） */
+.bottom-nav {
+  display: none;
+}
+
+/* 周期标签滚动隐藏 scrollbar */
+.period-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* 排行项目 - 我的排名高亮 */
+.rank-item-me {
+  border-color: var(--accent);
+  background: rgba(44, 74, 110, 0.06);
+}
+
+/* 底部导航（隐藏，用 my-rank-bar 替代） */
+.bottom-nav {
+  display: none;
+}
+
+/* 周期标签滚动隐藏 scrollbar */
+.period-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* 排行项目 - 我的排名高亮 */
+.rank-item-me {
+  border-color: var(--accent);
+  background: rgba(44, 74, 110, 0.06);
+}
+

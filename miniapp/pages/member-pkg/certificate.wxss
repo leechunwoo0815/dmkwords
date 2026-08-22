@@ -1,0 +1,411 @@
+/* frontend/pages/certificate/certificate.wxss */
+
+/* 页面背景 */
+.page-bg {
+  background: var(--bg);
+  min-height: 100vh;
+}
+
+/* 装饰彩纸 */
+.confetti-top {
+  font-size: 72rpx;
+  margin-bottom: 24rpx;
+  text-align: center;
+}
+
+/* 证书单张视图 */
+.cert-single {
+  padding: 64rpx 40rpx 160rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 金色渐变边框包裹 */
+.cert-wrapper {
+  width: 100%;
+  padding: 6rpx;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--gold-light), var(--warning), var(--gold), var(--warning), var(--gold-light));
+  position: relative;
+}
+
+/* 证书卡片 */
+.cert-card {
+  width: 100%;
+  background: var(--surface);
+  border-radius: 38rpx;
+  padding: 72rpx 48rpx;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 装饰角 */
+.cert-corner {
+  position: absolute;
+  width: 48rpx;
+  height: 48rpx;
+  border-color: var(--warning);
+  border-style: solid;
+  z-index: 1;
+}
+.cert-corner-tl {
+  top: 40rpx;
+  left: 40rpx;
+  border-width: 4rpx 0 0 4rpx;
+}
+.cert-corner-tr {
+  top: 40rpx;
+  right: 40rpx;
+  border-width: 4rpx 4rpx 0 0;
+}
+.cert-corner-bl {
+  bottom: 40rpx;
+  left: 40rpx;
+  border-width: 0 0 4rpx 4rpx;
+}
+.cert-corner-br {
+  bottom: 40rpx;
+  right: 40rpx;
+  border-width: 0 4rpx 4rpx 0;
+}
+
+.cert-header {
+  font-size: 22rpx;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 6rpx;
+  margin-bottom: 12rpx;
+  position: relative;
+}
+.cert-logo {
+  font-family: var(--font-display);
+  font-size: 40rpx;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--gold), var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 40rpx;
+  position: relative;
+}
+@supports not (background-clip: text) {
+  .cert-logo { color: var(--gold); -webkit-text-fill-color: var(--gold); }
+}
+.cert-title {
+  font-family: var(--font-display);
+  font-size: 44rpx;
+  font-weight: 700;
+  color: var(--fg);
+  margin-bottom: 40rpx;
+  letter-spacing: 4rpx;
+  position: relative;
+}
+.cert-badge {
+  font-size: 112rpx;
+  margin-bottom: 32rpx;
+  position: relative;
+}
+.cert-child-name {
+  font-family: var(--font-display);
+  font-size: 52rpx;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 8rpx;
+  position: relative;
+}
+.cert-english-name {
+  font-size: 30rpx;
+  color: var(--muted);
+  margin-bottom: 32rpx;
+  font-style: italic;
+  position: relative;
+}
+.cert-promo {
+  font-family: var(--font-display);
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 16rpx;
+  position: relative;
+}
+/* 晋级等级变化 */
+.cert-level-change {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24rpx;
+  margin-bottom: 32rpx;
+  position: relative;
+}
+.cert-level {
+  padding: 12rpx 32rpx;
+  border-radius: 999rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+.cert-level.from {
+  background: var(--border);
+  color: var(--muted);
+}
+.cert-level.to {
+  background: linear-gradient(135deg, var(--warning), var(--gold));
+  color: var(--surface);
+}
+.cert-arrow {
+  font-size: 36rpx;
+  color: var(--warning);
+}
+.cert-level-name {
+  font-family: var(--font-display);
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 24rpx;
+  position: relative;
+}
+
+/* 分割线 */
+.cert-divider {
+  width: 60%;
+  height: 2rpx;
+  margin: 0 auto 32rpx;
+  background: linear-gradient(90deg, transparent, var(--warning), transparent);
+  position: relative;
+}
+
+/* 日期和编号 */
+.cert-meta {
+  font-size: 24rpx;
+  color: var(--muted);
+  line-height: 1.8;
+  position: relative;
+}
+.cert-date {
+  display: block;
+}
+.cert-number {
+  font-family: 'Courier New', monospace;
+  font-size: 22rpx;
+  color: var(--gold);
+  letter-spacing: 2rpx;
+  margin-top: 4rpx;
+}
+
+/* 印章 */
+.cert-seal {
+  position: absolute;
+  bottom: 36rpx;
+  right: 48rpx;
+  font-size: 80rpx;
+  opacity: 0.12;
+  transform: rotate(-15deg);
+}
+
+/* 操作按钮 */
+.cert-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  margin-top: 48rpx;
+}
+.btn-save {
+  width: 100%;
+  padding: 28rpx;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 30rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  box-sizing: border-box;
+}
+.btn-share {
+  width: 100%;
+  padding: 28rpx;
+  border-radius: var(--radius);
+  background: var(--success);
+  color: var(--surface);
+  font-size: 30rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  box-sizing: border-box;
+  line-height: 1.4;
+}
+.btn-back {
+  width: 100%;
+  padding: 28rpx;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  color: var(--fg);
+  font-size: 30rpx;
+  font-weight: 500;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* 分享弹窗 */
+.share-modal {
+  position: fixed;
+    box-sizing: border-box;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(38, 36, 25, 0.5);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  box-sizing: border-box;
+}
+.share-modal.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.share-card {
+  width: calc(100% - 96rpx);
+  max-width: 680rpx;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 48rpx;
+  text-align: center;
+  transform: scale(0.9);
+  transition: transform 0.25s ease;
+}
+.share-modal.show .share-card {
+  transform: scale(1);
+}
+.share-card .qr-placeholder {
+  width: 240rpx;
+  height: 240rpx;
+  margin: 0 auto 24rpx;
+  background: var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  color: var(--muted);
+}
+.share-card .share-hint {
+  font-size: 26rpx;
+  color: var(--muted);
+  margin-bottom: 32rpx;
+}
+.share-card .share-close {
+  padding: 16rpx 48rpx;
+  border-radius: 999rpx;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+/* 隐藏 canvas */
+.cert-canvas {
+  position: fixed;
+    box-sizing: border-box;
+  left: -2000rpx;
+  top: -2000rpx;
+  /* 海报导出分辨率，与 canvasToTempFilePath 尺寸一致，保留 px（非布局单位） */
+  width: 600px;
+  height: 900px;
+  box-sizing: border-box;
+}
+
+/* 证书列表 */
+.cert-list {
+  padding: 48rpx;
+}
+.cert-list-item {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 36rpx 32rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 20rpx;
+}
+.cert-list-badge {
+  font-size: 72rpx;
+  flex-shrink: 0;
+}
+.cert-list-info {
+  flex: 1;
+  overflow: hidden;
+}
+.cert-list-level {
+  font-size: 30rpx;
+  font-weight: 600;
+  display: block;
+}
+.cert-list-no {
+  font-size: 24rpx;
+  color: var(--muted);
+  display: block;
+  margin-top: 4rpx;
+}
+.cert-list-date {
+  font-size: 22rpx;
+  color: var(--muted);
+  display: block;
+  margin-top: 4rpx;
+}
+/* 证书外层光晕 */
+.cert-wrapper::before {
+  content: '';
+  position: absolute;
+  inset: -8rpx;
+  border-radius: calc(var(--radius-lg) + 8rpx);
+  background: linear-gradient(135deg, var(--gold-light), var(--gold), var(--gold-dark), var(--gold), var(--gold-light));
+  opacity: 0.3;
+  filter: blur(16rpx);
+  z-index: -1;
+}
+
+/* 证书卡片内底纹 */
+.cert-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 10% 10%, rgba(var(--warning-rgb), 0.04), transparent 50%),
+              radial-gradient(circle at 90% 90%, rgba(var(--accent-rgb), 0.04), transparent 50%);
+  pointer-events: none;
+}
+
+/* 证书卡片内边框 */
+.cert-card::after {
+  content: '';
+  position: absolute;
+  top: 24rpx;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: 24rpx;
+  border: 2rpx solid rgba(var(--warning-rgb), 0.2);
+  border-radius: 36rpx;
+  pointer-events: none;
+}
+
+.cert-list-arrow {
+  font-size: 28rpx;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+

@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.behave*
+.ruff_cache/
+.coverage
+htmlcov/
+node_modules/
+dist/
+.env
+*.db
+uploads/
+backups/
+gate-runs/
+.DS_Store

@@ -1,0 +1,8 @@
+.page-bg { min-height: 100vh; background: var(--bg); }
+.top-bar { display: flex; align-items: center; padding: 24rpx 32rpx; background: var(--surface); border-bottom: 2rpx solid var(--border); }
+.back-btn { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; font-size: 36rpx; }
+.top-bar-title { flex: 1; text-align: center; font-size: 32rpx; font-weight: 600; margin-right: 64rpx; }
+.content { padding: 48rpx 32rpx; }
+.section-title { font-size: 32rpx; font-weight: 700; color: var(--fg); margin-top: 48rpx; margin-bottom: 16rpx; }
+.section-title:first-child { margin-top: 0; }
+.section-content { font-size: 28rpx; color: var(--muted); line-height: 1.8; }

@@ -1,0 +1,28 @@
+# Docker Compose — DmkWords 开发/生产同构（宪法 ADR-001）
+# 开发环境：macOS 用 OrbStack 运行本文件（省内存）
+# 使用：docker compose up -d mysql
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: dmkwords-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: dmkwords_dev
+      MYSQL_DATABASE: dmkwords
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pdmkwords_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mysql_data:

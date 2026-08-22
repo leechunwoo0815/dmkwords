@@ -1,0 +1,282 @@
+/* reservation.wxss — aligned with design/user-end/reservation.html */
+
+.page-bg {
+  background: var(--bg);
+  min-height: 100vh;
+  padding-bottom: 160rpx;
+}
+
+/* Nav Bar */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 24rpx 32rpx;
+  background: var(--surface);
+  border-bottom: 2rpx solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.nav-bar .back {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20rpx;
+  font-size: 40rpx;
+  color: var(--fg);
+}
+
+.nav-bar .title {
+  font-family: var(--font-display);
+  font-size: 34rpx;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+/* Tip Banner */
+.tip-banner {
+  margin: 16rpx 32rpx 32rpx;
+  padding: 24rpx 28rpx;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  font-size: 26rpx;
+  color: var(--accent);
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+  line-height: 1.5;
+}
+
+.tip-banner .tip-icon {
+  font-size: 32rpx;
+  flex-shrink: 0;
+}
+
+/* Section Labels */
+.section-label {
+  padding: 28rpx 32rpx 16rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.section-count {
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 2rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.section-count-muted {
+  background: rgba(111, 104, 90, 0.1);
+  color: var(--muted);
+}
+
+/* Reservation List */
+.reservation-list {
+  padding: 0 32rpx;
+}
+
+/* Reservation Card */
+.reservation-card {
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 32rpx;
+  margin-bottom: 20rpx;
+  display: flex;
+  gap: 24rpx;
+}
+
+/* Cover */
+.reservation-cover {
+  width: 128rpx;
+  height: 168rpx;
+  border-radius: 16rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56rpx;
+  border: 2rpx solid var(--border);
+  overflow: hidden;
+  background: linear-gradient(135deg, #f0f2f5, #e4e8ec); /* intentional decorative */
+}
+
+.reservation-cover image {
+  width: 100%;
+  height: 100%;
+}
+
+/* Info */
+.reservation-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.reservation-title {
+  font-family: var(--font-display);
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 8rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reservation-author {
+  font-size: 24rpx;
+  color: var(--muted);
+  margin-bottom: 16rpx;
+}
+
+.reservation-time {
+  font-size: 24rpx;
+  color: var(--muted);
+  margin-bottom: 16rpx;
+}
+
+/* Countdown Row */
+.countdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+}
+
+/* Countdown Badge */
+.countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 10rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.countdown.urgent {
+  background: var(--error-soft);
+  color: var(--error);
+}
+
+.countdown.normal {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.countdown .clock {
+  font-size: 28rpx;
+}
+
+/* Reservation Actions */
+.reservation-actions {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+}
+
+/* Fulfill Button */
+.fulfill-btn {
+  padding: 12rpx 28rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  border: none;
+  color: var(--surface);
+  background: var(--accent);
+  min-height: initial;
+  line-height: 1.5;
+}
+
+.fulfill-btn::after {
+  border: none;
+}
+
+.fulfill-btn:active {
+  opacity: 0.85;
+}
+
+/* Cancel Button */
+.cancel-btn {
+  padding: 12rpx 28rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  border: 2rpx solid var(--border);
+  color: var(--muted);
+  background: var(--surface);
+  min-height: initial;
+  line-height: 1.5;
+}
+
+.cancel-btn::after {
+  border: none;
+}
+
+.cancel-btn:active {
+  border-color: var(--error);
+  color: var(--error);
+  background: var(--error-soft);
+}
+
+/* Expired Card */
+.reservation-card.expired {
+  opacity: 0.55;
+}
+
+/* Expired Badge */
+.expired-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  background: rgba(111, 104, 90, 0.1);
+  color: var(--muted);
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+/* Queue Badge */
+.queue-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  background: var(--warning-soft);
+  color: var(--warning-dark);
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+/* Expired Reason */
+.expired-reason {
+  font-size: 22rpx;
+  color: var(--muted);
+}
+
+/* Loading State */
+.loading-state {
+  text-align: center;
+  padding: 120rpx 40rpx;
+  color: var(--muted);
+  font-size: 28rpx;
+}
+
+/* Safe Bottom */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}

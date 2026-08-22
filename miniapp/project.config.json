@@ -1,0 +1,43 @@
+{
+  "compileType": "miniprogram",
+  "projectname": "dmkwords",
+  "appid": "wxcdb224b9dc221016",
+  "libVersion": "3.6.2",
+  "packOptions": {
+    "ignore": [
+      {
+        "type": "file",
+        "value": ".DS_Store"
+      },
+      {
+        "type": "folder",
+        "value": "node_modules"
+      }
+    ]
+  },
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "newFeature": true,
+    "coverView": true,
+    "autoAudits": false,
+    "scopeDataCheck": false,
+    "checkInvalidKey": true,
+    "checkSiteMap": true,
+    "compileHotReLoad": true,
+    "__usePrivacyCheck__": true,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "useCompilerPlugins": false
+  },
+  "condition": {},
+  "isGameTourist": false
+}

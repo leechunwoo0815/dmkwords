@@ -1,0 +1,14 @@
+<!-- frontend/components/error-view/error-view.wxml -->
+<!-- 通用错误视图组件 -->
+<view class="error-view" wx:if="{{visible}}">
+  <view class="error-icon">{{icon}}</view>
+  <view class="error-title">{{title}}</view>
+  <view class="error-desc" wx:if="{{desc}}">{{desc}}</view>
+  <button class="error-btn" wx:if="{{showRetry}}" bindtap="onRetry">
+    <text>{{retryText}}</text>
+  </button>
+  <button class="error-btn-outline" wx:if="{{showBack}}" bindtap="onBack">
+    <text>{{backText}}</text>
+  </button>
+  <view class="error-contact" wx:if="{{contactText}}">{{contactText}}</view>
+</view>

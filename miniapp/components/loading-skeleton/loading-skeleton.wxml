@@ -1,0 +1,9 @@
+<view wx:if="{{loading}}" class="skeleton">
+  <view wx:for="{{rows}}" wx:key="index" class="skeleton-row">
+    <view class="skeleton-avatar" wx:if="{{index === 0}}"></view>
+    <view class="skeleton-lines">
+      <view class="skeleton-line" style="width: {{index === rows - 1 ? '60%' : '100%'}};"></view>
+    </view>
+  </view>
+</view>
+<slot wx:else></slot>

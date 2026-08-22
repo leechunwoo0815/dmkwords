@@ -1,0 +1,503 @@
+/* frontend/pages/achievement/achievement.wxss */
+
+/* 页面背景 */
+.page-bg {
+  background: var(--bg);
+  min-height: 100vh;
+  padding-bottom: 160rpx;
+}
+
+/* 级别卡片 */
+.level-card {
+  margin: 32rpx;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  border-radius: var(--radius-lg);
+  padding: 48rpx 40rpx;
+  color: var(--surface);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.level-card::before {
+  content: '';
+  position: absolute;
+  top: -40rpx;
+  right: -40rpx;
+  width: 200rpx;
+  height: 200rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+.level-emoji {
+  font-size: 96rpx;
+  margin-bottom: 16rpx;
+}
+.level-name {
+  font-family: var(--font-display);
+  font-size: 40rpx;
+  font-weight: 700;
+}
+.level-desc {
+  font-size: 26rpx;
+  opacity: 0.85;
+  margin-top: 8rpx;
+}
+.level-stats {
+  display: flex;
+  justify-content: center;
+  gap: 48rpx;
+  margin-top: 32rpx;
+}
+.level-stat {
+  text-align: center;
+}
+.level-stat .num {
+  font-family: var(--font-display);
+  font-size: 48rpx;
+  font-weight: 700;
+  display: block;
+}
+.level-stat .label {
+  font-size: 22rpx;
+  opacity: 0.8;
+}
+.level-progress {
+  margin-top: 28rpx;
+}
+.level-progress-bar {
+  height: 12rpx;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 6rpx;
+  overflow: hidden;
+}
+.level-progress-fill {
+  height: 100%;
+  background: var(--surface);
+  border-radius: 6rpx;
+}
+.level-progress-text {
+  font-size: 22rpx;
+  opacity: 0.8;
+  margin-top: 8rpx;
+  text-align: right;
+}
+.promote-btn {
+  margin-top: 24rpx;
+  padding: 16rpx 48rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--surface);
+  font-size: 26rpx;
+  font-weight: 600;
+  display: inline-block;
+}
+
+/* 标签页 */
+.tabs {
+  display: flex;
+  background: var(--surface);
+  border-bottom: 2rpx solid var(--border);
+  position: sticky;
+  top: 96rpx;
+  z-index: 9;
+}
+.tab {
+  flex: 1;
+  padding: 24rpx 0;
+  text-align: center;
+  font-size: 28rpx;
+  color: var(--muted);
+  font-weight: 500;
+  position: relative;
+}
+.tab.active {
+  color: var(--accent);
+}
+.tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 20%;
+  right: 20%;
+  height: 4rpx;
+  background: var(--accent);
+  border-radius: 2rpx;
+}
+
+/* 徽章网格 */
+.badges-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24rpx;
+  padding: 80rpx 32rpx 32rpx;
+}
+.badge-card {
+  width: calc(33.333% - 16rpx);
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 32rpx 16rpx;
+  text-align: center;
+  box-sizing: border-box;
+}
+.badge-card.locked {
+  opacity: 0.45;
+}
+.badge-card.locked .badge-icon {
+  filter: grayscale(1);
+}
+.badge-card.locked .badge-name {
+  color: var(--muted);
+}
+.badge-icon {
+  font-size: 72rpx;
+  margin-bottom: 12rpx;
+  position: relative;
+}
+.badge-colored-locked {
+  position: relative;
+  display: inline-block;
+}
+.badge-locked-emoji {
+  font-size: 72rpx;
+  opacity: 0.5;
+  filter: grayscale(0.6);
+}
+.badge-lock-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.badge-lock-overlay .lock-icon {
+  font-size: 28rpx;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  width: 44rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.15);
+  line-height: 44rpx;
+  text-align: center;
+}
+.badge-lock-hint {
+  margin-top: 4rpx;
+}
+.badge-lock-hint .lock-hint-text {
+  font-size: 18rpx;
+  color: var(--muted);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.badge-progress-ring {
+  margin-top: 8rpx;
+}
+.badge-progress-track {
+  height: 6rpx;
+  background: rgba(44, 74, 110, 0.12);
+  border-radius: 3rpx;
+  overflow: hidden;
+  margin-bottom: 4rpx;
+}
+.badge-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-light));
+  border-radius: 3rpx;
+  transition: width 0.3s ease;
+}
+.badge-progress-text {
+  font-size: 18rpx;
+  color: var(--accent);
+  font-weight: 600;
+}
+.badge-name {
+  font-size: 24rpx;
+  font-weight: 600;
+  margin-bottom: 4rpx;
+}
+.badge-date {
+  font-size: 20rpx;
+  color: var(--muted);
+}
+.badge-card.locked .badge-date {
+  color: var(--border);
+}
+.badge-lock {
+  width: 40rpx;
+  height: 40rpx;
+  margin: 0 auto;
+  color: var(--border);
+}
+
+/* 排行榜 */
+.leaderboard {
+  padding: 48rpx 32rpx 32rpx;
+  display: none;
+}
+.leaderboard.active {
+  display: block;
+}
+.leaderboard-section {
+  padding: 48rpx 32rpx 32rpx;
+}
+.leaderboard-section.active {
+  display: block;
+}
+.lb-item {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 24rpx 28rpx;
+  margin-bottom: 16rpx;
+}
+.lb-item-me {
+  border-color: var(--accent);
+}
+.lb-rank {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.lb-rank.top1 {
+  background: rgba(141, 102, 16, 0.15);
+  color: var(--warning);
+}
+.lb-rank.top2 {
+  background: rgba(228, 220, 200, 0.4);
+  color: var(--muted);
+}
+.lb-rank.top3 {
+  background: rgba(201, 162, 39, 0.12);
+  color: var(--warning);
+}
+.lb-rank.normal {
+  background: var(--border);
+  color: var(--muted);
+}
+.lb-avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  flex-shrink: 0;
+  background: var(--accent-soft);
+}
+.lb-info {
+  flex: 1;
+}
+.lb-name {
+  font-weight: 600;
+  font-size: 28rpx;
+  display: block;
+}
+.lb-books {
+  font-size: 24rpx;
+  color: var(--muted);
+}
+.lb-count {
+  flex-shrink: 0;
+}
+.lb-count-num {
+  font-family: var(--font-display);
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--accent);
+}
+.lb-count-unit {
+  font-size: 24rpx;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* 时间线 */
+.timeline {
+  padding: 32rpx;
+}
+.timeline-title {
+  font-family: var(--font-display);
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 24rpx;
+}
+.tl-item {
+  display: flex;
+  gap: 24rpx;
+  position: relative;
+  padding-bottom: 40rpx;
+}
+.tl-item:last-child {
+  padding-bottom: 0;
+}
+.tl-item::before {
+  content: '';
+  position: absolute;
+  left: 36rpx;
+  top: 76rpx;
+  bottom: 0;
+  width: 4rpx;
+  background: var(--border);
+}
+.tl-item:last-child::before {
+  display: none;
+}
+.tl-dot {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  background: var(--surface);
+  border: 4rpx solid var(--accent);
+}
+.tl-content {
+  flex: 1;
+  padding-top: 8rpx;
+}
+.tl-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  display: block;
+}
+.tl-desc {
+  font-size: 24rpx;
+  color: var(--muted);
+  margin-top: 4rpx;
+  display: block;
+}
+.tl-time {
+  font-size: 22rpx;
+  color: var(--muted);
+  margin-top: 8rpx;
+  display: block;
+}
+
+/* 弹窗 */
+.modal-overlay {
+  position: fixed;
+    box-sizing: border-box;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(38, 36, 25, 0.5);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.modal-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.modal-card {
+  width: calc(100% - 96rpx);
+  max-width: 720rpx;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 56rpx 48rpx;
+  text-align: center;
+  transform: scale(0.9);
+  transition: transform 0.25s ease;
+}
+.modal-overlay.show .modal-card {
+  transform: scale(1);
+}
+.m-icon {
+  font-size: 96rpx;
+  margin-bottom: 24rpx;
+}
+.m-name {
+  font-family: var(--font-display);
+  font-size: 36rpx;
+  font-weight: 700;
+  margin-bottom: 12rpx;
+}
+.m-desc {
+  font-size: 26rpx;
+  color: var(--muted);
+  margin-bottom: 24rpx;
+  line-height: 1.5;
+}
+.m-detail {
+  font-size: 24rpx;
+  color: var(--fg);
+  padding: 20rpx 24rpx;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  margin-bottom: 32rpx;
+  text-align: left;
+}
+.m-detail-row {
+  padding: 6rpx 0;
+}
+.m-label {
+  color: var(--muted);
+}
+.modal-close-btn {
+  display: inline-block;
+  padding: 20rpx 64rpx;
+  border-radius: 999rpx;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 28rpx;
+  font-weight: 600;
+}
+.modal-close {
+  padding: 20rpx 64rpx;
+  border-radius: 999rpx;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+/* 排行榜 - 隐藏/显示控制 */
+.leaderboard-section {
+  display: none;
+}
+.leaderboard-section.active {
+  display: block;
+}
+.badges-grid {
+  display: flex;
+}
+.badges-grid.active {
+  display: flex;
+}
+
+/* 排行榜数量样式 */
+.lb-count {
+  font-family: var(--font-display);
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}

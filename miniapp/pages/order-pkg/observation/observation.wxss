@@ -1,0 +1,391 @@
+/* frontend/pages/observation/observation.wxss — translated from design */
+
+.page-bg {
+  background: var(--bg);
+  min-height: 100vh;
+  padding-bottom: 200rpx;
+}
+
+/* nav-bar */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 24rpx 32rpx;
+  background: var(--surface);
+  border-bottom: 2rpx solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.nav-bar .back {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  font-size: 40rpx;
+  color: var(--fg);
+}
+.nav-title {
+  font-family: var(--font-display);
+  font-size: 34rpx;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+/* hero */
+.hero {
+  margin: 32rpx;
+  padding: 56rpx 40rpx;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(var(--success-rgb), 0.1), rgba(var(--accent-rgb), 0.08));
+  border: 2rpx solid rgba(var(--success-rgb), 0.15);
+  text-align: center;
+}
+.hero-icon {
+  font-size: 96rpx;
+  margin-bottom: 20rpx;
+}
+.hero-h1 {
+  font-family: var(--font-display);
+  font-size: 44rpx;
+  font-weight: 700;
+  margin-bottom: 12rpx;
+  color: var(--fg);
+}
+.hero-p {
+  font-size: 28rpx;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* price section */
+.price-section {
+  margin: 0 32rpx 32rpx;
+  padding: 40rpx;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  text-align: center;
+}
+.duration-badge {
+  display: inline-block;
+  padding: 8rpx 28rpx;
+  border-radius: 999rpx;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 26rpx;
+  font-weight: 600;
+  margin-bottom: 24rpx;
+}
+.price-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8rpx;
+  margin-bottom: 8rpx;
+}
+.price-sym {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: var(--accent);
+}
+.price-val {
+  font-family: var(--font-display);
+  font-size: 96rpx;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+.price-unit {
+  font-size: 30rpx;
+  color: var(--muted);
+}
+.price-note {
+  font-size: 26rpx;
+  color: var(--muted);
+  margin-top: 16rpx;
+}
+
+/* includes card */
+.includes-card {
+  margin: 0 32rpx 32rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 36rpx 32rpx;
+}
+.includes-h3 {
+  font-family: var(--font-display);
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 28rpx;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  color: var(--fg);
+}
+.includes-h3-icon {
+  font-size: 36rpx;
+  color: var(--accent);
+}
+.includes-list {
+  display: flex;
+  flex-direction: column;
+}
+.includes-item {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 20rpx 0;
+  border-bottom: 2rpx solid var(--border);
+}
+.includes-item:last-child {
+  border-bottom: none;
+}
+.inc-icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  flex-shrink: 0;
+}
+.ic1 { background: var(--accent-soft); }
+.ic2 { background: var(--success-soft); }
+.ic3 { background: rgba(var(--success-rgb), 0.12); }
+.ic4 { background: rgba(var(--warning-rgb), 0.12); }
+.ic5 { background: rgba(181, 64, 40,0.08); }
+.inc-content {
+  flex: 1;
+}
+.inc-title {
+  font-weight: 600;
+  font-size: 28rpx;
+  color: var(--fg);
+}
+.inc-desc {
+  font-size: 24rpx;
+  color: var(--muted);
+  margin-top: 2rpx;
+}
+
+/* guarantee */
+.guarantee-box {
+  margin: 0 32rpx 32rpx;
+  padding: 28rpx 32rpx;
+  border-radius: var(--radius);
+  background: rgba(var(--success-rgb), 0.12);
+  border: 2rpx solid rgba(var(--success-rgb), 0.2);
+  display: flex;
+  align-items: flex-start;
+  gap: 20rpx;
+}
+.guarantee-icon {
+  font-size: 40rpx;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+.g-text {
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: var(--fg);
+}
+.g-strong {
+  font-weight: 600;
+}
+
+/* FAQ */
+.faq-card {
+  margin: 0 32rpx 32rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.faq-header {
+  font-family: var(--font-display);
+  font-size: 30rpx;
+  font-weight: 600;
+  padding: 32rpx 32rpx 0;
+  margin-bottom: 8rpx;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  color: var(--fg);
+}
+.faq-header-icon {
+  font-size: 36rpx;
+}
+.faq-item {
+  border-bottom: 2rpx solid var(--border);
+}
+.faq-item:last-child {
+  border-bottom: none;
+}
+.faq-q {
+  padding: 28rpx 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 28rpx;
+  font-weight: 500;
+  color: var(--fg);
+}
+.faq-q-text {
+  flex: 1;
+  padding-right: 16rpx;
+}
+.faq-arrow {
+  font-size: 36rpx;
+  color: var(--muted);
+  transform: rotate(-90deg);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.faq-arrow-open {
+  transform: rotate(90deg);
+}
+.faq-a {
+  font-size: 26rpx;
+  color: var(--muted);
+  line-height: 1.6;
+  padding: 0 32rpx 28rpx;
+}
+
+/* pay bar */
+.pay-bar {
+  position: fixed;
+    box-sizing: border-box;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  background: var(--surface);
+  border-top: 2rpx solid var(--border);
+  padding: 24rpx 32rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  z-index: 20;
+}
+.pay-btn {
+  width: 100%;
+  padding: 28rpx;
+  border-radius: 999rpx;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 32rpx;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 8rpx 32rpx rgba(var(--accent-rgb), 0.3);
+}
+.pay-btn:active {
+  opacity: 0.92;
+}
+.btn-disabled {
+  opacity: 0.5;
+}
+.pay-sub {
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--muted);
+  margin-top: 12rpx;
+  display: block;
+}
+
+/* FAQ 问题文本 flex */
+.faq-q-text {
+  flex: 1;
+  padding-right: 16rpx;
+}
+
+/* FAQ 箭头方向控制 */
+.faq-arrow {
+  transform: rotate(-90deg);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.faq-arrow-open {
+  transform: rotate(90deg);
+}
+
+/* FAQ 答案展开 */
+.faq-item.open .faq-a {
+  padding: 0 32rpx 28rpx;
+}
+
+/* 支付按钮活跃态 */
+.pay-btn:active {
+  transform: scale(0.98);
+}
+
+/* 支付按钮阴影 */
+.pay-btn {
+  box-shadow: 0 8rpx 32rpx rgba(var(--accent-rgb), 0.3);
+}
+
+/* FAQ 问题文本 flex */
+.faq-q-text {
+  flex: 1;
+  padding-right: 16rpx;
+}
+
+/* FAQ 箭头方向控制 */
+.faq-arrow {
+  transform: rotate(-90deg);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.faq-arrow-open {
+  transform: rotate(90deg);
+}
+
+/* FAQ 答案展开 */
+.faq-item.open .faq-a {
+  padding: 0 32rpx 28rpx;
+}
+
+/* 支付按钮活跃态 */
+.pay-btn:active {
+  transform: scale(0.98);
+}
+
+/* 支付按钮阴影 */
+.pay-btn {
+  box-shadow: 0 8rpx 32rpx rgba(var(--accent-rgb), 0.3);
+}
+
+
+/* iOS 限制提示 */
+.ios-restrict {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  padding: 48rpx;
+}
+.ios-restrict-icon {
+  font-size: 72rpx;
+  margin-bottom: 32rpx;
+}
+.ios-restrict-text {
+  font-size: 28rpx;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.6;
+}
+.ios-guide-btn {
+  margin-top: 40rpx;
+  padding: 0 64rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  font-size: 30rpx;
+  color: var(--surface);
+  background: var(--accent);
+  border-radius: 40rpx;
+}

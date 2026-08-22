@@ -1,0 +1,478 @@
+/* frontend/pages/benefit-transfer/benefit-transfer.wxss */
+
+/* Color tokens */
+
+.page {
+  background: var(--bg);
+  min-height: 100vh;
+  padding-bottom: 200rpx;
+}
+
+/* Nav Bar */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 24rpx 32rpx;
+  background: var(--surface);
+  border-bottom: 2rpx solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.nav-bar .back {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+}
+
+.nav-bar .back-icon {
+  font-size: 40rpx;
+  color: var(--fg);
+}
+
+.nav-bar .title {
+  font-family: var(--font-display);
+  font-size: 34rpx;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+/* Transfer Card */
+.transfer-card {
+  margin: 32rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 32rpx;
+}
+
+.transfer-heading {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 28rpx;
+  display: block;
+}
+
+.child-select {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 24rpx;
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 16rpx;
+}
+
+.child-select.selected {
+  border-color: var(--accent);
+  border-width: 4rpx;
+}
+
+.avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  flex-shrink: 0;
+}
+
+.avatar.a {
+  background: rgba(var(--accent-rgb), 0.15);
+}
+
+.avatar.b {
+  background: rgba(var(--success-rgb), 0.15);
+}
+
+.info {
+  flex: 1;
+}
+
+.name {
+  font-weight: 600;
+  font-size: 30rpx;
+  color: var(--fg);
+  display: block;
+}
+
+.meta {
+  font-size: 24rpx;
+  color: var(--muted);
+  margin-top: 4rpx;
+  display: block;
+}
+
+.check-circle {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  border: 4rpx solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.check-circle.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.check-icon {
+  font-size: 24rpx;
+  color: var(--border);
+}
+
+.check-circle.checked .check-icon {
+  color: var(--surface);
+}
+
+/* Arrow Section */
+.arrow-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32rpx;
+}
+
+.arrow-icon {
+  font-size: 48rpx;
+  color: var(--muted);
+}
+
+/* Days Info */
+.days-info {
+  margin: 0 32rpx 32rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 32rpx;
+}
+
+.info-heading {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 24rpx;
+  display: block;
+}
+
+.days-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 0;
+  font-size: 28rpx;
+}
+
+.days-row .label {
+  color: var(--muted);
+}
+
+.days-row .value {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.days-row.highlight .value {
+  color: var(--accent);
+  font-size: 36rpx;
+}
+
+/* Check List */
+.check-list {
+  margin: 0 32rpx 32rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 32rpx;
+}
+
+.check-heading {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 24rpx;
+  display: block;
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 16rpx 0;
+  font-size: 28rpx;
+}
+
+.check-icon-wrap {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.check-icon-wrap.pass {
+  background: var(--success-soft);
+}
+
+.check-icon-wrap.fail {
+  background: var(--error-soft);
+}
+
+.check-result-icon {
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.check-icon-wrap.pass .check-result-icon {
+  color: var(--success);
+}
+
+.check-icon-wrap.fail .check-result-icon {
+  color: var(--error);
+}
+
+.check-text {
+  color: var(--fg);
+}
+
+/* Tip Card */
+.tip-card {
+  margin: 0 32rpx 32rpx;
+  padding: 24rpx 32rpx;
+  background: var(--warning-soft);
+  border-radius: var(--radius-sm);
+  font-size: 26rpx;
+  color: var(--warning);
+  display: flex;
+  gap: 16rpx;
+}
+
+.tip-icon {
+  font-size: 36rpx;
+  flex-shrink: 0;
+  margin-top: 2rpx;
+}
+
+.tip-text {
+  line-height: 1.6;
+}
+
+.check {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  border: 4rpx solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.child-select.selected .check {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.child-select.selected .check-icon {
+  color: white;
+}
+
+/* Records Section */
+.records-section {
+  margin: 0 32rpx 32rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 32rpx;
+}
+.records-heading {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 24rpx;
+  display: block;
+}
+.record-item {
+  padding: 20rpx 0;
+  border-bottom: 2rpx solid var(--border);
+}
+.record-item:last-child { border-bottom: none; }
+.record-header {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 8rpx;
+}
+.record-source, .record-target {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--fg);
+}
+.record-arrow {
+  font-size: 24rpx;
+  color: var(--muted);
+}
+.record-meta {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+.record-date {
+  font-size: 22rpx;
+  color: var(--muted);
+}
+.record-status {
+  font-size: 22rpx;
+  font-weight: 600;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+}
+.record-status.approved {
+  color: var(--success);
+  background: var(--success-soft);
+}
+.record-status.pending {
+  color: var(--warning-dark);
+  background: var(--warning-soft);
+}
+.record-status.rejected {
+  color: var(--error);
+  background: var(--error-soft);
+}
+.empty-records {
+  margin: 0 32rpx 32rpx;
+  text-align: center;
+  color: var(--muted);
+  font-size: 26rpx;
+  padding: 40rpx 0;
+}
+
+/* Submit Button */
+.submit-wrap {
+  position: fixed;
+    box-sizing: border-box;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  padding: 24rpx 32rpx 56rpx;
+  padding-bottom: calc(56rpx + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 2rpx solid var(--border);
+  box-sizing: border-box;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 28rpx;
+  border-radius: var(--radius);
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.submit-btn text {
+  color: var(--surface);
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.submit-btn.disabled {
+  opacity: 0.5;
+}
+
+/* Loading */
+.loading-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 0;
+  color: var(--muted);
+  font-size: 28rpx;
+}
+
+/* 提交按钮禁用态 */
+.submit-btn[disabled] {
+  opacity: 0.5;
+}
+
+/* 提交按钮文字颜色 */
+.submit-btn {
+  color: var(--surface);
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+/* 子选项选中勾选样式 */
+.child-select.selected .check-circle {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* 提示卡片颜色修正 */
+.tip-card {
+  color: rgba(139, 113, 23, 0.9);
+}
+
+/* 权益信息高亮行 */
+.days-row.highlight .value {
+  font-size: 36rpx;
+}
+
+/* 检查项失败图标颜色 */
+.check-icon-wrap.fail .check-result-icon {
+  color: var(--error);
+}
+
+/* 提交按钮文字颜色 */
+.submit-btn text {
+  color: var(--surface);
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+/* 提交按钮禁用态 */
+.submit-btn[disabled] {
+  opacity: 0.5;
+}
+
+/* 子选项选中勾选样式 */
+.child-select.selected .check-circle {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* 检查项图标颜色 */
+.check-icon-wrap.pass .check-result-icon {
+  color: var(--success);
+}
+.check-icon-wrap.fail .check-result-icon {
+  color: var(--error);
+}
+
+/* 权益信息高亮行 */
+.days-row.highlight .value {
+  color: var(--accent);
+  font-size: 36rpx;
+}
+
+/* 提示卡片文字颜色 */
+.tip-card {
+  color: rgba(139, 113, 23, 0.9);
+}
+

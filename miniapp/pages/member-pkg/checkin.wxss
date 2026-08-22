@@ -1,0 +1,472 @@
+/* frontend/pages/checkin/checkin.wxss */
+
+/* Nav Bar */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 24rpx 32rpx;
+  background: var(--surface);
+  border-bottom: 2rpx solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.nav-bar .back {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+}
+
+.nav-bar .back-arrow {
+  font-size: 36rpx;
+}
+
+.nav-bar .title {
+  font-family: var(--font-display);
+  font-size: 34rpx;
+  font-weight: 600;
+}
+
+/* Streak Banner */
+.streak-banner {
+  margin: 32rpx;
+  padding: 40rpx;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: var(--surface);
+  text-align: center;
+}
+
+.streak-banner .streak-num {
+  font-family: var(--font-display);
+  font-size: 96rpx;
+  font-weight: 700;
+  line-height: 1;
+  display: block;
+}
+
+.streak-banner .streak-label {
+  font-size: 28rpx;
+  opacity: 0.85;
+  margin-top: 8rpx;
+  display: block;
+}
+
+.streak-banner .streak-sub {
+  font-size: 24rpx;
+  opacity: 0.7;
+  margin-top: 8rpx;
+  display: block;
+}
+
+.streak-stats {
+  display: flex;
+  justify-content: center;
+  gap: 64rpx;
+  margin-top: 24rpx;
+}
+
+.streak-stats .ss-item {
+  text-align: center;
+}
+
+.streak-stats .ss-num {
+  font-family: var(--font-display);
+  font-size: 44rpx;
+  font-weight: 700;
+  display: block;
+}
+
+.streak-stats .ss-label {
+  font-size: 22rpx;
+  opacity: 0.8;
+  display: block;
+}
+
+/* Badge Row */
+.badge-row {
+  display: flex;
+  justify-content: center;
+  gap: 24rpx;
+  margin: 0 32rpx 32rpx;
+}
+
+.badge-item {
+  text-align: center;
+}
+
+.badge-icon {
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 8rpx;
+}
+
+.badge-icon.unlocked {
+  background: var(--surface);
+  border: 4rpx solid var(--accent);
+}
+
+.badge-icon.locked {
+  background: var(--bg);
+  opacity: 0.4;
+}
+
+.badge-icon .badge-emoji {
+  font-size: 56rpx;
+}
+
+.badge-item .b-name {
+  font-size: 20rpx;
+  color: var(--muted);
+}
+
+/* Today Status Card */
+.today-card {
+  margin: 0 32rpx 24rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 32rpx;
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+}
+
+.today-card.checked {
+  border-color: rgba(53, 112, 60, 0.3);
+  background: rgba(53, 112, 60, 0.04);
+}
+
+.today-card .tc-icon {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48rpx;
+  flex-shrink: 0;
+}
+
+.today-card.checked .tc-icon {
+  background: rgba(53, 112, 60, 0.1);
+}
+
+.today-card.unchecked .tc-icon {
+  background: rgba(141, 102, 16, 0.1);
+}
+
+.today-card .tc-info {
+  flex: 1;
+}
+
+.today-card .tc-title {
+  font-family: var(--font-display);
+  font-size: 30rpx;
+  font-weight: 600;
+  display: block;
+}
+
+.today-card .tc-sub {
+  font-size: 24rpx;
+  color: var(--muted);
+  margin-top: 4rpx;
+  display: block;
+}
+
+.today-card .tc-time {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--success);
+  flex-shrink: 0;
+}
+
+/* Auto Trigger */
+.auto-trigger {
+  margin: 0 32rpx 32rpx;
+  padding: 24rpx 28rpx;
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.auto-trigger .auto-trigger-icon {
+  font-size: 32rpx;
+  flex-shrink: 0;
+}
+
+.auto-trigger .auto-trigger-text {
+  font-size: 24rpx;
+  color: var(--fg);
+}
+
+/* Calendar Card */
+.calendar-card {
+  margin: 0 32rpx 32rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  padding: 32rpx;
+}
+
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+}
+
+.cal-header .month {
+  font-family: var(--font-display);
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.cal-header .nav-btns {
+  display: flex;
+  gap: 8rpx;
+}
+
+.cal-nav-btn {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12rpx;
+}
+
+.cal-nav-icon {
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+.cal-weekdays {
+  display: flex;
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--muted);
+  margin-bottom: 12rpx;
+}
+
+.cal-weekday {
+  flex: 1;
+}
+
+.cal-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+}
+
+.cal-day {
+  width: calc((100% - 48rpx) / 7);
+  height: 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-day .cal-day-text {
+  font-size: 26rpx;
+  font-weight: 500;
+}
+
+.cal-day.checked {
+  background: var(--accent);
+}
+
+.cal-day.checked .cal-day-text {
+  color: var(--surface);
+}
+
+.cal-day.today {
+  border: 4rpx solid var(--accent);
+}
+
+.cal-day.today .cal-day-text {
+  color: var(--accent);
+}
+
+.cal-day.empty {
+  visibility: hidden;
+}
+
+/* Records */
+.records {
+  margin: 0 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.records .records-title {
+  font-family: var(--font-display);
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 8rpx;
+}
+
+.record-item {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 24rpx 28rpx;
+}
+
+.record-item .r-icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  flex-shrink: 0;
+}
+
+.record-item .r-info {
+  flex: 1;
+}
+
+.record-item .r-date {
+  font-size: 26rpx;
+  font-weight: 500;
+  display: block;
+}
+
+.record-item .r-detail {
+  font-size: 24rpx;
+  color: var(--muted);
+  display: block;
+}
+
+.record-item .r-duration {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 26rpx;
+  font-weight: 500;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* Share Button */
+.share-btn {
+  margin: 0 32rpx 32rpx;
+  padding: 28rpx;
+  border-radius: var(--radius);
+  background: var(--success);
+  color: var(--surface);
+  font-size: 30rpx;
+  font-weight: 600;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  width: calc(100% - 64rpx);
+  border: none;
+  line-height: 1;
+}
+
+.share-btn::after {
+  border: none;
+}
+
+.share-btn .share-icon {
+  font-size: 36rpx;
+}
+
+/* 底部导航 */
+.bottom-nav {
+  position: fixed;
+    box-sizing: border-box;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  padding: 16rpx 16rpx 40rpx;
+  background: var(--surface);
+  border-top: 2rpx solid var(--border);
+  z-index: 10;
+  box-sizing: border-box;
+}
+.bottom-nav .nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+  font-size: 20rpx;
+  color: var(--muted);
+  padding: 8rpx 24rpx;
+}
+.bottom-nav .nav-item.active {
+  color: var(--accent);
+}
+
+/* 日历-今天边框 */
+.cal-day.today {
+  border: 4rpx solid var(--accent);
+}
+
+/* 徽章-锁定灰化 */
+.badge-icon.locked {
+  filter: grayscale(1);
+}
+
+/* 底部导航 */
+.bottom-nav {
+  position: fixed;
+    box-sizing: border-box;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  padding: 16rpx 16rpx 40rpx;
+  background: var(--surface);
+  border-top: 2rpx solid var(--border);
+  z-index: 10;
+  box-sizing: border-box;
+}
+.bottom-nav .nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+  font-size: 20rpx;
+  color: var(--muted);
+  padding: 8rpx 24rpx;
+}
+.bottom-nav .nav-item.active {
+  color: var(--accent);
+}
+
+/* 日历-今天边框 */
+.cal-day.today {
+  border: 4rpx solid var(--accent);
+}
+
+/* 徽章-锁定灰化 */
+.badge-icon.locked {
+  filter: grayscale(1);
+}
+

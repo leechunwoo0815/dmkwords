@@ -1,0 +1,342 @@
+/* deposit.wxss — aligned with design/user-end/deposit.html */
+
+.page {
+  background: var(--bg);
+  min-height: 100vh;
+  padding-bottom: 160rpx;
+}
+
+/* Nav Bar */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 24rpx 32rpx;
+  background: var(--surface);
+  border-bottom: 2rpx solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.nav-bar .back {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20rpx;
+}
+
+.nav-bar .back-icon {
+  font-size: 40rpx;
+  color: var(--fg);
+}
+
+.nav-bar .title {
+  font-family: var(--font-display);
+  font-size: 34rpx;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+/* Loading */
+.loading-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 0;
+  color: var(--muted);
+  font-size: 28rpx;
+}
+
+/* Status Section */
+.status-section {
+  padding: 32rpx;
+}
+
+.status-card {
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 48rpx 40rpx;
+  box-shadow: 0 4rpx 24rpx rgba(38, 36, 25, 0.04);
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin-bottom: 40rpx;
+}
+
+.status-badge {
+  padding: 10rpx 28rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.badge-paid {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.badge-warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.badge-info {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.badge-error {
+  background: var(--error-soft);
+  color: var(--error);
+}
+
+/* Balance Grid */
+.balance-grid {
+  display: flex;
+  gap: 32rpx;
+  margin-bottom: 40rpx;
+}
+
+.balance-item {
+  flex: 1;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 28rpx;
+}
+
+.balance-label {
+  font-size: 24rpx;
+  color: var(--muted);
+  margin-bottom: 8rpx;
+  display: block;
+}
+
+.balance-value {
+  font-family: var(--font-display);
+  font-size: 48rpx;
+  font-weight: 700;
+  color: var(--fg);
+  display: block;
+}
+
+.balance-value-muted {
+  color: var(--muted);
+  font-size: 40rpx;
+}
+
+.balance-value-fine {
+  color: var(--error);
+}
+
+/* Action Buttons */
+.action-buttons {
+  display: flex;
+  gap: 20rpx;
+}
+
+.btn-outline {
+  flex: 1;
+  padding: 24rpx 0;
+  border-radius: 999rpx;
+  border: 3rpx solid var(--accent);
+  color: var(--accent);
+  font-size: 30rpx;
+  font-weight: 600;
+  text-align: center;
+}
+
+.btn-outline:active {
+  background: var(--accent-soft);
+}
+
+.btn-primary-full {
+  flex: 1;
+  padding: 24rpx 0;
+  border-radius: 999rpx;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 30rpx;
+  font-weight: 600;
+  text-align: center;
+}
+
+.btn-primary-full:active {
+  opacity: 0.85;
+  transform: scale(0.97);
+}
+
+.btn-danger-full {
+  flex: 1;
+  padding: 24rpx 0;
+  border-radius: 999rpx;
+  background: var(--error);
+  color: var(--surface);
+  font-size: 30rpx;
+  font-weight: 600;
+  text-align: center;
+}
+
+.btn-danger-full:active {
+  opacity: 0.85;
+  transform: scale(0.97);
+}
+
+.btn-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Info Banner */
+.info-banner {
+  margin: 0 32rpx 32rpx;
+  padding: 24rpx 28rpx;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  font-size: 26rpx;
+  color: var(--accent);
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+  line-height: 1.5;
+}
+
+.info-icon {
+  font-size: 32rpx;
+  flex-shrink: 0;
+  margin-top: 2rpx;
+}
+
+.info-text {
+  flex: 1;
+}
+
+/* Section Header */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32rpx 32rpx 20rpx;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+/* Record List */
+.record-list {
+  padding: 0 32rpx;
+}
+
+.record-item {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 28rpx 0;
+  border-bottom: 2rpx solid var(--border);
+}
+
+.record-item:last-child {
+  border-bottom: none;
+}
+
+.record-icon {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  flex-shrink: 0;
+}
+
+.record-icon-pay {
+  background: var(--success-soft);
+}
+
+.record-icon-deduct {
+  background: var(--error-soft);
+}
+
+.record-icon-refund {
+  background: var(--accent-soft);
+}
+
+.record-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.record-type {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--fg);
+  display: block;
+  margin-bottom: 4rpx;
+}
+
+.record-reason {
+  font-size: 24rpx;
+  color: var(--muted);
+  display: block;
+}
+
+.record-right {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.record-amount {
+  font-family: var(--font-mono);
+  font-size: 30rpx;
+  font-weight: 600;
+  display: block;
+}
+
+.record-amount-plus {
+  color: var(--success);
+}
+
+.record-amount-minus {
+  color: var(--error);
+}
+
+.record-date {
+  font-size: 22rpx;
+  color: var(--muted);
+  margin-top: 4rpx;
+  display: block;
+}
+
+/* iOS 限制提示 */
+.ios-restrict {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  padding: 48rpx;
+}
+.ios-restrict-icon {
+  font-size: 72rpx;
+  margin-bottom: 32rpx;
+}
+.ios-restrict-text {
+  font-size: 28rpx;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.6;
+}

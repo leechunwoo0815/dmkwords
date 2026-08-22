@@ -1,0 +1,244 @@
+/* ============================================
+   全局样式 — 设计系统基座
+   「暖纸书房」v2 (2026-08-18) — 与管理端 base.css 同源
+   概念：布面精装书的牛津蓝 × 书页暖纸 × 书脊烫金 × 绘本印刷色
+   令牌名与 v1 完全兼容：43 个页面 WXSS 无需改动即可继承新风格
+   ============================================ */
+
+page {
+  /* ===== 设计 Token — 与 pcweb/base.css 同源 ===== */
+  /* 纸面 */
+  --bg: #f6f2e9;              /* 暖纸米白 */
+  --surface: #fffefa;         /* 暖白纸面 */
+  --fg: #262419;              /* 暖炭墨 */
+  --muted: #6f685a;           /* 暖灰 */
+  --border: #e4dcc8;          /* 暖沙 */
+
+  /* 主色：牛津布面蓝 */
+  --accent: #2c4a6e;
+  --accent-soft: rgba(44, 74, 110, 0.10);   /* 蓝染纸痕 */
+  --accent-hover: #1f3a59;
+  --accent-light: #5d7ba1;    /* 亮档（原紫 #5d7ba1 → 蓝灰亮档） */
+  --accent-dark: #23405f;
+  --accent-darker: #1a324b;
+
+  /* 点缀：蜜杏橙（绘本活力） */
+  --secondary: #e8945a;
+  --secondary-soft: rgba(232, 148, 90, 0.12);
+
+  /* 印刷状态色 */
+  --success: #35703c;
+  --success-soft: rgba(53, 112, 60, 0.10);
+  --warning: #8d6610;
+  --warning-soft: rgba(141, 102, 16, 0.10);
+  --warning-dark: #7a570c;
+  --error: #b54028;
+  --error-soft: rgba(181, 64, 40, 0.10);
+
+  /* RGB 通道（页面里做渐变/遮罩用） */
+  --error-rgb: 192, 71, 47;
+  --success-rgb: 62, 124, 69;
+  --warning-rgb: 169, 123, 20;
+  --accent-rgb: 44, 74, 110;
+
+  /* 书脊金（成就/等级/星标专用） */
+  --gold: #c9a227;
+  --gold-light: #f6edd3;
+  --gold-dark: #736013;
+
+  /* 硬边偏移阴影 — 品牌记忆点（实体按压感） */
+  --shadow-hard: 6rpx 6rpx 0 rgba(38, 36, 25, 0.12);
+  --shadow-hard-sm: 4rpx 4rpx 0 rgba(38, 36, 25, 0.10);
+  --shadow-soft: 0 4rpx 16rpx rgba(38, 36, 25, 0.06);
+
+  /* 圆角 */
+  --radius: 32rpx;
+  --radius-sm: 20rpx;
+  --radius-lg: 40rpx;
+
+  /* v1 兼容别名（存量页面引用，旧版即未定义，2026-08-18 补钉）
+     注：--pct 是页面 JS 动态注入的进度值，非设计 token，不在此定义 */
+  --primary: var(--accent);
+  --text-secondary: #5d5748;
+  --text-tertiary: #6f685a;
+  --secondary-ink: #9d5c22;  /* 蜜杏橙文字档（--secondary 仅装饰） */
+
+  /* 字体：标题衬线 = 书卷气 */
+  --font-display: 'Georgia', 'PingFang SC', 'Songti SC', 'STSong', serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
+  font-family: var(--font-body);
+  font-size: 28rpx;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+/* 全局按钮最小触控区 88rpx (44pt) — MP-018 红线，不可删 */
+button {
+  min-height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 核心操作按钮 96rpx — MP-018 红线，不可删 */
+.btn-primary, .fixed-bottom-btn {
+  min-height: 96rpx;
+}
+
+/* 全局安全底部栏 */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 全局 flex 工具 */
+.flex { display: flex; }
+.flex-col { display: flex; flex-direction: column; }
+.flex-1 { flex: 1; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.gap-sm { gap: 12rpx; }
+
+/* 全局文本工具 */
+.text-primary { color: var(--accent); }
+.text-secondary { color: var(--muted); }
+.text-bold { font-weight: 600; }
+.text-sm { font-size: 24rpx; }
+.text-display { font-family: var(--font-display); }
+
+/* 全局按钮样式 — 牛津蓝实色 + 硬边偏移阴影（实体按压感） */
+.btn-primary {
+  background: var(--accent);
+  color: #fffefa;
+  border: 1rpx solid var(--accent-hover);
+  border-radius: var(--radius);
+  font-size: 28rpx;
+  font-weight: 600;
+  box-shadow: var(--shadow-hard);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.btn-primary:active {
+  transform: translate(3rpx, 3rpx);
+  box-shadow: 2rpx 2rpx 0 rgba(38, 36, 25, 0.10);
+}
+.btn-outline {
+  background: transparent;
+  color: var(--accent);
+  border: 2rpx solid var(--accent);
+  border-radius: var(--radius);
+  font-size: 28rpx;
+  font-weight: 600;
+}
+.btn-outline:active {
+  background: var(--accent-soft);
+}
+.btn-disabled {
+  opacity: 0.4;
+  pointer-events: none;
+  box-shadow: none;
+}
+.btn-success {
+  background: var(--success);
+  color: #fffefa;
+  border: 1rpx solid var(--success);
+  border-radius: var(--radius);
+  font-size: 28rpx;
+  font-weight: 600;
+  box-shadow: var(--shadow-hard-sm);
+}
+.btn-success:active {
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none;
+}
+.btn-danger {
+  background: var(--error);
+  color: #fffefa;
+  border: 1rpx solid var(--error);
+  border-radius: var(--radius);
+  font-size: 28rpx;
+  font-weight: 600;
+  box-shadow: var(--shadow-hard-sm);
+}
+.btn-danger:active {
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none;
+}
+
+/* 全局固定底部栏 — 暖白纸面 */
+.fixed-bottom-bar {
+  position: fixed;
+  box-sizing: border-box;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16rpx 32rpx;
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1rpx solid var(--border);
+  box-sizing: border-box;
+  z-index: 100;
+}
+.fixed-bottom-btn {
+  width: 100%;
+  max-width: 600rpx;
+  margin: 0 auto;
+}
+
+/* 全局卡片样式 — 暖白纸面 + 暖沙边 */
+.card {
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32rpx;
+}
+
+/* 全局徽章样式 — 印刷贴纸感 */
+.badge {
+  display: inline-block;
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  border: 1rpx solid transparent;
+}
+.badge-success { background: var(--success-soft); color: var(--success); border-color: rgba(53, 112, 60, 0.25); }
+.badge-warning { background: var(--warning-soft); color: var(--warning); border-color: rgba(141, 102, 16, 0.25); }
+.badge-error { background: var(--error-soft); color: var(--error); border-color: rgba(181, 64, 40, 0.25); }
+.badge-info { background: var(--accent-soft); color: var(--accent); border-color: rgba(44, 74, 110, 0.25); }
+.badge-gold { background: var(--gold-light); color: var(--gold-dark); border-color: rgba(201, 162, 39, 0.35); }
+
+
+/* ============================================
+   Icon Font — emoji 替换方案
+   替换系统 emoji 为自定义图标，保证跨端一致性
+   上线前需从 iconfont.cn 下载真实 woff2 文件
+   ============================================ */
+
+/*
+  TODO: 上线前从 iconfont.cn 下载真实字体文件
+  @font-face {
+    font-family: 'iconfont';
+    src: url('/static/iconfont/iconfont.woff2') format('woff2');
+  }
+*/
+
+.icon {
+  font-family: 'iconfont', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+  font-style: normal;
+  font-size: inherit;
+  vertical-align: middle;
+  display: inline;
+}
+
+/* Icon sizing helpers */
+.icon-sm  { font-size: 0.75em; }
+.icon-lg  { font-size: 1.25em; }
+.icon-xl  { font-size: 1.5em; }
+
+/* Icon color helpers */
+.icon-accent  { color: var(--accent); }
+.icon-success { color: var(--success); }
+.icon-warning { color: var(--warning); }
+.icon-error   { color: var(--error); }
+.icon-muted   { color: var(--muted); }
+.icon-gold    { color: var(--gold); }

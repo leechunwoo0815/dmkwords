@@ -1,0 +1,129 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/books/books",
+    "pages/shelf/shelf",
+    "pages/member/member",
+    "pages/login/login",
+    "pages/agreement/service-agreement/service-agreement",
+    "pages/agreement/privacy-policy/privacy-policy"
+  ],
+  "subPackages": [
+    {
+      "root": "pages/reading-pkg",
+      "name": "reading",
+      "pages": [
+        "reader/reader",
+        "book-detail/book-detail",
+        "quiz/quiz",
+        "quiz-result/quiz-result",
+        "vocabulary/vocabulary",
+        "word-detail/word-detail"
+      ]
+    },
+    {
+      "root": "pages/member-pkg",
+      "name": "member-pkg",
+      "pages": [
+        "checkin/checkin",
+        "reading-stats/reading-stats",
+        "learning-report/learning-report",
+        "observation-report/observation-report",
+        "profile-card/profile-card",
+        "certificate/certificate",
+        "achievement/achievement",
+        "leaderboard/leaderboard",
+        "offline-guide/offline-guide"
+      ]
+    },
+    {
+      "root": "pages/order-pkg",
+      "name": "order",
+      "pages": [
+        "order-history/order-history",
+        "observation/observation",
+        "official/official",
+        "refund-apply/refund-apply",
+        "benefit-transfer/benefit-transfer",
+        "messages/messages",
+        "child-manage/child-manage",
+        "deposit/deposit",
+        "borrow-history/borrow-history",
+        "reservation/reservation"
+      ]
+    },
+    {
+      "root": "pages/activity-pkg",
+      "name": "activity",
+      "pages": [
+        "activity-list/activity-list",
+        "activity-detail/activity-detail"
+      ]
+    }
+  ],
+  "preloadRule": {
+    "pages/books/books": {
+      "network": "all",
+      "packages": [
+        "reading"
+      ]
+    },
+    "pages/member/member": {
+      "network": "all",
+      "packages": [
+        "member-pkg",
+        "order"
+      ]
+    }
+  },
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#5560cf",
+    "navigationBarTitleText": "DmkWords",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f5f5f5"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#999999",
+    "selectedColor": "#5560cf",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "icons/home.png",
+        "selectedIconPath": "icons/home-active.png"
+      },
+      {
+        "pagePath": "pages/books/books",
+        "text": "图书馆",
+        "iconPath": "icons/book.png",
+        "selectedIconPath": "icons/book-active.png"
+      },
+      {
+        "pagePath": "pages/shelf/shelf",
+        "text": "书架",
+        "iconPath": "icons/shelf.png",
+        "selectedIconPath": "icons/shelf-active.png"
+      },
+      {
+        "pagePath": "pages/member/member",
+        "text": "我的",
+        "iconPath": "icons/me.png",
+        "selectedIconPath": "icons/me-active.png"
+      }
+    ]
+  },
+  "requiredBackgroundModes": [
+    "audio"
+  ],
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "usingComponents": {
+    "error-view": "/components/error-view/error-view",
+    "empty-state": "/components/empty-state/empty-state",
+    "loading-skeleton": "/components/loading-skeleton/loading-skeleton"
+  }
+}

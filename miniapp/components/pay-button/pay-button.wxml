@@ -1,0 +1,13 @@
+<view class="pay-button-container">
+  <block wx:if="{{!isIOS}}">
+    <button class="pay-btn {{disabled ? 'disabled' : ''}}" bindtap="onTap" disabled="{{disabled}}">
+      <text>{{buttonText}}</text>
+      <text wx:if="{{amount > 0}}" class="pay-amount">¥{{amount}}</text>
+    </button>
+  </block>
+  <block wx:else>
+    <view class="pay-ios-tip" bindtap="onTap">
+      <text>当前暂不支持 iOS 端在线开通，点击查看门店/客服联系方式</text>
+    </view>
+  </block>
+</view>

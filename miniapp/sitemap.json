@@ -1,0 +1,11 @@
+{
+  "desc": "DmkWords 小程序 sitemap",
+  "rules": [
+    { "action": "allow", "page": "pages/index/index" },
+    { "action": "allow", "page": "pages/books/books" },
+    { "action": "allow", "page": "pages/login/login" },
+    { "action": "allow", "page": "pages/agreement/service-agreement/service-agreement" },
+    { "action": "allow", "page": "pages/agreement/privacy-policy/privacy-policy" },
+    { "action": "disallow", "page": "*" }
+  ]
+}
