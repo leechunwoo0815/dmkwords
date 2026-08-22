@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "./auth";
 import AuditLog from "./pages/AuditLog";
 import BookDetail from "./pages/BookDetail";
 import BookManage from "./pages/BookManage";
+import MemberManage from "./pages/MemberManage";
 import Dashboard from "./pages/Dashboard";
 import Layout from "./pages/Layout";
 import Login from "./pages/Login";
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="audit-logs" element={<AuditLog />} />
           <Route path="books" element={<BookManage />} />
           <Route path="books/:id" element={<BookDetail />} />
+          <Route path="members" element={<MemberManage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

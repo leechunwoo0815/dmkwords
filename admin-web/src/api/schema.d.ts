@@ -334,6 +334,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/members/parents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Parent */
+        post: operations["create_parent_api_admin_members_parents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/members/parents/{parent_id}/children": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Children */
+        get: operations["list_children_api_admin_members_parents__parent_id__children_get"];
+        put?: never;
+        /** Create Child */
+        post: operations["create_child_api_admin_members_parents__parent_id__children_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/members/children": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Children Page */
+        get: operations["list_children_page_api_admin_members_children_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Orders */
+        get: operations["list_orders_api_admin_orders_get"];
+        put?: never;
+        /** Create Order */
+        post: operations["create_order_api_admin_orders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/orders/{order_id}/confirm-payment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Payment */
+        post: operations["confirm_payment_api_admin_orders__order_id__confirm_payment_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/orders/{order_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Order */
+        post: operations["cancel_order_api_admin_orders__order_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -488,6 +592,78 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** ChildCreateRequest */
+        ChildCreateRequest: {
+            /** Name */
+            name: string;
+            /** English Name */
+            english_name?: string | null;
+            /** Gender */
+            gender?: number | null;
+            /** Birthday */
+            birthday?: string | null;
+            /**
+             * Grade
+             * @default
+             */
+            grade: string;
+        };
+        /** ChildResponse */
+        ChildResponse: {
+            /** Id */
+            id: number;
+            /** Parent Id */
+            parent_id: number;
+            /** Name */
+            name: string;
+            /** English Name */
+            english_name: string | null;
+            /** Gender */
+            gender: number | null;
+            /** Birthday */
+            birthday: string | null;
+            /** Grade */
+            grade: string;
+            /** Member Status */
+            member_status: string;
+            /** Member Start */
+            member_start: string | null;
+            /** Member Expire */
+            member_expire: string | null;
+        };
+        /** ChildWithParentResponse */
+        ChildWithParentResponse: {
+            /** Id */
+            id: number;
+            /** Parent Id */
+            parent_id: number;
+            /** Name */
+            name: string;
+            /** English Name */
+            english_name: string | null;
+            /** Gender */
+            gender: number | null;
+            /** Birthday */
+            birthday: string | null;
+            /** Grade */
+            grade: string;
+            /** Member Status */
+            member_status: string;
+            /** Member Start */
+            member_start: string | null;
+            /** Member Expire */
+            member_expire: string | null;
+            /**
+             * Parent Name
+             * @default
+             */
+            parent_name: string;
+            /**
+             * Parent Phone
+             * @default
+             */
+            parent_phone: string;
+        };
         /** CopyResponse */
         CopyResponse: {
             /** Id */
@@ -572,6 +748,64 @@ export interface components {
             /** Permissions */
             permissions: string[];
         };
+        /** OrderConfirmRequest */
+        OrderConfirmRequest: {
+            /**
+             * Pay Method
+             * @description 收款方式
+             */
+            pay_method: string;
+            /**
+             * Remark
+             * @description 凭证说明（留痕）
+             * @default
+             */
+            remark: string;
+        };
+        /** OrderCreateRequest */
+        OrderCreateRequest: {
+            /** Order Type */
+            order_type: string;
+            /** Child Id */
+            child_id: number;
+            /**
+             * Remark
+             * @default
+             */
+            remark: string;
+        };
+        /** OrderResponse */
+        OrderResponse: {
+            /** Id */
+            id: number;
+            /** Order No */
+            order_no: string;
+            /** Order Type */
+            order_type: string;
+            /** Parent Id */
+            parent_id: number;
+            /** Child Id */
+            child_id: number | null;
+            /** Amount */
+            amount: string;
+            /** Status */
+            status: string;
+            /** Pay Method */
+            pay_method: string | null;
+            /** Paid At */
+            paid_at: string | null;
+            /** Remark */
+            remark: string;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /** Child Name */
+            child_name?: string | null;
+            /** Parent Name */
+            parent_name?: string | null;
+        };
         /** PaginatedResponse[AuditLogResponse] */
         PaginatedResponse_AuditLogResponse_: {
             /**
@@ -635,6 +869,96 @@ export interface components {
              * @default false
              */
             has_next: boolean;
+        };
+        /** PaginatedResponse[ChildWithParentResponse] */
+        PaginatedResponse_ChildWithParentResponse_: {
+            /**
+             * Items
+             * @description 数据列表
+             */
+            items?: components["schemas"]["ChildWithParentResponse"][];
+            /**
+             * Total
+             * @description 总数
+             * @default 0
+             */
+            total: number;
+            /**
+             * Page
+             * @description 当前页码
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @description 每页数量
+             * @default 20
+             */
+            page_size: number;
+            /**
+             * Has Next
+             * @description 是否有下一页
+             * @default false
+             */
+            has_next: boolean;
+        };
+        /** PaginatedResponse[OrderResponse] */
+        PaginatedResponse_OrderResponse_: {
+            /**
+             * Items
+             * @description 数据列表
+             */
+            items?: components["schemas"]["OrderResponse"][];
+            /**
+             * Total
+             * @description 总数
+             * @default 0
+             */
+            total: number;
+            /**
+             * Page
+             * @description 当前页码
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @description 每页数量
+             * @default 20
+             */
+            page_size: number;
+            /**
+             * Has Next
+             * @description 是否有下一页
+             * @default false
+             */
+            has_next: boolean;
+        };
+        /** ParentCreateRequest */
+        ParentCreateRequest: {
+            /** Name */
+            name: string;
+            /**
+             * Phone
+             * @description 手机号（11位）
+             */
+            phone: string;
+            /**
+             * Remark
+             * @default
+             */
+            remark: string;
+        };
+        /** ParentResponse */
+        ParentResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Phone */
+            phone: string;
+            /** Remark */
+            remark: string;
         };
         /** QuizQuestionCreateRequest */
         QuizQuestionCreateRequest: {
@@ -1425,6 +1749,272 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_parent_api_admin_members_parents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_children_api_admin_members_parents__parent_id__children_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                parent_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChildResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_child_api_admin_members_parents__parent_id__children_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                parent_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChildCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChildResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_children_page_api_admin_members_children_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                keyword?: string | null;
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedResponse_ChildWithParentResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_orders_api_admin_orders_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                status?: string | null;
+                keyword?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedResponse_OrderResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_order_api_admin_orders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_payment_api_admin_orders__order_id__confirm_payment_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_order_api_admin_orders__order_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
                 };
             };
             /** @description Validation Error */
