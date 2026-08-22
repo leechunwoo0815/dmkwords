@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "./auth";
 import AuditLog from "./pages/AuditLog";
 import BookDetail from "./pages/BookDetail";
 import BookManage from "./pages/BookManage";
+import CirculationDesk from "./pages/CirculationDesk";
 import DepositManage from "./pages/DepositManage";
 import MemberManage from "./pages/MemberManage";
 import Dashboard from "./pages/Dashboard";
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="configs" element={<SystemConfig />} />
           <Route path="audit-logs" element={<AuditLog />} />
           <Route path="books" element={<BookManage />} />
+          <Route path="circulation" element={<CirculationDesk />} />
           <Route path="books/:id" element={<BookDetail />} />
           <Route path="members" element={<MemberManage />} />
           <Route path="deposits" element={<DepositManage />} />

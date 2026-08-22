@@ -334,6 +334,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/circulation/children/{child_id}/card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Child Card */
+        get: operations["child_card_api_admin_circulation_children__child_id__card_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circulation/borrow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Borrow Book */
+        post: operations["borrow_book_api_admin_circulation_borrow_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circulation/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Return Book */
+        post: operations["return_book_api_admin_circulation_return_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circulation/renew": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Renew Book */
+        post: operations["renew_book_api_admin_circulation_renew_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circulation/overdue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Overdue List */
+        get: operations["overdue_list_api_admin_circulation_overdue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/members/parents": {
         parameters: {
             query?: never;
@@ -694,6 +779,84 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** BorrowRecordResponse */
+        BorrowRecordResponse: {
+            /** Id */
+            id: number;
+            /** Child Id */
+            child_id: number;
+            /** Copy Id */
+            copy_id: number;
+            /** Book Id */
+            book_id: number;
+            /**
+             * Borrowed At
+             * Format: date-time
+             */
+            borrowed_at: string;
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /** Returned At */
+            returned_at: string | null;
+            /** Status */
+            status: string;
+            /** Renew Used */
+            renew_used: number;
+            /** Override Reason */
+            override_reason: string | null;
+        };
+        /** BorrowRequest */
+        BorrowRequest: {
+            /** Child Id */
+            child_id: number;
+            /**
+             * Isbn
+             * @description 扫 ISBN 借书
+             */
+            isbn?: string | null;
+            /**
+             * Copy Id
+             * @description 指定副本
+             */
+            copy_id?: number | null;
+            /**
+             * Override Reason
+             * @description 人工放行原因（异常借书）
+             */
+            override_reason?: string | null;
+        };
+        /** ChildCardResponse */
+        ChildCardResponse: {
+            /** Child Id */
+            child_id: number;
+            /** Name */
+            name: string;
+            /** English Name */
+            english_name: string | null;
+            /** Member Status */
+            member_status: string;
+            /** Parent Name */
+            parent_name: string;
+            /** Parent Phone */
+            parent_phone: string;
+            /** Active Borrows */
+            active_borrows: number;
+            /** Overdue Count */
+            overdue_count: number;
+            /** Available Quota */
+            available_quota: number;
+            /** Borrow Limit */
+            borrow_limit: number;
+            /** Deposit Status */
+            deposit_status: string;
+            /** Deposit Available */
+            deposit_available: string;
+            /** Records */
+            records: components["schemas"]["BorrowRecordResponse"][];
+        };
         /** ChildCreateRequest */
         ChildCreateRequest: {
             /** Name */
@@ -970,6 +1133,26 @@ export interface components {
             /** Parent Name */
             parent_name?: string | null;
         };
+        /** OverdueItemResponse */
+        OverdueItemResponse: {
+            /** Record Id */
+            record_id: number;
+            /** Child Name */
+            child_name: string;
+            /** Parent Phone */
+            parent_phone: string;
+            /** Book Title */
+            book_title: string;
+            /** Copy Code */
+            copy_code: string;
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /** Days Overdue */
+            days_overdue: number;
+        };
         /** PaginatedResponse[AuditLogResponse] */
         PaginatedResponse_AuditLogResponse_: {
             /**
@@ -1193,6 +1376,21 @@ export interface components {
             sort_order: number;
             /** Is Active */
             is_active: number;
+        };
+        /** RenewRequest */
+        RenewRequest: {
+            /** Record Id */
+            record_id: number;
+        };
+        /** ReturnRequest */
+        ReturnRequest: {
+            /** Copy Id */
+            copy_id: number;
+            /**
+             * Condition
+             * @default normal
+             */
+            condition: string;
         };
         /** SystemConfigResponse */
         SystemConfigResponse: {
@@ -1954,6 +2152,156 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    child_card_api_admin_circulation_children__child_id__card_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChildCardResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    borrow_book_api_admin_circulation_borrow_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BorrowRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BorrowRecordResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    return_book_api_admin_circulation_return_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReturnRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BorrowRecordResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    renew_book_api_admin_circulation_renew_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BorrowRecordResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    overdue_list_api_admin_circulation_overdue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverdueItemResponse"][];
                 };
             };
         };

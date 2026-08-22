@@ -1,1 +1,337 @@
-"""circulation 域 service（F 系列开发时按四件套模板实现）。"""
+# backend/domain/circulation/service.py — 借/还/续借/逾期扣减/人工放行
+"""并发纪律（模式手册 P10/P11）：锁主体行（Child with_for_update）串行化同一孩子的借书；
+副本行锁 + 唯一索引双保险防同一副本并发借出。"""
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from backend.common.config_service import ConfigService
+from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
+from backend.domain.catalog.audit_events import publish_audit
+from backend.domain.catalog.models import Book, BookCopy
+from backend.domain.circulation.models import BorrowRecord
+from backend.domain.identity.models import Child, Parent
+
+
+class CirculationService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    # ---------- 查询 ----------
+    def child_card(self, child_id: int) -> dict:
+        """借阅操作台的孩子卡片（WM5 核心视图）。"""
+        child = (
+            self.db.query(Child, Parent)
+            .join(Parent, Child.parent_id == Parent.id)
+            .filter(Child.id == child_id, Child.is_deleted == 0)
+            .first()
+        )
+        if not child:
+            raise NotFoundError("孩子不存在")
+        child, parent = child
+        now = datetime.now()
+        active = (
+            self.db.query(BorrowRecord)
+            .filter(
+                BorrowRecord.child_id == child_id,
+                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
+                BorrowRecord.is_deleted == 0,
+            )
+            .all()
+        )
+        overdue = [r for r in active if r.due_at < now]
+        borrow_limit = int(ConfigService(self.db).get_value("borrow_limit"))
+        from backend.domain.billing.models import Deposit
+
+        dep = (
+            self.db.query(Deposit)
+            .filter(Deposit.child_id == child_id, Deposit.is_deleted == 0)
+            .first()
+        )
+        return {
+            "child": child,
+            "parent": parent,
+            "active_borrows": len(active),
+            "overdue_count": len(overdue),
+            "available_quota": max(0, borrow_limit - len(overdue) - len(active)),
+            "borrow_limit": borrow_limit,
+            "deposit_status": dep.status if dep else "unpaid",
+            "deposit_available": str(dep.available_amount) if dep else "0",
+            "active_records": active,
+            "overdue_records": overdue,
+        }
+
+    def find_copy_by_isbn(self, isbn: str) -> tuple[Book, BookCopy]:
+        """ISBN → 书目 + 一个在馆副本（多副本取第一个 available）。"""
+        book = self.db.query(Book).filter(Book.isbn == isbn, Book.is_deleted == 0).first()
+        if not book:
+            raise NotFoundError(f"ISBN {isbn} 未入库")
+        copy = (
+            self.db.query(BookCopy)
+            .filter(
+                BookCopy.book_id == book.id,
+                BookCopy.status == BookCopy.STATUS_AVAILABLE,
+                BookCopy.is_deleted == 0,
+            )
+            .order_by(BookCopy.id)
+            .first()
+        )
+        return book, copy
+
+    # ---------- 借书 ----------
+    def borrow(
+        self,
+        admin,
+        child_id: int,
+        copy_id: int | None,
+        isbn: str | None,
+        override_reason: str | None = None,
+    ) -> BorrowRecord:
+        # 锁主体行：同一孩子的并发借书串行化（模式手册 P10）
+        child = self.db.query(Child).filter(Child.id == child_id).with_for_update().first()
+        if not child:
+            raise NotFoundError("孩子不存在")
+
+        # 同书未还禁借（先于副本定位——单副本时也会命中）
+        dup = (
+            self.db.query(func.count(BorrowRecord.id))
+            .filter(
+                BorrowRecord.child_id == child_id,
+                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
+                BorrowRecord.is_deleted == 0,
+            )
+            .scalar()
+        )
+        # 重复借阅精确判定需 book_id；isbn 路径先查书目
+        _dup_book_id = None
+        if isbn:
+            _b = self.db.query(Book).filter(Book.isbn == isbn, Book.is_deleted == 0).first()
+            _dup_book_id = _b.id if _b else None
+        elif copy_id:
+            _c = self.db.query(BookCopy).filter(BookCopy.id == copy_id).first()
+            _dup_book_id = _c.book_id if _c else None
+        if _dup_book_id:
+            _dup = (
+                self.db.query(func.count(BorrowRecord.id))
+                .filter(
+                    BorrowRecord.child_id == child_id,
+                    BorrowRecord.book_id == _dup_book_id,
+                    BorrowRecord.status.in_(
+                        [BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]
+                    ),
+                    BorrowRecord.is_deleted == 0,
+                )
+                .scalar()
+            )
+            if _dup:
+                raise ConflictError("该书尚未归还，不能重复借阅")
+
+        # 定位副本
+        if copy_id:
+            copy = self.db.query(BookCopy).filter(BookCopy.id == copy_id).with_for_update().first()
+            if not copy:
+                raise NotFoundError("副本不存在")
+            book = self.db.query(Book).filter(Book.id == copy.book_id).first()
+        elif isbn:
+            book, copy = self.find_copy_by_isbn(isbn)
+            if not copy:
+                raise ConflictError(f"《{book.title}》当前无在馆副本")
+            copy = self.db.query(BookCopy).filter(BookCopy.id == copy.id).with_for_update().first()
+        else:
+            raise ValidationError("请提供副本ID或ISBN")
+
+        # ---- 校验链 ----
+        warnings: list[str] = []
+        if not child.is_active_member:
+            # 未入会/过期/退会：硬拦截 + 可配置开关（红线：人工放行边界）
+            from backend.common.config_service import ConfigService as CS
+
+            allow = CS(self.db).get_value("allow_unpaid_offline_borrow") == "true"
+            if not allow or override_reason is None:
+                raise ValidationError(
+                    f"孩子会员状态为 {child.member_status}，"
+                    + (
+                        "未入会临时借书开关未开启"
+                        if not allow
+                        else "未入会借书需管理员放行并填写原因"
+                    )
+                )
+            warnings.append(f"未入会临时借书（原因：{override_reason}）")
+
+        # 押金校验
+        from backend.domain.billing.models import Deposit
+
+        dep = (
+            self.db.query(Deposit)
+            .filter(Deposit.child_id == child_id, Deposit.is_deleted == 0)
+            .first()
+        )
+        if not dep or dep.status == "unpaid":
+            if not override_reason:
+                raise ValidationError("押金未缴纳（可人工放行并填写原因）")
+            warnings.append("押金未缴纳")
+
+        # 借阅上限：30 − 逾期未还数（V1.1 §5.4）
+        borrow_limit = int(ConfigService(self.db).get_value("borrow_limit"))
+        now = datetime.now()
+        active_count = (
+            self.db.query(func.count(BorrowRecord.id))
+            .filter(
+                BorrowRecord.child_id == child_id,
+                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
+                BorrowRecord.is_deleted == 0,
+            )
+            .scalar()
+        )
+        overdue_count = (
+            self.db.query(func.count(BorrowRecord.id))
+            .filter(
+                BorrowRecord.child_id == child_id,
+                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
+                BorrowRecord.due_at < now,
+                BorrowRecord.is_deleted == 0,
+            )
+            .scalar()
+        )
+        quota = borrow_limit - overdue_count - active_count
+        if quota <= 0 and not override_reason:
+            raise ValidationError(
+                f"可借上限已满（上限 {borrow_limit}，逾期 {overdue_count} 本，在借 {active_count} 本）"
+            )
+        if quota <= 0:
+            warnings.append(f"超上限放行（逾期 {overdue_count}，在借 {active_count}）")
+
+        # 副本状态
+        if copy.status != BookCopy.STATUS_AVAILABLE:
+            raise ConflictError(f"副本状态为 {copy.status}，不可借出")
+
+        # ---- 写入 ----
+        borrow_days = int(ConfigService(self.db).get_value("borrow_days"))
+        record = BorrowRecord(
+            child_id=child_id,
+            copy_id=copy.id,
+            book_id=copy.book_id,
+            borrowed_at=now,
+            due_at=now + timedelta(days=borrow_days),
+            status=BorrowRecord.STATUS_ACTIVE,
+            borrowed_by=admin.id,
+            override_reason=override_reason,
+        )
+        self.db.add(record)
+        copy.status = BookCopy.STATUS_BORROWED
+        self.db.flush()
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="circulation.borrow",
+            target_type="borrow",
+            target_id=str(record.id),
+            detail={
+                "child": child.name,
+                "book": book.title,
+                "copy": copy.copy_code,
+                "warnings": warnings,
+            },
+            reason=override_reason or "正常借书",
+        )
+        self.db.commit()
+        return record
+
+    # ---------- 还书 ----------
+    def return_book(self, admin, copy_id: int, condition: str = "normal") -> BorrowRecord:
+        """condition: normal / maintenance / lost（遗失联动押金赔偿提示）。"""
+        if condition not in ("normal", "maintenance", "lost"):
+            raise ValidationError("归还状态仅支持 normal/maintenance/lost")
+        record = (
+            self.db.query(BorrowRecord)
+            .filter(
+                BorrowRecord.copy_id == copy_id,
+                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
+                BorrowRecord.is_deleted == 0,
+            )
+            .first()
+        )
+        if not record:
+            raise NotFoundError("该副本没有进行中的借阅")
+        copy = self.db.query(BookCopy).filter(BookCopy.id == copy_id).with_for_update().first()
+
+        was_overdue = record.due_at < datetime.now()
+        record.status = BorrowRecord.STATUS_RETURNED
+        record.returned_at = datetime.now()
+        record.returned_condition = condition
+        if condition == "normal":
+            copy.status = BookCopy.STATUS_AVAILABLE
+        elif condition == "maintenance":
+            copy.status = BookCopy.STATUS_MAINTENANCE
+        else:  # lost
+            record.status = BorrowRecord.STATUS_LOST
+            copy.status = BookCopy.STATUS_LOST
+        self.db.flush()
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="circulation.return",
+            target_type="borrow",
+            target_id=str(record.id),
+            detail={"condition": condition, "was_overdue": was_overdue},
+            reason=f"还书（{condition}）",
+        )
+        self.db.commit()
+        return record
+
+    # ---------- 续借 ----------
+    def renew(self, admin, record_id: int) -> BorrowRecord:
+        record = (
+            self.db.query(BorrowRecord)
+            .filter(BorrowRecord.id == record_id, BorrowRecord.is_deleted == 0)
+            .first()
+        )
+        if not record:
+            raise NotFoundError("借阅记录不存在")
+        if record.status not in (BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE):
+            raise ValidationError("该记录不可续借")
+        if record.due_at < datetime.now():
+            raise ValidationError("已逾期的书不能续借（V1.1 §5.4）")
+        if record.renew_used >= 1:
+            raise ValidationError("续借机会已用完（每本书限 1 次）")
+        renew_days = int(ConfigService(self.db).get_value("renew_days"))
+        record.due_at = record.due_at + timedelta(days=renew_days)  # 从原到期日起算
+        record.renew_used += 1
+        self.db.flush()
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="circulation.renew",
+            target_type="borrow",
+            target_id=str(record.id),
+            detail={"new_due": str(record.due_at)},
+            reason="续借",
+        )
+        self.db.commit()
+        return record
+
+    # ---------- 逾期列表 ----------
+    def overdue_list(self) -> list[tuple[BorrowRecord, Child, Parent, Book]]:
+        now = datetime.now()
+        rows = (
+            self.db.query(BorrowRecord, Child, Parent, Book)
+            .join(Child, BorrowRecord.child_id == Child.id)
+            .join(Parent, Child.parent_id == Parent.id)
+            .join(Book, BorrowRecord.book_id == Book.id)
+            .filter(
+                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
+                BorrowRecord.due_at < now,
+                BorrowRecord.is_deleted == 0,
+            )
+            .order_by(BorrowRecord.due_at)
+            .all()
+        )
+        # 顺手把状态标成 overdue
+        for record, *_ in rows:
+            record.status = BorrowRecord.STATUS_OVERDUE
+        self.db.commit()
+        return rows
