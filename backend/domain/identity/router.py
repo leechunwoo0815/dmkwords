@@ -51,7 +51,7 @@ def create_child(
 
 
 @router.get("/members/children", response_model=PaginatedResponse[ChildWithParentResponse])
-def list_children(
+def list_children_page(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     keyword: str | None = Query(None),
