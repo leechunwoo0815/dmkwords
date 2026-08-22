@@ -1,0 +1,36 @@
+<view class="page-bg" style="min-height:100vh;padding:24rpx;">
+  <view class="report-header">
+    <view class="rh-icon">📋</view>
+    <view>
+      <view class="rh-title">{{childName}} 的观察期评估</view>
+      <view class="rh-period">由馆内老师评估上传 · 每一阶段的成长记录</view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" style="text-align:center;color:var(--muted);padding:60rpx;">加载中…</view>
+
+  <view wx:if="{{!loading && !reports.length}}" class="empty-state">
+    <view class="empty-icon">📭</view>
+    <view style="color:var(--muted);">还没有评估报告，老师上传后这里会展示</view>
+  </view>
+
+  <view wx:for="{{reports}}" wx:key="id" class="stat-card" style="margin-bottom:24rpx;background:var(--surface);border-radius:20rpx;padding:24rpx;">
+    <view style="display:flex;align-items:center;margin-bottom:16rpx;">
+      <text style="font-size:26rpx;color:var(--muted);">{{item.created_at}}</text>
+    </view>
+    <view wx:if="{{item.remark}}" style="font-size:28rpx;color:var(--fg);margin-bottom:16rpx;">
+      {{item.remark}}
+    </view>
+    <view style="display:flex;flex-wrap:wrap;gap:12rpx;">
+      <image wx:for="{{item.images}}" wx:for-item="img" wx:key="*this"
+        src="{{img}}" mode="aspectFill"
+        style="width:200rpx;height:200rpx;border-radius:12rpx;background:var(--border);"
+        data-src="{{img}}" bindtap="onPreview" />
+    </view>
+  </view>
+
+  <view wx:if="{{preview}}" style="position:fixed;inset:0;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;z-index:99;"
+    bindtap="onClosePreview">
+    <image src="{{preview}}" mode="aspectFit" style="width:100%;height:100%;" />
+  </view>
+</view>

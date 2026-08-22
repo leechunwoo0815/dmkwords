@@ -1,0 +1,55 @@
+<view class="page-bg" style="min-height:100vh;padding:24rpx;">
+  <view style="font-size:28rpx;font-weight:600;margin-bottom:16rpx;color:var(--fg);">
+    {{childName}} · 申请退款
+  </view>
+
+  <view wx:if="{{loading}}" class="loading-state">加载中…</view>
+
+  <view class="selector-card" wx:if="{{!loading}}">
+    <view class="card-h3">选择要退的订单（已支付）</view>
+    <view wx:if="{{!orders.length}}" class="empty-text" style="padding:20rpx 0;color:var(--muted);">
+      没有可退款的订单
+    </view>
+    <view wx:for="{{orders}}" wx:key="id" class="info-row" data-order="{{item}}" bindtap="onPick"
+      style="padding:16rpx 0;border-bottom:1rpx solid var(--border);">
+      <view class="info-label">{{item.typeText}}</view>
+      <view class="info-value">￥{{item.amount}}</view>
+      <view style="font-size:22rpx;color:{{item.status === 'paid' ? 'var(--success)' : 'var(--muted)'}};">
+        {{item.status === 'paid' ? '可申请' : item.status === 'refunded' ? '已退款' : item.status}}
+      </view>
+    </view>
+  </view>
+
+  <view class="calc-card" wx:if="{{preview}}">
+    <view class="card-h3">可退金额（服务端计算）</view>
+    <view class="calc-desc">{{preview.rule}}</view>
+    <view class="calc-result">
+      <text class="calc-result-label">预计可退</text>
+      <text class="calc-result-amount">￥{{preview.refundable_amount}}</text>
+    </view>
+  </view>
+
+  <view class="reason-card" wx:if="{{preview}}">
+    <view class="card-h3">退款原因（必填）</view>
+    <textarea class="reason-textarea" placeholder="如：孩子时间安排变化…" value="{{reason}}"
+      bindinput="onReason" maxlength="200" />
+    <view class="submit-wrap">
+      <button class="submit-btn" bindtap="onSubmit">提交退款申请</button>
+    </view>
+  </view>
+
+  <view class="tip-card" wx:if="{{refunds.length}}">
+    <view class="card-h3">退款记录</view>
+    <view wx:for="{{refunds}}" wx:key="id" style="padding:14rpx 0;border-bottom:1rpx solid var(--border);">
+      <view style="display:flex;justify-content:space-between;">
+        <text>￥{{item.amount}}</text>
+        <text style="color:{{item.status === 'approved' ? 'var(--success)' : item.status === 'rejected' ? 'var(--error)' : 'var(--warning)'}};">
+          {{item.status === 'pending' ? '审核中' : item.status === 'approved' ? '已退款' : '已拒绝'}}
+        </text>
+      </view>
+      <view wx:if="{{item.review_remark}}" style="font-size:24rpx;color:var(--muted);margin-top:6rpx;">
+        审核意见：{{item.review_remark}}
+      </view>
+    </view>
+  </view>
+</view>

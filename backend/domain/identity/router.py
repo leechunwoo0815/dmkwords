@@ -1,12 +1,13 @@
 # backend/domain/identity/router.py — 会员与订单 API
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from pydantic import Field
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema, PaginatedResponse
 from backend.database import get_db
+from backend.domain.identity.observation_service import ObservationReportService
 from backend.domain.identity.schemas import (
     ChildCreateRequest,
     ChildResponse,
@@ -18,6 +19,11 @@ from backend.domain.identity.schemas import (
     ParentResponse,
 )
 from backend.domain.identity.service import ChildService, OrderService, ParentService
+from backend.domain.identity.wm10_service import (
+    RefundService,
+    TransferService,
+    WithdrawalService,
+)
 from backend.middleware.admin_rbac import require_perm, require_super_admin
 
 router = APIRouter(tags=["identity"])
@@ -143,3 +149,81 @@ def refund_order(
     """订单退款执行（超管；审核路径的家庭申请流程见 WM10 退款中心）。"""
     order = OrderService(db).refund_order(admin, order_id, body.remark)
     return {"id": order.id, "order_no": order.order_no, "status": order.status}
+
+
+# ==================== WM10：退款 / 退会 / 转让 / 评估报告（管理端） ====================
+
+
+class ReviewRequest(BaseSchema):
+    approve: bool
+    remark: str = Field("", max_length=200, description="审核备注（拒绝必填，家长可见）")
+
+
+@router.get("/refund-requests")
+def admin_refund_list(
+    status: str | None = None,
+    admin: Any = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    """退款申请列表（订单类 + 押金类统一，超管逐单审）。"""
+    return RefundService(db).admin_list(status)
+
+
+@router.post("/refund-requests/{request_id}/review")
+def admin_refund_review(
+    request_id: int,
+    body: ReviewRequest,
+    admin: Any = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    return RefundService(db).review(admin, request_id, body.approve, body.remark)
+
+
+@router.get("/withdrawals")
+def admin_withdrawal_list(
+    status: str | None = None,
+    admin: Any = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    return WithdrawalService(db).admin_list(status)
+
+
+@router.post("/withdrawals/{request_id}/review")
+def admin_withdrawal_review(
+    request_id: int,
+    body: ReviewRequest,
+    admin: Any = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    return WithdrawalService(db).review(admin, request_id, body.approve, body.remark)
+
+
+@router.get("/transfers")
+def admin_transfer_list(
+    status: str | None = None,
+    admin: Any = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    return TransferService(db).admin_list(status)
+
+
+@router.post("/transfers/{request_id}/review")
+def admin_transfer_review(
+    request_id: int,
+    body: ReviewRequest,
+    admin: Any = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    return TransferService(db).review(admin, request_id, body.approve, body.remark)
+
+
+@router.post("/children/{child_id}/observation-reports")
+async def upload_observation_report(
+    child_id: int,
+    remark: str = Form(""),
+    files: list[UploadFile] = File(...),
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """观察期评估报告上传（≤9 张图；家长端可见）。"""
+    return ObservationReportService(db).upload_for_admin(admin, child_id, files, remark or None)

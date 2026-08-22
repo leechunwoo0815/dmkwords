@@ -28,7 +28,15 @@ from backend.domain.growth.models import (  # noqa: E402, F401
     QuizAttempt,
     WordsLedger,
 )
-from backend.domain.identity.models import Child, Order, Parent  # noqa: E402, F401
+from backend.domain.identity.models import (  # noqa: E402, F401
+    Child,
+    ObservationReport,
+    Order,
+    Parent,
+    RefundRequest,
+    TransferRequest,
+    WithdrawalRequest,
+)
 
 # this is the Alembic Config object
 config = context.config

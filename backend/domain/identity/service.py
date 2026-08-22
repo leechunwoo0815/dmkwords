@@ -134,6 +134,8 @@ class OrderService:
         child = self.db.query(Child).filter(Child.id == req.child_id, Child.is_deleted == 0).first()
         if not child:
             raise NotFoundError("孩子不存在")
+        if child.operation_locked:
+            raise ValidationError("孩子正在转让/退会审核流程中，不能创建新订单")
         parent = ParentService(self.db).get(child.parent_id)
 
         # 金额计算（服务端唯一权威；二孩 9 折按下单时刻判定 V1.1 §3.1）

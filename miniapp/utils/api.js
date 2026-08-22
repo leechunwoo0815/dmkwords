@@ -60,6 +60,43 @@ module.exports = {
     return `${app.globalData.baseURL}/api/miniapp/reports/${kind}/image?child_id=${childId}&token=${encodeURIComponent(token)}`
   },
 
+  // 退款 / 退会 / 转让 / 评估报告（WM10）
+  myOrders(childId) {
+    return req.get('/api/miniapp/orders', null, { params: { child_id: childId } })
+  },
+  refundPreview(childId, orderId) {
+    return req.get('/api/miniapp/refund-preview', null, { params: { child_id: childId, order_id: orderId } })
+  },
+  applyRefund(childId, orderId, reason) {
+    return req.post('/api/miniapp/refund-requests', { child_id: childId, order_id: orderId, reason })
+  },
+  myRefunds(childId) {
+    return req.get('/api/miniapp/refund-requests', null, { params: { child_id: childId } })
+  },
+  applyWithdrawal(childId, reason) {
+    return req.post('/api/miniapp/withdrawals', { child_id: childId, reason })
+  },
+  myWithdrawals(childId) {
+    return req.get('/api/miniapp/withdrawals', null, { params: { child_id: childId } })
+  },
+  transferConditions(sourceChildId, targetChildId) {
+    return req.get('/api/miniapp/transfers/conditions', null, {
+      params: { source_child_id: sourceChildId, target_child_id: targetChildId },
+    })
+  },
+  applyTransfer(sourceChildId, targetChildId) {
+    return req.post('/api/miniapp/transfers', { source_child_id: sourceChildId, target_child_id: targetChildId })
+  },
+  myTransfers() {
+    return req.get('/api/miniapp/transfers')
+  },
+  cancelTransfer(transferId) {
+    return req.post(`/api/miniapp/transfers/${transferId}/cancel`)
+  },
+  observationReports(childId) {
+    return req.get('/api/miniapp/observation-reports', null, { params: { child_id: childId } })
+  },
+
   // 线下活动（WM9）
   listActivities(childId) {
     return req.get('/api/miniapp/activities', null, { params: { child_id: childId } })

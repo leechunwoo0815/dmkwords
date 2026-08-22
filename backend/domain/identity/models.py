@@ -1,6 +1,8 @@
 # backend/domain/identity/models.py — 家长 / 孩子（会员状态机 R-301）
 
-from sqlalchemy import Column, Date, DateTime, Index, Integer, Numeric, SmallInteger, String
+from datetime import datetime
+
+from sqlalchemy import Column, Date, DateTime, Index, Integer, Numeric, SmallInteger, String, Text
 
 from backend.common.base_model import BaseModel
 
@@ -61,6 +63,9 @@ class Child(BaseModel):
     )
     member_start = Column(Date, nullable=True, comment="会员开始日")
     member_expire = Column(Date, nullable=True, comment="会员到期日")
+    operation_locked = Column(
+        SmallInteger, nullable=False, default=0, comment="操作冻结（转让/退会审核中）"
+    )
 
     def can_transition(self, new_status: str) -> bool:
         return new_status in self.ALLOWED_TRANSITIONS.get(self.member_status, set())
@@ -116,3 +121,79 @@ class Order(BaseModel):
 
     def can_transition(self, new_status: str) -> bool:
         return new_status in self.ALLOWED_TRANSITIONS.get(self.status, set())
+
+
+class RefundRequest(BaseModel):
+    """退款申请（订单类 + 押金类统一；超管逐单审核）。"""
+
+    __tablename__ = "refund_requests"
+
+    KIND_ORDER = "order"
+    KIND_DEPOSIT = "deposit"
+
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+
+    kind = Column(String(10), nullable=False, comment="order/deposit")
+    order_id = Column(Integer, nullable=True, comment="关联订单（order 类）")
+    deposit_id = Column(Integer, nullable=True, comment="关联押金（deposit 类）")
+    child_id = Column(Integer, nullable=False, index=True)
+    amount = Column(Numeric(10, 2), nullable=False, comment="申请退款金额")
+    reason = Column(String(200), nullable=False, default="", comment="家长申请原因")
+    status = Column(String(20), nullable=False, default=STATUS_PENDING, index=True)
+    review_remark = Column(String(200), nullable=True, comment="审核备注（拒绝时给家长看）")
+    reviewed_by = Column(Integer, nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+
+
+class WithdrawalRequest(BaseModel):
+    """退会申请（审核期间孩子操作冻结）。"""
+
+    __tablename__ = "withdrawal_requests"
+
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+
+    child_id = Column(Integer, nullable=False, index=True)
+    reason = Column(String(200), nullable=False, default="")
+    status = Column(String(20), nullable=False, default=STATUS_PENDING, index=True)
+    review_remark = Column(String(200), nullable=True)
+    reviewed_by = Column(Integer, nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+
+
+class TransferRequest(BaseModel):
+    """权益转让（16 条件；双方冻结；72h 超时自动 expired）。"""
+
+    __tablename__ = "transfer_requests"
+
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_EXPIRED = "expired"
+
+    source_child_id = Column(Integer, nullable=False, index=True)
+    target_child_id = Column(Integer, nullable=False, index=True)
+    status = Column(String(20), nullable=False, default=STATUS_PENDING, index=True)
+    expires_at = Column(DateTime, nullable=False, comment="审核截止（超时 expired）")
+    review_remark = Column(String(200), nullable=True)
+    reviewed_by = Column(Integer, nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+
+
+class ObservationReport(BaseModel):
+    """观察期评估报告（馆员上传图片 ≤9 张；家长孩子可见）。"""
+
+    __tablename__ = "observation_reports"
+
+    child_id = Column(Integer, nullable=False, index=True)
+    images = Column(Text, nullable=False, default="[]", comment="图片路径 JSON 数组")
+    remark = Column(String(500), nullable=True, comment="馆员备注")
+    uploaded_by = Column(Integer, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)

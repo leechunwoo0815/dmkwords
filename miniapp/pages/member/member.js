@@ -48,6 +48,19 @@ Page({
     wx.navigateTo({ url: `/pages/member-pkg/checkin/checkin?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
 
+  goRefund() {
+    const c = this.data.currentChild
+    if (!c) return
+    wx.navigateTo({ url: `/pages/order-pkg/refund-apply/refund-apply?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
+  },
+  goTransfer() {
+    wx.navigateTo({ url: '/pages/order-pkg/benefit-transfer/benefit-transfer' })
+  },
+  goObservation() {
+    const c = this.data.currentChild
+    if (!c) return
+    wx.navigateTo({ url: `/pages/member-pkg/observation-report/observation-report?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
+  },
   goLeaderboard() {
     const c = this.data.currentChild
     if (!c) return

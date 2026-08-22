@@ -25,14 +25,17 @@
         "checkin/checkin",
         "achievement/achievement",
         "leaderboard/leaderboard",
-        "profile-card/profile-card"
+        "profile-card/profile-card",
+        "observation-report/observation-report"
       ]
     },
     {
       "root": "pages/order-pkg",
       "name": "order",
       "pages": [
-        "reservation/reservation"
+        "reservation/reservation",
+        "refund-apply/refund-apply",
+        "benefit-transfer/benefit-transfer"
       ]
     },
     {

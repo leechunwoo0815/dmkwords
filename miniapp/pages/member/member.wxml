@@ -41,6 +41,18 @@
         <text class="fi-icon">🪪</text>
         <text class="fi-label">阅读护照</text>
       </view>
+      <view class="func-item" bindtap="goRefund">
+        <text class="fi-icon">💰</text>
+        <text class="fi-label">退款申请</text>
+      </view>
+      <view class="func-item" bindtap="goTransfer">
+        <text class="fi-icon">🔁</text>
+        <text class="fi-label">权益转让</text>
+      </view>
+      <view class="func-item" bindtap="goObservation">
+        <text class="fi-icon">📋</text>
+        <text class="fi-label">评估报告</text>
+      </view>
     </view>
   </view>
 

@@ -243,6 +243,8 @@ class ReservationService:
 
     def create(self, child: Child, book_id: int) -> Reservation:
         # 校验：有效会员 + 押金 + 无逾期 + 额度（在借+预约 ≤ 上限）
+        if child.operation_locked:
+            raise ValidationError("孩子正在转让/退会审核流程中，预约已冻结")
         if not child.is_active_member:
             raise ValidationError("仅有效会员可预约")
         from backend.domain.billing.models import Deposit

@@ -528,6 +528,8 @@ class QuizService:
     def submit(self, child: Child, book_id: int, answers: list[str]) -> dict:
         # 锁主体行：同一孩子的并发提交串行化
         child = self.db.query(Child).filter(Child.id == child.id).with_for_update().first()
+        if child.operation_locked:
+            raise ValidationError("孩子正在转让/退会审核流程中，新测验已冻结")
         book = self.db.query(Book).filter(Book.id == book_id, Book.is_deleted == 0).first()
         if not book:
             raise NotFoundError("图书不存在")

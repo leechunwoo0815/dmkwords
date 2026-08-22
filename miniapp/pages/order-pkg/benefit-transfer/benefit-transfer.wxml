@@ -1,0 +1,60 @@
+<view class="page" style="min-height:100vh;padding:24rpx;background:var(--bg);">
+  <view class="tip-card">
+    <text class="tip-icon">💡</text>
+    <text class="tip-text">把大孩的会员剩余时间转给二孩：年费不退、到期日直接继承；词数/等级/积分/打卡各是各的（排行榜不失真）。押金不转，各缴各的。</text>
+  </view>
+
+  <view class="transfer-card">
+    <view class="transfer-heading">选择转出方（大孩）</view>
+    <view class="child-select">
+      <view wx:for="{{children}}" wx:key="id"
+        class="check-item {{sourceId === item.id ? 'active' : ''}}"
+        data-id="{{item.id}}" bindtap="onPickSource">
+        <view class="name">{{item.name}}</view>
+        <view class="meta">{{item.member_status}}</view>
+        <view class="check-circle">{{sourceId === item.id ? '✓' : ''}}</view>
+      </view>
+    </view>
+
+    <view class="arrow-section"><text class="arrow-icon">⬇</text></view>
+
+    <view class="transfer-heading">选择受让方（二孩）</view>
+    <view class="child-select">
+      <view wx:for="{{children}}" wx:key="id"
+        class="check-item {{targetId === item.id ? 'active' : ''}}"
+        data-id="{{item.id}}" bindtap="onPickTarget">
+        <view class="name">{{item.name}}</view>
+        <view class="meta">{{item.member_status}}</view>
+        <view class="check-circle">{{targetId === item.id ? '✓' : ''}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="check-card" wx:if="{{conditions}}">
+    <view class="check-heading">转让条件核对</view>
+    <view wx:for="{{conditions}}" wx:key="name" class="check-item-row">
+      <text class="check-icon">{{item.ok ? '✅' : '❌'}}</text>
+      <text class="check-text">{{item.name}}</text>
+    </view>
+    <view class="submit-wrap" wx:if="{{conditions.length}}">
+      <button class="submit-btn" bindtap="onSubmit" disabled="{{!allOk}}">
+        {{allOk ? '提交转让申请' : '条件不全，暂不能提交'}}
+      </button>
+    </view>
+  </view>
+
+  <view class="records-section" wx:if="{{records.length}}">
+    <view class="records-heading">转让记录</view>
+    <view wx:for="{{records}}" wx:key="id" class="record-item">
+      <view class="record-header">
+        <text>{{item.source_name}} → {{item.target_name}}</text>
+        <text class="record-status">{{item.status === 'pending' ? '审核中' : item.status === 'approved' ? '已通过' : item.status === 'rejected' ? '已拒绝' : item.status === 'expired' ? '已超时' : '已撤销'}}</text>
+      </view>
+      <view class="record-meta">
+        <text>截止 {{item.expires_at}}</text>
+        <text wx:if="{{item.status === 'pending'}}" class="record-arrow cancel" data-id="{{item.id}}" bindtap="onCancel">撤销</text>
+      </view>
+      <view wx:if="{{item.review_remark}}" class="record-meta">审核意见：{{item.review_remark}}</view>
+    </view>
+  </view>
+</view>

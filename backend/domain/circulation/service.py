@@ -95,6 +95,8 @@ class CirculationService:
         child = self.db.query(Child).filter(Child.id == child_id).with_for_update().first()
         if not child:
             raise NotFoundError("孩子不存在")
+        if child.operation_locked:
+            raise ValidationError("孩子正在转让/退会审核流程中，借书已冻结")
 
         # 同书未还禁借（重复借阅精确判定需 book_id；isbn/copy 路径先解析书目）
         _dup_book_id = None
@@ -282,6 +284,9 @@ class CirculationService:
         )
         if not record:
             raise NotFoundError("借阅记录不存在")
+        child = self.db.query(Child).filter(Child.id == record.child_id).first()
+        if child and child.operation_locked:
+            raise ValidationError("孩子正在转让/退会审核流程中，续借已冻结")
         if record.status not in (BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE):
             raise ValidationError("该记录不可续借")
         if record.due_at < datetime.now():

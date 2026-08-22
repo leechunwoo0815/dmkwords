@@ -7,6 +7,7 @@ import {
   PushpinOutlined,
   TrophyOutlined,
   CalendarOutlined,
+  SafetyCertificateOutlined,
   DashboardOutlined,
   SettingOutlined,
 } from "@ant-design/icons";
@@ -31,6 +32,7 @@ export default function Layout() {
     { key: "/reservations", icon: <PushpinOutlined />, label: "预约管理", perm: "borrow.operate" },
     { key: "/growth", icon: <TrophyOutlined />, label: "成长与测验", perm: "member.manage" },
     { key: "/activities", icon: <CalendarOutlined />, label: "线下活动", perm: "member.manage" },
+    { key: "/refund-center", icon: <SafetyCertificateOutlined />, label: "退款中心", perm: "audit.view" },
     { key: "/configs", icon: <SettingOutlined />, label: "系统配置", perm: "config.view" },
     { key: "/audit-logs", icon: <AuditOutlined />, label: "审计日志", perm: "audit.view" },
   ].filter((item) => hasPermission(permissions, item.perm));
