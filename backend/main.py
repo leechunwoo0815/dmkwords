@@ -31,5 +31,7 @@ def health() -> dict:
 
 
 from backend.domain.admin.router import router as admin_router  # noqa: E402
+from backend.domain.catalog.router import router as catalog_router  # noqa: E402
 
 app.include_router(admin_router, prefix="/api/admin")
+app.include_router(catalog_router, prefix="/api/admin")

@@ -13,7 +13,14 @@ from backend.database import SessionLocal, engine
 from backend.domain.admin.service import invalidate_config_cache
 from backend.main import app
 
-ADMIN_TABLES = ["audit_logs", "system_configs", "admin_users"]
+ADMIN_TABLES = [
+    "quiz_questions",
+    "book_copies",
+    "books",
+    "audit_logs",
+    "system_configs",
+    "admin_users",
+]
 
 
 @pytest.fixture(autouse=True)

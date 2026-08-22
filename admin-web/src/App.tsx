@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { getToken } from "./api/client";
 import { AuthProvider, useAuth } from "./auth";
 import AuditLog from "./pages/AuditLog";
+import BookDetail from "./pages/BookDetail";
+import BookManage from "./pages/BookManage";
 import Dashboard from "./pages/Dashboard";
 import Layout from "./pages/Layout";
 import Login from "./pages/Login";
@@ -31,6 +33,8 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="configs" element={<SystemConfig />} />
           <Route path="audit-logs" element={<AuditLog />} />
+          <Route path="books" element={<BookManage />} />
+          <Route path="books/:id" element={<BookDetail />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
