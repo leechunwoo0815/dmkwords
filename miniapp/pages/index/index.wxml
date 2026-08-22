@@ -64,6 +64,11 @@
         <view class="entry-title">阅读护照</view>
         <view class="entry-desc">成长档案</view>
       </view>
+      <view class="entry-item" bindtap="goActivities">
+        <view class="entry-icon-wrap"><text class="entry-icon">🎪</text></view>
+        <view class="entry-title">线下活动</view>
+        <view class="entry-desc">读书会 · 亲子</view>
+      </view>
     </view>
   </view>
 </view>

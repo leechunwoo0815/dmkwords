@@ -1,0 +1,57 @@
+<view class="page-bg" style="min-height:100vh;">
+  <view class="top-bar">
+    <view class="tabs">
+      <view class="tab {{tab === 'upcoming' ? 'active' : ''}}" data-tab="upcoming" bindtap="onTab">可报名</view>
+      <view class="tab {{tab === 'mine' ? 'active' : ''}}" data-tab="mine" bindtap="onTab">我的报名</view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading-wrap">加载中…</view>
+
+  <block wx:if="{{!loading && tab === 'upcoming'}}">
+    <view wx:if="{{!activities.length}}" class="empty-state">
+      <view class="empty-icon">🎪</view>
+      <view class="empty-text">近期没有活动，敬请期待</view>
+    </view>
+    <view class="activity-list">
+      <view wx:for="{{activities}}" wx:key="id" class="activity-card" data-id="{{item.id}}" bindtap="goDetail">
+        <view class="activity-banner banner-{{index % 3}}">
+          <text class="activity-banner-text">{{item.fee_display}}</text>
+        </view>
+        <view class="activity-body">
+          <view class="activity-title">{{item.title}}</view>
+          <view class="activity-meta">
+            <view class="meta-item"><text class="meta-icon">🕒</text>{{item.start_at}}</view>
+            <view class="meta-item"><text class="meta-icon">📍</text>{{item.location}}</view>
+          </view>
+          <view class="activity-footer">
+            <text wx:if="{{item.full}}" class="activity-status status-full">已满</text>
+            <text wx:else class="activity-status status-open">剩 {{item.quota_left}} 个名额</text>
+            <text wx:if="{{item.member_only}}" class="activity-status">仅会员</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <block wx:if="{{!loading && tab === 'mine'}}">
+    <view wx:if="{{!myEnrollments.length}}" class="empty-state">
+      <view class="empty-icon">🎟️</view>
+      <view class="empty-text">还没有报名，去「可报名」看看</view>
+    </view>
+    <view class="activity-list">
+      <view wx:for="{{myEnrollments}}" wx:key="id" class="activity-card">
+        <view class="activity-body">
+          <view class="activity-title">{{item.activity_title}}</view>
+          <view class="activity-meta">
+            <view class="meta-item"><text class="meta-icon">🕒</text>{{item.activity_start_at}}</view>
+          </view>
+          <view class="activity-footer">
+            <text class="activity-status">{{item.status === 'enrolled' ? '已报名' : item.status === 'checked_in' ? '已签到' : item.status === 'pending_payment' ? '待收款确认' : item.status === 'refund_pending' ? '退款待审' : item.status === 'refunded' ? '已退款' : '已取消'}}</text>
+            <text class="meta-item" wx:if="{{item.ticket_code}}">券码 {{item.ticket_code}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>

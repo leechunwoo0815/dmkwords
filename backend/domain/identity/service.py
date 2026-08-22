@@ -204,6 +204,59 @@ class OrderService:
         self.db.commit()
         return order
 
+    def _create_activity_order(self, child: Child, activity, fee) -> Order:
+        """活动报名订单（家长小程序发起；占名额待收款确认；不 commit 由调用方统一提交）。"""
+        import types
+        import uuid
+
+        order = Order(
+            order_no=f"DMK{datetime.now():%Y%m%d%H%M%S}{uuid.uuid4().hex[:6].upper()}",
+            order_type=Order.TYPE_ACTIVITY,
+            parent_id=child.parent_id,
+            child_id=child.id,
+            amount=fee,
+            status=Order.STATUS_PENDING_MANUAL,
+            remark=f"活动报名：{activity.title}",
+        )
+        self.db.add(order)
+        self.db.flush()
+        actor = types.SimpleNamespace(id=0, display_name=f"家长(小程序) child={child.id}")
+        publish_audit(
+            self.db,
+            admin=actor,
+            action="order.create",
+            target_type="order",
+            target_id=order.order_no,
+            detail={
+                "type": Order.TYPE_ACTIVITY,
+                "amount": str(fee),
+                "child": child.name,
+                "activity": activity.title,
+            },
+        )
+        return order
+
+    def refund_order(self, admin, order_id: int, remark: str) -> Order:
+        """订单退款执行（超管审核通过后调用；99 元资格随 refunded 状态恢复）。"""
+        order = self.db.query(Order).filter(Order.id == order_id, Order.is_deleted == 0).first()
+        if not order:
+            raise NotFoundError("订单不存在")
+        if order.status != Order.STATUS_PAID:
+            raise ValidationError(f"订单状态 {order.status} 不可退款")
+        order.status = Order.STATUS_REFUNDED
+        self.db.flush()
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="order.refund",
+            target_type="order",
+            target_id=order.order_no,
+            detail={"amount": str(order.amount), "child_id": order.child_id},
+            reason=remark or "退款审核通过",
+        )
+        self.db.commit()
+        return order
+
     def confirm_payment(self, admin, order_id: int, req) -> Order:
         """人工收款确认 → paid → 联动会员开通。"""
         order = self.db.query(Order).filter(Order.id == order_id, Order.is_deleted == 0).first()
@@ -246,6 +299,11 @@ class OrderService:
                 from backend.domain.billing.service import DepositService
 
                 DepositService(self.db).on_deposit_order_paid(admin, order)
+            # 活动费订单 → 报名转正（activity 域；同一事务）
+            if order.order_type == Order.TYPE_ACTIVITY:
+                from backend.domain.activity.service import ActivityService
+
+                ActivityService(self.db).on_activity_order_paid(order)
 
         publish_audit(
             self.db,

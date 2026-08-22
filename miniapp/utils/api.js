@@ -60,6 +60,26 @@ module.exports = {
     return `${app.globalData.baseURL}/api/miniapp/reports/${kind}/image?child_id=${childId}&token=${encodeURIComponent(token)}`
   },
 
+  // 线下活动（WM9）
+  listActivities(childId) {
+    return req.get('/api/miniapp/activities', null, { params: { child_id: childId } })
+  },
+  activityDetail(activityId, childId) {
+    return req.get(`/api/miniapp/activities/${activityId}`, null, { params: { child_id: childId } })
+  },
+  enrollActivity(activityId, childId) {
+    return req.post(`/api/miniapp/activities/${activityId}/enroll`, { child_id: childId })
+  },
+  myEnrollments(childId) {
+    return req.get('/api/miniapp/enrollments', null, { params: { child_id: childId } })
+  },
+  cancelEnrollment(enrollmentId, childId) {
+    return req.post(`/api/miniapp/enrollments/${enrollmentId}/cancel`, { child_id: childId })
+  },
+  refundApplyEnrollment(enrollmentId, childId) {
+    return req.post(`/api/miniapp/enrollments/${enrollmentId}/refund-apply`, { child_id: childId })
+  },
+
   // 生词本 / 收藏 / 书架（WM8）
   lookupWord(word, childId, bookId) {
     return req.get('/api/miniapp/vocabulary/lookup', null, {

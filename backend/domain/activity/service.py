@@ -1,1 +1,456 @@
-"""activity 域 service（F 系列开发时按四件套模板实现）。"""
+# backend/domain/activity/service.py — 活动发布/报名/签到/退款矩阵
+"""红线对齐（V1.1 §9）：
+- 待支付先占名额（防超卖：活动行锁 + 活跃报名计数）
+- 已签到不退；未开始未签到全额退；开始前 2h 关线上；已开始线下协商
+- 门店取消 → 已付未签到批量转退款待审，逐单超管审核
+事务纪律：Service 统一 commit；留痕走审计事件。
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime, timedelta
+
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
+from backend.domain.catalog.audit_events import publish_audit
+from backend.domain.identity.models import Child, Order
+
+from .models import Activity, ActivityEnrollment
+
+
+def _ticket_code(activity_id: int, child_id: int) -> str:
+    return f"TK{activity_id:05d}{child_id:05d}{uuid.uuid4().hex[:4].upper()}"
+
+
+class ActivityService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    # ---------- 查询 ----------
+    def list_admin(self, status: str | None = None) -> list[dict]:
+        q = self.db.query(Activity).filter(Activity.is_deleted == 0)
+        if status:
+            q = q.filter(Activity.status == status)
+        rows = q.order_by(Activity.start_at.desc()).limit(200).all()
+        return [self._activity_view(a, with_quota=True) for a in rows]
+
+    def list_upcoming(self, child: Child | None = None) -> list[dict]:
+        rows = (
+            self.db.query(Activity)
+            .filter(
+                Activity.is_deleted == 0,
+                Activity.status == Activity.STATUS_PUBLISHED,
+                Activity.start_at >= datetime.now() - timedelta(hours=2),
+            )
+            .order_by(Activity.start_at)
+            .limit(50)
+            .all()
+        )
+        out = []
+        my_map = self._my_enrollment_map(child.id) if child else {}
+        for a in rows:
+            v = self._activity_view(a, with_quota=True)
+            v["my_enrollment"] = my_map.get(a.id)
+            out.append(v)
+        return out
+
+    def detail(self, activity_id: int, child: Child | None = None) -> dict:
+        a = self._get(activity_id)
+        v = self._activity_view(a, with_quota=True)
+        if child:
+            v["my_enrollment"] = self._my_enrollment_map(child.id).get(a.id)
+        return v
+
+    def _my_enrollment_map(self, child_id: int) -> dict:
+        rows = (
+            self.db.query(ActivityEnrollment)
+            .filter(
+                ActivityEnrollment.child_id == child_id,
+                ActivityEnrollment.is_deleted == 0,
+            )
+            .all()
+        )
+        return {r.activity_id: self._enrollment_view(r) for r in rows}
+
+    def _get(self, activity_id: int) -> Activity:
+        a = (
+            self.db.query(Activity)
+            .filter(Activity.id == activity_id, Activity.is_deleted == 0)
+            .first()
+        )
+        if not a:
+            raise NotFoundError("活动不存在")
+        return a
+
+    def _quota_used(self, activity_id: int) -> int:
+        return (
+            self.db.query(func.count(ActivityEnrollment.id))
+            .filter(
+                ActivityEnrollment.activity_id == activity_id,
+                ActivityEnrollment.status.in_(ActivityEnrollment.ACTIVE_STATUSES),
+                ActivityEnrollment.is_deleted == 0,
+            )
+            .scalar()
+        )
+
+    def _activity_view(self, a: Activity, with_quota: bool = False) -> dict:
+        v = {
+            "id": a.id,
+            "title": a.title,
+            "activity_type": a.activity_type,
+            "start_at": str(a.start_at),
+            "location": a.location,
+            "fee": str(a.fee),
+            "fee_display": "免费" if float(a.fee) == 0 else f"{a.fee} 元",
+            "member_only": bool(a.member_only),
+            "enroll_deadline": str(a.enroll_deadline) if a.enroll_deadline else None,
+            "status": a.status,
+            "description": a.description,
+        }
+        if with_quota:
+            used = self._quota_used(a.id)
+            v["quota_used"] = used
+            v["quota_left"] = max(0, a.max_quota - used)
+            v["max_quota"] = a.max_quota
+            v["full"] = used >= a.max_quota
+        return v
+
+    def _enrollment_view(self, r: ActivityEnrollment) -> dict:
+        return {
+            "id": r.id,
+            "activity_id": r.activity_id,
+            "child_id": r.child_id,
+            "status": r.status,
+            "ticket_code": r.ticket_code,
+            "checked_in_at": str(r.checked_in_at) if r.checked_in_at else None,
+            "created_at": str(r.created_at),
+        }
+
+    # ---------- 管理端 ----------
+    def create(self, admin, req) -> Activity:
+        if req.activity_type not in Activity.TYPE_OPTIONS:
+            raise ValidationError("活动类型不正确")
+        if req.start_at <= datetime.now():
+            raise ValidationError("开始时间必须在未来")
+        if req.max_quota <= 0:
+            raise ValidationError("名额必须大于 0")
+        if req.fee < 0:
+            raise ValidationError("费用不能为负（免费填 0）")
+        if req.enroll_deadline and req.enroll_deadline > req.start_at:
+            raise ValidationError("报名截止不能晚于活动开始")
+        a = Activity(
+            title=req.title.strip(),
+            activity_type=req.activity_type,
+            start_at=req.start_at,
+            location=(req.location or "").strip(),
+            max_quota=req.max_quota,
+            fee=req.fee,
+            description=req.description,
+            member_only=1 if req.member_only else 0,
+            enroll_deadline=req.enroll_deadline,
+            status=Activity.STATUS_PUBLISHED,
+        )
+        self.db.add(a)
+        self.db.flush()
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="activity.create",
+            target_type="activity",
+            target_id=str(a.id),
+            detail={"title": a.title, "quota": a.max_quota, "fee": str(a.fee)},
+            reason="活动发布",
+        )
+        self.db.commit()
+        return a
+
+    def cancel_activity(self, admin, activity_id: int) -> dict:
+        """取消整场：已付未签到 → 退款待审（逐单人工审）；待支付 → 取消。"""
+        a = self._get(activity_id)
+        if a.status != Activity.STATUS_PUBLISHED:
+            raise ValidationError("活动状态不可取消")
+        a.status = Activity.STATUS_CANCELLED
+        enrollments = (
+            self.db.query(ActivityEnrollment)
+            .filter(
+                ActivityEnrollment.activity_id == activity_id,
+                ActivityEnrollment.is_deleted == 0,
+            )
+            .all()
+        )
+        refund_cnt = cancel_cnt = 0
+        for e in enrollments:
+            if e.status == ActivityEnrollment.STATUS_PENDING_PAYMENT:
+                e.status = ActivityEnrollment.STATUS_CANCELLED
+                e.cancel_reason = "活动取消"
+                cancel_cnt += 1
+            elif e.status == ActivityEnrollment.STATUS_ENROLLED:
+                e.status = ActivityEnrollment.STATUS_REFUND_PENDING
+                e.cancel_reason = "活动取消，待退款审核"
+                refund_cnt += 1
+            # checked_in / refund_pending / refunded / cancelled 不动
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="activity.cancel",
+            target_type="activity",
+            target_id=str(activity_id),
+            detail={"refund_pending": refund_cnt, "cancelled": cancel_cnt},
+            reason="门店取消活动",
+        )
+        self.db.commit()
+        return {"activity_id": activity_id, "refund_pending": refund_cnt, "cancelled": cancel_cnt}
+
+    def list_enrollments(self, activity_id: int) -> list[dict]:
+        self._get(activity_id)
+        rows = (
+            self.db.query(ActivityEnrollment, Child)
+            .join(Child, ActivityEnrollment.child_id == Child.id)
+            .filter(
+                ActivityEnrollment.activity_id == activity_id, ActivityEnrollment.is_deleted == 0
+            )
+            .order_by(ActivityEnrollment.id.desc())
+            .all()
+        )
+        out = []
+        for e, child in rows:
+            v = self._enrollment_view(e)
+            v["child_name"] = child.name
+            out.append(v)
+        return out
+
+    def signin(self, admin, ticket_code: str) -> dict:
+        """扫码/手输入场券签到（记录时间 + 操作人）。"""
+        code = (ticket_code or "").strip().upper()
+        e = (
+            self.db.query(ActivityEnrollment)
+            .filter(ActivityEnrollment.ticket_code == code, ActivityEnrollment.is_deleted == 0)
+            .first()
+        )
+        if not e:
+            raise NotFoundError("入场券不存在（请核对券码）")
+        if e.status == ActivityEnrollment.STATUS_CHECKED_IN:
+            raise ConflictError("该券已签到过")
+        if e.status != ActivityEnrollment.STATUS_ENROLLED:
+            raise ValidationError(f"报名状态为 {e.status}，不可签到（未完成收款或已退款）")
+        a = self._get(e.activity_id)
+        if a.status != Activity.STATUS_PUBLISHED:
+            raise ValidationError("活动已取消或结束")
+        e.status = ActivityEnrollment.STATUS_CHECKED_IN
+        e.checked_in_at = datetime.now()
+        e.checked_in_by = admin.id
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="activity.signin",
+            target_type="enrollment",
+            target_id=str(e.id),
+            detail={"ticket": code, "child_id": e.child_id, "activity": a.title},
+            reason="活动签到",
+        )
+        self.db.commit()
+        return {
+            "enrollment_id": e.id,
+            "child_id": e.child_id,
+            "checked_in_at": str(e.checked_in_at),
+        }
+
+    # ---------- 退款审核（超管） ----------
+    def list_refund_pending(self) -> list[dict]:
+        rows = (
+            self.db.query(ActivityEnrollment, Activity, Child)
+            .join(Activity, ActivityEnrollment.activity_id == Activity.id)
+            .join(Child, ActivityEnrollment.child_id == Child.id)
+            .filter(
+                ActivityEnrollment.status == ActivityEnrollment.STATUS_REFUND_PENDING,
+                ActivityEnrollment.is_deleted == 0,
+            )
+            .order_by(ActivityEnrollment.id.desc())
+            .all()
+        )
+        out = []
+        for e, a, child in rows:
+            order = (
+                self.db.query(Order).filter(Order.id == e.order_id).first() if e.order_id else None
+            )
+            out.append(
+                {
+                    "enrollment_id": e.id,
+                    "activity_id": a.id,
+                    "activity_title": a.title,
+                    "child_id": child.id,
+                    "child_name": child.name,
+                    "order_id": e.order_id,
+                    "amount": str(order.amount) if order else "0",
+                    "reason": e.cancel_reason or "",
+                    "created_at": str(e.created_at),
+                }
+            )
+        return out
+
+    def review_refund(self, admin, enrollment_id: int, approve: bool, remark: str) -> dict:
+        """超管逐单审核：通过 → 订单 refunded + 报名 refunded（名额释放）；拒绝 → 恢复已报名。"""
+        e = (
+            self.db.query(ActivityEnrollment)
+            .filter(ActivityEnrollment.id == enrollment_id, ActivityEnrollment.is_deleted == 0)
+            .first()
+        )
+        if not e or e.status != ActivityEnrollment.STATUS_REFUND_PENDING:
+            raise ValidationError("退款申请不存在或状态不可审")
+        if approve:
+            e.status = ActivityEnrollment.STATUS_REFUNDED
+            if e.order_id:
+                order = self.db.query(Order).filter(Order.id == e.order_id).first()
+                if order and order.status == Order.STATUS_PAID:
+                    order.status = Order.STATUS_REFUNDED
+        else:
+            e.status = ActivityEnrollment.STATUS_ENROLLED
+            e.cancel_reason = None
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="activity.refund_review",
+            target_type="enrollment",
+            target_id=str(e.id),
+            detail={"approve": approve, "remark": remark},
+            reason=remark or ("退款通过" if approve else "退款拒绝"),
+        )
+        self.db.commit()
+        return {"enrollment_id": e.id, "status": e.status}
+
+    # ---------- 报名（小程序） ----------
+    def enroll(self, child: Child, activity_id: int) -> dict:
+        # 锁活动行：并发扣减防超卖
+        a = (
+            self.db.query(Activity)
+            .filter(Activity.id == activity_id, Activity.is_deleted == 0)
+            .with_for_update()
+            .first()
+        )
+        if not a:
+            raise NotFoundError("活动不存在")
+        if a.status != Activity.STATUS_PUBLISHED:
+            raise ValidationError("活动已取消或结束")
+        now = datetime.now()
+        if a.start_at <= now:
+            raise ValidationError("活动已开始，无法报名")
+        if a.enroll_deadline and now > a.enroll_deadline:
+            raise ValidationError("报名已截止")
+        if a.member_only and not child.is_active_member:
+            raise ValidationError("该活动仅限会员报名")
+        # 同活动同孩子唯一（活跃态）
+        dup = (
+            self.db.query(func.count(ActivityEnrollment.id))
+            .filter(
+                ActivityEnrollment.activity_id == activity_id,
+                ActivityEnrollment.child_id == child.id,
+                ActivityEnrollment.status.in_(ActivityEnrollment.ACTIVE_STATUSES),
+                ActivityEnrollment.is_deleted == 0,
+            )
+            .scalar()
+        )
+        if dup:
+            raise ConflictError("该孩子已报名此活动（不能重复报名）")
+        used = self._quota_used(activity_id)
+        if used >= a.max_quota:
+            raise ConflictError("名额已满（可到店咨询）")
+
+        fee = a.fee
+        order = None
+        if float(fee) > 0:
+            # 收费活动：先建订单（待人工收款确认）占名额
+            from backend.domain.identity.service import OrderService
+
+            order = OrderService(self.db)._create_activity_order(child, a, fee)
+            status = ActivityEnrollment.STATUS_PENDING_PAYMENT
+        else:
+            status = ActivityEnrollment.STATUS_ENROLLED
+        e = ActivityEnrollment(
+            activity_id=activity_id,
+            child_id=child.id,
+            order_id=order.id if order else None,
+            ticket_code=_ticket_code(activity_id, child.id),
+            status=status,
+        )
+        self.db.add(e)
+        self.db.flush()
+        self.db.commit()
+        return {"enrollment": self._enrollment_view(e), "order_id": order.id if order else None}
+
+    def on_activity_order_paid(self, order: Order) -> ActivityEnrollment:
+        """收款确认 → 报名转正（identity confirm_payment 联动，同一事务）。"""
+        e = (
+            self.db.query(ActivityEnrollment)
+            .filter(ActivityEnrollment.order_id == order.id, ActivityEnrollment.is_deleted == 0)
+            .first()
+        )
+        if not e:
+            raise NotFoundError("该订单没有关联的活动报名")
+        if e.status == ActivityEnrollment.STATUS_PENDING_PAYMENT:
+            e.status = ActivityEnrollment.STATUS_ENROLLED
+        return e
+
+    def my_enrollments(self, child: Child) -> list[dict]:
+        rows = (
+            self.db.query(ActivityEnrollment, Activity)
+            .join(Activity, ActivityEnrollment.activity_id == Activity.id)
+            .filter(ActivityEnrollment.child_id == child.id, ActivityEnrollment.is_deleted == 0)
+            .order_by(ActivityEnrollment.id.desc())
+            .all()
+        )
+        out = []
+        for e, a in rows:
+            v = self._enrollment_view(e)
+            v["activity_title"] = a.title
+            v["activity_start_at"] = str(a.start_at)
+            v["activity_status"] = a.status
+            out.append(v)
+        return out
+
+    def cancel(self, child: Child, enrollment_id: int) -> dict:
+        """免费活动报名取消（开始前）。"""
+        e = self._my_enrollment(child, enrollment_id)
+        if e.status != ActivityEnrollment.STATUS_ENROLLED:
+            raise ValidationError(f"状态 {e.status} 不可取消")
+        a = self._get(e.activity_id)
+        if a.start_at <= datetime.now():
+            raise ValidationError("活动已开始，不能取消（请联系馆员）")
+        e.status = ActivityEnrollment.STATUS_CANCELLED
+        e.cancel_reason = "家长取消"
+        self.db.commit()
+        return {"enrollment_id": e.id, "status": e.status}
+
+    def apply_refund(self, child: Child, enrollment_id: int) -> dict:
+        """退款矩阵（V1.1 §9.3）：已签到不退；未开始未签到全额；前 2h 关线上；已开始线下。"""
+        e = self._my_enrollment(child, enrollment_id)
+        if e.status == ActivityEnrollment.STATUS_CHECKED_IN:
+            raise ValidationError("已签到，不能退款（人都来了，成本已发生）")
+        if e.status != ActivityEnrollment.STATUS_ENROLLED:
+            raise ValidationError(f"状态 {e.status} 不可申请退款")
+        a = self._get(e.activity_id)
+        now = datetime.now()
+        if a.start_at <= now:
+            raise ValidationError("活动已开始，请线下与馆员协商处理")
+        if a.start_at - now < timedelta(hours=2):
+            raise ValidationError("距开始不足 2 小时，线上退款已关闭，请找馆员线下处理")
+        e.status = ActivityEnrollment.STATUS_REFUND_PENDING
+        e.cancel_reason = "家长申请退款（活动未开始）"
+        self.db.commit()
+        return {"enrollment_id": e.id, "status": e.status, "amount_hint": "全额待审核"}
+
+    def _my_enrollment(self, child: Child, enrollment_id: int) -> ActivityEnrollment:
+        e = (
+            self.db.query(ActivityEnrollment)
+            .filter(
+                ActivityEnrollment.id == enrollment_id,
+                ActivityEnrollment.child_id == child.id,
+                ActivityEnrollment.is_deleted == 0,
+            )
+            .first()
+        )
+        if not e:
+            raise NotFoundError("报名不存在")
+        return e

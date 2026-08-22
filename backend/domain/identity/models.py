@@ -92,11 +92,12 @@ class Order(BaseModel):
     STATUS_PENDING_MANUAL = "pending_manual_confirm"  # 待人工确认收款
     STATUS_PAID = "paid"
     STATUS_CANCELLED = "cancelled"
+    STATUS_REFUNDED = "refunded"  # 已退款（WM9/WM10：审核通过后置）
 
     ALLOWED_TRANSITIONS = {
         STATUS_PENDING_PAYMENT: {STATUS_PAID, STATUS_CANCELLED},
         STATUS_PENDING_MANUAL: {STATUS_PAID, STATUS_CANCELLED},
-        STATUS_PAID: set(),
+        STATUS_PAID: {STATUS_REFUNDED},
         STATUS_CANCELLED: set(),
     }
 

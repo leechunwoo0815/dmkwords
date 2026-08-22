@@ -7,6 +7,7 @@ import BookDetail from "./pages/BookDetail";
 import BookManage from "./pages/BookManage";
 import CirculationDesk from "./pages/CirculationDesk";
 import DepositManage from "./pages/DepositManage";
+import ActivityManage from "./pages/ActivityManage";
 import GrowthManage from "./pages/GrowthManage";
 import Reservations from "./pages/Reservations";
 import MemberManage from "./pages/MemberManage";
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="deposits" element={<DepositManage />} />
           <Route path="reservations" element={<Reservations />} />
           <Route path="growth" element={<GrowthManage />} />
+          <Route path="activities" element={<ActivityManage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

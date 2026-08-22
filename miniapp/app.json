@@ -34,6 +34,14 @@
       "pages": [
         "reservation/reservation"
       ]
+    },
+    {
+      "root": "pages/activity-pkg",
+      "name": "activity",
+      "pages": [
+        "activity-list/activity-list",
+        "activity-detail/activity-detail"
+      ]
     }
   ],
   "preloadRule": {

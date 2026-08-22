@@ -56,6 +56,11 @@ Page({
     if (!c) return
     wx.navigateTo({ url: `/pages/member-pkg/checkin/checkin?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
+  goActivities() {
+    const c = this.data.currentChild
+    if (!c) return
+    wx.navigateTo({ url: `/pages/activity-pkg/activity-list/activity-list` })
+  },
   goLeaderboard() {
     const c = this.data.currentChild
     if (!c) return

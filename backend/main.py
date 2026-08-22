@@ -30,6 +30,8 @@ def health() -> dict:
     return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
 
 
+from backend.domain.activity.miniapp_router import router as activity_miniapp_router  # noqa: E402
+from backend.domain.activity.router import router as activity_router  # noqa: E402
 from backend.domain.admin.audit_handlers import register_audit_handlers  # noqa: E402
 from backend.domain.admin.router import router as admin_router  # noqa: E402
 from backend.domain.billing.router import router as billing_router  # noqa: E402
@@ -51,6 +53,8 @@ app.include_router(circulation_router, prefix="/api/admin")
 app.include_router(identity_router, prefix="/api/admin")
 app.include_router(billing_router, prefix="/api/admin")
 app.include_router(miniapp_router, prefix="/api/miniapp")
+app.include_router(activity_router, prefix="/api/admin")
+app.include_router(activity_miniapp_router, prefix="/api/miniapp")
 app.include_router(growth_router, prefix="/api/admin")
 app.include_router(growth_miniapp_router, prefix="/api/miniapp")
 app.include_router(reading_router, prefix="/api/admin")

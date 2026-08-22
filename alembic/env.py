@@ -14,6 +14,7 @@ from backend.database import Base  # noqa: E402
 
 # Import domain models to register them with Base.metadata
 # （新域模型落地时在此追加 import）
+from backend.domain.activity.models import Activity, ActivityEnrollment  # noqa: E402, F401
 from backend.domain.admin.models import AdminUser, AuditLog, SystemConfig  # noqa: E402, F401
 from backend.domain.catalog.models import Book, BookCopy, QuizQuestion  # noqa: E402, F401
 from backend.domain.circulation.models import BorrowRecord  # noqa: E402, F401

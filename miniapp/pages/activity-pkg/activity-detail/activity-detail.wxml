@@ -1,0 +1,71 @@
+<view class="page-bg" style="min-height:100vh;" wx:if="{{activity}}">
+  <view class="hero">
+    <view style="font-size:40rpx;font-weight:700;color:#fff;">{{activity.title}}</view>
+    <view style="color:#e8dfc8;margin-top:12rpx;font-size:26rpx;">
+      {{activity.start_at}} · {{activity.location}}
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">活动信息</view>
+    <view class="section-body">
+      <view class="info-card">
+        <view class="price-row">
+          <text class="price-label">费用</text>
+          <text class="price-value">{{activity.fee_display}}</text>
+        </view>
+        <view class="capacity-wrap">
+          <view class="capacity-header">
+            <text>名额</text>
+            <text>{{activity.quota_used}} / {{activity.max_quota}}</text>
+          </view>
+          <view class="capacity-bar">
+            <view class="capacity-hint" style="width: {{activity.quota_used * 100 / activity.max_quota}}%"></view>
+          </view>
+          <view class="capacity-hint" style="font-size:22rpx;color:var(--muted);">
+            {{activity.full ? '已满（可到店咨询）' : '剩余 ' + activity.quota_left + ' 个名额'}}
+          </view>
+        </view>
+        <view wx:if="{{activity.member_only}}" class="info-row">
+          <text class="info-label">限制</text>
+          <text class="info-value">仅限会员报名</text>
+        </view>
+        <view wx:if="{{activity.description}}" class="info-row">
+          <text class="info-label">介绍</text>
+          <text class="info-value">{{activity.description}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section" wx:if="{{activity.my_enrollment}}">
+    <view class="section-title">我的报名</view>
+    <view class="section-body">
+      <view class="qr-section">
+        <view class="qr-placeholder">
+          <text style="font-size:64rpx;">🎟️</text>
+        </view>
+        <view class="qr-hint">入场券码：{{activity.my_enrollment.ticket_code}}</view>
+        <view class="qr-hint">活动当天出示券码，馆员扫码签到</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="action-bar">
+    <block wx:if="{{!activity.my_enrollment}}">
+      <button class="btn-primary" bindtap="onEnroll" disabled="{{enrolling}}">
+        {{enrolling ? '报名中…' : activity.full ? '已满（到店咨询）' : '立即报名'}}
+      </button>
+    </block>
+    <block wx:elif="{{activity.my_enrollment.status === 'enrolled'}}">
+      <button class="btn-outline" bindtap="onCancel">取消报名</button>
+      <button class="btn-primary" bindtap="onRefund" wx:if="{{activity.fee !== '0.00'}}">申请退款</button>
+    </block>
+    <block wx:elif="{{activity.my_enrollment.status === 'pending_payment'}}">
+      <button class="btn-primary" disabled>待馆员确认收款（名额已保留）</button>
+    </block>
+    <block wx:else>
+      <button class="btn-primary" disabled>状态：{{activity.my_enrollment.status}}</button>
+    </block>
+  </view>
+</view>

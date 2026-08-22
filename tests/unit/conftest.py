@@ -14,6 +14,8 @@ from backend.domain.admin.service import invalidate_config_cache
 from backend.main import app
 
 ADMIN_TABLES = [
+    "activity_enrollments",
+    "activities",
     "vocabularies",
     "favorites",
     "dictionary_words",

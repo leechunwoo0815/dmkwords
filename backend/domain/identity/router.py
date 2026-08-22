@@ -2,9 +2,10 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import Field
 from sqlalchemy.orm import Session
 
-from backend.common.base_schema import PaginatedResponse
+from backend.common.base_schema import BaseSchema, PaginatedResponse
 from backend.database import get_db
 from backend.domain.identity.schemas import (
     ChildCreateRequest,
@@ -17,7 +18,7 @@ from backend.domain.identity.schemas import (
     ParentResponse,
 )
 from backend.domain.identity.service import ChildService, OrderService, ParentService
-from backend.middleware.admin_rbac import require_perm
+from backend.middleware.admin_rbac import require_perm, require_super_admin
 
 router = APIRouter(tags=["identity"])
 
@@ -126,3 +127,19 @@ def cancel_order(
     item = OrderResponse.model_validate(order)
     item.amount = str(order.amount)
     return item
+
+
+class OrderRefundRequest(BaseSchema):
+    remark: str = Field("", max_length=200, description="退款说明（留痕）")
+
+
+@router.post("/orders/{order_id}/refund")
+def refund_order(
+    order_id: int,
+    body: OrderRefundRequest,
+    admin: Any = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    """订单退款执行（超管；审核路径的家庭申请流程见 WM10 退款中心）。"""
+    order = OrderService(db).refund_order(admin, order_id, body.remark)
+    return {"id": order.id, "order_no": order.order_no, "status": order.status}
