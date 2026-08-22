@@ -1,15 +1,17 @@
 # backend/domain/catalog/router.py — 图书资产 API
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+import os
+
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import PaginatedResponse
+from backend.config import get_settings
 from backend.database import get_db
 from backend.domain.admin.models import AdminUser
 from backend.domain.catalog.import_service import import_books
 from backend.domain.catalog.schemas import (
     BookCreateRequest,
-    BookListQuery,
     BookResponse,
     BookUpdateRequest,
     CopyResponse,
@@ -22,10 +24,6 @@ from backend.domain.catalog.service import BookService, QuizQuestionService
 from backend.middleware.admin_rbac import require_perm
 
 router = APIRouter(tags=["catalog"])
-
-import os
-
-from backend.config import get_settings
 
 
 def _to_book_response(book, copy_count: int) -> BookResponse:

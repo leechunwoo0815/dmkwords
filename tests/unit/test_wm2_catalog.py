@@ -1,6 +1,5 @@
 # tests/unit/test_wm2_catalog.py — 图书资产（真实链路）
 import io
-import json
 
 from fastapi.testclient import TestClient
 from openpyxl import Workbook

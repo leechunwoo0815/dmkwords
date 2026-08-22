@@ -9,7 +9,7 @@ import re
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
+from backend.common.exceptions import ConflictError, ValidationError
 from backend.domain.admin.models import AuditLog
 from backend.domain.admin.repository import AuditLogRepository
 from backend.domain.catalog.models import Book, BookCopy, QuizQuestion
@@ -249,6 +249,6 @@ class QuizQuestionService:
         return q
 
     def delete(self, admin, question_id: int) -> None:
-        q = self.question_repo.get_by_id_or_raise(question_id)
+        self.question_repo.get_by_id_or_raise(question_id)
         self.question_repo.soft_delete(question_id)
         self.db.commit()

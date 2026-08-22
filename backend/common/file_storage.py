@@ -71,7 +71,6 @@ def _mp3_duration(data: bytes) -> int:
         sample_rate = sample_rates[sr_idx]
         # Xing/Info 检测（VBR 头在帧数据开侧）
         frame_size = 144 * bitrate_table[bitrate_idx] * 1000 // sample_rate
-        xing_off = 36 if version == 3 else 21
         xing = data.find(b"Xing", idx + 4) if version == 3 else data.find(b"Info", idx + 4)
         if xing != -1 and xing - idx < frame_size:
             flags = struct.unpack(">I", data[xing + 4 : xing + 8])[0]
