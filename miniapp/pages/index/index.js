@@ -56,6 +56,11 @@ Page({
     if (!c) return
     wx.navigateTo({ url: `/pages/member-pkg/checkin/checkin?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
+  goAchievement() {
+    const c = this.data.currentChild
+    if (!c) return
+    wx.navigateTo({ url: `/pages/member-pkg/achievement/achievement?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
+  },
   goReservation() {
     const c = this.data.currentChild
     if (!c) return

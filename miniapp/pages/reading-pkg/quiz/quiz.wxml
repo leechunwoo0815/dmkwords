@@ -1,0 +1,52 @@
+<view class="quiz-page">
+  <view class="quiz-header">
+    <view class="quiz-book-name">{{bookTitle}}</view>
+    <view class="quiz-progress-row">
+      <view class="quiz-progress-bar">
+        <view class="quiz-progress-fill" style="width: {{(current + 1) * 100 / questions.length}}%"></view>
+      </view>
+      <text class="quiz-progress-text">{{current + 1}} / {{questions.length}} · 剩余机会 {{attemptsLeft}} 次</text>
+    </view>
+  </view>
+
+  <view wx:if="{{status === 'locked'}}" class="feedback">
+    <text class="feedback-icon">🔒</text>
+    <text class="feedback-text">需先听完音频（95%）才能开始测验</text>
+  </view>
+  <view wx:elif="{{status === 'failed'}}" class="feedback">
+    <text class="feedback-icon">😅</text>
+    <text class="feedback-text">这本书的测验机会已用完，可以请馆员帮忙重置</text>
+  </view>
+
+  <view wx:else class="question-area">
+    <view class="question-num">第 {{current + 1}} 题</view>
+    <view class="question-text">{{questions[current].text}}</view>
+    <view class="options">
+      <view wx:for="{{questions[current].options}}" wx:key="*this"
+        class="option {{selected === index ? 'option-selected' : ''}}"
+        data-index="{{index}}" bindtap="onPick">
+        <view class="option-letter {{selected === index ? 'option-letter-active' : ''}}">{{index < 6 ? 'ABCD'[index] : ''}}</view>
+        <view class="option-text">{{item}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="quiz-footer" wx:if="{{status !== 'locked' && status !== 'failed'}}">
+    <view wx:if="{{current > 0}}" class="next-btn" style="background:var(--border);color:var(--fg)" bindtap="onPrev">上一题</view>
+    <view class="next-btn" bindtap="onNext">
+      {{current === questions.length - 1 ? '提交测验' : '下一题'}}
+    </view>
+  </view>
+
+  <view wx:if="{{showConfirm}}" class="confirm-overlay">
+    <view class="confirm-dialog">
+      <view class="cd-emoji">📝</view>
+      <view class="cd-title">确认提交？</view>
+      <view class="cd-sub">提交后占用 1 次机会（还剩 {{attemptsLeft}} 次）；中途退出不占次</view>
+      <view class="cd-actions">
+        <view class="cd-btn cd-cancel" bindtap="onCancelSubmit">再检查一下</view>
+        <view class="cd-btn cd-confirm" bindtap="onConfirmSubmit">确认提交</view>
+      </view>
+    </view>
+  </view>
+</view>

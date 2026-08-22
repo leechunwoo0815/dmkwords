@@ -42,6 +42,18 @@ Page({
     finally { this.setData({ reserving: false }) }
   },
 
+  onQuiz() {
+    const { book, childId, childName, progress } = this.data
+    if (!childId) { wx.showToast({ title: '请先选择孩子', icon: 'none' }); return }
+    if (!progress || !progress.finished) {
+      wx.showToast({ title: '需先听完音频（95%）才解锁测验', icon: 'none' }); return
+    }
+    wx.navigateTo({
+      url: `/pages/reading-pkg/quiz/quiz?book_id=${book.id}&book_title=${encodeURIComponent(book.title)}`
+        + `&child_id=${childId}&child_name=${encodeURIComponent(childName)}`,
+    })
+  },
+
   onPlay() {
     const { book, childId, childName } = this.data
     if (!childId) { wx.showToast({ title: '请先选择孩子', icon: 'none' }); return }

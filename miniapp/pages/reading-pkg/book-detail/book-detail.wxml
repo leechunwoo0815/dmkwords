@@ -35,5 +35,6 @@
       {{reserving ? '预约中…' : '🔖 预约此书'}}
     </button>
     <button class="action-primary" bindtap="onPlay">▶ 开始听</button>
+    <button class="action-secondary" bindtap="onQuiz">📝 去测验</button>
   </view>
 </view>

@@ -49,6 +49,11 @@
         <view class="entry-title">我的预约</view>
         <view class="entry-desc">到店取书</view>
       </view>
+      <view class="entry-item" bindtap="goAchievement">
+        <view class="entry-icon-wrap"><text class="entry-icon">🏆</text></view>
+        <view class="entry-title">等级勋章</view>
+        <view class="entry-desc">词数 · 积分</view>
+      </view>
     </view>
   </view>
 </view>

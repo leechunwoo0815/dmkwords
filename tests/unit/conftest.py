@@ -14,6 +14,12 @@ from backend.domain.admin.service import invalidate_config_cache
 from backend.main import app
 
 ADMIN_TABLES = [
+    "checkin_streak_awards",
+    "milestone_awards",
+    "child_growth_states",
+    "point_ledgers",
+    "words_ledgers",
+    "quiz_attempts",
     "quiz_questions",
     "book_copies",
     "books",

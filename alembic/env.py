@@ -19,6 +19,14 @@ from backend.domain.catalog.models import Book, BookCopy, QuizQuestion  # noqa: 
 from backend.domain.circulation.models import BorrowRecord  # noqa: E402, F401
 from backend.domain.reading.models import CheckIn, ReadingProgress, Reservation  # noqa: E402, F401
 from backend.domain.billing.models import Deposit, DepositLedger  # noqa: E402, F401
+from backend.domain.growth.models import (  # noqa: E402, F401
+    CheckinStreakRecord,
+    ChildGrowthState,
+    MilestoneAward,
+    PointLedger,
+    QuizAttempt,
+    WordsLedger,
+)
 from backend.domain.identity.models import Child, Order, Parent  # noqa: E402, F401
 
 # this is the Alembic Config object

@@ -5,6 +5,7 @@ import {
   SwapOutlined,
   WalletOutlined,
   PushpinOutlined,
+  TrophyOutlined,
   DashboardOutlined,
   SettingOutlined,
 } from "@ant-design/icons";
@@ -27,6 +28,7 @@ export default function Layout() {
     { key: "/deposits", icon: <WalletOutlined />, label: "押金与赔偿", perm: "member.manage" },
     { key: "/circulation", icon: <SwapOutlined />, label: "借阅操作台", perm: "borrow.operate" },
     { key: "/reservations", icon: <PushpinOutlined />, label: "预约管理", perm: "borrow.operate" },
+    { key: "/growth", icon: <TrophyOutlined />, label: "成长与测验", perm: "member.manage" },
     { key: "/configs", icon: <SettingOutlined />, label: "系统配置", perm: "config.view" },
     { key: "/audit-logs", icon: <AuditOutlined />, label: "审计日志", perm: "audit.view" },
   ].filter((item) => hasPermission(permissions, item.perm));

@@ -173,6 +173,10 @@ class ReadingService:
         streak = (yesterday.streak + 1) if yesterday else 1
         self.db.add(CheckIn(child_id=child.id, checkin_date=today, book_id=book_id, streak=streak))
         self.db.flush()
+        # 打卡事件 → growth 域发周期积分（同事务；无订阅者时为 no-op）
+        from backend.common.events import CheckInEvent, event_bus
+
+        event_bus.publish(CheckInEvent(child_id=child.id, streak_days=streak), db=self.db)
         return {"checked_in": True, "streak": streak, "date": str(today)}
 
     def _progress_view(self, p: ReadingProgress) -> dict:

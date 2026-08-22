@@ -1,0 +1,53 @@
+<view class="page-bg" style="min-height:100vh;padding:24rpx;">
+  <view class="level-card" wx:if="{{summary}}">
+    <view class="level-emoji">{{levelEmoji}}</view>
+    <view class="level-name">{{summary.level}} 级</view>
+    <view class="level-desc">
+      {{childName}} · 已有效阅读 {{summary.books_total}} 本书（每 {{summary.level_books_threshold}} 本升一级，只升不降）
+    </view>
+    <view class="level-progress">
+      <view class="level-progress-bar">
+        <view class="level-progress-fill" style="width: {{summary.level_books_threshold ? (summary.progress_in_level * 100 / summary.level_books_threshold) : 0}}%"></view>
+      </view>
+      <view class="level-progress-text">
+        {{summary.is_z_capped ? '已达 Z 级封顶，继续累计' : '本级进度 ' + summary.progress_in_level + ' / ' + summary.level_books_threshold + ' 本'}}
+      </view>
+    </view>
+    <view class="level-stats">
+      <view class="level-stat">
+        <view class="m-name">{{summary.words_total}}</view>
+        <view class="m-label">有效词数</view>
+      </view>
+      <view class="level-stat">
+        <view class="m-name">{{summary.points_total}}</view>
+        <view class="m-label">积分</view>
+      </view>
+      <view class="level-stat">
+        <view class="m-name">{{summary.words_remainder}}</view>
+        <view class="m-label">零头池(词)</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-label" style="margin:32rpx 0 16rpx;font-size:28rpx;font-weight:600;color:var(--fg);">里程碑勋章</view>
+  <view class="badges-grid">
+    <view wx:for="{{badges}}" wx:key="node" class="badge-card {{item.unlocked ? '' : 'badge-colored-locked'}}">
+      <view class="badge-icon">{{item.emoji}}</view>
+      <view class="badge-name">{{item.label}}</view>
+      <view wx:if="{{!item.unlocked}}" class="badge-lock-hint">未达成</view>
+    </view>
+  </view>
+
+  <view class="section-label" style="margin:32rpx 0 16rpx;font-size:28rpx;font-weight:600;color:var(--fg);">最近积分明细</view>
+  <view class="timeline">
+    <view wx:for="{{points}}" wx:key="id" class="tl-item">
+      <view class="tl-dot"></view>
+      <view class="tl-content">
+        <view class="tl-name">{{item.detail}}</view>
+        <view class="tl-time">{{item.created_at}}</view>
+      </view>
+      <view class="tl-desc" style="color:var(--success);font-weight:600;">+{{item.points}}</view>
+    </view>
+    <view wx:if="{{!points.length}}" style="color:var(--muted);font-size:26rpx;text-align:center;padding:20rpx;">还没有积分记录</view>
+  </view>
+</view>

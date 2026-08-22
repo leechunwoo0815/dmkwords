@@ -1,0 +1,62 @@
+<view class="result-page" wx:if="{{result}}">
+  <view class="level-up-banner" wx:if="{{result.level_up}}">
+    <view class="level-up-emoji">🎉</view>
+    <view class="level-up-title">升级啦！</view>
+    <view class="level-up-desc">升到 {{result.new_level}} 级，继续加油！</view>
+  </view>
+
+  <view class="result-card">
+    <view class="result-icon {{result.passed ? 'result-icon-pass' : 'result-icon-fail'}}">{{result.passed ? '✓' : '!'}}</view>
+    <view class="result-title {{result.passed ? 'title-pass' : 'title-fail'}}">
+      {{result.passed ? '测验通过' : '再试一次'}}
+    </view>
+    <view class="result-sub">{{result.book_title}} · 答对 {{result.score}} / {{result.total}} 题</view>
+
+    <view class="score-circle {{result.passed ? 'ring-pass' : 'ring-fail'}}">
+      <view class="score-value">{{percent}}</view>
+      <view class="score-unit">分</view>
+    </view>
+
+    <view class="stats-row" wx:if="{{result.passed}}">
+      <view class="stat-item">
+        <view class="stat-val">+{{result.words_added}}</view>
+        <view class="stat-label">有效词数</view>
+      </view>
+      <view class="stat-item">
+        <view class="stat-val">+{{result.points_detail.length ? result.points_detail[0].points : 0}}</view>
+        <view class="stat-label">积分</view>
+      </view>
+      <view class="stat-item">
+        <view class="stat-val">{{result.best_score}}/{{result.total}}</view>
+        <view class="stat-label">历史最高</view>
+      </view>
+    </view>
+
+    <view class="encourage-box" wx:else>
+      <view class="result-sub">还剩 {{result.attempts_left}} 次机会，鼓励孩子再来一次！</view>
+    </view>
+  </view>
+
+  <view class="wrong-review" wx:if="{{result.wrong.length}}">
+    <view class="wrong-toggle" bindtap="toggleWrong">
+      错题回顾（{{result.wrong.length}} 题）<text class="toggle-arrow">{{showWrong ? '▲' : '▼'}}</text>
+    </view>
+    <view wx:if="{{showWrong}}" class="wrong-list">
+      <view wx:for="{{result.wrong}}" wx:key="question_id" class="wrong-item">
+        <view class="wrong-q">
+          <text class="wrong-q-num">{{index + 1}}.</text>
+          <text class="wrong-q-text">{{item.text}}</text>
+        </view>
+        <view class="wrong-answers">
+          <view class="wrong-user-answer">你的答案：{{item.user_answer}} ✗</view>
+          <view class="wrong-correct-answer">正确答案：{{item.answer}} ✓</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="btn-group">
+    <view class="btn-secondary" bindtap="onBack">返回</view>
+    <view wx:if="{{!result.passed && result.attempts_left > 0}}" class="btn-primary" bindtap="onRetry">再测一次</view>
+  </view>
+</view>

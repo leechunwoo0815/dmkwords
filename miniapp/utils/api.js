@@ -30,6 +30,20 @@ module.exports = {
     })
   },
 
+  // 测验与成长（WM7）
+  getQuiz(bookId, childId) {
+    return req.get(`/api/miniapp/quiz/${bookId}`, null, { params: { child_id: childId } })
+  },
+  submitQuiz(bookId, childId, answers) {
+    return req.post(`/api/miniapp/quiz/${bookId}/submit`, { child_id: childId, answers })
+  },
+  growthSummary(childId) {
+    return req.get('/api/miniapp/growth/summary', null, { params: { child_id: childId } })
+  },
+  pointsList(childId) {
+    return req.get('/api/miniapp/points', null, { params: { child_id: childId } })
+  },
+
   // 打卡
   getCheckins(childId, days) {
     return req.get('/api/miniapp/checkins', null, { params: { child_id: childId, days: days || 60 } })

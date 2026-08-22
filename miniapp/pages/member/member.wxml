@@ -29,6 +29,10 @@
         <text class="fi-icon">🔖</text>
         <text class="fi-label">我的预约</text>
       </view>
+      <view class="func-item" bindtap="goAchievement">
+        <text class="fi-icon">🏆</text>
+        <text class="fi-label">等级勋章</text>
+      </view>
     </view>
   </view>
 
