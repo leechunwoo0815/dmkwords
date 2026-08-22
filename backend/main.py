@@ -1,9 +1,10 @@
-# backend/main.py — FastAPI 入口（骨架版）
+# backend/main.py — FastAPI 入口
 import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.common.exceptions import BusinessException, business_exception_handler
 from backend.config import get_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -16,10 +17,12 @@ app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 骨架期放开；上线前收紧为小程序/管理端域名
+    allow_origins=["http://localhost:5173"],  # admin-web 开发端口；上线前收紧为正式域名
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_exception_handler(BusinessException, business_exception_handler)
 
 
 @app.get("/health")
@@ -27,6 +30,6 @@ def health() -> dict:
     return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
 
 
-# 域 Router 在各域就绪后按序挂载（F0 起逐域启用）：
-# from backend.domain.admin.router import router as admin_router  # noqa: ERA001
-# app.include_router(admin_router, prefix="/api/admin")
+from backend.domain.admin.router import router as admin_router  # noqa: E402
+
+app.include_router(admin_router, prefix="/api/admin")

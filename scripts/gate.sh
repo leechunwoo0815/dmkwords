@@ -62,8 +62,8 @@ else
   skip "alembic versions 为空，F0 起启用"
 fi
 
-step 7 "覆盖率（骨架期=0；F1 起逐域抬升，终态整体85/关键域90）"
-run python -m pytest tests/ -q --cov=backend --cov-fail-under=0 --cov-report=term-missing:skip-covered
+step 7 "覆盖率（WM1 基线 25%，随模块逐级抬升，终态整体85/关键域90）"
+run python -m pytest tests/ -q --cov=backend --cov-fail-under=25 --cov-report=term-missing:skip-covered
 
 echo ""
 if [ "$FAILED" -eq 0 ]; then

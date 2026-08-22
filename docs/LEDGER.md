@@ -8,7 +8,7 @@
 |---|---|---|---|---|
 | M0 | 项目骨架 + 门禁 + 宪法 | DONE | commit 820631f; gate.sh full exit 0 | 2026-08-22 |
 | M0.5 | Feature 全量清单 + Gherkin 初稿 | DONE | commit 78388a1; 230 场景解析通过 | 2026-08-22 |
-| WM1 | 平台基座（登录/RBAC/配置/审计 + admin-web 骨架 + dev.sh） | PENDING | — | 含完整流程 Demo |
+| WM1 | 平台基座（登录/RBAC/配置/审计 + admin-web 骨架 + dev.sh） | MANUAL_TEST | gate.sh full exit 0（27 pytest + 12 BDD 场景 + 架构关 + 覆盖率 26%）| 等用户按手册 §WM1 手动验收 |
 | WM2 | 图书资产 | PENDING | — | |
 | WM3 | 会员与订单（人工收款路径） | PENDING | — | |
 | WM4 | 押金与赔偿 | PENDING | — | |
