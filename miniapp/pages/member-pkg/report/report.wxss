@@ -1,0 +1,77 @@
+/* pages/member-pkg/report/report.wxss — 周报/月报页 */
+.report-head {
+  background: #2c4a6e;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  color: #fffefa;
+}
+.report-header-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.report-title {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+.report-period {
+  font-size: 22rpx;
+  color: #e4dcc8;
+}
+.report-kinds {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+.rk-chip {
+  padding: 8rpx 32rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fffefa;
+  font-size: 26rpx;
+}
+.rk-chip.active {
+  background: #f6f2e9;
+  color: #2c4a6e;
+  font-weight: 600;
+}
+.rp-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+.rp-stat {
+  flex: 1 0 28%;
+  background: #f6f2e9;
+  border-radius: 12rpx;
+  padding: 16rpx 8rpx;
+  text-align: center;
+}
+.rp-num {
+  display: block;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2c4a6e;
+}
+.rp-label {
+  display: block;
+  font-size: 20rpx;
+  color: #6f685a;
+  margin-top: 6rpx;
+}
+.rp-note {
+  margin-top: 20rpx;
+  font-size: 24rpx;
+  color: #6f685a;
+}
+.rp-image {
+  width: 100%;
+  border-radius: 12rpx;
+  margin-top: 12rpx;
+}
+.rp-loading {
+  color: #a39a86;
+  font-size: 26rpx;
+  padding: 40rpx 0;
+  text-align: center;
+}

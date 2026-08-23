@@ -1,0 +1,49 @@
+<view class="page-bg" style="min-height:100vh;padding:24rpx;">
+  <view class="report-head">
+    <view class="report-header-line">
+      <text class="report-title">{{childName}} · {{kindLabel}}</text>
+      <text class="report-period">{{report.period_label || ''}}</text>
+    </view>
+    <view class="report-kinds">
+      <view class="rk-chip {{kind === 'weekly' ? 'active' : ''}}" data-kind="weekly" bindtap="switchKind">周报</view>
+      <view class="rk-chip {{kind === 'monthly' ? 'active' : ''}}" data-kind="monthly" bindtap="switchKind">月报</view>
+    </view>
+  </view>
+
+  <view class="section-card" wx:if="{{report}}" style="margin-top: 24rpx;">
+    <view class="section-title">阅读概要</view>
+    <view class="rp-stats">
+      <view class="rp-stat">
+        <text class="rp-num">{{report.books}}</text>
+        <text class="rp-label">有效阅读(本)</text>
+      </view>
+      <view class="rp-stat">
+        <text class="rp-num">{{report.words}}</text>
+        <text class="rp-label">新学词数</text>
+      </view>
+      <view class="rp-stat">
+        <text class="rp-num">{{report.checkin_days}}</text>
+        <text class="rp-label">打卡(天)</text>
+      </view>
+      <view class="rp-stat">
+        <text class="rp-num">{{report.quiz_count}}</text>
+        <text class="rp-label">测验(次)</text>
+      </view>
+      <view class="rp-stat">
+        <text class="rp-num">{{report.quiz_avg_percent || '—'}}{{report.quiz_avg_percent ? '%' : ''}}</text>
+        <text class="rp-label">测验均分</text>
+      </view>
+      <view class="rp-stat">
+        <text class="rp-num">{{report.level || '—'}}</text>
+        <text class="rp-label">当前等级</text>
+      </view>
+    </view>
+    <view class="rp-note">累计：{{report.total_words}} 词 · {{report.points_total}} 积分</view>
+  </view>
+
+  <view class="section-card" style="margin-top: 24rpx;">
+    <view class="section-title">报告图片</view>
+    <image wx:if="{{imageUrl}}" class="rp-image" src="{{imageUrl}}" mode="widthFix" show-menu-by-longpress="true" />
+    <view wx:else class="rp-loading">生成中，请稍后……</view>
+  </view>
+</view>

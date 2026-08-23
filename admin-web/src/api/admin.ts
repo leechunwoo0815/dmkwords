@@ -5,7 +5,7 @@ import type { components } from "./schema";
 export type AdminUser = components["schemas"]["AdminUserResponse"];
 export type SystemConfig = components["schemas"]["SystemConfigResponse"];
 export type AuditLog = components["schemas"]["AuditLogResponse"];
-type LoginRequest = components["schemas"]["LoginRequest"];
+type LoginRequest = components["schemas"]["backend__domain__admin__schemas__LoginRequest"];
 type SystemConfigUpdateRequest = components["schemas"]["SystemConfigUpdateRequest"];
 type PaginatedAuditLogs = components["schemas"]["PaginatedResponse_AuditLogResponse_"];
 
@@ -26,6 +26,39 @@ export function apiUpdateConfig(
   body: SystemConfigUpdateRequest
 ): Promise<SystemConfig> {
   return request(`/api/admin/configs/${key}`, { method: "PUT", body: JSON.stringify(body) });
+}
+
+type StaffCreateRequest = components["schemas"]["StaffCreateRequest"];
+type StaffStatusRequest = components["schemas"]["StaffStatusRequest"];
+type StaffResetPasswordRequest = components["schemas"]["StaffResetPasswordRequest"];
+
+export function apiListStaff(): Promise<AdminUser[]> {
+  return request("/api/admin/staff");
+}
+
+export function apiCreateStaff(body: StaffCreateRequest): Promise<AdminUser> {
+  return request("/api/admin/staff", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function apiUpdateStaff(
+  id: number,
+  body: { display_name?: string; role?: string },
+): Promise<AdminUser> {
+  return request(`/api/admin/staff/${id}`, { method: "PUT", body: JSON.stringify(body) });
+}
+
+export function apiSetStaffStatus(id: number, status: number): Promise<AdminUser> {
+  return request(`/api/admin/staff/${id}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status } satisfies StaffStatusRequest),
+  });
+}
+
+export function apiResetStaffPassword(id: number, new_password: string): Promise<{ ok: boolean }> {
+  return request(`/api/admin/staff/${id}/reset-password`, {
+    method: "POST",
+    body: JSON.stringify({ new_password } satisfies StaffResetPasswordRequest),
+  });
 }
 
 export function apiListAuditLogs(params: {

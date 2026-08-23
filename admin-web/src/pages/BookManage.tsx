@@ -16,7 +16,7 @@ import {
 } from "antd";
 import { InboxOutlined, PlusOutlined } from "@ant-design/icons";
 
-import { apiCreateBook, apiImportBooks, apiListBooks, apiToggleBookStatus, type Book } from "../api/catalog";
+import { apiCreateBook, apiDownloadImportTemplate, apiImportBooks, apiListBooks, apiToggleBookStatus, type Book } from "../api/catalog";
 
 export default function BookManage() {
   const { message } = AntdApp.useApp();
@@ -91,6 +91,7 @@ export default function BookManage() {
           图书管理
         </Typography.Title>
         <Space>
+          <Button onClick={() => { apiDownloadImportTemplate().catch((e) => message.error((e as Error).message)); }}>下载导入模板</Button>
           <Button onClick={() => setImportOpen(true)}>Excel 批量导入</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
             新书入库

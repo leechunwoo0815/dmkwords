@@ -98,6 +98,54 @@ class ChildService:
             raise NotFoundError("孩子不存在")
         return child
 
+    def update_profile(
+        self,
+        admin,
+        child_id: int,
+        english_name: str | None = None,
+        grade: str | None = None,
+        ar_level: str | None = None,
+    ) -> Child:
+        """维护孩子资料（C19）：英文名/年级/AR 值；AR 只升不降（老师评估口径）+ 审计。"""
+        child = self._get_child(child_id)
+        changed = []
+        if english_name is not None:
+            child.english_name = english_name or None
+            changed.append("english_name")
+        if grade is not None:
+            child.grade = grade
+            changed.append("grade")
+        if ar_level is not None:
+            current = child.ar_level
+            try:
+                cur_v = float(current) if current is not None else -1.0
+            except ValueError:
+                cur_v = 0.0
+            try:
+                new_v = float(ar_level)
+            except ValueError:
+                raise ValidationError("AR 值必须是数字（如 3.5）") from None
+            if new_v < 0:
+                raise ValidationError("AR 值不能为负数")
+            if current is None or new_v > cur_v:
+                child.ar_level = f"{new_v:.1f}"
+                changed.append("ar_level")
+            else:
+                raise ValidationError(f"AR 值只升不降（当前 {current}，提交 {ar_level}）")
+        if not changed:
+            raise ValidationError("没有可更新的字段")
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="child.update_profile",
+            target_type="child",
+            target_id=str(child.id),
+            detail={"fields": changed, "ar_level": child.ar_level, "grade": child.grade},
+            reason="维护孩子资料（老师评估）",
+        )
+        self.db.commit()
+        return child
+
     def mark_pending_evaluation(self, admin, child_id: int, reason: str) -> Child:
         """观察期 → 待评估（C13/决策 8：馆员手动标记留痕；到期自动转换任务在 WM11）。"""
         child = self._get_child(child_id)

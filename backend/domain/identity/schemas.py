@@ -27,6 +27,12 @@ class ChildCreateRequest(BaseSchema):
     grade: str = Field("", max_length=50)
 
 
+class ChildUpdateRequest(BaseSchema):
+    english_name: str | None = Field(None, max_length=64)
+    grade: str | None = Field(None, max_length=50)
+    ar_level: str | None = Field(None, max_length=10, description="AR 值（老师评估，只升不降）")
+
+
 class ChildResponse(BaseSchema):
     id: int
     parent_id: int
@@ -38,6 +44,7 @@ class ChildResponse(BaseSchema):
     member_status: str
     member_start: date | None
     member_expire: date | None
+    ar_level: str | None
 
 
 class ChildWithParentResponse(ChildResponse):

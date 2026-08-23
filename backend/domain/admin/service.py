@@ -17,16 +17,20 @@ from backend.common.config_service import (  # noqa: F401 — 兼容旧引用
     invalidate_config_cache,
 )
 from backend.common.exceptions import (
+    ConflictError,
     ForbiddenError,
+    NotFoundError,
     UnauthorizedError,
+    ValidationError,
 )
-from backend.common.security import create_admin_token, verify_password
+from backend.common.security import create_admin_token, hash_password, verify_password
 from backend.domain.admin.models import AdminUser, AuditLog, SystemConfig
 from backend.domain.admin.repository import (
     AdminUserRepository,
     AuditLogRepository,
     SystemConfigRepository,
 )
+from backend.domain.catalog.audit_events import publish_audit
 
 # ---------- 权限目录（声明式 RBAC 的单一事实源） ----------
 # superadmin = 全量；staff = 日常运营（借还/图书/活动/会员办理/放行留痕），不含资金审核与系统管理
@@ -169,3 +173,112 @@ class DashboardService:
             "config_count": config_count,
             "recent_config_changes": [_fmt(e) for e in recent_changes],
         }
+
+
+class StaffService:
+    """员工账号管理（WM1 超管职责：创建/禁用/改角色/重置密码）。"""
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.user_repo = AdminUserRepository(db)
+
+    def list(self) -> list[AdminUser]:
+        return (
+            self.db.query(AdminUser)
+            .filter(AdminUser.is_deleted == 0)
+            .order_by(AdminUser.id.asc())
+            .all()
+        )
+
+    def create(
+        self, admin: AdminUser, username: str, password: str, display_name: str, role: str
+    ) -> AdminUser:
+        if self.user_repo.get_by_username(username):
+            raise ConflictError("用户名已存在")
+        if role not in (AdminUser.ROLE_SUPER_ADMIN, AdminUser.ROLE_STAFF):
+            raise ValidationError("角色必须是 superadmin 或 staff")
+        user = AdminUser(
+            username=username,
+            password_hash=hash_password(password),
+            display_name=display_name,
+            role=role,
+            status=AdminUser.STATUS_ACTIVE,
+        )
+        self.db.add(user)
+        self.db.flush()
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="staff.create",
+            target_type="admin_user",
+            target_id=str(user.id),
+            detail={"username": username, "role": role},
+            reason=f"创建员工账号 {username}",
+        )
+        self.db.commit()
+        return user
+
+    def _get(self, admin: AdminUser, user_id: int) -> AdminUser:
+        user = (
+            self.db.query(AdminUser)
+            .filter(AdminUser.id == user_id, AdminUser.is_deleted == 0)
+            .first()
+        )
+        if not user:
+            raise NotFoundError("员工不存在")
+        return user
+
+    def update(
+        self, admin: AdminUser, user_id: int, display_name: str | None, role: str | None
+    ) -> AdminUser:
+        user = self._get(admin, user_id)
+        if user.id == admin.id and role and role != user.role:
+            raise ValidationError("不能修改自己的角色（防自杀锁）")
+        if role is not None:
+            if role not in (AdminUser.ROLE_SUPER_ADMIN, AdminUser.ROLE_STAFF):
+                raise ValidationError("角色必须是 superadmin 或 staff")
+            user.role = role
+        if display_name is not None:
+            user.display_name = display_name
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="staff.update",
+            target_type="admin_user",
+            target_id=str(user.id),
+            detail={"display_name": display_name, "role": role},
+            reason=f"更新员工账号（id={user.id}）",
+        )
+        self.db.commit()
+        return user
+
+    def set_status(self, admin: AdminUser, user_id: int, status: int) -> AdminUser:
+        user = self._get(admin, user_id)
+        if user.id == admin.id:
+            raise ValidationError("不能禁用自己（防自杀锁）")
+        user.status = AdminUser.STATUS_ACTIVE if status else AdminUser.STATUS_DISABLED
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="staff.status",
+            target_type="admin_user",
+            target_id=str(user.id),
+            detail={"status": status},
+            reason=f"{'启用' if status else '禁用'}员工账号（{user.username}）",
+        )
+        self.db.commit()
+        return user
+
+    def reset_password(self, admin: AdminUser, user_id: int, new_password: str) -> None:
+        user = self._get(admin, user_id)
+        user.password_hash = hash_password(new_password)
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="staff.reset_password",
+            target_type="admin_user",
+            target_id=str(user.id),
+            detail={"username": user.username},
+            reason=f"重置员工密码（{user.username}）",
+        )
+        self.db.commit()

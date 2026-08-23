@@ -101,6 +101,21 @@ export async function apiImportBooks(file: File): Promise<{
   return res.json();
 }
 
+export async function apiDownloadImportTemplate(): Promise<void> {
+  const token = localStorage.getItem("dmkwords_admin_token");
+  const res = await fetch("/api/admin/books/import-template", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { detail?: string }).detail ?? "模板下载失败");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "books-import-template.xlsx";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function apiListQuestions(bookId: number): Promise<QuizQuestion[]> {
   return request(`/api/admin/books/${bookId}/questions`);
 }

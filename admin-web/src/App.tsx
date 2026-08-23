@@ -15,6 +15,7 @@ import MemberManage from "./pages/MemberManage";
 import Dashboard from "./pages/Dashboard";
 import Layout from "./pages/Layout";
 import Login from "./pages/Login";
+import Staff from "./pages/Staff";
 import SystemConfig from "./pages/SystemConfig";
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="growth" element={<GrowthManage />} />
           <Route path="activities" element={<ActivityManage />} />
           <Route path="refund-center" element={<RefundCenter />} />
+          <Route path="staff" element={<Staff />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -1,9 +1,10 @@
 # backend/domain/catalog/router.py — 图书资产 API
+import io
 import os
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import PaginatedResponse
@@ -24,10 +25,27 @@ from backend.domain.catalog.schemas import (
     QuizQuestionCreateRequest,
     QuizQuestionResponse,
 )
-from backend.domain.catalog.service import BookService, QuizQuestionService
+from backend.domain.catalog.service import (
+    BookService,
+    QuizQuestionService,
+    build_import_template,
+)
 from backend.middleware.admin_rbac import require_perm
 
 router = APIRouter(tags=["catalog"])
+
+
+@router.get("/books/import-template")
+def import_template(admin: Any = Depends(require_perm("book.manage"))):
+    """Excel 批量导入模板下载（C8：与 import_books 解析列序一致）。"""
+    data = build_import_template()
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": 'attachment; filename="books-import-template.xlsx"',
+        },
+    )
 
 
 def _to_book_response(book, copy_count: int) -> BookResponse:

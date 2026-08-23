@@ -247,3 +247,44 @@ class QuizQuestionService:
         self.question_repo.get_by_id_or_raise(question_id)
         self.question_repo.soft_delete(question_id)
         self.db.commit()
+
+
+IMPORT_TEMPLATE_HEADERS = ["ISBN", "书名*", "作者", "AR值", "词数", "主题", "年级(如 G1)", "副本数"]
+
+
+def build_import_template() -> bytes:
+    """生成 Excel 导入模板（与 import_books 解析列序一致；含说明行）。第 2 行为示例。"""
+    from io import BytesIO
+
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "图书导入"
+    ws.append(IMPORT_TEMPLATE_HEADERS)
+    ws.append(["9780545582889", "示例书名", "示例作者", "3.5", "1200", "动物", "G1", "1"])
+    ws.append(["", "", "", "", "", "", "", ""])
+    ws.append(["", "", "", "", "", "", "", ""])
+    ws.append(
+        [
+            "说明：仅『书名』必填；ISBN 建议填写（重复 ISBN 不重复建书，只加副本）；AR 值差异超范围在借书时仅提示；副本数空=1（范围 0-999）；其余信息可在管理端补录",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+        ]
+    )
+    ws.column_dimensions["A"].width = 18
+    ws.column_dimensions["B"].width = 30
+    ws.column_dimensions["C"].width = 16
+    ws.column_dimensions["D"].width = 10
+    ws.column_dimensions["E"].width = 10
+    ws.column_dimensions["F"].width = 12
+    ws.column_dimensions["G"].width = 12
+    ws.column_dimensions["H"].width = 10
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

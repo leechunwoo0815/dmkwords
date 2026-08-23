@@ -16,11 +16,32 @@ class AdminUserResponse(BaseSchema):
     username: str
     display_name: str
     role: str
+    status: int = 1
 
 
 class LoginResponse(BaseSchema):
     token: str
     user: AdminUserResponse
+
+
+class StaffCreateRequest(BaseSchema):
+    username: str = Field(..., min_length=2, max_length=191, pattern=r"^[A-Za-z0-9_.-]+$")
+    password: str = Field(..., min_length=8, max_length=128)
+    display_name: str = Field(..., min_length=1, max_length=64)
+    role: str = Field("staff", pattern=r"^(superadmin|staff)$")
+
+
+class StaffUpdateRequest(BaseSchema):
+    display_name: str | None = Field(None, min_length=1, max_length=64)
+    role: str | None = Field(None, pattern=r"^(superadmin|staff)$")
+
+
+class StaffStatusRequest(BaseSchema):
+    status: int = Field(..., ge=0, le=1)
+
+
+class StaffResetPasswordRequest(BaseSchema):
+    new_password: str = Field(..., min_length=8, max_length=128)
 
 
 class MeResponse(BaseSchema):

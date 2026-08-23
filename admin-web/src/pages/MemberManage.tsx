@@ -39,6 +39,7 @@ import {
   apiListChildren,
   apiListOrders,
   apiMarkPendingEvaluation,
+  apiUpdateChild,
   type Child,
   type Order,
 } from "../api/members";
@@ -100,6 +101,8 @@ export default function MemberManage() {
   const [readingLoading, setReadingLoading] = useState(false);
   const [orderForm] = Form.useForm();
   const [confirmForm] = Form.useForm();
+  const [editChild, setEditChild] = useState<Child | null>(null);
+  const [editForm] = Form.useForm();
 
   const loadChildren = useCallback(
     (page: number) => {
@@ -270,10 +273,10 @@ export default function MemberManage() {
             rowKey="id" loading={loading} dataSource={children} size="middle"
             pagination={{ current: childPage, pageSize: 15, total: childTotal, showSizeChanger: false, onChange: setChildPage }}
             columns={[
-              { title: "孩子", key: "child", width: 150, render: (_, r) => (
+              { title: "孩子", key: "child", width: 170, render: (_, r) => (
                 <div>
                   <div>{r.name}{r.english_name ? `（${r.english_name}）` : ""}</div>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>{r.grade || "—"}</Typography.Text>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>{r.grade || "—"}{r.ar_level ? ` · AR ${r.ar_level}` : ""}</Typography.Text>
                 </div>
               ) },
               { title: "家长", key: "parent", width: 160, render: (_, r) => (
@@ -288,7 +291,7 @@ export default function MemberManage() {
               { title: "会员到期", dataIndex: "member_expire", width: 120, render: (v) => v ?? "—" },
               { title: "会员开始", dataIndex: "member_start", width: 120, render: (v) => v ?? "—" },
               {
-                title: "操作", key: "op", width: 230,
+                title: "操作", key: "op", width: 280,
                 render: (_, r) => (
                   <Space size={0} wrap>
                     <Button type="link" size="small" onClick={() => {
@@ -303,6 +306,10 @@ export default function MemberManage() {
                     )}
                     <Button type="link" size="small" onClick={() => openReadingProfile(r)}>阅读档案</Button>
                     <Button type="link" size="small" onClick={() => { setObsChild(r); setObsFileList([]); setObsRemark(""); }}>评估报告</Button>
+                    <Button type="link" size="small" onClick={() => {
+                      setEditChild(r);
+                      editForm.setFieldsValue({ english_name: r.english_name || "", grade: r.grade || "", ar_level: r.ar_level || "" });
+                    }}>编辑</Button>
                   </Space>
                 ),
               },
@@ -549,6 +556,47 @@ export default function MemberManage() {
           </>
         )}
       </Drawer>
+
+      <Modal
+        title={`编辑孩子资料 — ${editChild?.name ?? ""}`}
+        open={!!editChild}
+        okText="保存"
+        cancelText="取消"
+        destroyOnClose
+        onOk={async () => {
+          if (!editChild) return;
+          try {
+            const v = await editForm.validateFields();
+            await apiUpdateChild(editChild.id, {
+              english_name: v.english_name || undefined,
+              grade: v.grade || undefined,
+              ar_level: v.ar_level || undefined,
+            });
+            message.success("已保存");
+            setEditChild(null);
+            loadChildren(childPage);
+          } catch (e) {
+            if ((e as Error).message) message.error((e as Error).message);
+          }
+        }}
+        onCancel={() => setEditChild(null)}
+      >
+        <Form form={editForm} layout="vertical">
+          <Form.Item name="english_name" label="英文名（榜单展示用）">
+            <Input maxLength={64} />
+          </Form.Item>
+          <Form.Item name="grade" label="年级">
+            <Input maxLength={50} />
+          </Form.Item>
+          <Form.Item
+            name="ar_level"
+            label="AR 值（老师评估，只升不降）"
+            extra="首次填写任意值；再次填写仅允许高于当前值（降级将被拒绝）"
+          >
+            <Input maxLength={10} placeholder="如 3.5" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </>
   );
 }

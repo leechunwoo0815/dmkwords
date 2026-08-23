@@ -11,6 +11,7 @@ from backend.domain.identity.observation_service import ObservationReportService
 from backend.domain.identity.schemas import (
     ChildCreateRequest,
     ChildResponse,
+    ChildUpdateRequest,
     ChildWithParentResponse,
     OrderConfirmRequest,
     OrderCreateRequest,
@@ -92,6 +93,21 @@ def mark_pending_evaluation(
     """观察期 → 待评估（C13：馆员手动标记；自动转换任务在 WM11）。"""
     return ChildResponse.model_validate(
         ChildService(db).mark_pending_evaluation(admin, child_id, body.reason)
+    )
+
+
+@router.put("/members/children/{child_id}", response_model=ChildResponse)
+def update_child(
+    child_id: int,
+    body: ChildUpdateRequest,
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """维护孩子资料（C19）：英文名/年级/AR 值（AR 只升不降）。"""
+    return ChildResponse.model_validate(
+        ChildService(db).update_profile(
+            admin, child_id, body.english_name, body.grade, body.ar_level
+        )
     )
 
 

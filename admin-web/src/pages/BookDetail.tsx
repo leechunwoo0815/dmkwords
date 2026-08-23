@@ -133,6 +133,10 @@ export default function BookDetail() {
                 <Space>
                   <Tag color="green">已上传</Tag>
                   {book.audio_duration_seconds ? <Typography.Text type="secondary">约 {Math.ceil(book.audio_duration_seconds / 60)} 分钟</Typography.Text> : null}
+                  <audio
+                    controls preload="metadata" style={{ width: 320, height: 36 }}
+                    src={`/api/admin/${book.audio_path}`}
+                  />
                 </Space>
               ) : (
                 <Tag>未上传</Tag>

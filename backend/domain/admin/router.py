@@ -12,6 +12,10 @@ from backend.domain.admin.schemas import (
     LoginRequest,
     LoginResponse,
     MeResponse,
+    StaffCreateRequest,
+    StaffResetPasswordRequest,
+    StaffStatusRequest,
+    StaffUpdateRequest,
     SystemConfigResponse,
     SystemConfigUpdateRequest,
 )
@@ -20,10 +24,11 @@ from backend.domain.admin.service import (
     AuthService,
     ConfigService,
     DashboardService,
+    StaffService,
     permissions_for_role,
 )
 from backend.middleware.admin_auth import get_current_admin
-from backend.middleware.admin_rbac import require_perm
+from backend.middleware.admin_rbac import require_perm, require_super_admin
 
 router = APIRouter(tags=["admin"])
 
@@ -88,3 +93,56 @@ def dashboard_overview(
     db: Session = Depends(get_db),
 ):
     return DashboardOverviewResponse.model_validate(DashboardService(db).overview())
+
+
+# ---------- 员工管理（WM1 §11.1：超管账号/角色/密码） ----------
+
+
+@router.get("/staff", response_model=list[AdminUserResponse])
+def staff_list(
+    admin: AdminUser = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    return StaffService(db).list()
+
+
+@router.post("/staff", response_model=AdminUserResponse)
+def staff_create(
+    body: StaffCreateRequest,
+    admin: AdminUser = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    return StaffService(db).create(
+        admin, body.username, body.password, body.display_name, body.role
+    )
+
+
+@router.put("/staff/{user_id}", response_model=AdminUserResponse)
+def staff_update(
+    user_id: int,
+    body: StaffUpdateRequest,
+    admin: AdminUser = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    return StaffService(db).update(admin, user_id, body.display_name, body.role)
+
+
+@router.put("/staff/{user_id}/status", response_model=AdminUserResponse)
+def staff_status(
+    user_id: int,
+    body: StaffStatusRequest,
+    admin: AdminUser = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    return StaffService(db).set_status(admin, user_id, body.status)
+
+
+@router.post("/staff/{user_id}/reset-password", response_model=dict)
+def staff_reset_password(
+    user_id: int,
+    body: StaffResetPasswordRequest,
+    admin: AdminUser = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    StaffService(db).reset_password(admin, user_id, body.new_password)
+    return {"ok": True}
