@@ -13,19 +13,24 @@ import type { components } from "../api/schema";
 
 type Overview = components["schemas"]["DashboardOverviewResponse"];
 
-/** 经营看板格子：随模块交付逐格点亮（置灰格显示待哪个模块） */
-const BUSINESS_CELLS = [
-  { label: "总藏书量", value: null as number | null, unit: "本", module: "图书模块" },
-  { label: "在馆 / 借出", value: null as number | null, unit: "本", module: "图书模块" },
-  { label: "今日借出", value: null as number | null, unit: "本", module: "借阅模块" },
-  { label: "今日归还", value: null as number | null, unit: "本", module: "借阅模块" },
-  { label: "当前逾期", value: null as number | null, unit: "本", module: "借阅模块" },
-  { label: "会员总数", value: null as number | null, unit: "人", module: "会员模块" },
-  { label: "本周新增会员", value: null as number | null, unit: "人", module: "会员模块" },
-  { label: "近期活动报名", value: null as number | null, unit: "人次", module: "活动模块" },
+/** 经营看板格子（C21 点亮：只读统计；valueKey 对应 DashboardOverviewResponse 字段） */
+const BUSINESS_CELLS: { label: string; unit: string; valueKey: string }[] = [
+  { label: "总藏书量", unit: "本", valueKey: "copy_total" },
+  { label: "在馆 / 借出", unit: "本", valueKey: "copy_available_borrowed" },
+  { label: "今日借出", unit: "本", valueKey: "today_borrowed" },
+  { label: "今日归还", unit: "本", valueKey: "today_returned" },
+  { label: "当前逾期", unit: "本", valueKey: "overdue_active" },
+  { label: "会员总数", unit: "人", valueKey: "member_total" },
+  { label: "本周新增会员", unit: "人", valueKey: "member_new_week" },
+  { label: "近期活动报名", unit: "人次", valueKey: "activity_enroll_recent" },
 ];
 
-const moduleTag = (mod: string) => `待${mod}交付`;
+const cellValue = (o: Overview | null, key: string): number | string | null => {
+  if (!o) return null;
+  if (key === "copy_available_borrowed") return `${o.copy_available} / ${o.copy_borrowed}`;
+  const raw = (o as unknown as Record<string, number | null | undefined>)[key] ?? null;
+  return raw;
+};
 
 export default function Dashboard() {
   const [overview, setOverview] = useState<Overview | null>(null);
@@ -152,7 +157,7 @@ export default function Dashboard() {
             <Col key={cell.label} xs={12} sm={6}>
               <Card
                 size="small"
-                style={{ opacity: 0.55, background: "#f6f2e9", borderColor: "#e4dcc8" }}
+                style={{ background: "#f6f2e9", borderColor: "#e4dcc8" }}
                 styles={{ body: { padding: "12px 16px" } }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -160,8 +165,10 @@ export default function Dashboard() {
                   <BookOutlined style={{ color: "#a39a86" }} />
                 </div>
                 <div style={{ marginTop: 6, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <Typography.Text type="secondary">—</Typography.Text>
-                  <Tag style={{ fontSize: 11 }}>{moduleTag(cell.module)}</Tag>
+                  <Typography.Text style={{ fontSize: 20, fontWeight: 700, fontFamily: "Georgia, 'Songti SC', serif" }}>
+                    {cellValue(overview, cell.valueKey) ?? "—"}
+                  </Typography.Text>
+                  <Tag color="green" style={{ fontSize: 11 }}>{cell.unit}</Tag>
                 </div>
               </Card>
             </Col>

@@ -29,12 +29,38 @@ Page({
       statusText: MEMBER_STATUS_TEXT[c.member_status] || c.member_status,
     }))
     const currentChild = session.getCurrentChild()
+    const expireLine = this._expireLine(currentChild)
     this.setData({
       parent,
       children,
       currentChild,
       statusText: currentChild ? (MEMBER_STATUS_TEXT[currentChild.member_status] || currentChild.member_status) : '',
+      expireLine,
+      expireWarn: expireLine.indexOf('即将到期') > -1,
     })
+  },
+
+  _expireLine(c) {
+    if (!c) return ''
+    const fmt = (d) => {
+      const dt = new Date(d)
+      const m = String(dt.getMonth() + 1).padStart(2, '0')
+      const day = String(dt.getDate()).padStart(2, '0')
+      return `${dt.getFullYear()}-${m}-${day}`
+    }
+    if (c.member_status === 'none' || c.member_status === 'withdrawn') return ''
+    if (c.member_status === 'expired') return '已过期（请联系店内处理）'
+    const today = new Date()
+    if (c.member_status === 'observation' && !c.member_expire) {
+      const d = new Date(today.getTime() + 30 * 24 * 3600 * 1000)
+      return `会员到期(观察期 30 天) ${fmt(d)}`
+    }
+    if (!c.member_expire) return ''
+    const diff = Math.ceil((new Date(c.member_expire).getTime() - today.getTime()) / 86400000)
+    if (c.member_status === 'formal' && diff >= 0 && diff <= 7) {
+      return `会员到期 ${fmt(c.member_expire)} · 即将到期，请联系馆员续费`
+    }
+    return `会员到期 ${fmt(c.member_expire)}`
   },
 
   onSwitchChild(e) {
@@ -86,6 +112,12 @@ Page({
     const c = this.data.currentChild
     if (!c) return
     wx.navigateTo({ url: `/pages/member-pkg/report/report?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
+  },
+
+  goDeposit() {
+    const c = this.data.currentChild
+    if (!c) return
+    wx.navigateTo({ url: `/pages/order-pkg/deposit/deposit?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}&member_status=${c.member_status || ''}` })
   },
 
   goReservation() {

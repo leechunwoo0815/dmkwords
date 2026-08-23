@@ -168,4 +168,12 @@ module.exports = {
   cancelReservation(reservationId, childId) {
     return req.post(`/api/miniapp/reservations/${reservationId}/cancel`, { child_id: childId })
   },
+
+  // 押金（R-312 家长端）
+  myDeposit(childId) {
+    return req.get('/api/miniapp/deposits', null, { params: { child_id: childId } })
+  },
+  createSupplementOrder(childId) {
+    return req.post('/api/miniapp/deposits/supplement-orders', { child_id: childId })
+  },
 }

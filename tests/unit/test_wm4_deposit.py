@@ -53,6 +53,29 @@ def test_deposit_pay_flow(client: TestClient):
     assert r.status_code == 422
 
 
+def test_miniapp_deposit_with_ledger(client: TestClient):
+    """C23：家长端押金页端点（R-312/313 守卫 + 流水 ledger 最近 20 条）。"""
+    h = _h(client)
+    c = _paid_child(client, h, phone="13800000410")
+    mini = {
+        "Authorization": f"Bearer {client.post('/api/miniapp/login', json={'phone': '13800000410', 'code': '1234'}).json()['token']}"
+    }
+    _pay_deposit(client, h, c["id"])
+    body = client.get("/api/miniapp/deposits", params={"child_id": c["id"]}, headers=mini).json()
+    assert body["status"] == "paid"
+    assert float(body["available_amount"]) == 1200
+    assert len(body["ledger"]) >= 1
+    assert body["ledger"][0]["entry_type"] in ("pay", "deduct", "supplement", "refund")
+    # 未缴孩子：unpaid + 空流水
+    c2 = _paid_child(client, h, phone="13800000411")
+    mini2 = {
+        "Authorization": f"Bearer {client.post('/api/miniapp/login', json={'phone': '13800000411', 'code': '1234'}).json()['token']}"
+    }
+    body2 = client.get("/api/miniapp/deposits", params={"child_id": c2["id"]}, headers=mini2).json()
+    assert body2["status"] == "unpaid"
+    assert body2["ledger"] == []
+
+
 def test_deduct_and_supplement(client: TestClient):
     h = _h(client)
     c = _paid_child(client, h, "13800000302", "赔偿孩")

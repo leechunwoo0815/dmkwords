@@ -116,7 +116,7 @@ class DashboardService:
         self.audit_repo = AuditLogRepository(db)
 
     def overview(self) -> dict:
-        from datetime import datetime
+        from datetime import datetime, timedelta
 
         from sqlalchemy import func
 
@@ -138,6 +138,87 @@ class DashboardService:
         )
         config_count = (
             self.db.query(func.count(SystemConfig.id)).filter(SystemConfig.is_deleted == 0).scalar()
+            or 0
+        )
+
+        # ---- 经营格子（C21：只读统计，口径与 circulation/identity/activity 域一致） ----
+        from backend.domain.activity.models import ActivityEnrollment
+        from backend.domain.catalog.models import BookCopy
+        from backend.domain.circulation.models import BorrowRecord
+        from backend.domain.identity.models import Child
+
+        copy_total = (
+            self.db.query(func.count(BookCopy.id)).filter(BookCopy.is_deleted == 0).scalar() or 0
+        )
+        copy_available = (
+            self.db.query(func.count(BookCopy.id))
+            .filter(BookCopy.is_deleted == 0, BookCopy.status == BookCopy.STATUS_AVAILABLE)
+            .scalar()
+            or 0
+        )
+        copy_borrowed = (
+            self.db.query(func.count(BookCopy.id))
+            .filter(BookCopy.is_deleted == 0, BookCopy.status == BookCopy.STATUS_BORROWED)
+            .scalar()
+            or 0
+        )
+        today_borrowed = (
+            self.db.query(func.count(BorrowRecord.id))
+            .filter(BorrowRecord.is_deleted == 0, BorrowRecord.borrowed_at >= today_start)
+            .scalar()
+            or 0
+        )
+        today_returned = (
+            self.db.query(func.count(BorrowRecord.id))
+            .filter(
+                BorrowRecord.is_deleted == 0,
+                BorrowRecord.returned_at.isnot(None),
+                BorrowRecord.returned_at >= today_start,
+            )
+            .scalar()
+            or 0
+        )
+        # 逾期口径与 circulation.overdue_list 保持一致（active/overdue + due_at < now）
+        overdue_active = (
+            self.db.query(func.count(BorrowRecord.id))
+            .filter(
+                BorrowRecord.is_deleted == 0,
+                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
+                BorrowRecord.due_at < datetime.now(),
+            )
+            .scalar()
+            or 0
+        )
+        member_total = (
+            self.db.query(func.count(Child.id))
+            .filter(
+                Child.is_deleted == 0,
+                Child.member_status.in_(
+                    [
+                        Child.MEMBER_OBSERVATION,
+                        Child.MEMBER_PENDING_EVALUATION,
+                        Child.MEMBER_FORMAL,
+                        Child.MEMBER_EXPIRED,
+                    ]
+                ),
+            )
+            .scalar()
+            or 0
+        )
+        week_start = today_start - timedelta(days=datetime.now().weekday())
+        member_new_week = (
+            self.db.query(func.count(Child.id))
+            .filter(Child.is_deleted == 0, Child.create_time >= week_start)
+            .scalar()
+            or 0
+        )
+        activity_enroll_recent = (
+            self.db.query(func.count(ActivityEnrollment.id))
+            .filter(
+                ActivityEnrollment.is_deleted == 0,
+                ActivityEnrollment.created_at >= datetime.now() - timedelta(days=7),
+            )
+            .scalar()
             or 0
         )
 
@@ -172,6 +253,15 @@ class DashboardService:
             "today_logins": today_logins,
             "config_count": config_count,
             "recent_config_changes": [_fmt(e) for e in recent_changes],
+            "copy_total": copy_total,
+            "copy_available": copy_available,
+            "copy_borrowed": copy_borrowed,
+            "today_borrowed": today_borrowed,
+            "today_returned": today_returned,
+            "overdue_active": overdue_active,
+            "member_total": member_total,
+            "member_new_week": member_new_week,
+            "activity_enroll_recent": activity_enroll_recent,
         }
 
 

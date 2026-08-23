@@ -20,6 +20,7 @@
 
   <view wx:if="{{currentChild}}" class="section-card" style="margin: 24rpx;">
     <view class="section-title">{{currentChild.name}}（{{statusText}}）</view>
+    <view wx:if="{{expireLine}}" class="expire-line {{expireWarn ? 'warn' : ''}}">{{expireLine}}</view>
     <view class="func-grid">
       <view class="func-item" bindtap="goCheckin">
         <text class="fi-icon">📅</text>
@@ -60,6 +61,10 @@
       <view class="func-item" bindtap="goVocabulary">
         <text class="fi-icon">📖</text>
         <text class="fi-label">生词本</text>
+      </view>
+      <view class="func-item" bindtap="goDeposit">
+        <text class="fi-icon">💳</text>
+        <text class="fi-label">押金</text>
       </view>
     </view>
   </view>

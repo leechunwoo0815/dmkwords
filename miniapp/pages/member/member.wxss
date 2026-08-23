@@ -367,3 +367,18 @@
   font-size: 28rpx;
   color: var(--muted);
 }
+
+/* C22 会员到期行 */
+.expire-line {
+  margin: 12rpx 0 4rpx;
+  padding: 12rpx 20rpx;
+  background: #f6f2e9;
+  border-radius: 10rpx;
+  font-size: 24rpx;
+  color: #6f685a;
+}
+.expire-line.warn {
+  background: #fff3e0;
+  color: #b45309;
+  font-weight: 600;
+}

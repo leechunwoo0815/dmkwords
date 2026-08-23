@@ -1,0 +1,45 @@
+<view class="page-bg" style="min-height:100vh;padding:24rpx;">
+  <view class="dp-head">
+    <text class="dp-title">{{childName}} · 押金</text>
+    <text class="dp-status">{{statusText}}</text>
+  </view>
+
+  <view class="section-card" wx:if="{{dep}}" style="margin-top: 24rpx;">
+    <view class="dp-amounts">
+      <view class="dp-amt">
+        <text class="dp-num">￥{{dep.available_amount}}</text>
+        <text class="dp-label">可用余额</text>
+      </view>
+      <view class="dp-amt">
+        <text class="dp-num" style="color:#b45309;">￥{{dep.deducted_amount}}</text>
+        <text class="dp-label">已扣除</text>
+      </view>
+      <view class="dp-amt">
+        <text class="dp-num" style="color:#2c4a6e;">￥{{dep.standard_amount}}</text>
+        <text class="dp-label">标准押金</text>
+      </view>
+    </view>
+    <view wx:if="{{dep.unpaid_balance !== '0.00'}}" class="dp-balance">未结清赔偿：￥{{dep.unpaid_balance}}</view>
+    <button class="dp-btn {{(supplementDisabled || dep.status === 'unpaid') ? 'disabled' : ''}}"
+      disabled="{{supplementDisabled || dep.status === 'unpaid'}}" bindtap="onSupplement">
+      {{supplementHint || (dep.status === 'unpaid' ? '未缴纳，请到店办理' : (dep.need_supplement ? '申请补缴' : '已缴足'))}}
+    </button>
+    <view wx:if="{{supplementHint}}" class="dp-hint">{{supplementHint}}</view>
+  </view>
+
+  <view class="section-card" style="margin-top: 24rpx;">
+    <view class="section-title">押金流水</view>
+    <view wx:if="{{ledger.length === 0}}" class="dp-empty">暂无流水记录</view>
+    <view wx:for="{{ledger}}" wx:key="index" class="dp-row">
+      <view class="dp-row-left">
+        <view class="dp-row-type {{item.entry_type === 'deduct' ? 'red' : ''}}">{{entryTexts[item.entry_type] || item.entry_type}}</view>
+        <view class="dp-row-reason">{{item.reason || '—'}}</view>
+        <view class="dp-row-time">{{item.created_at}}</view>
+      </view>
+      <view class="dp-row-right">
+        <text class="dp-row-amount {{item.entry_type === 'deduct' ? 'red' : ''}}">￥{{item.amount}}</text>
+        <text class="dp-row-balance">余 {{item.balance_after}}</text>
+      </view>
+    </view>
+  </view>
+</view>

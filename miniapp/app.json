@@ -36,7 +36,8 @@
       "pages": [
         "reservation/reservation",
         "refund-apply/refund-apply",
-        "benefit-transfer/benefit-transfer"
+        "benefit-transfer/benefit-transfer",
+        "deposit/deposit"
       ]
     },
     {

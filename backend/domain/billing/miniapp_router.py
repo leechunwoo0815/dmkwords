@@ -50,7 +50,17 @@ def my_deposit(child_id: int, auth: Any = Depends(get_current_parent)):
             "deducted_amount": "0.00",
             "unpaid_balance": "0.00",
             "need_supplement": False,
+            "ledger": [],
         }
+    from backend.domain.billing.models import DepositLedger
+
+    ledger_rows = (
+        db.query(DepositLedger)
+        .filter(DepositLedger.deposit_id == dep.id)
+        .order_by(DepositLedger.id.desc())
+        .limit(20)
+        .all()
+    )
     return {
         "child_id": child_id,
         "status": dep.status,
@@ -61,6 +71,16 @@ def my_deposit(child_id: int, auth: Any = Depends(get_current_parent)):
         "need_supplement": dep.status
         in (Deposit.STATUS_PARTIALLY_DEDUCTED, Deposit.STATUS_FULLY_DEDUCTED)
         and dep.available_amount < standard,
+        "ledger": [
+            {
+                "entry_type": r.entry_type,
+                "amount": str(r.amount),
+                "balance_after": str(r.balance_after),
+                "reason": r.reason,
+                "created_at": str(r.create_time),
+            }
+            for r in ledger_rows
+        ],
     }
 
 

@@ -2460,6 +2460,51 @@ export interface components {
             config_count: number;
             /** Recent Config Changes */
             recent_config_changes: components["schemas"]["DashboardRecentChange"][];
+            /**
+             * Copy Total
+             * @default 0
+             */
+            copy_total: number;
+            /**
+             * Copy Available
+             * @default 0
+             */
+            copy_available: number;
+            /**
+             * Copy Borrowed
+             * @default 0
+             */
+            copy_borrowed: number;
+            /**
+             * Today Borrowed
+             * @default 0
+             */
+            today_borrowed: number;
+            /**
+             * Today Returned
+             * @default 0
+             */
+            today_returned: number;
+            /**
+             * Overdue Active
+             * @default 0
+             */
+            overdue_active: number;
+            /**
+             * Member Total
+             * @default 0
+             */
+            member_total: number;
+            /**
+             * Member New Week
+             * @default 0
+             */
+            member_new_week: number;
+            /**
+             * Activity Enroll Recent
+             * @default 0
+             */
+            activity_enroll_recent: number;
         };
         /** DashboardRecentChange */
         DashboardRecentChange: {

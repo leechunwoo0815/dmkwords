@@ -91,3 +91,12 @@ class DashboardOverviewResponse(BaseSchema):
     today_logins: int
     config_count: int
     recent_config_changes: list[DashboardRecentChange]
+    copy_total: int = 0
+    copy_available: int = 0
+    copy_borrowed: int = 0
+    today_borrowed: int = 0
+    today_returned: int = 0
+    overdue_active: int = 0
+    member_total: int = 0
+    member_new_week: int = 0
+    activity_enroll_recent: int = 0
