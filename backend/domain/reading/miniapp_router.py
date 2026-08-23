@@ -15,6 +15,7 @@ from backend.common.base_schema import BaseSchema
 from backend.common.exceptions import NotFoundError, UnauthorizedError, ValidationError
 from backend.database import get_db
 from backend.domain.catalog.models import Book
+from backend.domain.identity import guards
 from backend.domain.identity.models import Child, Parent
 from backend.domain.reading.service import (
     FavoriteService,
@@ -303,9 +304,10 @@ def vocabulary_lookup(
     book_id: int | None = None,
     auth: Any = Depends(get_current_parent),
 ):
-    """查词（命中自动进生词本；播放页下半屏查询不中断音频）。"""
+    """查词（命中自动进生词本；播放页下半屏查询不中断音频）。R-313：未缴费禁/过期仅音频场景/退会禁。"""
     parent, db = auth
     child = _child_of_parent(db, parent.id, child_id)
+    guards.require_member_action(db, child, guards.LOOKUP, book_id=book_id)
     return VocabularyService(db).lookup(child, word, book_id)
 
 
@@ -313,6 +315,7 @@ def vocabulary_lookup(
 def vocabulary_list(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child = _child_of_parent(db, parent.id, child_id)
+    guards.require_member_action(db, child, guards.VOCAB_VIEW)
     return VocabularyService(db).list_words(child)
 
 
@@ -320,6 +323,7 @@ def vocabulary_list(child_id: int, auth: Any = Depends(get_current_parent)):
 def vocabulary_remove(vocabulary_id: int, child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child = _child_of_parent(db, parent.id, child_id)
+    guards.require_member_action(db, child, guards.VOCAB_WRITE)
     VocabularyService(db).remove(child, vocabulary_id)
     return {"detail": "已删除"}
 
@@ -338,6 +342,7 @@ def favorites_list(child_id: int, auth: Any = Depends(get_current_parent)):
 def favorites_add(body: dict, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child = _child_of_parent(db, parent.id, int(body.get("child_id") or 0))
+    guards.require_member_action(db, child, guards.FAVORITE_WRITE)
     return FavoriteService(db).add(child, int(body.get("book_id") or 0))
 
 
@@ -345,6 +350,7 @@ def favorites_add(body: dict, auth: Any = Depends(get_current_parent)):
 def favorites_remove(book_id: int, child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child = _child_of_parent(db, parent.id, child_id)
+    guards.require_member_action(db, child, guards.FAVORITE_WRITE)
     FavoriteService(db).remove(child, book_id)
     return {"detail": "已取消收藏"}
 

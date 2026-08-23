@@ -13,6 +13,7 @@ from backend.database import get_db
 from backend.domain.growth.board_service import LeaderboardService, PassportService
 from backend.domain.growth.report_service import ReportService
 from backend.domain.growth.service import GrowthService, QuizService
+from backend.domain.identity import guards
 from backend.domain.identity.models import Child
 from backend.domain.reading.miniapp_router import get_current_parent
 
@@ -39,6 +40,7 @@ class QuizSubmitRequest(BaseSchema):
 def get_quiz(book_id: int, child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child = _child_of_parent(db, parent.id, child_id)
+    guards.require_member_action(db, child, guards.QUIZ)
     return QuizService(db).get_quiz(child, book_id)
 
 
@@ -46,6 +48,7 @@ def get_quiz(book_id: int, child_id: int, auth: Any = Depends(get_current_parent
 def submit_quiz(book_id: int, body: QuizSubmitRequest, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child = _child_of_parent(db, parent.id, body.child_id)
+    guards.require_member_action(db, child, guards.QUIZ)
     return QuizService(db).submit(child, book_id, body.answers)
 
 
@@ -53,13 +56,15 @@ def submit_quiz(book_id: int, body: QuizSubmitRequest, auth: Any = Depends(get_c
 def growth_summary(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child = _child_of_parent(db, parent.id, child_id)
+    guards.require_member_action(db, child, guards.PASSPORT_VIEW)
     return GrowthService(db).summary(child)
 
 
 @router.get("/points")
 def points_ledger(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
-    _child_of_parent(db, parent.id, child_id)
+    child = _child_of_parent(db, parent.id, child_id)
+    guards.require_member_action(db, child, guards.POINTS_VIEW)
     return GrowthService(db).points_list(child_id)
 
 
@@ -77,14 +82,16 @@ def leaderboard(period: str = "week", child_id: int = 0, auth: Any = Depends(get
 def passport(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child = _child_of_parent(db, parent.id, child_id)
+    guards.require_member_action(db, child, guards.PASSPORT_VIEW)
     return PassportService(db).passport(child)
 
 
 @router.get("/reports/{kind}")
 def report(kind: str, child_id: int, auth: Any = Depends(get_current_parent)):
-    """周报/月报数据（家长预览）。"""
+    """周报/月报数据（家长预览）。R-313：未缴费禁；过期/退会只读。"""
     parent, db = auth
     child = _child_of_parent(db, parent.id, child_id)
+    guards.require_member_action(db, child, guards.REPORT_VIEW)
     svc = ReportService(db)
     data = svc.report_data(child, kind)
     data["image_url"] = f"/api/miniapp/reports/{kind}/image?child_id={child_id}"

@@ -78,6 +78,37 @@ def list_children_page(
     )
 
 
+class MemberStatusActionRequest(BaseSchema):
+    reason: str = Field("", max_length=200, description="操作原因（留痕）")
+
+
+@router.post("/members/children/{child_id}/mark-pending-evaluation", response_model=ChildResponse)
+def mark_pending_evaluation(
+    child_id: int,
+    body: MemberStatusActionRequest,
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """观察期 → 待评估（C13：馆员手动标记；自动转换任务在 WM11）。"""
+    return ChildResponse.model_validate(
+        ChildService(db).mark_pending_evaluation(admin, child_id, body.reason)
+    )
+
+
+@router.post("/members/children/{child_id}/evaluate-approve", response_model=OrderResponse)
+def evaluate_approve(
+    child_id: int,
+    body: MemberStatusActionRequest,
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """评估通过转正（C13/R-101-5）：创建年费订单（二孩折扣沿用），收款确认后转正式会员。"""
+    order = ChildService(db).evaluate_approve(admin, child_id, body.reason)
+    item = OrderResponse.model_validate(order)
+    item.amount = str(order.amount)
+    return item
+
+
 @router.post("/orders", response_model=OrderResponse)
 def create_order(
     body: OrderCreateRequest,
@@ -177,6 +208,24 @@ def admin_refund_review(
     db: Session = Depends(get_db),
 ):
     return RefundService(db).review(admin, request_id, body.approve, body.remark)
+
+
+class RefundExecuteRequest(BaseSchema):
+    success: bool = Field(
+        ..., description="执行结果：true=退款成功（凭证登记）/ false=失败（可重试）"
+    )
+    remark: str = Field("", max_length=200, description="退款凭证/失败原因（留痕）")
+
+
+@router.post("/refund-requests/{request_id}/execute")
+def admin_refund_execute(
+    request_id: int,
+    body: RefundExecuteRequest,
+    admin: Any = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    """执行退款（R-308：approved → processing → refunded/failed；线下打款登记凭证）。"""
+    return RefundService(db).execute(admin, request_id, body.success, body.remark)
 
 
 @router.get("/withdrawals")

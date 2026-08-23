@@ -1,12 +1,12 @@
 // 退款中心（WM10：订单/押金退款 + 退会 + 转让，超管逐单审核）
 import { useCallback, useEffect, useState } from "react";
 import {
-  App as AntdApp, Button, Input, Modal, Space, Table, Tabs, Tag, Typography,
+  App as AntdApp, Button, Input, Modal, Radio, Space, Table, Tabs, Tag, Typography,
 } from "antd";
 
 import {
   apiListRefunds, apiListTransfers, apiListWithdrawals,
-  apiReviewRefund, apiReviewTransfer, apiReviewWithdrawal,
+  apiReviewRefund, apiReviewTransfer, apiReviewWithdrawal, apiExecuteRefund,
   type RefundRequestItem, type TransferItem, type WithdrawalItem,
 } from "../api/refunds";
 
@@ -16,9 +16,20 @@ const ORDER_TYPE_LABEL: Record<string, string> = {
   first_activity_fee: "首场活动", activity_fee: "活动费",
   deposit: "押金", deposit_supplement: "押金补缴",
 };
+const STATUS_LABEL: Record<string, string> = {
+  // 退款 7 态（R-308）
+  pending: "待审核", approved: "已通过", processing: "执行中",
+  refunded: "已退款", failed: "退款失败", rejected: "已拒绝", cancelled: "已撤销",
+  // 退会 6 态（R-311）
+  applying: "已申请", pending_settle: "待结算", refunding: "退款中", completed: "已完成",
+  // 转让
+  expired: "已超时",
+};
 const STATUS_COLOR: Record<string, string> = {
-  pending: "orange", approved: "green", rejected: "red",
+  pending: "orange", approved: "green", processing: "blue",
+  refunded: "green", failed: "red", rejected: "red",
   cancelled: "default", expired: "default",
+  applying: "orange", pending_settle: "gold", refunding: "blue", completed: "green",
 };
 
 export default function RefundCenter() {
@@ -34,6 +45,15 @@ export default function RefundCenter() {
     title: string;
     content: string;
   } | null>(null);
+  const [execTarget, setExecTarget] = useState<{
+    id: number;
+    childName: string;
+    amount: string;
+    kind: string;
+    retry: boolean;
+  } | null>(null);
+  const [execSuccess, setExecSuccess] = useState(true);
+  const [execRemark, setExecRemark] = useState("");
 
   const load = useCallback(() => {
     apiListRefunds().then(setRefunds).catch((e: Error) => message.error(e.message));
@@ -71,8 +91,36 @@ export default function RefundCenter() {
   };
 
   const pendingRefunds = refunds.filter((r) => r.status === "pending");
-  const pendingWithdrawals = withdrawals.filter((w) => w.status === "pending");
+  const pendingWithdrawals = withdrawals.filter((w) => w.status === "applying");
   const pendingTransfers = transfers.filter((t) => t.status === "pending");
+
+  const askExecute = (r: RefundRequestItem) => {
+    setExecSuccess(true);
+    setExecRemark("");
+    setExecTarget({
+      id: r.id,
+      childName: r.child_name,
+      amount: r.amount,
+      kind: r.kind,
+      retry: r.status === "failed",
+    });
+  };
+
+  const doExecute = async () => {
+    if (!execTarget) return;
+    if (!execSuccess && !execRemark.trim()) {
+      message.warning("执行失败必须填写原因（留痕）");
+      return;
+    }
+    try {
+      await apiExecuteRefund(execTarget.id, execSuccess, execRemark);
+      message.success(execSuccess ? "已登记退款完成" : "已登记退款失败");
+      setExecTarget(null);
+      load();
+    } catch (e) {
+      message.error((e as Error).message);
+    }
+  };
 
   return (
     <div>
@@ -107,11 +155,11 @@ export default function RefundCenter() {
                   },
                   { title: "金额", dataIndex: "amount", width: 100, render: (v) => <Typography.Text strong>￥{Number(v).toLocaleString()}</Typography.Text> },
                   { title: "家长原因", dataIndex: "reason" },
-                  { title: "状态", dataIndex: "status", width: 90, render: (s) => <Tag color={STATUS_COLOR[s]}>{s}</Tag> },
+                  { title: "状态", dataIndex: "status", width: 90, render: (s) => <Tag color={STATUS_COLOR[s]}>{STATUS_LABEL[s] ?? s}</Tag> },
                   { title: "审核备注", dataIndex: "review_remark", width: 150, render: (v) => v ?? "—" },
                   { title: "申请时间", dataIndex: "created_at", width: 165, render: (v) => v.replace("T", " ").slice(0, 19) },
                   {
-                    title: "操作", key: "op", width: 140, render: (_, r) => (
+                    title: "操作", key: "op", width: 190, render: (_, r) => (
                       r.status === "pending" ? (
                         <Space>
                           <Button type="primary" size="small" onClick={() => askReview("refund", r.id, true,
@@ -121,6 +169,11 @@ export default function RefundCenter() {
                             "拒绝退款",
                             `${r.child_name} · ￥${r.amount}（${KIND_LABEL[r.kind]}）`)}>拒绝</Button>
                         </Space>
+                      ) : (r.status === "approved" || r.status === "failed") ? (
+                        <Button type="primary" size="small"
+                          onClick={() => askExecute(r)}>
+                          {r.status === "failed" ? "重试执行" : "执行退款"}
+                        </Button>
                       ) : <span>—</span>
                     ),
                   },
@@ -139,7 +192,7 @@ export default function RefundCenter() {
                   { title: "孩子", dataIndex: "child_name", width: 100 },
                   { title: "当前状态", dataIndex: "member_status", width: 100 },
                   { title: "退会原因", dataIndex: "reason" },
-                  { title: "状态", dataIndex: "status", width: 90, render: (s) => <Tag color={STATUS_COLOR[s]}>{s}</Tag> },
+                  { title: "状态", dataIndex: "status", width: 90, render: (s) => <Tag color={STATUS_COLOR[s]}>{STATUS_LABEL[s] ?? s}</Tag> },
                   { title: "审核备注", dataIndex: "review_remark", width: 150, render: (v) => v ?? "—" },
                   { title: "申请时间", dataIndex: "created_at", width: 165, render: (v) => v.replace("T", " ").slice(0, 19) },
                   {
@@ -170,7 +223,7 @@ export default function RefundCenter() {
                 columns={[
                   { title: "转出方", dataIndex: "source_name", width: 100 },
                   { title: "受让方", dataIndex: "target_name", width: 100 },
-                  { title: "状态", dataIndex: "status", width: 90, render: (s) => <Tag color={STATUS_COLOR[s]}>{s}</Tag> },
+                  { title: "状态", dataIndex: "status", width: 90, render: (s) => <Tag color={STATUS_COLOR[s]}>{STATUS_LABEL[s] ?? s}</Tag> },
                   { title: "审核截止", dataIndex: "expires_at", width: 165, render: (v) => v.replace("T", " ").slice(0, 19) },
                   { title: "审核备注", dataIndex: "review_remark", width: 140, render: (v) => v ?? "—" },
                   { title: "申请时间", dataIndex: "created_at", width: 165, render: (v) => v.replace("T", " ").slice(0, 19) },
@@ -204,6 +257,26 @@ export default function RefundCenter() {
         <Input.TextArea
           rows={2} value={remark} onChange={(e) => setRemark(e.target.value)}
           placeholder={remarkTarget?.approve ? "备注（可选）" : "拒绝原因（必填，家长可见）"}
+        />
+      </Modal>
+
+      <Modal
+        title={execTarget?.retry ? "重试执行退款" : "执行退款"}
+        open={!!execTarget}
+        okText="确认登记" cancelText="取消"
+        onOk={doExecute} onCancel={() => setExecTarget(null)}
+      >
+        <Typography.Paragraph>
+          {execTarget?.childName} · ￥{execTarget?.amount}（{execTarget ? KIND_LABEL[execTarget.kind] : ""}）
+        </Typography.Paragraph>
+        <Radio.Group value={execSuccess ? "ok" : "fail"} onChange={(e) => setExecSuccess(e.target.value === "ok")}>
+          <Radio value="ok">退款成功</Radio>
+          <Radio value="fail">退款失败</Radio>
+        </Radio.Group>
+        <Input.TextArea
+          rows={2} value={execRemark} onChange={(e) => setExecRemark(e.target.value)}
+          placeholder={execSuccess ? "凭证/备注（可选）" : "失败原因（必填，留痕）"}
+          style={{ marginTop: 8 }}
         />
       </Modal>
     </div>

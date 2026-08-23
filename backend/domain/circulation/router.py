@@ -43,7 +43,9 @@ class BorrowRecordResponse(BaseSchema):
     status: str
     renew_used: int
     override_reason: str | None
-    warnings: list[str] = Field(default_factory=list, description="借书软提示（AR 超范围等，不拦截）")
+    warnings: list[str] = Field(
+        default_factory=list, description="借书软提示（AR 超范围等，不拦截）"
+    )
 
 
 class ChildCardResponse(BaseSchema):

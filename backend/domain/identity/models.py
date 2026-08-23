@@ -63,6 +63,11 @@ class Child(BaseModel):
     )
     member_start = Column(Date, nullable=True, comment="会员开始日")
     member_expire = Column(Date, nullable=True, comment="会员到期日")
+    withdraw_reason = Column(
+        String(32),
+        nullable=True,
+        comment="退会原因码（user_withdrawal/user_refund/membership_transfer）",
+    )
     operation_locked = Column(
         SmallInteger, nullable=False, default=0, comment="操作冻结（转让/退会审核中）"
     )
@@ -111,7 +116,15 @@ class Order(BaseModel):
     STATUS_PENDING_MANUAL = "pending_manual_confirm"  # 待人工确认收款
     STATUS_PAID = "paid"
     STATUS_CANCELLED = "cancelled"
-    STATUS_REFUNDED = "refunded"  # 已退款（WM9/WM10：审核通过后置）
+    STATUS_REFUNDED = "refunded"  # 已退款（WM9/WM10：退款执行成功后置）
+
+    # 退款链路状态（R-308；独立于订单主状态，供 99 元资格等"未全额退款"判定）
+    REFUND_STATUS_NONE = ""
+    REFUND_STATUS_PENDING = "pending"
+    REFUND_STATUS_APPROVED = "approved"
+    REFUND_STATUS_PROCESSING = "processing"
+    REFUND_STATUS_REFUNDED = "refunded"
+    REFUND_STATUS_FAILED = "failed"
 
     ALLOWED_TRANSITIONS = {
         STATUS_PENDING_PAYMENT: {STATUS_PAID, STATUS_CANCELLED},
@@ -126,6 +139,9 @@ class Order(BaseModel):
     child_id = Column(Integer, nullable=True, index=True, comment="孩子ID（活动费可能家长级）")
     amount = Column(Numeric(10, 2), nullable=False, comment="实收金额（Decimal 铁律）")
     status = Column(String(24), nullable=False, default=STATUS_PENDING_MANUAL, index=True)
+    refund_status = Column(
+        String(24), nullable=False, default="", server_default="", comment="退款链路状态（R-308）"
+    )
     pay_method = Column(
         String(24), nullable=True, comment="收款方式（wechat/scan/alipay/transfer/card/cash）"
     )
@@ -138,20 +154,25 @@ class Order(BaseModel):
 
 
 class RefundRequest(BaseModel):
-    """退款申请（订单类 + 押金类统一；超管逐单审核）。"""
+    """退款申请（订单类 + 押金类统一；超管逐单审核）。R-308 七态。"""
 
     __tablename__ = "refund_requests"
 
     KIND_ORDER = "order"
     KIND_DEPOSIT = "deposit"
 
-    STATUS_PENDING = "pending"
-    STATUS_APPROVED = "approved"
-    STATUS_REJECTED = "rejected"
+    STATUS_PENDING = "pending"  # 家长/系统申请，待审核
+    STATUS_APPROVED = "approved"  # 审核通过，待执行
+    STATUS_PROCESSING = "processing"  # 退款执行中（线下打款/线上原路）
+    STATUS_REFUNDED = "refunded"  # 退款成功（终态）
+    STATUS_FAILED = "failed"  # 执行失败（可重试）
+    STATUS_REJECTED = "rejected"  # 审核拒绝
+    STATUS_CANCELLED = "cancelled"  # 家长撤销
 
     kind = Column(String(10), nullable=False, comment="order/deposit")
     order_id = Column(Integer, nullable=True, comment="关联订单（order 类）")
     deposit_id = Column(Integer, nullable=True, comment="关联押金（deposit 类）")
+    withdrawal_id = Column(Integer, nullable=True, comment="关联退会申请（退会/退款联动结算生成）")
     child_id = Column(Integer, nullable=False, index=True)
     amount = Column(Numeric(10, 2), nullable=False, comment="申请退款金额")
     reason = Column(String(200), nullable=False, default="", comment="家长申请原因")
@@ -163,17 +184,32 @@ class RefundRequest(BaseModel):
 
 
 class WithdrawalRequest(BaseModel):
-    """退会申请（审核期间孩子操作冻结）。"""
+    """退会申请（审核期间孩子操作冻结）。R-311 六态。"""
 
     __tablename__ = "withdrawal_requests"
 
-    STATUS_PENDING = "pending"
-    STATUS_APPROVED = "approved"
+    STATUS_APPLYING = "applying"  # 家长已提交，待审核
+    STATUS_PENDING_SETTLE = "pending_settle"  # 审核通过，待结算（计算可退金额并生成退款单）
+    STATUS_REFUNDING = "refunding"  # 退款单执行中
+    STATUS_COMPLETED = "completed"  # 全部退款完成，退会生效
     STATUS_REJECTED = "rejected"
+    STATUS_CANCELLED = "cancelled"
+
+    # 来源：主动退会 / 会员费退款联动（R-309）/ 权益转让联动（R-305）
+    SOURCE_NORMAL = "normal"
+    SOURCE_REFUND = "refund_linked"
+    SOURCE_TRANSFER = "transfer_linked"
 
     child_id = Column(Integer, nullable=False, index=True)
+    source = Column(
+        String(24),
+        nullable=False,
+        default=SOURCE_NORMAL,
+        server_default="normal",
+        comment="来源（normal/refund_linked/transfer_linked）",
+    )
     reason = Column(String(200), nullable=False, default="")
-    status = Column(String(20), nullable=False, default=STATUS_PENDING, index=True)
+    status = Column(String(20), nullable=False, default=STATUS_APPLYING, index=True)
     review_remark = Column(String(200), nullable=True)
     reviewed_by = Column(Integer, nullable=True)
     reviewed_at = Column(DateTime, nullable=True)

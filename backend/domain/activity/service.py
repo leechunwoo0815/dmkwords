@@ -49,6 +49,9 @@ class ActivityService:
             .limit(50)
             .all()
         )
+        # R-313 活动列表行：退会不可见"会员专属"（C20）
+        if child is not None and child.member_status == Child.MEMBER_WITHDRAWN:
+            rows = [a for a in rows if not a.member_only]
         out = []
         my_map = self._my_enrollment_map(child.id) if child else {}
         for a in rows:

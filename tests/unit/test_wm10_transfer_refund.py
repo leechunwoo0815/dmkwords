@@ -113,7 +113,7 @@ def test_refund_preview_apply_review_chain(client: TestClient):
         headers=mini,
     )
     assert r2.status_code == 200
-    # 通过 → 订单 refunded
+    # 通过（R-308 两步）：approve → approved（订单仍 paid，退款链路 approved）
     ok = client.post(
         f"/api/admin/refund-requests/{r2.json()['id']}/review",
         json={
@@ -123,12 +123,22 @@ def test_refund_preview_apply_review_chain(client: TestClient):
         headers=h,
     )
     assert ok.status_code == 200
+    assert ok.json()["status"] == "approved"
+    # 执行退款（登记凭证）→ refunded + 订单 refunded
+    ex = client.post(
+        f"/api/admin/refund-requests/{r2.json()['id']}/execute",
+        json={"success": True, "remark": "微信原路退回，凭证 20260824-001"},
+        headers=h,
+    )
+    assert ex.status_code == 200, ex.text
+    assert ex.json()["status"] == "refunded"
     from backend.database import get_session
     from backend.domain.identity.models import Order
 
     db = get_session()
     order = db.query(Order).filter(Order.id == o["id"]).first()
     assert order.status == "refunded"
+    assert order.refund_status == "refunded"
     db.close()
 
 
@@ -214,7 +224,7 @@ def test_withdrawal_flow_and_deposit_refund(client: TestClient):
         json={"copy_id": borrow2.json()["copy_id"], "condition": "normal"},
         headers=h,
     )
-    # 再申请 → 通过：withdrawn + 押金退款申请自动生成
+    # 再申请 → 通过（R-311 六态）：审核通过 → 结算生成退款单（观察期费 + 押金 1200）→ refunding
     r2 = client.post(
         "/api/miniapp/withdrawals",
         json={
@@ -223,8 +233,9 @@ def test_withdrawal_flow_and_deposit_refund(client: TestClient):
         },
         headers=mini,
     )
+    wid2 = r2.json()["id"]
     ok = client.post(
-        f"/api/admin/withdrawals/{r2.json()['id']}/review",
+        f"/api/admin/withdrawals/{wid2}/review",
         json={
             "approve": True,
             "remark": "同意",
@@ -232,32 +243,49 @@ def test_withdrawal_flow_and_deposit_refund(client: TestClient):
         headers=h,
     )
     assert ok.status_code == 200
+    assert ok.json()["status"] == "refunding"  # 结算单生成，进入退款中
     from backend.database import get_session
-    from backend.domain.identity.models import Child
+    from backend.domain.identity.models import Child, WithdrawalRequest
 
+    db = get_session()
+    w = db.query(WithdrawalRequest).filter(WithdrawalRequest.id == wid2).first()
+    assert w.source == "normal"
+    # 结算单：观察期费（按剩余天数）+ 押金 1200
+    pend = client.get("/api/admin/refund-requests?status=pending", headers=h).json()
+    dep_req = [x for x in pend if x["kind"] == "deposit" and x["child_id"] == c["id"]]
+    obs_req = [
+        x
+        for x in pend
+        if x["kind"] == "order"
+        and x["child_id"] == c["id"]
+        and x.get("order_type") == "observation_fee"
+    ]
+    assert len(dep_req) == 1
+    assert float(dep_req[0]["amount"]) == 1200
+    assert len(obs_req) == 1
+    db.close()
+    # 逐单审核 + 执行 → 全部 refunded → 退会 completed + withdrawn
+    for rr in (obs_req[0], dep_req[0]):
+        client.post(
+            f"/api/admin/refund-requests/{rr['id']}/review",
+            json={"approve": True, "remark": "同意"},
+            headers=h,
+        )
+        ex = client.post(
+            f"/api/admin/refund-requests/{rr['id']}/execute",
+            json={"success": True, "remark": "线下已退，凭证留存"},
+            headers=h,
+        )
+        assert ex.status_code == 200, ex.text
     db = get_session()
     ch = db.query(Child).filter(Child.id == c["id"]).first()
     assert ch.member_status == "withdrawn"
+    assert ch.withdraw_reason == "user_withdrawal"
     assert ch.operation_locked == 0
-    db.close()
-    # 押金退款待审（1200 全额）
-    pend = client.get("/api/admin/refund-requests?status=pending", headers=h).json()
-    dep_req = [x for x in pend if x["kind"] == "deposit" and x["child_id"] == c["id"]]
-    assert len(dep_req) == 1
-    assert float(dep_req[0]["amount"]) == 1200
-    # 审核押金退款 → 退可用余额
-    ok_dep = client.post(
-        f"/api/admin/refund-requests/{dep_req[0]['id']}/review",
-        json={
-            "approve": True,
-            "remark": "无扣减，全额退",
-        },
-        headers=h,
-    )
-    assert ok_dep.status_code == 200
+    w2 = db.query(WithdrawalRequest).filter(WithdrawalRequest.id == wid2).first()
+    assert w2.status == "completed"
     from backend.domain.billing.models import Deposit
 
-    db = get_session()
     dep = db.query(Deposit).filter(Deposit.child_id == c["id"]).first()
     assert dep.status == "refunded"
     db.close()

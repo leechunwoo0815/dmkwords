@@ -70,18 +70,20 @@ export default function CirculationDesk() {
     if (!card || !isbn.trim()) return;
     setBusy(true);
     try {
-      await apiBorrow({
+      const rec = await apiBorrow({
         child_id: card.child_id,
         isbn: isbn.trim(),
         ...(override ? { override_reason: "" } : {}),
       });
       message.success("借书成功");
+      // 软提示不拦截（C16 AR 超范围 / C15 未入会 72h 等）
+      (rec.warnings ?? []).forEach((w) => message.warning(w, 4));
       setIsbn("");
       await refresh();
     } catch (e) {
       const errText = e instanceof Error ? e.message : "借书失败";
-      // 异常借书 → 人工放行确认（填原因留痕）
-      if (!override && /押金|上限|未入会/.test(errText)) {
+      // 异常借书 → 人工放行确认（填原因留痕）；「限 1 本」为硬限制不吃放行
+      if (!override && /押金|上限|未入会|过期/.test(errText) && !/限 1 本/.test(errText)) {
         let reason = "";
         modal.confirm({
           title: "异常借书 — 人工放行",
@@ -100,8 +102,9 @@ export default function CirculationDesk() {
           onOk: async () => {
             if (!reason.trim()) { message.warning("必须填写放行原因"); return Promise.reject(); }
             try {
-              await apiBorrow({ child_id: card.child_id, isbn: isbn.trim(), override_reason: reason.trim() });
+              const rec2 = await apiBorrow({ child_id: card.child_id, isbn: isbn.trim(), override_reason: reason.trim() });
               message.success("已放行借出（留痕）");
+              (rec2.warnings ?? []).forEach((w) => message.warning(w, 4));
               setIsbn("");
               await refresh();
             } catch (e2) {

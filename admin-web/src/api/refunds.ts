@@ -53,6 +53,14 @@ export function apiReviewRefund(
   });
 }
 
+export function apiExecuteRefund(
+  id: number, success: boolean, remark: string,
+): Promise<{ id: number; status: string }> {
+  return request(`/api/admin/refund-requests/${id}/execute`, {
+    method: "POST", body: JSON.stringify({ success, remark }),
+  });
+}
+
 export function apiListWithdrawals(status?: string): Promise<WithdrawalItem[]> {
   const qs = status ? `?status=${encodeURIComponent(status)}` : "";
   return request(`/api/admin/withdrawals${qs}`);

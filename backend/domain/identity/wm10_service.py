@@ -10,13 +10,12 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from backend.common.config_service import ConfigService
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.circulation.models import BorrowRecord
@@ -102,29 +101,101 @@ class RefundService:
 
     # ---------- 家长申请 ----------
     def apply(self, child: Child, order_id: int, reason: str) -> RefundRequest:
-        _ensure_not_locked(child)
         if not reason or not reason.strip():
             raise ValidationError("必须填写退款原因")
         order = self._paid_order(child, order_id)
+        # dup 检查先于锁定检查（同订单重复申请给更具体的错误）
         dup = (
             self.db.query(func.count(RefundRequest.id))
             .filter(
                 RefundRequest.order_id == order_id,
-                RefundRequest.status == RefundRequest.STATUS_PENDING,
+                RefundRequest.status.in_(
+                    [
+                        RefundRequest.STATUS_PENDING,
+                        RefundRequest.STATUS_APPROVED,
+                        RefundRequest.STATUS_PROCESSING,
+                    ]
+                ),
                 RefundRequest.is_deleted == 0,
             )
             .scalar()
         )
         if dup:
             raise ConflictError("该订单已有进行中的退款申请（同一时刻仅一个）")
+        _ensure_not_locked(child)
+
+        withdrawal = None
+        if order.order_type in (Order.TYPE_OBSERVATION, Order.TYPE_FORMAL):
+            # R-309：会员费退款申请本质 = 退会申请（同时创建 + 锁定）
+            pending_withdrawal = (
+                self.db.query(func.count(WithdrawalRequest.id))
+                .filter(
+                    WithdrawalRequest.child_id == child.id,
+                    WithdrawalRequest.status.in_(
+                        [
+                            WithdrawalRequest.STATUS_APPLYING,
+                            WithdrawalRequest.STATUS_PENDING_SETTLE,
+                            WithdrawalRequest.STATUS_REFUNDING,
+                        ]
+                    ),
+                    WithdrawalRequest.is_deleted == 0,
+                )
+                .scalar()
+            )
+            if pending_withdrawal:
+                raise ConflictError("该孩子已有进行中的退会流程，会员费退款请走退会申请")
+            withdrawal = WithdrawalRequest(
+                child_id=child.id,
+                source=WithdrawalRequest.SOURCE_REFUND,
+                reason=f"会员费退款联动退会：{reason.strip()}",
+            )
+            self.db.add(withdrawal)
+            self.db.flush()
+            child.operation_locked = 1
+
         req = RefundRequest(
             kind=RefundRequest.KIND_ORDER,
             order_id=order_id,
+            withdrawal_id=withdrawal.id if withdrawal else None,
             child_id=child.id,
             amount=self._refundable_amount(order),
             reason=reason.strip(),
         )
         self.db.add(req)
+        order.refund_status = Order.REFUND_STATUS_PENDING
+        self.db.commit()
+        return req
+
+    def cancel(self, child: Child, request_id: int) -> RefundRequest:
+        """家长撤销待审核退款申请（BDD：状态 cancelled、订单恢复）。"""
+        req = (
+            self.db.query(RefundRequest)
+            .filter(
+                RefundRequest.id == request_id,
+                RefundRequest.child_id == child.id,
+                RefundRequest.is_deleted == 0,
+            )
+            .first()
+        )
+        if not req:
+            raise NotFoundError("退款申请不存在")
+        if req.status != RefundRequest.STATUS_PENDING:
+            raise ValidationError(f"申请状态 {req.status}，不可撤销")
+        req.status = RefundRequest.STATUS_CANCELLED
+        if req.order_id:
+            order = self.db.query(Order).filter(Order.id == req.order_id).first()
+            if order and order.refund_status in (Order.REFUND_STATUS_PENDING,):
+                order.refund_status = Order.REFUND_STATUS_NONE
+        # 联动退会申请一并撤销 + 解锁（R-309 联动创建的）
+        if req.withdrawal_id:
+            w = (
+                self.db.query(WithdrawalRequest)
+                .filter(WithdrawalRequest.id == req.withdrawal_id)
+                .first()
+            )
+            if w and w.status == WithdrawalRequest.STATUS_APPLYING:
+                w.status = WithdrawalRequest.STATUS_CANCELLED
+                child.operation_locked = 0
         self.db.commit()
         return req
 
@@ -171,6 +242,8 @@ class RefundService:
         return out
 
     def review(self, admin, request_id: int, approve: bool, remark: str) -> dict:
+        """超管审核（R-308）：approve → approved（待执行）；拒绝 → rejected。
+        执行（线下打款登记/线上原路）走 execute。"""
         req = (
             self.db.query(RefundRequest)
             .filter(RefundRequest.id == request_id, RefundRequest.is_deleted == 0)
@@ -182,11 +255,82 @@ class RefundService:
             req.status = RefundRequest.STATUS_APPROVED
             if req.kind == RefundRequest.KIND_ORDER and req.order_id:
                 order = self.db.query(Order).filter(Order.id == req.order_id).first()
+                if order:
+                    order.refund_status = Order.REFUND_STATUS_APPROVED
+            # R-309 联动退会：审核通过 → 进入执行阶段（refunding），
+            # 失败时 execute 分支才能回 pending_settle 并允许重试
+            if req.withdrawal_id:
+                w = (
+                    self.db.query(WithdrawalRequest)
+                    .filter(WithdrawalRequest.id == req.withdrawal_id)
+                    .first()
+                )
+                if w and w.status == WithdrawalRequest.STATUS_APPLYING:
+                    w.status = WithdrawalRequest.STATUS_REFUNDING
+        else:
+            if not remark or not remark.strip():
+                raise ValidationError("拒绝退款必须填写原因（家长可见）")
+            req.status = RefundRequest.STATUS_REJECTED
+            if req.kind == RefundRequest.KIND_ORDER and req.order_id:
+                order = self.db.query(Order).filter(Order.id == req.order_id).first()
+                if order and order.refund_status == Order.REFUND_STATUS_PENDING:
+                    order.refund_status = Order.REFUND_STATUS_NONE
+            # 联动退会申请一并拒绝 + 解锁（R-309 联动创建的；拒绝后家长可再申请）
+            if req.withdrawal_id:
+                w = (
+                    self.db.query(WithdrawalRequest)
+                    .filter(WithdrawalRequest.id == req.withdrawal_id)
+                    .first()
+                )
+                if w and w.status == WithdrawalRequest.STATUS_APPLYING:
+                    w.status = WithdrawalRequest.STATUS_REJECTED
+                    child = self.db.query(Child).filter(Child.id == req.child_id).first()
+                    if child:
+                        child.operation_locked = 0
+        req.review_remark = remark or None
+        req.reviewed_by = admin.id
+        req.reviewed_at = datetime.now()
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="refund.review",
+            target_type="refund_request",
+            target_id=str(request_id),
+            detail={"approve": approve, "amount": str(req.amount), "kind": req.kind},
+            reason=remark or ("退款审核通过，待执行" if approve else "退款拒绝"),
+        )
+        self.db.commit()
+        return {"id": req.id, "status": req.status}
+
+    def execute(self, admin, request_id: int, success: bool, remark: str) -> dict:
+        """执行退款（R-308：approved/failed → processing → refunded/failed）。
+        线下人工打款登记凭证（remark）即完成；失败可重试。"""
+        req = (
+            self.db.query(RefundRequest)
+            .filter(RefundRequest.id == request_id, RefundRequest.is_deleted == 0)
+            .first()
+        )
+        if not req or req.status not in (
+            RefundRequest.STATUS_APPROVED,
+            RefundRequest.STATUS_FAILED,
+        ):
+            raise ValidationError("退款申请不存在或状态不可执行（需先审核通过）")
+        req.status = RefundRequest.STATUS_PROCESSING
+        self.db.flush()
+
+        if success:
+            req.status = RefundRequest.STATUS_REFUNDED
+            if req.kind == RefundRequest.KIND_ORDER and req.order_id:
+                order = self.db.query(Order).filter(Order.id == req.order_id).first()
                 if order and order.status == Order.STATUS_PAID:
                     order.status = Order.STATUS_REFUNDED
+                    order.refund_status = Order.REFUND_STATUS_REFUNDED
                     # 活动订单 → 联动报名退款（同事务）
                     if order.order_type == Order.TYPE_ACTIVITY:
                         self._refund_activity_enrollment(order)
+                    # 会员费退款成功 → 联动退会（R-310：withdrawn + 自动发起押金退款）
+                    if order.order_type in (Order.TYPE_OBSERVATION, Order.TYPE_FORMAL):
+                        self._complete_refund_withdrawal(admin, req, order)
             elif req.kind == RefundRequest.KIND_DEPOSIT and req.deposit_id:
                 from backend.domain.billing.models import Deposit
 
@@ -199,31 +343,146 @@ class RefundService:
                         DepositLedger(
                             deposit_id=dep.id,
                             entry_type=DepositLedger.ENTRY_REFUND,
-                            amount=dep.available_amount,
+                            amount=req.amount,
                             balance_after=Decimal("0"),
-                            reason="退会审核通过，押金退款",
+                            reason=remark or "押金退款执行",
                             operator_id=admin.id,
                         )
                     )
                     dep.available_amount = Decimal("0")
         else:
             if not remark or not remark.strip():
-                raise ValidationError("拒绝退款必须填写原因（家长可见）")
-            req.status = RefundRequest.STATUS_REJECTED
-        req.review_remark = remark or None
+                raise ValidationError("执行失败必须填写原因（留痕）")
+            req.status = RefundRequest.STATUS_FAILED
+            if req.kind == RefundRequest.KIND_ORDER and req.order_id:
+                order = self.db.query(Order).filter(Order.id == req.order_id).first()
+                if order:
+                    order.refund_status = Order.REFUND_STATUS_FAILED
+            # 关联退会流程回待结算（R-311：失败可回 pending_settle 人工重新处理）
+            if req.withdrawal_id:
+                w = (
+                    self.db.query(WithdrawalRequest)
+                    .filter(WithdrawalRequest.id == req.withdrawal_id)
+                    .first()
+                )
+                if w and w.status == WithdrawalRequest.STATUS_REFUNDING:
+                    w.status = WithdrawalRequest.STATUS_PENDING_SETTLE
+
+        req.review_remark = remark or req.review_remark
         req.reviewed_by = admin.id
         req.reviewed_at = datetime.now()
         publish_audit(
             self.db,
             admin=admin,
-            action="refund.review",
+            action="refund.execute",
             target_type="refund_request",
             target_id=str(request_id),
-            detail={"approve": approve, "amount": str(req.amount), "kind": req.kind},
-            reason=remark or ("退款通过" if approve else "退款拒绝"),
+            detail={"success": success, "amount": str(req.amount), "kind": req.kind},
+            reason=remark or ("退款执行成功" if success else "退款执行失败"),
         )
         self.db.commit()
+        # 聚合推进关联退会流程（全部退款完成 → completed）
+        if success:
+            self._advance_withdrawal(request_id)
+            self.db.commit()
         return {"id": req.id, "status": req.status}
+
+    def _complete_refund_withdrawal(self, admin, req: RefundRequest, order: Order) -> None:
+        """会员费退款成功（R-310）：child → withdrawn + 自动发起押金退款。
+        退会原因：refund_linked 联动 = user_refund；主动退会结算单 = user_withdrawal。"""
+        child = self.db.query(Child).filter(Child.id == req.child_id).first()
+        if not child or child.member_status == Child.MEMBER_WITHDRAWN:
+            return
+        reason_code = "user_refund"
+        if req.withdrawal_id:
+            w = (
+                self.db.query(WithdrawalRequest)
+                .filter(WithdrawalRequest.id == req.withdrawal_id)
+                .first()
+            )
+            if w and w.source == WithdrawalRequest.SOURCE_NORMAL:
+                reason_code = "user_withdrawal"
+        child.member_status = Child.MEMBER_WITHDRAWN
+        child.withdraw_reason = reason_code
+        child.operation_locked = 0
+        # 自动发起押金退款申请（可用余额；已有进行中押金单则不重复发起）
+        from backend.domain.billing.models import Deposit
+
+        existing_dep_rr = (
+            self.db.query(func.count(RefundRequest.id))
+            .filter(
+                RefundRequest.child_id == child.id,
+                RefundRequest.kind == RefundRequest.KIND_DEPOSIT,
+                RefundRequest.status.in_(
+                    [
+                        RefundRequest.STATUS_PENDING,
+                        RefundRequest.STATUS_APPROVED,
+                        RefundRequest.STATUS_PROCESSING,
+                    ]
+                ),
+                RefundRequest.is_deleted == 0,
+            )
+            .scalar()
+        )
+        dep = (
+            self.db.query(Deposit)
+            .filter(Deposit.child_id == child.id, Deposit.is_deleted == 0)
+            .first()
+        )
+        if dep and dep.available_amount > 0 and not existing_dep_rr:
+            dep_rr = RefundRequest(
+                kind=RefundRequest.KIND_DEPOSIT,
+                deposit_id=dep.id,
+                child_id=child.id,
+                amount=dep.available_amount,
+                reason="会员费退款成功，自动发起押金退款（R-310）",
+            )
+            self.db.add(dep_rr)
+            self.db.flush()
+            dep.status = Deposit.STATUS_REFUNDING
+
+    def _advance_withdrawal(self, refund_request_id: int) -> None:
+        """退款执行成功后聚合推进关联退会流程：
+        全部关联退款单 refunded → withdrawal completed（退会正式生效已由各路径落）。
+        applying 态命中 = refund_linked 联动退会（会员费单成功即完成）。"""
+        req = self.db.query(RefundRequest).filter(RefundRequest.id == refund_request_id).first()
+        if not req or not req.withdrawal_id:
+            return
+        w = (
+            self.db.query(WithdrawalRequest)
+            .filter(WithdrawalRequest.id == req.withdrawal_id)
+            .first()
+        )
+        if not w or w.status not in (
+            WithdrawalRequest.STATUS_REFUNDING,
+            WithdrawalRequest.STATUS_APPLYING,
+            WithdrawalRequest.STATUS_PENDING_SETTLE,
+        ):
+            return
+        open_cnt = (
+            self.db.query(func.count(RefundRequest.id))
+            .filter(
+                RefundRequest.withdrawal_id == w.id,
+                RefundRequest.status.in_(
+                    [
+                        RefundRequest.STATUS_PENDING,
+                        RefundRequest.STATUS_APPROVED,
+                        RefundRequest.STATUS_PROCESSING,
+                        RefundRequest.STATUS_FAILED,
+                    ]
+                ),
+                RefundRequest.is_deleted == 0,
+            )
+            .scalar()
+        )
+        if open_cnt == 0:
+            w.status = WithdrawalRequest.STATUS_COMPLETED
+            child = self.db.query(Child).filter(Child.id == w.child_id).first()
+            if child:
+                if child.member_status != Child.MEMBER_WITHDRAWN:
+                    child.member_status = Child.MEMBER_WITHDRAWN
+                    child.withdraw_reason = "user_withdrawal"
+                child.operation_locked = 0
 
     def _refund_activity_enrollment(self, order: Order) -> None:
         from backend.domain.activity.models import ActivityEnrollment
@@ -248,7 +507,8 @@ class WithdrawalService:
         self.db = db
 
     def _preconditions(self, child: Child) -> list[str]:
-        """退会 4 项前提（V1.1 §3.5）：返回不满足项（空=可退）。"""
+        """退会 7 项前提（R-311/V1.1 §3.5）：返回不满足项（空=可退）。
+        遗失/损坏赔偿归入"未结清赔偿"口径（押金 unpaid_balance）。"""
         problems = []
         active = (
             self.db.query(func.count(BorrowRecord.id))
@@ -283,6 +543,39 @@ class WithdrawalService:
         )
         if dep and dep.unpaid_balance and dep.unpaid_balance > 0:
             problems.append(f"有未结清赔偿款 {dep.unpaid_balance} 元")
+        # 进行中转让（WM10-07）
+        pending_transfer = (
+            self.db.query(func.count(TransferRequest.id))
+            .filter(
+                TransferRequest.status == TransferRequest.STATUS_PENDING,
+                (TransferRequest.source_child_id == child.id)
+                | (TransferRequest.target_child_id == child.id),
+                TransferRequest.is_deleted == 0,
+            )
+            .scalar()
+        )
+        if pending_transfer:
+            problems.append("有进行中的权益转让申请")
+        # 进行中会员费退款（WM10-07）
+        pending_member_refund = (
+            self.db.query(func.count(RefundRequest.id))
+            .join(Order, RefundRequest.order_id == Order.id)
+            .filter(
+                RefundRequest.child_id == child.id,
+                RefundRequest.status.in_(
+                    [
+                        RefundRequest.STATUS_PENDING,
+                        RefundRequest.STATUS_APPROVED,
+                        RefundRequest.STATUS_PROCESSING,
+                    ]
+                ),
+                Order.order_type.in_([Order.TYPE_OBSERVATION, Order.TYPE_FORMAL]),
+                RefundRequest.is_deleted == 0,
+            )
+            .scalar()
+        )
+        if pending_member_refund:
+            problems.append("有进行中的会员费退款申请")
         return problems
 
     def apply(self, child: Child, reason: str) -> dict:
@@ -300,18 +593,46 @@ class WithdrawalService:
             self.db.query(func.count(WithdrawalRequest.id))
             .filter(
                 WithdrawalRequest.child_id == child.id,
-                WithdrawalRequest.status == WithdrawalRequest.STATUS_PENDING,
+                WithdrawalRequest.status.in_(
+                    [
+                        WithdrawalRequest.STATUS_APPLYING,
+                        WithdrawalRequest.STATUS_PENDING_SETTLE,
+                        WithdrawalRequest.STATUS_REFUNDING,
+                    ]
+                ),
                 WithdrawalRequest.is_deleted == 0,
             )
             .scalar()
         )
         if dup:
             raise ConflictError("已有进行中的退会申请")
-        req = WithdrawalRequest(child_id=child.id, reason=reason.strip())
+        req = WithdrawalRequest(
+            child_id=child.id, source=WithdrawalRequest.SOURCE_NORMAL, reason=reason.strip()
+        )
         self.db.add(req)
         child.operation_locked = 1  # 冻结：借/约/续/新订单/新测验/退款/转让
         self.db.commit()
         return {"id": req.id, "status": req.status, "child_id": child.id}
+
+    def cancel(self, child: Child, request_id: int) -> WithdrawalRequest:
+        """家长撤销进行中的退会申请（applying → cancelled + 解锁）。"""
+        req = (
+            self.db.query(WithdrawalRequest)
+            .filter(
+                WithdrawalRequest.id == request_id,
+                WithdrawalRequest.child_id == child.id,
+                WithdrawalRequest.is_deleted == 0,
+            )
+            .first()
+        )
+        if not req:
+            raise NotFoundError("退会申请不存在")
+        if req.status != WithdrawalRequest.STATUS_APPLYING:
+            raise ValidationError(f"申请状态 {req.status}，不可撤销")
+        req.status = WithdrawalRequest.STATUS_CANCELLED
+        child.operation_locked = 0
+        self.db.commit()
+        return req
 
     def my_list(self, child: Child) -> list[dict]:
         rows = (
@@ -355,12 +676,14 @@ class WithdrawalService:
         return out
 
     def review(self, admin, request_id: int, approve: bool, remark: str) -> dict:
+        """R-311 六态流转：approve → pending_settle（结算生成退款单）→ refunding；
+        全部退款单 refunded 后由 RefundService.execute 聚合推进 completed。"""
         req = (
             self.db.query(WithdrawalRequest)
             .filter(WithdrawalRequest.id == request_id, WithdrawalRequest.is_deleted == 0)
             .first()
         )
-        if not req or req.status != WithdrawalRequest.STATUS_PENDING:
+        if not req or req.status != WithdrawalRequest.STATUS_APPLYING:
             raise ValidationError("退会申请不存在或已处理")
         child = self.db.query(Child).filter(Child.id == req.child_id).first()
         if not child:
@@ -370,10 +693,38 @@ class WithdrawalService:
             problems = self._preconditions(child)
             if problems:
                 raise ValidationError("审核时前提不满足：" + "；".join(problems))
-            req.status = WithdrawalRequest.STATUS_APPROVED
-            child.member_status = Child.MEMBER_WITHDRAWN
-            child.operation_locked = 0
-            # 自动发起押金退款申请（可用余额；已扣除部分不退）
+            req.status = WithdrawalRequest.STATUS_PENDING_SETTLE
+            # ---- 结算：计算三类可退金额并生成退款单（R-311：观察期费/年费/押金）----
+            refund_ids = []
+            # 1) 会员费订单（可退金额 > 0 的 paid 单）
+            refund_svc = RefundService(self.db)
+            member_orders = (
+                self.db.query(Order)
+                .filter(
+                    Order.child_id == child.id,
+                    Order.order_type.in_([Order.TYPE_OBSERVATION, Order.TYPE_FORMAL]),
+                    Order.status == Order.STATUS_PAID,
+                    Order.is_deleted == 0,
+                )
+                .all()
+            )
+            for order in member_orders:
+                amount = refund_svc._refundable_amount(order)
+                if amount <= 0:
+                    continue
+                rr = RefundRequest(
+                    kind=RefundRequest.KIND_ORDER,
+                    order_id=order.id,
+                    withdrawal_id=req.id,
+                    child_id=child.id,
+                    amount=amount,
+                    reason="退会结算：会员费按剩余天数比例退",
+                )
+                self.db.add(rr)
+                self.db.flush()
+                order.refund_status = Order.REFUND_STATUS_PENDING
+                refund_ids.append(rr.id)
+            # 2) 押金（可用余额；已扣除部分不退）
             from backend.domain.billing.models import Deposit
 
             dep = (
@@ -386,14 +737,24 @@ class WithdrawalService:
                 rr = RefundRequest(
                     kind=RefundRequest.KIND_DEPOSIT,
                     deposit_id=dep.id,
+                    withdrawal_id=req.id,
                     child_id=child.id,
                     amount=dep.available_amount,
-                    reason="退会审核通过，自动发起押金退款",
+                    reason="退会结算：押金退可用余额",
                 )
                 self.db.add(rr)
                 self.db.flush()
                 deposit_refund_id = rr.id
+                refund_ids.append(rr.id)
                 dep.status = Deposit.STATUS_REFUNDING
+            # 3) 有退款单 → refunding；无可退 → 直接 completed + withdrawn
+            if refund_ids:
+                req.status = WithdrawalRequest.STATUS_REFUNDING
+            else:
+                req.status = WithdrawalRequest.STATUS_COMPLETED
+                child.member_status = Child.MEMBER_WITHDRAWN
+                child.withdraw_reason = "user_withdrawal"
+                child.operation_locked = 0
             publish_audit(
                 self.db,
                 admin=admin,
@@ -403,8 +764,10 @@ class WithdrawalService:
                 detail={
                     "deposit_refund_id": deposit_refund_id,
                     "deposit_amount": str(dep.available_amount) if dep else "0",
+                    "settle_refunds": refund_ids,
+                    "withdrawal_status": req.status,
                 },
-                reason=remark or "退会通过",
+                reason=remark or "退会通过，进入结算",
             )
         else:
             if not remark or not remark.strip():
@@ -418,328 +781,6 @@ class WithdrawalService:
         return {"id": req.id, "status": req.status}
 
 
-class TransferService:
-    def __init__(self, db: Session):
-        self.db = db
-
-    # ---------- 16 项前置条件（返回 [名称, 是否满足] 列表） ----------
-    def check_conditions(
-        self,
-        parent,
-        source: Child,
-        target: Child,
-        exclude_transfer_id: int | None = None,
-    ) -> list[dict]:
-        """16 项前置条件；exclude_transfer_id 用于审核二次校验（排除本单自身造成的状态）。"""
-        skip_lock_checks = exclude_transfer_id is not None
-        checks: list[tuple[str, bool]] = []
-
-        def _has_pending(child_id: int) -> bool:
-            pending_refund = (
-                self.db.query(func.count(RefundRequest.id))
-                .filter(
-                    RefundRequest.child_id == child_id,
-                    RefundRequest.status == RefundRequest.STATUS_PENDING,
-                    RefundRequest.is_deleted == 0,
-                )
-                .scalar()
-            )
-            pending_withdraw = (
-                self.db.query(func.count(WithdrawalRequest.id))
-                .filter(
-                    WithdrawalRequest.child_id == child_id,
-                    WithdrawalRequest.status == WithdrawalRequest.STATUS_PENDING,
-                    WithdrawalRequest.is_deleted == 0,
-                )
-                .scalar()
-            )
-            return bool(pending_refund or pending_withdraw)
-
-        active_borrows = lambda cid: (  # noqa: E731
-            self.db.query(func.count(BorrowRecord.id))
-            .filter(
-                BorrowRecord.child_id == cid,
-                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
-                BorrowRecord.is_deleted == 0,
-            )
-            .scalar()
-        )
-        active_reservations = lambda cid: (  # noqa: E731
-            self.db.query(func.count(Reservation.id))
-            .filter(
-                Reservation.child_id == cid,
-                Reservation.status == Reservation.STATUS_ACTIVE,
-                Reservation.is_deleted == 0,
-            )
-            .scalar()
-        )
-
-        checks.append(
-            ("同一家长账号下的两个孩子", source.parent_id == target.parent_id == parent.id)
-        )
-        checks.append(
-            (
-                "转出方是正式会员",
-                source.member_status == Child.MEMBER_FORMAL and source.is_active_member,
-            )
-        )
-        checks.append(
-            (
-                "转出方会员剩余时间大于 0",
-                bool(source.member_expire and source.member_expire > date.today()),
-            )
-        )
-        if not skip_lock_checks:
-            checks.append(("转出方未处于冻结流程", not source.operation_locked))
-        checks.append(("转出方没有进行中的申请（退款/退会/转让）", not _has_pending(source.id)))
-        checks.append(("转出方图书已全部归还", active_borrows(source.id) == 0))
-        checks.append(("转出方没有进行中的预约", active_reservations(source.id) == 0))
-        from backend.domain.billing.models import Deposit
-
-        dep = (
-            self.db.query(Deposit)
-            .filter(Deposit.child_id == source.id, Deposit.is_deleted == 0)
-            .first()
-        )
-        checks.append(
-            ("转出方无未结清赔偿款", not (dep and dep.unpaid_balance and dep.unpaid_balance > 0))
-        )
-        if not skip_lock_checks:
-            checks.append(("受让方未处于冻结流程", not target.operation_locked))
-        checks.append(
-            (
-                "受让方从未入会或已退会",
-                target.member_status in (Child.MEMBER_NONE, Child.MEMBER_WITHDRAWN),
-            )
-        )
-        checks.append(("受让方没有进行中的申请", not _has_pending(target.id)))
-        dup_q = self.db.query(func.count(TransferRequest.id)).filter(
-            TransferRequest.status == TransferRequest.STATUS_PENDING,
-            TransferRequest.is_deleted == 0,
-            (TransferRequest.source_child_id.in_([source.id, target.id]))
-            | (TransferRequest.target_child_id.in_([source.id, target.id])),
-        )
-        if exclude_transfer_id is not None:
-            dup_q = dup_q.filter(TransferRequest.id != exclude_transfer_id)
-        dup = dup_q.scalar()
-        checks.append(("没有进行中的其他转让", not dup))
-        return [{"name": n, "ok": ok} for n, ok in checks]
-
-    def apply(self, parent, source_child_id: int, target_child_id: int) -> dict:
-        if source_child_id == target_child_id:
-            raise ValidationError("转出方和受让方不能是同一个孩子")
-        source = self._child(source_child_id)
-        target = self._child(target_child_id)
-        if source.parent_id != parent.id or target.parent_id != parent.id:
-            raise ValidationError("只能在自己账号的孩子之间转让")
-        checks = self.check_conditions(parent, source, target)
-        failed = [c["name"] for c in checks if not c["ok"]]
-        if failed:
-            raise ValidationError("转让条件不满足：" + "；".join(failed))
-        hours = int(ConfigService(self.db).get_value("transfer_review_timeout_hours"))
-        req = TransferRequest(
-            source_child_id=source.id,
-            target_child_id=target.id,
-            expires_at=datetime.now() + timedelta(hours=hours),
-        )
-        self.db.add(req)
-        source.operation_locked = 1
-        target.operation_locked = 1
-        self.db.commit()
-        return {
-            "id": req.id,
-            "status": req.status,
-            "expires_at": str(req.expires_at),
-            "conditions": checks,
-        }
-
-    def _child(self, child_id: int) -> Child:
-        child = self.db.query(Child).filter(Child.id == child_id, Child.is_deleted == 0).first()
-        if not child:
-            raise NotFoundError("孩子不存在")
-        return child
-
-    def my_list(self, parent) -> list[dict]:
-        self.expire_overdue()
-        child_ids = [
-            c.id
-            for c in self.db.query(Child.id)
-            .filter(Child.parent_id == parent.id, Child.is_deleted == 0)
-            .all()
-        ]
-        if not child_ids:
-            return []
-        rows = (
-            self.db.query(TransferRequest)
-            .filter(
-                (TransferRequest.source_child_id.in_(child_ids))
-                | (TransferRequest.target_child_id.in_(child_ids)),
-                TransferRequest.is_deleted == 0,
-            )
-            .order_by(TransferRequest.id.desc())
-            .all()
-        )
-        return [self._view(r) for r in rows]
-
-    def _view(self, r: TransferRequest) -> dict:
-        src = self.db.query(Child).filter(Child.id == r.source_child_id).first()
-        tgt = self.db.query(Child).filter(Child.id == r.target_child_id).first()
-        return {
-            "id": r.id,
-            "source_child_id": r.source_child_id,
-            "source_name": src.name if src else f"#{r.source_child_id}",
-            "target_child_id": r.target_child_id,
-            "target_name": tgt.name if tgt else f"#{r.target_child_id}",
-            "status": r.status,
-            "expires_at": str(r.expires_at),
-            "review_remark": r.review_remark,
-            "created_at": str(r.created_at),
-        }
-
-    def cancel(self, parent, transfer_id: int) -> dict:
-        req = self._pending_of(parent, transfer_id)
-        req.status = TransferRequest.STATUS_CANCELLED
-        self._unlock_both(req)
-        self.db.commit()
-        return {"id": req.id, "status": req.status}
-
-    def expire_overdue(self) -> int:
-        """超时未审 → expired + 双方解锁（列表访问时惰性触发；WM11 定时任务接管）。"""
-        rows = (
-            self.db.query(TransferRequest)
-            .filter(
-                TransferRequest.status == TransferRequest.STATUS_PENDING,
-                TransferRequest.expires_at < datetime.now(),
-                TransferRequest.is_deleted == 0,
-            )
-            .all()
-        )
-        for r in rows:
-            r.status = TransferRequest.STATUS_EXPIRED
-            self._unlock_both(r)
-        if rows:
-            self.db.commit()
-        return len(rows)
-
-    def _unlock_both(self, req: TransferRequest) -> None:
-        for cid in (req.source_child_id, req.target_child_id):
-            child = self.db.query(Child).filter(Child.id == cid).first()
-            if child:
-                child.operation_locked = 0
-
-    def _pending_of(self, parent, transfer_id: int) -> TransferRequest:
-        req = (
-            self.db.query(TransferRequest)
-            .filter(TransferRequest.id == transfer_id, TransferRequest.is_deleted == 0)
-            .first()
-        )
-        if not req:
-            raise NotFoundError("转让申请不存在")
-        child_ids = [
-            c.id
-            for c in self.db.query(Child.id)
-            .filter(Child.parent_id == parent.id, Child.is_deleted == 0)
-            .all()
-        ]
-        if req.source_child_id not in child_ids or req.target_child_id not in child_ids:
-            raise ValidationError("无权操作该转让申请")
-        if req.status != TransferRequest.STATUS_PENDING:
-            raise ValidationError(f"转让状态 {req.status}，不可操作")
-        return req
-
-    # ---------- 管理端 ----------
-    def admin_list(self, status: str | None = None) -> list[dict]:
-        self.expire_overdue()
-        q = self.db.query(TransferRequest).filter(TransferRequest.is_deleted == 0)
-        if status:
-            q = q.filter(TransferRequest.status == status)
-        rows = q.order_by(TransferRequest.id.desc()).limit(200).all()
-        return [self._view(r) for r in rows]
-
-    def review(self, admin, transfer_id: int, approve: bool, remark: str) -> dict:
-        req = (
-            self.db.query(TransferRequest)
-            .filter(TransferRequest.id == transfer_id, TransferRequest.is_deleted == 0)
-            .first()
-        )
-        if not req or req.status != TransferRequest.STATUS_PENDING:
-            raise ValidationError("转让申请不存在或已处理")
-        if req.expires_at < datetime.now():
-            req.status = TransferRequest.STATUS_EXPIRED
-            self._unlock_both(req)
-            self.db.commit()
-            raise ValidationError("转让已超时自动取消")
-        source = self.db.query(Child).filter(Child.id == req.source_child_id).first()
-        target = self.db.query(Child).filter(Child.id == req.target_child_id).first()
-        if not source or not target:
-            raise NotFoundError("孩子不存在")
-        if approve:
-            # 二次校验（6 项核心：formal/剩余/无借阅/受让资格/无未结/同家长）
-            from backend.domain.identity.models import Parent
-
-            parent_obj = self.db.query(Parent).filter(Parent.id == source.parent_id).first()
-            checks = self.check_conditions(parent_obj, source, target, exclude_transfer_id=req.id)
-            failed = [c["name"] for c in checks if not c["ok"]]
-            if failed:
-                raise ValidationError("审核时条件不满足：" + "；".join(failed))
-            # ---- 同事务 6 步（R-305）----
-            req.status = TransferRequest.STATUS_APPROVED
-            # 1) 转出方退会（年费不退；历史阅读成果保留）
-            source.member_status = Child.MEMBER_WITHDRAWN
-            # 2) 自动发起转出方押金退款申请
-            from backend.domain.billing.models import Deposit
-
-            dep = (
-                self.db.query(Deposit)
-                .filter(Deposit.child_id == source.id, Deposit.is_deleted == 0)
-                .first()
-            )
-            deposit_refund_id = None
-            if dep and dep.available_amount > 0:
-                rr = RefundRequest(
-                    kind=RefundRequest.KIND_DEPOSIT,
-                    deposit_id=dep.id,
-                    child_id=source.id,
-                    amount=dep.available_amount,
-                    reason="权益转让通过，自动发起押金退款",
-                )
-                self.db.add(rr)
-                self.db.flush()
-                deposit_refund_id = rr.id
-                dep.status = Deposit.STATUS_REFUNDING
-            # 3) 受让方转正式会员，到期日继承
-            target.member_status = Child.MEMBER_FORMAL
-            target.member_start = date.today()
-            target.member_expire = source.member_expire
-            # 4) 解锁双方
-            source.operation_locked = 0
-            target.operation_locked = 0
-            # 5) 留痕
-            publish_audit(
-                self.db,
-                admin=admin,
-                action="transfer.approve",
-                target_type="transfer",
-                target_id=str(req.id),
-                detail={
-                    "source": source.name,
-                    "target": target.name,
-                    "expire_inherited": str(source.member_expire),
-                    "deposit_refund_id": deposit_refund_id,
-                },
-                reason=remark or "转让通过",
-            )
-        else:
-            if not remark or not remark.strip():
-                raise ValidationError("拒绝转让必须填写原因（家长可见）")
-            req.status = TransferRequest.STATUS_REJECTED
-            self._unlock_both(req)
-        req.review_remark = remark or None
-        req.reviewed_by = admin.id
-        req.reviewed_at = datetime.now()
-        self.db.commit()
-        return {"id": req.id, "status": req.status}
-
-
-# Reservation 延迟导入（避免域循环）
-from backend.domain.reading.models import Reservation  # noqa: E402
+# 权益转让已拆至 transfer_service.py（单文件 ≤800 行架构铁律）
+# 保留 re-export 兼容既有 import：from backend.domain.identity.wm10_service import TransferService
+from backend.domain.identity.transfer_service import TransferService  # noqa: E402, F401  # isort: skip

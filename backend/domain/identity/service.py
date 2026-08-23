@@ -92,6 +92,61 @@ class ChildService:
             )
         child.member_status = new_status
 
+    def _get_child(self, child_id: int) -> Child:
+        child = self.db.query(Child).filter(Child.id == child_id, Child.is_deleted == 0).first()
+        if not child:
+            raise NotFoundError("孩子不存在")
+        return child
+
+    def mark_pending_evaluation(self, admin, child_id: int, reason: str) -> Child:
+        """观察期 → 待评估（C13/决策 8：馆员手动标记留痕；到期自动转换任务在 WM11）。"""
+        child = self._get_child(child_id)
+        if child.member_status != Child.MEMBER_OBSERVATION:
+            raise ValidationError(f"仅观察期孩子可标记待评估（当前状态 {child.member_status}）")
+        self._transition(child, Child.MEMBER_PENDING_EVALUATION)
+        self.db.flush()
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="child.mark_pending_evaluation",
+            target_type="child",
+            target_id=str(child.id),
+            detail={
+                "child": child.name,
+                "from": Child.MEMBER_OBSERVATION,
+                "to": Child.MEMBER_PENDING_EVALUATION,
+            },
+            reason=reason or "观察期到期，标记待评估",
+        )
+        self.db.commit()
+        return child
+
+    def evaluate_approve(self, admin, child_id: int, reason: str) -> Order:
+        """评估通过转正（C13/R-101-5）：转正必须支付正式年费 → 创建年费订单（二孩折扣
+        沿用 OrderService 判定），收款确认后自动转正式会员。审计与订单同一事务提交。"""
+        child = self._get_child(child_id)
+        if child.member_status != Child.MEMBER_PENDING_EVALUATION:
+            raise ValidationError(f"仅待评估孩子可评估通过转正（当前状态 {child.member_status}）")
+        if child.operation_locked:
+            raise ValidationError("孩子正在转让/退会审核流程中，不能办理转正")
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="child.evaluate_approve",
+            target_type="child",
+            target_id=str(child.id),
+            detail={"child": child.name, "next": "创建年费订单，收款确认后转正"},
+            reason=reason or "评估通过，转正式会员",
+        )
+        from backend.domain.identity.schemas import OrderCreateRequest
+
+        req = OrderCreateRequest(
+            child_id=child_id,
+            order_type=Order.TYPE_FORMAL,
+            remark=reason or "评估通过转正",
+        )
+        return OrderService(self.db).create(admin, req)
+
     def list_children(self, page: int, page_size: int, keyword: str | None, status: str | None):
         q = self.db.query(Child).filter(Child.is_deleted == 0)
         if keyword:
@@ -140,13 +195,15 @@ class OrderService:
 
         # 金额计算（服务端唯一权威；二孩 9 折按下单时刻判定 V1.1 §3.1）
         if req.order_type == Order.TYPE_FIRST_ACTIVITY:
-            # 99 元每账号一次（R-321）：存在未全额退的已付 99 单则拒绝
+            # 99 元每账号一次（R-321）：存在未被全额退款的已付 99 单则拒绝
+            # （refund_status 口径：退款中/失败均占资格；仅 refunded 释放）
             exists = (
                 self.db.query(func.count(Order.id))
                 .filter(
                     Order.parent_id == parent.id,
                     Order.order_type == Order.TYPE_FIRST_ACTIVITY,
                     Order.status == Order.STATUS_PAID,
+                    Order.refund_status != Order.REFUND_STATUS_REFUNDED,
                     Order.is_deleted == 0,
                 )
                 .scalar()
@@ -159,23 +216,17 @@ class OrderService:
         elif req.order_type == Order.TYPE_FORMAL:
             base = self._config_decimal("formal_fee")
             discount = self._config_decimal("second_child_discount_percent")
-            # 下单时该账号下另有有效会员孩子 → 自动 9 折
-            siblings_active = (
-                self.db.query(func.count(Child.id))
+            # 下单时该账号下另有有效会员孩子 → 自动 9 折（有效=日期感知口径 D1：过期的 formal 不算）
+            siblings = (
+                self.db.query(Child)
                 .filter(
                     Child.parent_id == parent.id,
                     Child.id != child.id,
-                    Child.member_status.in_(
-                        [
-                            Child.MEMBER_OBSERVATION,
-                            Child.MEMBER_PENDING_EVALUATION,
-                            Child.MEMBER_FORMAL,
-                        ]
-                    ),
                     Child.is_deleted == 0,
                 )
-                .scalar()
+                .all()
             )
+            siblings_active = any(s.is_active_member for s in siblings)
             amount = (
                 (base * discount / Decimal(100)).quantize(Decimal("0.01"))
                 if siblings_active

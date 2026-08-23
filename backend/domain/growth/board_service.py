@@ -161,6 +161,6 @@ class PassportService:
             "english_name": child.english_name,
             "avatar": child.avatar,
             "total_checkin_days": int(checkins or 0),
-            "read_only": child.member_status in (Child.MEMBER_WITHDRAWN,),
+            "read_only": child.member_status == Child.MEMBER_WITHDRAWN or child.is_expired_member,
             "recent_books": recent,
         }

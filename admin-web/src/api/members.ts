@@ -52,3 +52,17 @@ export function apiRefundOrder(orderId: number, remark: string): Promise<{ id: n
     method: "POST", body: JSON.stringify({ remark }),
   });
 }
+
+// C13：观察期 → 待评估（馆员手动标记，留痕）
+export function apiMarkPendingEvaluation(childId: number, reason: string): Promise<Child> {
+  return request(`/api/admin/members/children/${childId}/mark-pending-evaluation`, {
+    method: "POST", body: JSON.stringify({ reason }),
+  });
+}
+
+// C13：评估通过转正（创建年费订单，收款确认后转正式会员）
+export function apiEvaluateApprove(childId: number, reason: string): Promise<Order> {
+  return request(`/api/admin/members/children/${childId}/evaluate-approve`, {
+    method: "POST", body: JSON.stringify({ reason }),
+  });
+}

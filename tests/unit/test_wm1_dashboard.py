@@ -7,7 +7,7 @@ def test_dashboard_overview_fields(client: TestClient, admin_headers: dict) -> N
     assert resp.status_code == 200
     body = resp.json()
     assert body["admin_count"] == 2  # admin + staff01
-    assert body["config_count"] == 29
+    assert body["config_count"] == 30  # 29 基础键 + ar_warning_range（C16）
     assert body["today_logins"] >= 1  # admin_headers fixture 的登录
     assert isinstance(body["recent_config_changes"], list)
 

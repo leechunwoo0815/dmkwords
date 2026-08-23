@@ -807,6 +807,12 @@ export interface components {
             renew_used: number;
             /** Override Reason */
             override_reason: string | null;
+            /**
+             * Warnings
+             * @description 借书软提示（AR 超范围等，不拦截）
+             * @default []
+             */
+            warnings: string[];
         };
         /** BorrowRequest */
         BorrowRequest: {

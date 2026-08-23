@@ -35,8 +35,10 @@ import {
   apiCreateChild,
   apiCreateOrder,
   apiCreateParent,
+  apiEvaluateApprove,
   apiListChildren,
   apiListOrders,
+  apiMarkPendingEvaluation,
   type Child,
   type Order,
 } from "../api/members";
@@ -165,6 +167,59 @@ export default function MemberManage() {
     }
   };
 
+  const onMarkPendingEvaluation = (c: Child) => {
+    let reason = "";
+    Modal.confirm({
+      title: `标记 ${c.name} 为待评估`,
+      content: (
+        <div>
+          <div style={{ marginBottom: 8 }}>
+            观察期到期后标记（权益保留、无时限）；到期自动转换任务将在通知模块上线。操作将写入审计日志。
+          </div>
+          <Input.TextArea rows={2} placeholder="操作原因（留痕，如：观察期一个月已到）" onChange={(e) => { reason = e.target.value; }} />
+        </div>
+      ),
+      okText: "标记待评估",
+      onOk: async () => {
+        try {
+          const r = await apiMarkPendingEvaluation(c.id, reason.trim() || "观察期到期，标记待评估");
+          message.success(`${r.name} 已标记为待评估`);
+          loadChildren(childPage);
+        } catch (e) {
+          message.error((e as Error).message);
+          return Promise.reject(e);
+        }
+      },
+    });
+  };
+
+  const onEvaluateApprove = (c: Child) => {
+    let reason = "";
+    Modal.confirm({
+      title: `评估通过 — ${c.name} 转正`,
+      content: (
+        <div>
+          <div style={{ marginBottom: 8 }}>
+            转正需支付正式年费（二孩折扣自动判定）：确认后将创建年费订单（待人工确认），收款确认后自动转为正式会员。
+          </div>
+          <Input.TextArea rows={2} placeholder="评估结论（留痕，如：听力达标，同意转正）" onChange={(e) => { reason = e.target.value; }} />
+        </div>
+      ),
+      okText: "通过并创建年费订单",
+      onOk: async () => {
+        try {
+          const order = await apiEvaluateApprove(c.id, reason.trim() || "评估通过，转正式会员");
+          message.success(`已创建年费订单 ￥${Number(order.amount).toLocaleString()}，请到「订单」页确认收款`);
+          setTab("orders");
+          loadOrders(1);
+        } catch (e) {
+          message.error((e as Error).message);
+          return Promise.reject(e);
+        }
+      },
+    });
+  };
+
   const openReadingProfile = useCallback((child: Child) => {
     setReadingChild(child);
     setReadingProfile(null);
@@ -233,13 +288,19 @@ export default function MemberManage() {
               { title: "会员到期", dataIndex: "member_expire", width: 120, render: (v) => v ?? "—" },
               { title: "会员开始", dataIndex: "member_start", width: 120, render: (v) => v ?? "—" },
               {
-                title: "操作", key: "op", width: 150,
+                title: "操作", key: "op", width: 230,
                 render: (_, r) => (
-                  <Space>
+                  <Space size={0} wrap>
                     <Button type="link" size="small" onClick={() => {
                       orderForm.setFieldsValue({ child_id: r.id, order_type: r.member_status === "none" ? "observation_fee" : "formal_fee" });
                       setOrderOpen(true);
                     }}>创建订单</Button>
+                    {r.member_status === "observation" && (
+                      <Button type="link" size="small" onClick={() => onMarkPendingEvaluation(r)}>标记待评估</Button>
+                    )}
+                    {r.member_status === "pending_evaluation" && (
+                      <Button type="link" size="small" onClick={() => onEvaluateApprove(r)}>评估通过</Button>
+                    )}
                     <Button type="link" size="small" onClick={() => openReadingProfile(r)}>阅读档案</Button>
                     <Button type="link" size="small" onClick={() => { setObsChild(r); setObsFileList([]); setObsRemark(""); }}>评估报告</Button>
                   </Space>

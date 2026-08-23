@@ -98,6 +98,21 @@ def refund_list(child_id: int, auth: Any = Depends(get_current_parent)):
     return RefundService(db).my_list(child)
 
 
+class RefundCancelRequest(BaseSchema):
+    child_id: int
+
+
+@router.post("/refund-requests/{request_id}/cancel")
+def refund_cancel(
+    request_id: int, body: RefundCancelRequest, auth: Any = Depends(get_current_parent)
+):
+    """家长撤销待审核退款申请（BDD：cancelled、订单恢复；联动撤销退会申请）。"""
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, body.child_id)
+    req = RefundService(db).cancel(child, request_id)
+    return {"id": req.id, "status": req.status}
+
+
 # ---------- 退会 ----------
 @router.post("/withdrawals")
 def withdrawal_apply(body: WithdrawalApplyRequest, auth: Any = Depends(get_current_parent)):
@@ -111,6 +126,21 @@ def withdrawal_list(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child = _child_of_parent(db, parent.id, child_id)
     return WithdrawalService(db).my_list(child)
+
+
+class WithdrawalCancelRequest(BaseSchema):
+    child_id: int
+
+
+@router.post("/withdrawals/{request_id}/cancel")
+def withdrawal_cancel(
+    request_id: int, body: WithdrawalCancelRequest, auth: Any = Depends(get_current_parent)
+):
+    """家长撤销进行中的退会申请（applying → cancelled + 解锁）。"""
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, body.child_id)
+    req = WithdrawalService(db).cancel(child, request_id)
+    return {"id": req.id, "status": req.status}
 
 
 # ---------- 权益转让 ----------
