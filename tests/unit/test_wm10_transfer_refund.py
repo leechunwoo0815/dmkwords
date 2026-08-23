@@ -135,11 +135,10 @@ def test_refund_preview_apply_review_chain(client: TestClient):
     from backend.database import get_session
     from backend.domain.identity.models import Order
 
-    db = get_session()
-    order = db.query(Order).filter(Order.id == o["id"]).first()
-    assert order.status == "refunded"
-    assert order.refund_status == "refunded"
-    db.close()
+    with get_session() as db:
+        order = db.query(Order).filter(Order.id == o["id"]).first()
+        assert order.status == "refunded"
+        assert order.refund_status == "refunded"
 
 
 def test_withdrawal_flow_and_deposit_refund(client: TestClient):
@@ -247,9 +246,9 @@ def test_withdrawal_flow_and_deposit_refund(client: TestClient):
     from backend.database import get_session
     from backend.domain.identity.models import Child, WithdrawalRequest
 
-    db = get_session()
-    w = db.query(WithdrawalRequest).filter(WithdrawalRequest.id == wid2).first()
-    assert w.source == "normal"
+    with get_session() as db:
+        w = db.query(WithdrawalRequest).filter(WithdrawalRequest.id == wid2).first()
+        assert w.source == "normal"
     # 结算单：观察期费（按剩余天数）+ 押金 1200
     pend = client.get("/api/admin/refund-requests?status=pending", headers=h).json()
     dep_req = [x for x in pend if x["kind"] == "deposit" and x["child_id"] == c["id"]]
@@ -263,7 +262,6 @@ def test_withdrawal_flow_and_deposit_refund(client: TestClient):
     assert len(dep_req) == 1
     assert float(dep_req[0]["amount"]) == 1200
     assert len(obs_req) == 1
-    db.close()
     # 逐单审核 + 执行 → 全部 refunded → 退会 completed + withdrawn
     for rr in (obs_req[0], dep_req[0]):
         client.post(
@@ -277,18 +275,17 @@ def test_withdrawal_flow_and_deposit_refund(client: TestClient):
             headers=h,
         )
         assert ex.status_code == 200, ex.text
-    db = get_session()
-    ch = db.query(Child).filter(Child.id == c["id"]).first()
-    assert ch.member_status == "withdrawn"
-    assert ch.withdraw_reason == "user_withdrawal"
-    assert ch.operation_locked == 0
-    w2 = db.query(WithdrawalRequest).filter(WithdrawalRequest.id == wid2).first()
-    assert w2.status == "completed"
     from backend.domain.billing.models import Deposit
 
-    dep = db.query(Deposit).filter(Deposit.child_id == c["id"]).first()
-    assert dep.status == "refunded"
-    db.close()
+    with get_session() as db:
+        ch = db.query(Child).filter(Child.id == c["id"]).first()
+        assert ch.member_status == "withdrawn"
+        assert ch.withdraw_reason == "user_withdrawal"
+        assert ch.operation_locked == 0
+        w2 = db.query(WithdrawalRequest).filter(WithdrawalRequest.id == wid2).first()
+        assert w2.status == "completed"
+        dep = db.query(Deposit).filter(Deposit.child_id == c["id"]).first()
+        assert dep.status == "refunded"
 
 
 def test_transfer_full_chain(client: TestClient):
@@ -367,15 +364,14 @@ def test_transfer_full_chain(client: TestClient):
     from backend.database import get_session
     from backend.domain.identity.models import Child
 
-    db = get_session()
-    s = db.query(Child).filter(Child.id == src["id"]).first()
-    t = db.query(Child).filter(Child.id == tgt["id"]).first()
-    assert s.member_status == "withdrawn"
-    assert s.operation_locked == 0
-    assert t.member_status == "formal"
-    assert t.operation_locked == 0
-    assert t.member_expire == s.member_expire  # 到期日继承
-    db.close()
+    with get_session() as db:
+        s = db.query(Child).filter(Child.id == src["id"]).first()
+        t = db.query(Child).filter(Child.id == tgt["id"]).first()
+        assert s.member_status == "withdrawn"
+        assert s.operation_locked == 0
+        assert t.member_status == "formal"
+        assert t.operation_locked == 0
+        assert t.member_expire == s.member_expire  # 到期日继承
     # 押金退款自动生成（src 无押金 → 无申请；tgt 自己缴押金才能借）
     # tgt 借书需要自己押金
     no_dep = client.post(
@@ -441,22 +437,20 @@ def test_transfer_timeout_expired(client: TestClient):
     from backend.database import get_session
     from backend.domain.identity.models import TransferRequest
 
-    db = get_session()
-    tr = db.query(TransferRequest).filter(TransferRequest.id == tid).first()
-    tr.expires_at = datetime.now() - timedelta(minutes=1)
-    db.commit()
-    db.close()
+    with get_session() as db:
+        tr = db.query(TransferRequest).filter(TransferRequest.id == tid).first()
+        tr.expires_at = datetime.now() - timedelta(minutes=1)
+        db.commit()
     lst = client.get("/api/miniapp/transfers", headers=mini).json()
     mine = [x for x in lst if x["id"] == tid]
     assert mine[0]["status"] == "expired"
     # 双方解锁
     from backend.domain.identity.models import Child
 
-    db = get_session()
-    for cid in (src["id"], tgt["id"]):
-        ch = db.query(Child).filter(Child.id == cid).first()
-        assert ch.operation_locked == 0
-    db.close()
+    with get_session() as db:
+        for cid in (src["id"], tgt["id"]):
+            ch = db.query(Child).filter(Child.id == cid).first()
+            assert ch.operation_locked == 0
     # 过期后审核被拒
     late = client.post(f"/api/admin/transfers/{tid}/review", json={"approve": True}, headers=h)
     assert late.status_code == 422
@@ -487,10 +481,9 @@ def test_transfer_reject_and_cancel(client: TestClient):
     from backend.database import get_session
     from backend.domain.identity.models import Child
 
-    db = get_session()
-    s = db.query(Child).filter(Child.id == src["id"]).first()
-    assert s.member_status == "formal" and s.operation_locked == 0
-    db.close()
+    with get_session() as db:
+        s = db.query(Child).filter(Child.id == src["id"]).first()
+        assert s.member_status == "formal" and s.operation_locked == 0
     # 家长撤销
     p2, [src2, tgt2], mini2 = _mk_parent_with_children(
         client, h, "13800001007", ["撤转出", "撤受让"]
