@@ -1,7 +1,7 @@
 // 退款中心（WM10：订单/押金退款 + 退会 + 转让，超管逐单审核）
 import { useCallback, useEffect, useState } from "react";
 import {
-  App as AntdApp, Button, Input, Modal, Radio, Space, Table, Tabs, Tag, Typography,
+  App as AntdApp, Button, Input, Modal, Radio, Space, Table, Tabs, Tag, Tooltip, Typography,
 } from "antd";
 
 import {
@@ -24,6 +24,11 @@ const STATUS_LABEL: Record<string, string> = {
   applying: "已申请", pending_settle: "待结算", refunding: "退款中", completed: "已完成",
   // 转让
   expired: "已超时",
+};
+const STATUS_TOOLTIP: Record<string, string> = {
+  pending_settle: "结算中：退款单已生成，请在「退款」tab 逐单执行",
+  refunding: "执行中：等待关联退款单处理，进度见「退款」tab",
+  completed: "退会已完成（所有退款单均已结清）",
 };
 const STATUS_COLOR: Record<string, string> = {
   pending: "orange", approved: "green", processing: "blue",
@@ -192,7 +197,11 @@ export default function RefundCenter() {
                   { title: "孩子", dataIndex: "child_name", width: 100 },
                   { title: "当前状态", dataIndex: "member_status", width: 100 },
                   { title: "退会原因", dataIndex: "reason" },
-                  { title: "状态", dataIndex: "status", width: 90, render: (s) => <Tag color={STATUS_COLOR[s]}>{STATUS_LABEL[s] ?? s}</Tag> },
+                  { title: "状态", dataIndex: "status", width: 120, render: (s) => (
+                    <Tooltip title={STATUS_TOOLTIP[s]}>
+                      <Tag color={STATUS_COLOR[s]}>{STATUS_LABEL[s] ?? s}</Tag>
+                    </Tooltip>
+                  ) },
                   { title: "审核备注", dataIndex: "review_remark", width: 150, render: (v) => v ?? "—" },
                   { title: "申请时间", dataIndex: "created_at", width: 165, render: (v) => v.replace("T", " ").slice(0, 19) },
                   {

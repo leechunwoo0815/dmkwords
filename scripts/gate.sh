@@ -65,6 +65,13 @@ fi
 step 7 "覆盖率（WM1 基线 25%，随模块逐级抬升，终态整体85/关键域90）"
 run python -m pytest tests/ -q --cov=backend --cov-fail-under=25 --cov-report=term-missing:skip-covered
 
+step 8 "前端类型检查（tsc）"
+if [ -f "admin-web/node_modules/.bin/tsc" ]; then
+  run bash -c "cd admin-web && pnpm exec tsc --noEmit"
+else
+  skip "admin-web 未安装依赖（pnpm install 后启用）"
+fi
+
 echo ""
 if [ "$FAILED" -eq 0 ]; then
   echo "===== 全量门禁 PASS（退出码 0） ====="
