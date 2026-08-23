@@ -43,6 +43,7 @@ class BorrowRecordResponse(BaseSchema):
     status: str
     renew_used: int
     override_reason: str | None
+    warnings: list[str] = Field(default_factory=list, description="借书软提示（AR 超范围等，不拦截）")
 
 
 class ChildCardResponse(BaseSchema):
@@ -106,10 +107,12 @@ def borrow_book(
     admin: Any = Depends(require_perm("borrow.operate")),
     db: Session = Depends(get_db),
 ):
-    record = CirculationService(db).borrow(
+    record, warnings = CirculationService(db).borrow(
         admin, body.child_id, body.copy_id, body.isbn, body.override_reason
     )
-    return BorrowRecordResponse.model_validate(record)
+    resp = BorrowRecordResponse.model_validate(record)
+    resp.warnings = warnings
+    return resp
 
 
 @router.post("/circulation/return", response_model=BorrowRecordResponse)

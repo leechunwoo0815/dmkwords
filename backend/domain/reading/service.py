@@ -72,7 +72,7 @@ class ReadingService:
             raise ValidationError("该书暂无音频")
         # 会员权限（FEAT-038：有效会员全馆在架；过期仅在手；未入会/退会无）
         if not child.is_active_member:
-            if child.member_status == Child.MEMBER_EXPIRED:
+            if child.is_expired_member:
                 holding = (
                     self.db.query(func.count(BorrowRecord.id))
                     .filter(
@@ -486,7 +486,7 @@ class ReservationAdminService:
         self.db.flush()
         from backend.domain.circulation.service import CirculationService
 
-        record = CirculationService(self.db).borrow(
+        record, _borrow_warnings = CirculationService(self.db).borrow(
             admin, res.child_id, copy_id=res.copy_id, isbn=None
         )
         return record, res

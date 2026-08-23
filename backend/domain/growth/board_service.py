@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from backend.common.config_service import ConfigService
@@ -46,9 +46,17 @@ class LeaderboardService:
         if end is not None:
             q = q.filter(WordsLedger.created_at < end)
         if active_only:
+            # 周期榜仅有效会员（R-317）；正式会员到期即剔除（D1：不依赖定时任务落库）
+            today = datetime.now().date()
             q = q.filter(
-                Child.member_status.in_(
-                    [Child.MEMBER_OBSERVATION, Child.MEMBER_PENDING_EVALUATION, Child.MEMBER_FORMAL]
+                or_(
+                    Child.member_status.in_(
+                        [Child.MEMBER_OBSERVATION, Child.MEMBER_PENDING_EVALUATION]
+                    ),
+                    and_(
+                        Child.member_status == Child.MEMBER_FORMAL,
+                        Child.member_expire >= today,
+                    ),
                 )
             )
         rows = q.group_by(Child.id).all()
@@ -59,7 +67,8 @@ class LeaderboardService:
                 "avatar": child.avatar,
                 "words": int(words),
                 "member_status": child.member_status,
-                "is_history": child.member_status in (Child.MEMBER_EXPIRED, Child.MEMBER_WITHDRAWN),
+                "is_history": child.is_expired_member
+                or child.member_status == Child.MEMBER_WITHDRAWN,
             }
             for child, words in rows
         ]

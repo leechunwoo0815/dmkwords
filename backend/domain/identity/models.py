@@ -1,6 +1,6 @@
 # backend/domain/identity/models.py — 家长 / 孩子（会员状态机 R-301）
 
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import Column, Date, DateTime, Index, Integer, Numeric, SmallInteger, String, Text
 
@@ -72,11 +72,25 @@ class Child(BaseModel):
 
     @property
     def is_active_member(self) -> bool:
-        """有效会员（观察期/待评估/正式）——听全馆音频、借书资格的判定口径。"""
-        return self.member_status in (
-            self.MEMBER_OBSERVATION,
-            self.MEMBER_PENDING_EVALUATION,
-            self.MEMBER_FORMAL,
+        """有效会员（R-313/术语表口径）——听全馆音频、借书/预约资格的判定口径。
+
+        - 观察期/待评估：权益保留、无时限（R-101/决策 8），member_expire 仅作状态转换触发不作失效判定；
+        - 正式会员：member_expire >= 今天（D1：读时即时判定，不依赖定时任务落库 expired）；
+        - none/expired/withdrawn：无效。
+        """
+        if self.member_status in (self.MEMBER_OBSERVATION, self.MEMBER_PENDING_EVALUATION):
+            return True
+        if self.member_status == self.MEMBER_FORMAL:
+            return self.member_expire is not None and self.member_expire >= date.today()
+        return False
+
+    @property
+    def is_expired_member(self) -> bool:
+        """过期会员：正式会员到期未续费（状态可能尚未由 WM11 定时任务落库为 expired，读时兜底判定）。"""
+        if self.member_status == self.MEMBER_EXPIRED:
+            return True
+        return self.member_status == self.MEMBER_FORMAL and (
+            self.member_expire is not None and self.member_expire < date.today()
         )
 
 

@@ -90,7 +90,7 @@ class CirculationService:
         copy_id: int | None,
         isbn: str | None,
         override_reason: str | None = None,
-    ) -> BorrowRecord:
+    ) -> tuple[BorrowRecord, list[str]]:
         # 锁主体行：同一孩子的并发借书串行化（模式手册 P10）
         child = self.db.query(Child).filter(Child.id == child_id).with_for_update().first()
         if not child:
@@ -138,21 +138,46 @@ class CirculationService:
 
         # ---- 校验链 ----
         warnings: list[str] = []
+        unpaid_override = False  # 未入会放行借阅：72 小时借期（R-313）
         if not child.is_active_member:
-            # 未入会/过期/退会：硬拦截 + 可配置开关（红线：人工放行边界）
-            from backend.common.config_service import ConfigService as CS
-
-            allow = CS(self.db).get_value("allow_unpaid_offline_borrow") == "true"
-            if not allow or override_reason is None:
-                raise ValidationError(
-                    f"孩子会员状态为 {child.member_status}，"
-                    + (
-                        "未入会临时借书开关未开启"
-                        if not allow
-                        else "未入会借书需管理员放行并填写原因"
+            # R-313 借书矩阵行：未缴费=开关+放行+限 1 本；过期=软提示可放行；退会=禁
+            if child.member_status == Child.MEMBER_WITHDRAWN:
+                raise ValidationError("孩子已退会，禁止借书（R-313）")
+            if child.member_status == Child.MEMBER_NONE:
+                # 未入会：默认硬拦截；开关开启 + 放行原因才可借，且每次限 1 本（R-313/C15）
+                allow = ConfigService(self.db).get_value("allow_unpaid_offline_borrow") == "true"
+                if not allow or not override_reason:
+                    raise ValidationError(
+                        f"孩子会员状态为 {child.member_status}，"
+                        + (
+                            "未入会临时借书开关未开启"
+                            if not allow
+                            else "未入会借书需管理员放行并填写原因"
+                        )
                     )
+                held = (
+                    self.db.query(func.count(BorrowRecord.id))
+                    .filter(
+                        BorrowRecord.child_id == child_id,
+                        BorrowRecord.status.in_(
+                            [BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]
+                        ),
+                        BorrowRecord.is_deleted == 0,
+                    )
+                    .scalar()
                 )
-            warnings.append(f"未入会临时借书（原因：{override_reason}）")
+                if held >= 1:
+                    raise ValidationError(
+                        f"未入会临时借书每次限 1 本（当前已借 {held} 本未还），"
+                        "请先归还或办理入会（R-313）"
+                    )
+                unpaid_override = True
+                warnings.append(f"未入会临时借书（原因：{override_reason}）：72 小时内归还或入会")
+            else:
+                # 过期（状态 expired 或 formal 已到期未落库）：软提示，馆员放行即可，不吃未入会开关（D3/C17）
+                if not override_reason:
+                    raise ValidationError("孩子会员已过期，需馆员放行并填写原因（可放行）")
+                warnings.append(f"会员已过期，馆员放行借书（原因：{override_reason}）")
 
         # 押金校验
         from backend.domain.billing.models import Deposit
@@ -201,14 +226,30 @@ class CirculationService:
         if copy.status != BookCopy.STATUS_AVAILABLE:
             raise ConflictError(f"副本状态为 {copy.status}，不可借出")
 
+        # AR 超范围软提示（FEAT-031：提示不拦截；阈值走配置 ar_warning_range）
+        if child.ar_level and book.ar_level:
+            try:
+                ar_diff = abs(float(child.ar_level) - float(book.ar_level))
+            except (TypeError, ValueError):
+                ar_diff = None  # 无法解析的 AR 值不提示
+            if ar_diff is not None:
+                ar_range = float(ConfigService(self.db).get_value("ar_warning_range", "0.5"))
+                if ar_diff > ar_range:
+                    warnings.append(
+                        f"AR 超范围提示：孩子 AR {child.ar_level}，本书 AR {book.ar_level}（不拦截，请确认）"
+                    )
+
         # ---- 写入 ----
         borrow_days = int(ConfigService(self.db).get_value("borrow_days"))
+        due_at = now + timedelta(days=borrow_days)
+        if unpaid_override:
+            due_at = now + timedelta(hours=72)  # R-313：未入会放行借阅 72 小时内归还或入会
         record = BorrowRecord(
             child_id=child_id,
             copy_id=copy.id,
             book_id=copy.book_id,
             borrowed_at=now,
-            due_at=now + timedelta(days=borrow_days),
+            due_at=due_at,
             status=BorrowRecord.STATUS_ACTIVE,
             borrowed_by=admin.id,
             override_reason=override_reason,
@@ -231,7 +272,7 @@ class CirculationService:
             reason=override_reason or "正常借书",
         )
         self.db.commit()
-        return record
+        return record, warnings
 
     # ---------- 还书 ----------
     def return_book(self, admin, copy_id: int, condition: str = "normal") -> BorrowRecord:
@@ -287,6 +328,10 @@ class CirculationService:
         child = self.db.query(Child).filter(Child.id == record.child_id).first()
         if child and child.operation_locked:
             raise ValidationError("孩子正在转让/退会审核流程中，续借已冻结")
+        # D1：过期/未入会/退会均不能续借（D3/R-313 自助续借行；过期无可放行口径）
+        if child and not child.is_active_member:
+            state = "已过期" if child.is_expired_member else child.member_status
+            raise ValidationError(f"孩子会员状态无效（{state}），不能续借（R-313）")
         if record.status not in (BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE):
             raise ValidationError("该记录不可续借")
         if record.due_at < datetime.now():

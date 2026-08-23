@@ -477,7 +477,12 @@ class TransferService:
         checks.append(
             ("同一家长账号下的两个孩子", source.parent_id == target.parent_id == parent.id)
         )
-        checks.append(("转出方是正式会员", source.member_status == Child.MEMBER_FORMAL))
+        checks.append(
+            (
+                "转出方是正式会员",
+                source.member_status == Child.MEMBER_FORMAL and source.is_active_member,
+            )
+        )
         checks.append(
             (
                 "转出方会员剩余时间大于 0",
