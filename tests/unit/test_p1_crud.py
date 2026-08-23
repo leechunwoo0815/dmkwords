@@ -30,8 +30,7 @@ def test_import_template_download(client: TestClient):
     # 原样导入模板（非上传文件路径）-> 不产生任何数据
     resp = client.post(
         "/api/admin/books/import",
-        files={"file": ("template.xlsx", BytesIO(r.content),
-                        "application/octet-stream")},
+        files={"file": ("template.xlsx", BytesIO(r.content), "application/octet-stream")},
         headers=h,
     )
     assert resp.status_code == 200, resp.text
