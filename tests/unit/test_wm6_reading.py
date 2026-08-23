@@ -48,11 +48,10 @@ def _setup(client, h, phone="13800000601", isbn="9780545582889", duration=600):
     from backend.database import get_session
     from backend.domain.catalog.models import Book as BookModel
 
-    db = get_session()
-    b = db.query(BookModel).filter(BookModel.id == book["id"]).first()
-    b.audio_duration_seconds = duration
-    db.commit()
-    db.close()
+    with get_session() as db:
+        b = db.query(BookModel).filter(BookModel.id == book["id"]).first()
+        b.audio_duration_seconds = duration
+        db.commit()
     # 小程序登录
     r = client.post("/api/miniapp/login", json={"phone": phone, "code": "1234"})
     mini_h = {"Authorization": f"Bearer {r.json()['token']}"}
@@ -77,8 +76,7 @@ def _backdate(client, child_id: int, book_id: int, seconds: int):
     from backend.database import get_session
     from backend.domain.reading.models import ReadingProgress
 
-    db = get_session()
-    try:
+    with get_session() as db:
         p = (
             db.query(ReadingProgress)
             .filter(
@@ -91,8 +89,6 @@ def _backdate(client, child_id: int, book_id: int, seconds: int):
         assert p is not None, "progress row must exist before backdating"
         p.last_report_at = datetime.now() - timedelta(seconds=seconds)
         db.commit()
-    finally:
-        db.close()
 
 
 def test_progress_and_finish(client: TestClient):
@@ -229,11 +225,10 @@ def _setup_book_with_audio(client, h, isbn, title="Dog Man", duration=600):
     from backend.database import get_session
     from backend.domain.catalog.models import Book as BookModel
 
-    db = get_session()
-    b = db.query(BookModel).filter(BookModel.id == book["id"]).first()
-    b.audio_duration_seconds = duration
-    db.commit()
-    db.close()
+    with get_session() as db:
+        b = db.query(BookModel).filter(BookModel.id == book["id"]).first()
+        b.audio_duration_seconds = duration
+        db.commit()
     return book
 
 
@@ -265,11 +260,10 @@ def test_member_permission_for_playback(client: TestClient):
     from backend.database import get_session
     from backend.domain.identity.models import Child as ChildModel
 
-    db = get_session()
-    ch = db.query(ChildModel).filter(ChildModel.id == c2["id"]).first()
-    ch.member_status = "expired"
-    db.commit()
-    db.close()
+    with get_session() as db:
+        ch = db.query(ChildModel).filter(ChildModel.id == c2["id"]).first()
+        ch.member_status = "expired"
+        db.commit()
     ok = _report(client, mini2, c2["id"], book2["id"], 10, 0)
     assert ok.status_code == 200
     other = _setup_book_with_audio(client, h, "9789999999999", "Other Book")

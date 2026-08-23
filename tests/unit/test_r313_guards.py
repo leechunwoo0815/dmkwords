@@ -87,10 +87,9 @@ def _withdrawn_child(client, h, phone, name="退会孩"):
     from backend.database import get_session
     from backend.domain.identity.models import Child
 
-    db = get_session()
-    ch = db.query(Child).filter(Child.id == c["id"]).first()
-    assert ch.member_status == "withdrawn"
-    db.close()
+    with get_session() as db:
+        ch = db.query(Child).filter(Child.id == c["id"]).first()
+        assert ch.member_status == "withdrawn"
     return c, mini
 
 

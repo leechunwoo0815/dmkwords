@@ -35,11 +35,10 @@ def _mk_child_with_audio_book(client, h, phone, isbn):
     from backend.database import get_session
     from backend.domain.catalog.models import Book as BookModel
 
-    db = get_session()
-    b = db.query(BookModel).filter(BookModel.id == book["id"]).first()
-    b.audio_duration_seconds = 600
-    db.commit()
-    db.close()
+    with get_session() as db:
+        b = db.query(BookModel).filter(BookModel.id == book["id"]).first()
+        b.audio_duration_seconds = 600
+        db.commit()
     r = client.post("/api/miniapp/login", json={"phone": phone, "code": "1234"})
     mini = {"Authorization": f"Bearer {r.json()['token']}"}
     return c, book, mini, r.json()["token"]
@@ -97,15 +96,14 @@ def test_report_image_endpoint(client: TestClient):
     from backend.database import get_session
     from backend.domain.reading.models import ReadingProgress
 
-    db = get_session()
-    prog = (
-        db.query(ReadingProgress)
-        .filter(ReadingProgress.child_id == c["id"], ReadingProgress.book_id == book["id"])
-        .first()
-    )
-    prog.last_report_at = datetime.now() - timedelta(seconds=590)
-    db.commit()
-    db.close()
+    with get_session() as db:
+        prog = (
+            db.query(ReadingProgress)
+            .filter(ReadingProgress.child_id == c["id"], ReadingProgress.book_id == book["id"])
+            .first()
+        )
+        prog.last_report_at = datetime.now() - timedelta(seconds=590)
+        db.commit()
     client.post(
         "/api/miniapp/reading/progress",
         json={

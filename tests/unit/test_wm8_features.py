@@ -46,21 +46,19 @@ def _credit_words(client, h, child_id, isbn, words, created_at=None):
     from backend.domain.catalog.models import Book
     from backend.domain.growth.models import WordsLedger
 
-    db = get_session()
-    book = db.query(Book).filter(Book.isbn == isbn).first()
-    if not book:
-        db.close()
-        raise AssertionError(f"book {isbn} not found")
-    db.add(
-        WordsLedger(
-            child_id=child_id,
-            book_id=book.id,
-            word_count=words,
-            created_at=created_at or datetime.now(),
+    with get_session() as db:
+        book = db.query(Book).filter(Book.isbn == isbn).first()
+        if not book:
+            raise AssertionError(f"book {isbn} not found")
+        db.add(
+            WordsLedger(
+                child_id=child_id,
+                book_id=book.id,
+                word_count=words,
+                created_at=created_at or datetime.now(),
+            )
         )
-    )
-    db.commit()
-    db.close()
+        db.commit()
 
 
 def _mk_book(client, h, isbn, word_count=1000):
@@ -114,11 +112,10 @@ def test_leaderboard_total_with_history_student(client: TestClient):
     from backend.database import get_session
     from backend.domain.identity.models import Child
 
-    db = get_session()
-    ch = db.query(Child).filter(Child.id == c1["id"]).first()
-    ch.member_status = "withdrawn"
-    db.commit()
-    db.close()
+    with get_session() as db:
+        ch = db.query(Child).filter(Child.id == c1["id"]).first()
+        ch.member_status = "withdrawn"
+        db.commit()
     # 总榜：退会孩子保留，标历史学员
     board = client.get(
         "/api/miniapp/leaderboard?period=total&child_id=" + str(c2["id"]), headers=m2

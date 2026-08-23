@@ -64,11 +64,10 @@ def _setup_finished_book(client, h, phone, isbn, word_count=2500, duration=600):
     from backend.database import get_session
     from backend.domain.catalog.models import Book as BookModel
 
-    db = get_session()
-    b = db.query(BookModel).filter(BookModel.id == book["id"]).first()
-    b.audio_duration_seconds = duration
-    db.commit()
-    db.close()
+    with get_session() as db:
+        b = db.query(BookModel).filter(BookModel.id == book["id"]).first()
+        b.audio_duration_seconds = duration
+        db.commit()
     r = client.post("/api/miniapp/login", json={"phone": phone, "code": "1234"})
     mini = {"Authorization": f"Bearer {r.json()['token']}"}
     client.post(
@@ -81,18 +80,17 @@ def _setup_finished_book(client, h, phone, isbn, word_count=2500, duration=600):
         },
         headers=mini,
     )
-    from backend.database import get_session as gs
+    from backend.database import get_session
     from backend.domain.reading.models import ReadingProgress
 
-    db = gs()
-    prog = (
-        db.query(ReadingProgress)
-        .filter(ReadingProgress.child_id == c["id"], ReadingProgress.book_id == book["id"])
-        .first()
-    )
-    prog.last_report_at = datetime.now() - timedelta(seconds=590)
-    db.commit()
-    db.close()
+    with get_session() as db:
+        prog = (
+            db.query(ReadingProgress)
+            .filter(ReadingProgress.child_id == c["id"], ReadingProgress.book_id == book["id"])
+            .first()
+        )
+        prog.last_report_at = datetime.now() - timedelta(seconds=590)
+        db.commit()
     client.post(
         "/api/miniapp/reading/progress",
         json={
@@ -294,11 +292,10 @@ def test_points_remainder_pool_and_full_marks(client: TestClient):
     from backend.database import get_session
     from backend.domain.catalog.models import Book as BookModel
 
-    db = get_session()
-    b = db.query(BookModel).filter(BookModel.id == book2["id"]).first()
-    b.audio_duration_seconds = 600
-    db.commit()
-    db.close()
+    with get_session() as db:
+        b = db.query(BookModel).filter(BookModel.id == book2["id"]).first()
+        b.audio_duration_seconds = 600
+        db.commit()
     client.post(
         "/api/miniapp/reading/progress",
         json={
@@ -311,15 +308,14 @@ def test_points_remainder_pool_and_full_marks(client: TestClient):
     )
     from backend.domain.reading.models import ReadingProgress
 
-    db = get_session()
-    prog = (
-        db.query(ReadingProgress)
-        .filter(ReadingProgress.child_id == c["id"], ReadingProgress.book_id == book2["id"])
-        .first()
-    )
-    prog.last_report_at = datetime.now() - timedelta(seconds=590)
-    db.commit()
-    db.close()
+    with get_session() as db:
+        prog = (
+            db.query(ReadingProgress)
+            .filter(ReadingProgress.child_id == c["id"], ReadingProgress.book_id == book2["id"])
+            .first()
+        )
+        prog.last_report_at = datetime.now() - timedelta(seconds=590)
+        db.commit()
     client.post(
         "/api/miniapp/reading/progress",
         json={
@@ -418,21 +414,20 @@ def test_checkin_streak_points(client: TestClient):
     c, book, mini = _setup_finished_book(client, h, "13800000707", "9787100000007")
     # 手工造连续 6 天打卡，然后第 7 天走真实事件链（_checkin 发布事件 → growth 入账）
     # 先删掉 setup 完播 book1 产生的今日打卡（第 7 天的打卡必须由 book2 触发）
-    db = get_session()
-    db.query(CheckIn).filter(
-        CheckIn.child_id == c["id"], CheckIn.checkin_date == date.today()
-    ).delete()
-    for i in range(6, 0, -1):
-        db.add(
-            CheckIn(
-                child_id=c["id"],
-                checkin_date=date.today() - td(days=i),
-                book_id=book["id"],
-                streak=7 - i,
+    with get_session() as db:
+        db.query(CheckIn).filter(
+            CheckIn.child_id == c["id"], CheckIn.checkin_date == date.today()
+        ).delete()
+        for i in range(6, 0, -1):
+            db.add(
+                CheckIn(
+                    child_id=c["id"],
+                    checkin_date=date.today() - td(days=i),
+                    book_id=book["id"],
+                    streak=7 - i,
+                )
             )
-        )
-    db.commit()
-    db.close()
+        db.commit()
     # 第 7 天：真实完播打卡（换一本书触发当天首次打卡）
     book2 = client.post(
         "/api/admin/books",
@@ -449,11 +444,10 @@ def test_checkin_streak_points(client: TestClient):
     )
     from backend.domain.catalog.models import Book as BookModel
 
-    db = get_session()
-    b = db.query(BookModel).filter(BookModel.id == book2["id"]).first()
-    b.audio_duration_seconds = 600
-    db.commit()
-    db.close()
+    with get_session() as db:
+        b = db.query(BookModel).filter(BookModel.id == book2["id"]).first()
+        b.audio_duration_seconds = 600
+        db.commit()
     client.post(
         "/api/miniapp/reading/progress",
         json={
@@ -466,15 +460,14 @@ def test_checkin_streak_points(client: TestClient):
     )
     from backend.domain.reading.models import ReadingProgress
 
-    db = get_session()
-    prog = (
-        db.query(ReadingProgress)
-        .filter(ReadingProgress.child_id == c["id"], ReadingProgress.book_id == book2["id"])
-        .first()
-    )
-    prog.last_report_at = datetime.now() - timedelta(seconds=590)
-    db.commit()
-    db.close()
+    with get_session() as db:
+        prog = (
+            db.query(ReadingProgress)
+            .filter(ReadingProgress.child_id == c["id"], ReadingProgress.book_id == book2["id"])
+            .first()
+        )
+        prog.last_report_at = datetime.now() - timedelta(seconds=590)
+        db.commit()
     r = client.post(
         "/api/miniapp/reading/progress",
         json={
