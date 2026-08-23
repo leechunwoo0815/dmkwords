@@ -13,7 +13,8 @@ def _h(client: TestClient, username: str = "admin") -> dict:
 
 
 def test_import_template_download(client: TestClient):
-    """C8：模板接口 200 + xlsx 可读（表头与 import_books 解析列序一致）。"""
+    """C8：模板接口 200 + xlsx 可读（表头与 import_books 解析列序一致）；
+    且活动 sheet 仅表头+空行——把模板原样导入必须 0 成功 0 失败（防脏数据）。"""
     h = _h(client)
     r = client.get("/api/admin/books/import-template", headers=h)
     assert r.status_code == 200, r.text
@@ -26,6 +27,17 @@ def test_import_template_download(client: TestClient):
     assert headers[0] == "ISBN"
     assert headers[1] == "书名*"
     assert headers[7] == "副本数"
+    # 原样导入模板（非上传文件路径）-> 不产生任何数据
+    resp = client.post(
+        "/api/admin/books/import",
+        files={"file": ("template.xlsx", BytesIO(r.content),
+                        "application/octet-stream")},
+        headers=h,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["success_count"] == 0, body
+    assert body["failed_count"] == 0, body
 
 
 def test_staff_crud_permissions(client: TestClient):

@@ -253,7 +253,9 @@ IMPORT_TEMPLATE_HEADERS = ["ISBN", "书名*", "作者", "AR值", "词数", "主�
 
 
 def build_import_template() -> bytes:
-    """生成 Excel 导入模板（与 import_books 解析列序一致；含说明行）。第 2 行为示例。"""
+    """生成 Excel 导入模板（C8）。
+    活动 sheet 仅表头+空行（import_books 按行解析，示例/说明若在活动 sheet 会被当数据导入）；
+    示例与说明放第二个 sheet「填写说明」。"""
     from io import BytesIO
 
     from openpyxl import Workbook
@@ -262,21 +264,8 @@ def build_import_template() -> bytes:
     ws = wb.active
     ws.title = "图书导入"
     ws.append(IMPORT_TEMPLATE_HEADERS)
-    ws.append(["9780545582889", "示例书名", "示例作者", "3.5", "1200", "动物", "G1", "1"])
-    ws.append(["", "", "", "", "", "", "", ""])
-    ws.append(["", "", "", "", "", "", "", ""])
-    ws.append(
-        [
-            "说明：仅『书名』必填；ISBN 建议填写（重复 ISBN 不重复建书，只加副本）；AR 值差异超范围在借书时仅提示；副本数空=1（范围 0-999）；其余信息可在管理端补录",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-        ]
-    )
+    for _ in range(3):
+        ws.append([])
     ws.column_dimensions["A"].width = 18
     ws.column_dimensions["B"].width = 30
     ws.column_dimensions["C"].width = 16
@@ -285,6 +274,21 @@ def build_import_template() -> bytes:
     ws.column_dimensions["F"].width = 12
     ws.column_dimensions["G"].width = 12
     ws.column_dimensions["H"].width = 10
+
+    guide = wb.create_sheet("填写说明")
+    guide.append(["列", "是否必填", "说明"])
+    guide.append(["ISBN", "建议", "重复 ISBN 不重复建书，只加副本；图书唯一性最优解"])
+    guide.append(["书名", "必填", "其余列可空，管理端补录"])
+    guide.append(["作者", "否", ""])
+    guide.append(["AR值", "否", "与孩子 AR 差值超范围时借书仅提示"])
+    guide.append(["词数", "否", ""])
+    guide.append(["主题", "否", ""])
+    guide.append(["年级(如 G1)", "否", ""])
+    guide.append(["副本数", "否", "空=1；范围 0-999"])
+    guide.append([])
+    guide.append(["示例行（正式导入时请删除或改为真实数据）"])
+    guide.append(["9780545582889", "示例书名", "示例作者", "3.5", "1200", "动物", "G1", "1"])
+
     buf = BytesIO()
     wb.save(buf)
     return buf.getvalue()
