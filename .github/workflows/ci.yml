@@ -6,60 +6,60 @@ on:
   pull_request:
     branches: [main]
 
-env:
-  MOCK_PAYMENT: "true"
-  MOCK_SMS: "true"
-  DEBUG: "true"
-  SECRET_KEY: "ci-test-key-short"
-  DATABASE_URL: "sqlite:///:memory:"
-  ENABLE_TEST_TOKEN: "true"
+# DmkWords 门禁（D3 重写）：MySQL-only + uv + bash scripts/gate.sh（含 tsc step 8）
+# 事实依据：项目为 pyproject.toml + uv（无 requirements.txt）；测试用 TRUNCATE/
+# MySQL 语义，sqlite 无法启动；旧 job（verify_api_contract/check_model_consistency/
+# verify_action_wiring/gen_config_doc.py）为 librio 遗留工具，仓库中不存在。
 
 jobs:
-  lint:
+  gate:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: dmkwords_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot --silent"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+    env:
+      DEBUG: "true"
+      SECRET_KEY: "ci-test-key-short"
+      DB_HOST: "127.0.0.1"
+      DB_PORT: "3306"
+      DB_USER: "root"
+      DB_PASSWORD: "root"
+      DB_NAME: "dmkwords_ci"
+      MOCK_PAYMENT: "true"
+      MOCK_SMS: "true"
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-          cache: pip
-      - run: pip install ruff==0.15.16
-      - run: ruff check backend/ tests/
-      - run: ruff check features/ scripts/
-      - run: ruff format --check .
 
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.13"
-          cache: pip
-      - run: pip install -r requirements.txt pytest pytest-asyncio httpx behave PyHamcrest
-      - run: python -m pytest tests/ -x -q --tb=short
-      - run: python -m behave features/ --no-capture -q
-      - run: python -m scripts.verify_api_contract
+          enable-cache: true
 
-  model-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-          cache: pip
-      - run: pip install -r requirements.txt
-      - run: python -m scripts.check_model_consistency
+      - name: Install dependencies (uv)
+        run: uv sync --frozen
 
-  data-action-wiring:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.13"
-          cache: pip
-      - run: pip install -r requirements.txt
-      - run: python -m scripts.verify_action_wiring --strict
-      - run: PYTHONPATH=. python scripts/gen_config_doc.py --check
+          node-version: "22"
+          cache: "pnpm"
+          cache-dependency-path: admin-web/pnpm-lock.yaml
+
+      - name: Install admin-web dependencies (tsc step 8)
+        run: pnpm --dir admin-web install --frozen-lockfile
+
+      - name: Apply migrations (empty CI database)
+        run: .venv/bin/alembic upgrade head
+
+      - name: Run full gate
+        run: bash scripts/gate.sh
