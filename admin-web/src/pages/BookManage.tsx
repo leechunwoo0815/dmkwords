@@ -119,7 +119,13 @@ export default function BookManage() {
           allowClear
           style={{ width: 260 }}
           value={searchValue}
-          onChange={(e) => setSearchValue(e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value;
+            setSearchValue(v);
+            if (v === "") {
+              doSearch("");
+            }
+          }}
           onSearch={doSearch}
           onClear={() => doSearch("")}
         />
