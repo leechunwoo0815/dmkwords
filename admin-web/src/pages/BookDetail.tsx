@@ -37,6 +37,7 @@ import {
   type BookCopy,
   type QuizQuestion,
 } from "../api/catalog";
+import { GRADE_OPTIONS } from "../constants/grade";
 
 const COPY_STATUS_LABEL: Record<string, string> = {
   available: "在馆", reserved: "预约锁定", borrowed: "借出",
@@ -330,7 +331,7 @@ export default function BookDetail() {
           </Space>
           <Space size="large">
             <Form.Item name="topic" label="主题"><Input style={{ width: 140 }} /></Form.Item>
-            <Form.Item name="grade" label="适读年级"><Input style={{ width: 140 }} /></Form.Item>
+            <Form.Item name="grade" label="适读阶段"><Select options={GRADE_OPTIONS} allowClear placeholder="请选择" style={{ width: 160 }} /></Form.Item>
           </Space>
           <Form.Item name="description" label="简介"><Input.TextArea rows={2} /></Form.Item>
         </Form>

@@ -7,6 +7,7 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Select,
   Space,
   Table,
   Tabs,
@@ -17,6 +18,7 @@ import {
 import { InboxOutlined, PlusOutlined } from "@ant-design/icons";
 
 import { apiCreateBook, apiDownloadImportTemplate, apiImportBooks, apiListBooks, apiToggleBookStatus, type Book } from "../api/catalog";
+import { GRADE_OPTIONS } from "../constants/grade";
 
 export default function BookManage() {
   const { message } = AntdApp.useApp();
@@ -200,8 +202,8 @@ export default function BookManage() {
             <Form.Item name="topic" label="主题">
               <Input style={{ width: 140 }} />
             </Form.Item>
-            <Form.Item name="grade" label="适读年级">
-              <Input style={{ width: 140 }} />
+            <Form.Item name="grade" label="适读阶段">
+              <Select options={GRADE_OPTIONS} allowClear placeholder="请选择适读阶段" style={{ width: 180 }} />
             </Form.Item>
             <Form.Item name="copy_count" label="入库副本数" initialValue={1}>
               <InputNumber min={1} max={99} style={{ width: 90 }} />
