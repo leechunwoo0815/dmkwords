@@ -9,6 +9,7 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Radio,
   Select,
   Space,
   Table,
@@ -25,9 +26,11 @@ import {
   apiGetBook,
   apiListCopies,
   apiListQuestions,
+  apiMediaUrl,
   apiToggleQuestion,
   apiUpdateBook,
   apiUpdateCopyStatus,
+  apiUpdateQuestion,
   apiUploadAudio,
   apiUploadCover,
   type Book,
@@ -54,6 +57,9 @@ export default function BookDetail() {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [editOpen, setEditOpen] = useState(false);
   const [questionOpen, setQuestionOpen] = useState(false);
+  const [qEditing, setQEditing] = useState<QuizQuestion | null>(null);
+  const [qOptions, setQOptions] = useState<string[]>(["", "", "", ""]);
+  const [qAnswerIdx, setQAnswerIdx] = useState(0);
   const [form] = Form.useForm();
   const [qForm] = Form.useForm();
 
@@ -66,7 +72,6 @@ export default function BookDetail() {
   useEffect(load, [bookId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!book) return null;
-
   const openEdit = () => {
     form.setFieldsValue({
       title: book.title, author: book.author, word_count: book.word_count,
@@ -74,6 +79,58 @@ export default function BookDetail() {
       description: book.description ?? "",
     });
     setEditOpen(true);
+  };
+
+  const openQuestionEditor = (q: QuizQuestion) => {
+    qForm.setFieldsValue({
+      question_type: q.question_type,
+      question_text: q.question_text,
+      bool_answer: q.answer,
+    });
+    setQEditing(q);
+    setQOptions(q.question_type === "boolean" ? ["对", "错"] : [...q.options, "", "", "", ""].slice(0, Math.max(4, q.options.length)));
+    const idx = q.options.indexOf(q.answer);
+    setQAnswerIdx(idx >= 0 ? idx : 0);
+    setQuestionOpen(true);
+  };
+
+  const onQuestionSubmit = async () => {
+    const values = await qForm.validateFields();
+    try {
+      if (values.question_type === "boolean") {
+        const body = {
+          question_type: values.question_type,
+          question_text: values.question_text,
+          options: ["对", "错"],
+          answer: values.bool_answer,
+        };
+        if (qEditing) await apiUpdateQuestion(qEditing.id, body);
+        else await apiCreateQuestion(bookId, body);
+      } else {
+        const trimmed = qOptions.map((o) => o.trim());
+        if (trimmed.some((o) => !o)) {
+          message.warning("所有选项都需要填写");
+          return;
+        }
+        if (trimmed.length < 2) {
+          message.warning("单选题至少 2 个选项");
+          return;
+        }
+        const body = {
+          question_type: String(values.question_type),
+          question_text: String(values.question_text),
+          options: trimmed,
+          answer: trimmed[qAnswerIdx] ?? trimmed[0] ?? "",
+        };
+        if (qEditing) await apiUpdateQuestion(qEditing.id, body);
+        else await apiCreateQuestion(bookId, body);
+      }
+      message.success(qEditing ? "题目已更新" : "题目已添加");
+      setQuestionOpen(false);
+      load();
+    } catch (e) {
+      message.error((e as Error).message || "保存失败，请检查填写内容");
+    }
   };
 
   return (
@@ -104,7 +161,7 @@ export default function BookDetail() {
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>封面</Typography.Text>
             <div style={{ margin: "4px 0 8px" }}>
               {book.cover_path ? (
-                <img src={`/api/admin/${book.cover_path}`} alt="封面" style={{ width: 72, height: 100, objectFit: "cover", borderRadius: 6, border: "1px solid #e4dcc8" }} />
+                <img src={apiMediaUrl(bookId, "cover")} alt="封面" style={{ width: 72, height: 100, objectFit: "cover", borderRadius: 6, border: "1px solid #e4dcc8" }} />
               ) : (
                 <div style={{ width: 72, height: 100, borderRadius: 6, border: "1px dashed #e4dcc8", display: "flex", alignItems: "center", justifyContent: "center", color: "#a39a86", fontSize: 12 }}>未上传</div>
               )}
@@ -135,7 +192,7 @@ export default function BookDetail() {
                   {book.audio_duration_seconds ? <Typography.Text type="secondary">约 {Math.ceil(book.audio_duration_seconds / 60)} 分钟</Typography.Text> : null}
                   <audio
                     controls preload="metadata" style={{ width: 320, height: 36 }}
-                    src={`/api/admin/${book.audio_path}`}
+                    src={apiMediaUrl(bookId, "audio")}
                   />
                 </Space>
               ) : (
@@ -218,7 +275,13 @@ export default function BookDetail() {
       <Card
         title={`测验题目（取前 ${Math.min(5, questions.filter((q) => q.is_active === 1).length)} 道作为正式题；多余备用）`}
         size="small"
-        extra={<Button size="small" icon={<PlusOutlined />} onClick={() => { qForm.resetFields(); setQuestionOpen(true); }}>添加题目</Button>}
+        extra={<Button size="small" icon={<PlusOutlined />} onClick={() => {
+          qForm.resetFields();
+          setQEditing(null);
+          setQOptions(["", "", "", ""]);
+          setQAnswerIdx(0);
+          setQuestionOpen(true);
+        }}>添加题目</Button>}
       >
         <Table<QuizQuestion>
           rowKey="id" dataSource={questions} size="small" pagination={false}
@@ -230,9 +293,10 @@ export default function BookDetail() {
             { title: "答案", dataIndex: "answer", width: 110 },
             { title: "状态", dataIndex: "is_active", width: 80, render: (v: number) => (v === 1 ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>) },
             {
-              title: "操作", key: "op", width: 120,
+              title: "操作", key: "op", width: 170,
               render: (_, r) => (
                 <Space>
+                  <Button type="link" size="small" onClick={() => openQuestionEditor(r)}>编辑</Button>
                   <Button type="link" size="small" onClick={async () => { await apiToggleQuestion(r.id); load(); }}>
                     {r.is_active === 1 ? "停用" : "启用"}
                   </Button>
@@ -273,23 +337,10 @@ export default function BookDetail() {
       </Modal>
 
       <Modal
-        title="添加测验题目" open={questionOpen}
-        onOk={async () => {
-          const values = await qForm.validateFields();
-          const options = values.question_type === "boolean" ? ["对", "错"] : values.options;
-          const answer = values.question_type === "boolean" ? values.bool_answer : values.answer;
-          await apiCreateQuestion(bookId, {
-            question_type: values.question_type,
-            question_text: values.question_text,
-            options,
-            answer,
-            sort_order: questions.length + 1,
-          });
-          message.success("题目已添加");
-          setQuestionOpen(false);
-          load();
-        }}
-        onCancel={() => setQuestionOpen(false)} okText="添加" cancelText="取消" destroyOnClose
+        title={qEditing ? "编辑题目" : "添加测验题目"} open={questionOpen}
+        onOk={onQuestionSubmit}
+        onCancel={() => setQuestionOpen(false)}
+        okText={qEditing ? "保存" : "添加"} cancelText="取消" destroyOnClose
       >
         <Form form={qForm} layout="vertical" initialValues={{ question_type: "single" }}>
           <Form.Item name="question_type" label="题型">
@@ -300,14 +351,44 @@ export default function BookDetail() {
             {({ getFieldValue }) =>
               getFieldValue("question_type") === "single" ? (
                 <>
-                  <Form.Item name="options" label="选项（每行一个）" rules={[{ required: true }]}>
-                    <Input.TextArea rows={4} placeholder={"Dog Man\nCat Kid\nPetey\nLil Petey"} />
+                  <Form.Item label="选项（可增删）" required>
+                    <div>
+                      {qOptions.map((opt, i) => (
+                        <Space key={i} style={{ display: "flex", marginBottom: 6 }}>
+                          <Input
+                            value={opt}
+                            style={{ width: 240 }}
+                            placeholder={`选项 ${String.fromCharCode(65 + i)}`}
+                            onChange={(e) => setQOptions((old) => old.map((o, j) => (j === i ? e.target.value : o)))}
+                          />
+                          <Button size="small" type="text" danger disabled={qOptions.length <= 2}
+                            onClick={() => setQOptions((old) => old.filter((_, j) => j !== i))}>
+                            删除
+                          </Button>
+                        </Space>
+                      ))}
+                      <Button size="small" type="dashed" disabled={qOptions.length >= 6}
+                        onClick={() => setQOptions((old) => [...old, ""])}>
+                        添加选项
+                      </Button>
+                    </div>
                   </Form.Item>
-                  <Form.Item name="answer" label="正确答案（必须是选项之一）" rules={[{ required: true }]}><Input /></Form.Item>
+                  <Form.Item label="正确答案" required>
+                    <Radio.Group value={qAnswerIdx} onChange={(e) => setQAnswerIdx(e.target.value)}>
+                      {qOptions.map((_, i) => (
+                        <Radio key={i} value={i} disabled={!qOptions[i]?.trim()}>
+                          {String.fromCharCode(65 + i)}
+                        </Radio>
+                      ))}
+                    </Radio.Group>
+                  </Form.Item>
                 </>
               ) : (
                 <Form.Item name="bool_answer" label="正确答案" rules={[{ required: true }]}>
-                  <Select options={[{ value: "对", label: "对" }, { value: "错", label: "错" }]} />
+                  <Radio.Group>
+                    <Radio value="对">对</Radio>
+                    <Radio value="错">错</Radio>
+                  </Radio.Group>
                 </Form.Item>
               )
             }

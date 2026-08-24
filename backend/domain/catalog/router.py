@@ -3,7 +3,7 @@ import io
 import os
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ from backend.database import get_db
 if TYPE_CHECKING:
     pass
 
+from backend.common.exceptions import NotFoundError
 from backend.domain.catalog.import_service import import_books
 from backend.domain.catalog.schemas import (
     BookCreateRequest,
@@ -24,6 +25,7 @@ from backend.domain.catalog.schemas import (
     ImportResultResponse,
     QuizQuestionCreateRequest,
     QuizQuestionResponse,
+    QuizQuestionUpdateRequest,
 )
 from backend.domain.catalog.service import (
     BookService,
@@ -46,6 +48,64 @@ def import_template(admin: Any = Depends(require_perm("book.manage"))):
             "Content-Disposition": 'attachment; filename="books-import-template.xlsx"',
         },
     )
+
+
+def _media_response(book, field: str, media_type: str):
+    """C25：管理端媒体响应（封面/音频）。路径安全（防目录穿越，参照 reading 端点）。"""
+    import os
+
+    from fastapi.responses import FileResponse
+
+    from backend.config import get_settings
+
+    rel = getattr(book, field, None)
+    if not rel:
+        raise NotFoundError("资源不存在")
+    root = os.path.abspath(get_settings().UPLOADS_DIR)
+    full = os.path.abspath(os.path.join(root, rel))
+    if not full.startswith(root) or not os.path.isfile(full):
+        raise NotFoundError("资源不存在")
+    return FileResponse(full, media_type=media_type)
+
+
+def _media_auth(request: "Request", token: str = "") -> None:
+    """管理端媒体鉴权（委托 media_auth 模块：Router 不落 try/except 与 HTTPException）。"""
+    from backend.domain.catalog.media_auth import authorize_media
+
+    authorize_media(request, token)
+
+
+def _book_or_404(db: Session, book_id: int):
+    from backend.domain.catalog.repository import BookRepository
+
+    book = BookRepository(db).get_by_id_or_raise(book_id)
+    return book
+
+
+@router.get("/books/{book_id}/cover-media")
+def book_cover_media(
+    book_id: int,
+    request: Request,
+    token: str = "",
+    db: Session = Depends(get_db),
+):
+    """封面（管理端 <img> 用；query token 或 Bearer 均可）。"""
+    _media_auth(request, token)
+    book = _book_or_404(db, book_id)
+    return _media_response(book, "cover_path", "image/jpeg")
+
+
+@router.get("/books/{book_id}/audio-media")
+def book_audio_media(
+    book_id: int,
+    request: Request,
+    token: str = "",
+    db: Session = Depends(get_db),
+):
+    """音频试听（C7 播放器；query token 或 Bearer 均可）。"""
+    _media_auth(request, token)
+    book = _book_or_404(db, book_id)
+    return _media_response(book, "audio_path", "audio/mpeg")
 
 
 def _to_book_response(book, copy_count: int) -> BookResponse:
@@ -233,6 +293,17 @@ def create_question(
     db: Session = Depends(get_db),
 ):
     q = QuizQuestionService(db).create(admin, book_id, body)
+    return QuizQuestionResponse.model_validate(q)
+
+
+@router.put("/questions/{question_id}", response_model=QuizQuestionResponse)
+def update_question(
+    question_id: int,
+    body: QuizQuestionUpdateRequest,
+    admin: Any = Depends(require_perm("quiz.manage")),
+    db: Session = Depends(get_db),
+):
+    q = QuizQuestionService(db).update(admin, question_id, body)
     return QuizQuestionResponse.model_validate(q)
 
 

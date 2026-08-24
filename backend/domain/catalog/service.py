@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import re
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from backend.common.exceptions import ConflictError, ValidationError
@@ -116,7 +116,8 @@ class BookService:
         book.title = req.title.strip()
         book.author = req.author.strip()
         book.word_count = req.word_count
-        book.ar_level = req.ar_level
+        # C24：空串规范为 NULL（保证「AR 待配置」筛选 ar_level IS NULL 命中）
+        book.ar_level = (req.ar_level or "").strip() or None
         book.topic = req.topic
         book.grade = req.grade
         book.description = req.description
@@ -214,25 +215,50 @@ class QuizQuestionService:
     def list_by_book(self, book_id: int) -> list[QuizQuestion]:
         return self.question_repo.list_by_book(book_id, active_only=False)
 
-    def create(self, admin, book_id: int, req) -> QuizQuestion:
-        if req.question_type == QuizQuestion.TYPE_BOOLEAN:
+    def _validate_question(self, question_type: str, options: list[str], answer: str) -> list[str]:
+        if question_type == QuizQuestion.TYPE_BOOLEAN:
             valid_options = ["对", "错"]
-            if [o.strip() for o in req.options] != valid_options:
+            if [o.strip() for o in options] != valid_options:
                 raise ValidationError("判断题选项固定为 [对, 错]")
         else:
-            if len(req.options) < 2:
+            if len(options) < 2:
                 raise ValidationError("单选题至少 2 个选项")
-        if req.answer not in req.options:
+        if answer not in options:
             raise ValidationError("正确答案必须是选项之一")
+        return answer
+
+    def create(self, admin, book_id: int, req) -> QuizQuestion:
+        self._validate_question(req.question_type, req.options, req.answer)
+        # C29：序号由服务端分配（max(sort_order)+1），前端不再传（避免删除后重号）
+        max_sort = (
+            self.db.query(func.max(QuizQuestion.sort_order))
+            .filter(
+                QuizQuestion.book_id == book_id,
+                QuizQuestion.is_deleted == 0,
+            )
+            .scalar()
+        )
         q = QuizQuestion(
             book_id=book_id,
             question_type=req.question_type,
             question_text=req.question_text.strip(),
             options=json.dumps(req.options, ensure_ascii=False),
             answer=req.answer,
-            sort_order=req.sort_order,
+            sort_order=(max_sort or 0) + 1,
         )
         self.question_repo.create(q)
+        self.db.commit()
+        return q
+
+    def update(self, admin, question_id: int, req) -> QuizQuestion:
+        """C28：编辑题目（题干/类型/选项/答案；sort_order 不动）。"""
+        q = self.question_repo.get_by_id_or_raise(question_id)
+        self._validate_question(req.question_type, req.options, req.answer)
+        q.question_type = req.question_type
+        q.question_text = req.question_text.strip()
+        q.options = json.dumps(req.options, ensure_ascii=False)
+        q.answer = req.answer
+        self.question_repo.update(q)
         self.db.commit()
         return q
 
@@ -249,7 +275,16 @@ class QuizQuestionService:
         self.db.commit()
 
 
-IMPORT_TEMPLATE_HEADERS = ["ISBN", "书名*", "作者", "AR值", "词数", "主题", "年级(如 G1)", "副本数"]
+IMPORT_TEMPLATE_HEADERS = [
+    "ISBN",
+    "书名*",
+    "作者",
+    "AR值",
+    "词数*",
+    "主题",
+    "年级(如 G1)",
+    "副本数",
+]
 
 
 def build_import_template() -> bytes:
@@ -281,7 +316,7 @@ def build_import_template() -> bytes:
     guide.append(["书名", "必填", "其余列可空，管理端补录"])
     guide.append(["作者", "否", ""])
     guide.append(["AR值", "否", "与孩子 AR 差值超范围时借书仅提示"])
-    guide.append(["词数", "否", ""])
+    guide.append(["词数", "是", "正整数"])
     guide.append(["主题", "否", ""])
     guide.append(["年级(如 G1)", "否", ""])
     guide.append(["副本数", "否", "空=1；范围 0-999"])

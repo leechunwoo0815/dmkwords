@@ -25,7 +25,7 @@ def _mk_child_with_audio_book(client, h, phone, isbn):
     book = client.post(
         "/api/admin/books", json={"isbn": isbn, "title": "Audit Book", "word_count": 800}, headers=h
     ).json()
-    mp3 = b"\xff\xfb\x90\x64" + b"\x00" * 2000
+    mp3 = b"\xff\xfb\x90\x00" + b"\x00" * 125000
     client.post(
         f"/api/admin/books/{book['id']}/audio",
         files={"file": ("a.mp3", io.BytesIO(mp3), "audio/mpeg")},

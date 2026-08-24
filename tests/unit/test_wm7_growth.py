@@ -37,7 +37,6 @@ def _setup_finished_book(client, h, phone, isbn, word_count=2500, duration=600):
                 "question_text": f"Q{i}?",
                 "options": ["A", "B", "C", "D"],
                 "answer": "A",
-                "sort_order": i,
             },
             headers=h,
         )
@@ -48,14 +47,13 @@ def _setup_finished_book(client, h, phone, isbn, word_count=2500, duration=600):
             "question_text": "Q5?",
             "options": ["对", "错"],
             "answer": "对",
-            "sort_order": 5,
         },
         headers=h,
     )
     # 完播（时间回拨模拟真实流逝）
     import io
 
-    mp3 = b"\xff\xfb\x90\x64" + b"\x00" * 2000
+    mp3 = b"\xff\xfb\x90\x00" + b"\x00" * 125000
     client.post(
         f"/api/admin/books/{book['id']}/audio",
         files={"file": ("a.mp3", io.BytesIO(mp3), "audio/mpeg")},
@@ -283,7 +281,7 @@ def test_points_remainder_pool_and_full_marks(client: TestClient):
         )
     import io
 
-    mp3 = b"\xff\xfb\x90\x64" + b"\x00" * 2000
+    mp3 = b"\xff\xfb\x90\x00" + b"\x00" * 125000
     client.post(
         f"/api/admin/books/{book2['id']}/audio",
         files={"file": ("a.mp3", io.BytesIO(mp3), "audio/mpeg")},
@@ -436,7 +434,7 @@ def test_checkin_streak_points(client: TestClient):
     ).json()
     import io
 
-    mp3 = b"\xff\xfb\x90\x64" + b"\x00" * 2000
+    mp3 = b"\xff\xfb\x90\x00" + b"\x00" * 125000
     client.post(
         f"/api/admin/books/{book2['id']}/audio",
         files={"file": ("a.mp3", io.BytesIO(mp3), "audio/mpeg")},

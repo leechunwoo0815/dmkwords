@@ -208,7 +208,6 @@ def test_quiz_question_crud_and_validation(client: TestClient):
         "question_text": "Who is the hero?",
         "options": ["Dog Man", "Cat Kid", "Petey", "Lil Petey"],
         "answer": "Dog Man",
-        "sort_order": 1,
     }
     resp = client.post(f"/api/admin/books/{book['id']}/questions", json=q, headers=h)
     assert resp.status_code == 200

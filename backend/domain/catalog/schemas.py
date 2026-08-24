@@ -69,7 +69,13 @@ class QuizQuestionCreateRequest(BaseSchema):
     question_text: str = Field(..., min_length=1, max_length=500)
     options: list[str] = Field(..., min_length=2, max_length=6)
     answer: str = Field(..., max_length=200)
-    sort_order: int = Field(0, ge=0)
+
+
+class QuizQuestionUpdateRequest(BaseSchema):
+    question_type: str = Field("single", pattern="^(single|boolean)$")
+    question_text: str = Field(..., min_length=1, max_length=500)
+    options: list[str] = Field(..., min_length=2, max_length=6)
+    answer: str = Field(..., max_length=200)
 
 
 class QuizQuestionResponse(BaseSchema):

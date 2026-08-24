@@ -135,7 +135,7 @@ def test_expired_formal_audio_only_holding(client: TestClient, db):
         import io
 
         book = _book(client, h, isbn, title)
-        mp3 = b"\xff\xfb\x90\x64" + b"\x00" * 2000
+        mp3 = b"\xff\xfb\x90\x00" + b"\x00" * 125000
         client.post(
             f"/api/admin/books/{book['id']}/audio",
             files={"file": ("a.mp3", io.BytesIO(mp3), "audio/mpeg")},

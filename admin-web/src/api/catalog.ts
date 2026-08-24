@@ -127,10 +127,26 @@ export function apiCreateQuestion(
     question_text: string;
     options: string[];
     answer: string;
-    sort_order: number;
   }
 ): Promise<QuizQuestion> {
   return request(`/api/admin/books/${bookId}/questions`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export function apiUpdateQuestion(
+  questionId: number,
+  body: {
+    question_type: string;
+    question_text: string;
+    options: string[];
+    answer: string;
+  }
+): Promise<QuizQuestion> {
+  return request(`/api/admin/questions/${questionId}`, { method: "PUT", body: JSON.stringify(body) });
+}
+
+export function apiMediaUrl(bookId: number, kind: "cover" | "audio"): string {
+  const token = localStorage.getItem("dmkwords_admin_token");
+  return `/api/admin/books/${bookId}/${kind}-media${token ? `?token=${encodeURIComponent(token)}` : ""}`;
 }
 
 export function apiToggleQuestion(id: number): Promise<QuizQuestion> {

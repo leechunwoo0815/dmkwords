@@ -39,7 +39,7 @@ def _setup(client, h, phone="13800000601", isbn="9780545582889", duration=600):
     # 造 MP3（最小帧头）并上传 → duration 解析可能为 0，直接改库设时长
     import io
 
-    mp3 = b"\xff\xfb\x90\x64" + b"\x00" * 2000
+    mp3 = b"\xff\xfb\x90\x00" + b"\x00" * 125000
     client.post(
         f"/api/admin/books/{book['id']}/audio",
         files={"file": ("a.mp3", io.BytesIO(mp3), "audio/mpeg")},
@@ -216,7 +216,7 @@ def _setup_book_with_audio(client, h, isbn, title="Dog Man", duration=600):
     ).json()
     import io
 
-    mp3 = b"\xff\xfb\x90\x64" + b"\x00" * 2000
+    mp3 = b"\xff\xfb\x90\x00" + b"\x00" * 125000
     client.post(
         f"/api/admin/books/{book['id']}/audio",
         files={"file": ("a.mp3", io.BytesIO(mp3), "audio/mpeg")},
