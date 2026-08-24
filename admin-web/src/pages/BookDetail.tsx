@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Form,
+  Image,
   Input,
   InputNumber,
   Modal,
@@ -75,6 +76,7 @@ export default function BookDetail() {
   if (!book) return null;
   const openEdit = () => {
     form.setFieldsValue({
+      isbn: book.isbn ?? "",
       title: book.title, author: book.author, word_count: book.word_count,
       ar_level: book.ar_level, topic: book.topic, grade: book.grade,
       description: book.description ?? "",
@@ -162,7 +164,14 @@ export default function BookDetail() {
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>封面</Typography.Text>
             <div style={{ margin: "4px 0 8px" }}>
               {book.cover_path ? (
-                <img src={apiMediaUrl(bookId, "cover")} alt="封面" style={{ width: 72, height: 100, objectFit: "cover", borderRadius: 6, border: "1px solid #e4dcc8" }} />
+                <Image
+                  src={apiMediaUrl(bookId, "cover")}
+                  alt="封面"
+                  width={72}
+                  height={100}
+                  style={{ objectFit: "cover", borderRadius: 6, border: "1px solid #e4dcc8" }}
+                  preview={{ mask: "预览" }}
+                />
               ) : (
                 <div style={{ width: 72, height: 100, borderRadius: 6, border: "1px dashed #e4dcc8", display: "flex", alignItems: "center", justifyContent: "center", color: "#a39a86", fontSize: 12 }}>未上传</div>
               )}
@@ -323,6 +332,9 @@ export default function BookDetail() {
         onCancel={() => setEditOpen(false)} okText="保存" cancelText="取消" destroyOnClose
       >
         <Form form={form} layout="vertical">
+          <Form.Item name="isbn" label="ISBN（留空则使用系统编号，填写后不可清空）">
+            <Input placeholder="如 9780545582889" />
+          </Form.Item>
           <Form.Item name="title" label="书名" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="author" label="作者"><Input /></Form.Item>
           <Space size="large">

@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 from backend.common.exceptions import NotFoundError
 from backend.domain.catalog.import_service import import_books
+from backend.domain.catalog.repository import QuizQuestionRepository
 from backend.domain.catalog.schemas import (
     BookCreateRequest,
     BookResponse,
@@ -108,7 +109,7 @@ def book_audio_media(
     return _media_response(book, "audio_path", "audio/mpeg")
 
 
-def _to_book_response(book, copy_count: int) -> BookResponse:
+def _to_book_response(book, copy_count: int, question_count: int = 0) -> BookResponse:
     return BookResponse(
         id=book.id,
         isbn=book.isbn,
@@ -125,6 +126,7 @@ def _to_book_response(book, copy_count: int) -> BookResponse:
         description=book.description,
         status=book.status,
         copy_count=copy_count,
+        question_count=question_count,
     )
 
 
@@ -139,8 +141,11 @@ def list_books(
     db: Session = Depends(get_db),
 ):
     books, counts, total = BookService(db).list_books(page, page_size, keyword, ar_pending, status)
+    question_counts = QuizQuestionRepository(db).question_counts_by_book([b.id for b in books])
     return PaginatedResponse[BookResponse].create(
-        items=[_to_book_response(b, counts.get(b.id, 0)) for b in books],
+        items=[
+            _to_book_response(b, counts.get(b.id, 0), question_counts.get(b.id, 0)) for b in books
+        ],
         total=total,
         page=page,
         page_size=page_size,
@@ -164,7 +169,8 @@ def get_book(
     db: Session = Depends(get_db),
 ):
     book, copies = BookService(db).get_book(book_id)
-    return _to_book_response(book, len(copies))
+    question_count = len(QuizQuestionRepository(db).list_by_book(book_id, active_only=False))
+    return _to_book_response(book, len(copies), question_count)
 
 
 @router.put("/books/{book_id}", response_model=BookResponse)
@@ -176,7 +182,18 @@ def update_book(
 ):
     book = BookService(db).update_book(admin, book_id, body)
     _, copies = BookService(db).get_book(book_id)
-    return _to_book_response(book, len(copies))
+    question_count = len(QuizQuestionRepository(db).list_by_book(book_id, active_only=False))
+    return _to_book_response(book, len(copies), question_count)
+
+
+@router.delete("/books/{book_id}")
+def delete_book(
+    book_id: int,
+    admin: Any = Depends(require_perm("book.manage")),
+    db: Session = Depends(get_db),
+):
+    BookService(db).delete_book(admin, book_id)
+    return {"detail": "已删除"}
 
 
 @router.post("/books/{book_id}/copies", response_model=list[CopyResponse])

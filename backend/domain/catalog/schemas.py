@@ -17,6 +17,7 @@ class BookCreateRequest(BaseSchema):
 
 
 class BookUpdateRequest(BaseSchema):
+    isbn: str | None = Field(None, max_length=20, description="ISBN；可后补或修改")
     title: str = Field(..., min_length=1, max_length=200)
     author: str = Field("", max_length=100)
     word_count: int = Field(..., ge=0)
@@ -42,6 +43,7 @@ class BookResponse(BaseSchema):
     description: str | None
     status: int
     copy_count: int = Field(0, description="在册副本总数")
+    question_count: int = Field(0, description="测验题目数量")
 
 
 class BookListQuery(BaseSchema):

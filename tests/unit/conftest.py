@@ -51,6 +51,10 @@ ADMIN_TABLES = [
 def clean_db():
     """每个测试独立数据：截断 admin 三表 → 重播种子 → 清配置缓存。"""
     with engine.begin() as conn:
+        # 2026-08-24 事故加固：dev.sh 后端与 pytest 共库，后端连接持有表锁会导致
+        # TRUNCATE 挂起无输出。先设短锁等待超时，让问题显式报错而非假死 15 分钟。
+        # 正确流程：跑 pytest / gate.sh 前必须 `bash scripts/dev.sh stop`。
+        conn.execute(text("SET SESSION lock_wait_timeout = 10"))
         for table in ADMIN_TABLES:
             conn.execute(text(f"TRUNCATE TABLE {table}"))
     from backend.seeds.seed_admin import seed as seed_admin

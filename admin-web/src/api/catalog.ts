@@ -42,6 +42,10 @@ export function apiToggleBookStatus(id: number): Promise<Book> {
   return request(`/api/admin/books/${id}/toggle-status`, { method: "POST" });
 }
 
+export function apiDeleteBook(id: number): Promise<{ detail: string }> {
+  return request(`/api/admin/books/${id}`, { method: "DELETE" });
+}
+
 export function apiListCopies(bookId: number): Promise<BookCopy[]> {
   return request(`/api/admin/books/${bookId}/copies`);
 }

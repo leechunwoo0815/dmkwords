@@ -60,7 +60,14 @@ class BookService:
         q = self.db.query(Book).filter(Book.is_deleted == 0)
         if keyword:
             like = f"%{keyword}%"
-            q = q.filter(or_(Book.title.like(like), Book.author.like(like), Book.isbn.like(like)))
+            q = q.filter(
+                or_(
+                    Book.title.like(like),
+                    Book.author.like(like),
+                    Book.isbn.like(like),
+                    Book.internal_code.like(like),
+                )
+            )
         if ar_pending:
             q = q.filter(Book.ar_level.is_(None))
         if status is not None:
@@ -112,7 +119,20 @@ class BookService:
 
     def update_book(self, admin, book_id: int, req: BookUpdateRequest) -> Book:
         book = self.book_repo.get_by_id_or_raise(book_id)
-        old = {"title": book.title, "word_count": book.word_count, "ar_level": book.ar_level}
+        old = {
+            "title": book.title,
+            "word_count": book.word_count,
+            "ar_level": book.ar_level,
+            "isbn": book.isbn,
+        }
+        # ISBN 可后补/修改：校验格式 + 唯一性（不含自己）
+        new_isbn = (req.isbn or "").strip() or None
+        if new_isbn != book.isbn:
+            if new_isbn and not ISBN_RE.match(new_isbn):
+                raise ValidationError(f"ISBN 格式不正确: {new_isbn}")
+            if new_isbn and self.book_repo.get_by_isbn(new_isbn):
+                raise ConflictError(f"ISBN {new_isbn} 已存在（补货请走副本管理增加副本）")
+            book.isbn = new_isbn
         book.title = req.title.strip()
         book.author = req.author.strip()
         book.word_count = req.word_count
@@ -132,11 +152,32 @@ class BookService:
                     "title": book.title,
                     "word_count": book.word_count,
                     "ar_level": book.ar_level,
+                    "isbn": book.isbn,
                 },
             },
         )
         self.db.commit()
         return book
+
+    def delete_book(self, admin, book_id: int) -> None:
+        """软删书目（仅无在借副本时允许）。"""
+        book = self.book_repo.get_by_id_or_raise(book_id)
+        borrowed = (
+            self.db.query(BookCopy)
+            .filter(BookCopy.book_id == book_id, BookCopy.status == BookCopy.STATUS_BORROWED)
+            .count()
+        )
+        if borrowed:
+            raise ConflictError(f"该书目存在 {borrowed} 本借出中副本，请先归还再删除")
+        book.is_deleted = 1
+        self.book_repo.update(book)
+        self._audit(
+            admin,
+            "book.delete",
+            str(book.id),
+            {"title": book.title, "isbn": book.isbn, "internal_code": book.internal_code},
+        )
+        self.db.commit()
 
     def add_copies(self, admin, book_id: int, count: int) -> list[BookCopy]:
         book = self.book_repo.get_by_id_or_raise(book_id)

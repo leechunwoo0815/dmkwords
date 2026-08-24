@@ -212,6 +212,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/books/{book_id}/cover-media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Book Cover Media
+         * @description 封面（管理端 <img> 用；query token 或 Bearer 均可）。
+         */
+        get: operations["book_cover_media_api_admin_books__book_id__cover_media_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/books/{book_id}/audio-media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Book Audio Media
+         * @description 音频试听（C7 播放器；query token 或 Bearer 均可）。
+         */
+        get: operations["book_audio_media_api_admin_books__book_id__audio_media_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/books": {
         parameters: {
             query?: never;
@@ -242,7 +282,8 @@ export interface paths {
         /** Update Book */
         put: operations["update_book_api_admin_books__book_id__put"];
         post?: never;
-        delete?: never;
+        /** Delete Book */
+        delete: operations["delete_book_api_admin_books__book_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -389,6 +430,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/questions/{question_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Question */
+        put: operations["update_question_api_admin_questions__question_id__put"];
+        post?: never;
+        /** Delete Question */
+        delete: operations["delete_question_api_admin_questions__question_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/questions/{question_id}/toggle-active": {
         parameters: {
             query?: never;
@@ -401,23 +460,6 @@ export interface paths {
         /** Toggle Question */
         post: operations["toggle_question_api_admin_questions__question_id__toggle_active_post"];
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/questions/{question_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Delete Question */
-        delete: operations["delete_question_api_admin_questions__question_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2197,9 +2239,20 @@ export interface components {
              * @default 0
              */
             copy_count: number;
+            /**
+             * Question Count
+             * @description 测验题目数量
+             * @default 0
+             */
+            question_count: number;
         };
         /** BookUpdateRequest */
         BookUpdateRequest: {
+            /**
+             * Isbn
+             * @description ISBN；可后补或修改
+             */
+            isbn?: string | null;
             /** Title */
             title: string;
             /**
@@ -2944,11 +2997,6 @@ export interface components {
             options: string[];
             /** Answer */
             answer: string;
-            /**
-             * Sort Order
-             * @default 0
-             */
-            sort_order: number;
         };
         /** QuizQuestionResponse */
         QuizQuestionResponse: {
@@ -2968,6 +3016,20 @@ export interface components {
             sort_order: number;
             /** Is Active */
             is_active: number;
+        };
+        /** QuizQuestionUpdateRequest */
+        QuizQuestionUpdateRequest: {
+            /**
+             * Question Type
+             * @default single
+             */
+            question_type: string;
+            /** Question Text */
+            question_text: string;
+            /** Options */
+            options: string[];
+            /** Answer */
+            answer: string;
         };
         /** QuizSubmitRequest */
         QuizSubmitRequest: {
@@ -3587,6 +3649,72 @@ export interface operations {
             };
         };
     };
+    book_cover_media_api_admin_books__book_id__cover_media_get: {
+        parameters: {
+            query?: {
+                token?: string;
+            };
+            header?: never;
+            path: {
+                book_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    book_audio_media_api_admin_books__book_id__audio_media_get: {
+        parameters: {
+            query?: {
+                token?: string;
+            };
+            header?: never;
+            path: {
+                book_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_books_api_admin_books_get: {
         parameters: {
             query?: {
@@ -3708,6 +3836,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BookResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_book_api_admin_books__book_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                book_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -4051,7 +4210,7 @@ export interface operations {
             };
         };
     };
-    toggle_question_api_admin_questions__question_id__toggle_active_post: {
+    update_question_api_admin_questions__question_id__put: {
         parameters: {
             query?: never;
             header?: never;
@@ -4060,7 +4219,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuizQuestionUpdateRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -4100,6 +4263,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    toggle_question_api_admin_questions__question_id__toggle_active_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                question_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizQuestionResponse"];
                 };
             };
             /** @description Validation Error */

@@ -17,7 +17,7 @@ import {
 } from "antd";
 import { InboxOutlined, PlusOutlined } from "@ant-design/icons";
 
-import { apiCreateBook, apiDownloadImportTemplate, apiImportBooks, apiListBooks, apiToggleBookStatus, type Book } from "../api/catalog";
+import { apiCreateBook, apiDeleteBook, apiDownloadImportTemplate, apiImportBooks, apiListBooks, apiToggleBookStatus, type Book } from "../api/catalog";
 import { GRADE_OPTIONS } from "../constants/grade";
 
 export default function BookManage() {
@@ -37,6 +37,15 @@ export default function BookManage() {
     failed_count: number;
     errors: string[];
   } | null>(null);
+  const [searchValue, setSearchValue] = useState("");
+
+  const doSearch = useCallback(
+    (v: string) => {
+      setKeyword(v);
+      setPage(1);
+    },
+    []
+  );
 
   const load = useCallback(
     (targetPage: number) => {
@@ -106,13 +115,13 @@ export default function BookManage() {
 
       <Space style={{ marginBottom: 12 }}>
         <Input.Search
-          placeholder="书名 / 作者 / ISBN"
+          placeholder="书名 / 作者 / ISBN / 编号"
           allowClear
           style={{ width: 260 }}
-          onSearch={(v) => {
-            setKeyword(v);
-            setPage(1);
-          }}
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
+          onSearch={doSearch}
+          onClear={() => doSearch("")}
         />
       </Space>
       <Tabs
@@ -138,34 +147,52 @@ export default function BookManage() {
           { title: "书名", dataIndex: "title", width: 220, render: (t: string, r) => (
             <a onClick={() => window.open(`/books/${r.id}`, "_self")}>{t}</a>
           ) },
-          { title: "作者", dataIndex: "author", width: 120, ellipsis: true },
-          { title: "ISBN / 编号", key: "code", width: 150, render: (_, r) => (
+          { title: "作者", dataIndex: "author", width: 100, ellipsis: true },
+          { title: "ISBN / 编号", key: "code", width: 130, render: (_, r) => (
             <Typography.Text code style={{ fontSize: 12 }}>{r.isbn ?? r.internal_code}</Typography.Text>
           ) },
           { title: "AR", dataIndex: "ar_level", width: 70, render: (v) => v ?? <Tag color="orange">待配置</Tag> },
-          { title: "词数", dataIndex: "word_count", width: 90, render: (v: number) => v.toLocaleString() },
-          { title: "副本", dataIndex: "copy_count", width: 70 },
+          { title: "词数", dataIndex: "word_count", width: 80, render: (v: number) => v.toLocaleString() },
+          { title: "副本", dataIndex: "copy_count", width: 60 },
           {
-            title: "音频", dataIndex: "audio_path", width: 80,
+            title: "封面", dataIndex: "cover_path", width: 60,
             render: (v) => (v ? <Tag color="green">已传</Tag> : <Tag>未传</Tag>),
           },
           {
-            title: "状态", dataIndex: "status", width: 80,
+            title: "音频", dataIndex: "audio_path", width: 60,
+            render: (v) => (v ? <Tag color="green">已传</Tag> : <Tag>未传</Tag>),
+          },
+          { title: "测验", dataIndex: "question_count", width: 60 },
+          {
+            title: "状态", dataIndex: "status", width: 70,
             render: (s: number) => (s === 1 ? <Tag color="green">上架</Tag> : <Tag>下架</Tag>),
           },
           {
-            title: "操作", key: "op", width: 90,
+            title: "操作", key: "op", width: 160,
             render: (_, r) => (
-              <Popconfirm
-                title={r.status === 1 ? "下架后小程序不可见、不可借阅预约，已借出的仍需归还" : "确认恢复上架？"}
-                onConfirm={async () => {
-                  await apiToggleBookStatus(r.id);
-                  message.success(r.status === 1 ? "已下架" : "已上架");
-                  load(page);
-                }}
-              >
-                <Button type="link" size="small">{r.status === 1 ? "下架" : "上架"}</Button>
-              </Popconfirm>
+              <Space size="small">
+                <Button type="link" size="small" onClick={() => window.open(`/books/${r.id}`, "_self")}>编辑</Button>
+                <Popconfirm
+                  title={r.status === 1 ? "下架后小程序不可见、不可借阅预约，已借出的仍需归还" : "确认恢复上架？"}
+                  onConfirm={async () => {
+                    await apiToggleBookStatus(r.id);
+                    message.success(r.status === 1 ? "已下架" : "已上架");
+                    load(page);
+                  }}
+                >
+                  <Button type="link" size="small">{r.status === 1 ? "下架" : "上架"}</Button>
+                </Popconfirm>
+                <Popconfirm
+                  title="确认删除该书目？删除后不可恢复"
+                  onConfirm={async () => {
+                    await apiDeleteBook(r.id);
+                    message.success("已删除");
+                    load(page);
+                  }}
+                >
+                  <Button type="link" size="small" danger>删除</Button>
+                </Popconfirm>
+              </Space>
             ),
           },
         ]}

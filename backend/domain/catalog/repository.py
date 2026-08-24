@@ -67,3 +67,14 @@ class QuizQuestionRepository(BaseRepository[QuizQuestion]):
         if active_only:
             q = q.filter(QuizQuestion.is_active == 1)
         return q.order_by(QuizQuestion.sort_order, QuizQuestion.id).all()
+
+    def question_counts_by_book(self, book_ids: list[int]) -> dict[int, int]:
+        if not book_ids:
+            return {}
+        rows = (
+            self.db.query(QuizQuestion.book_id, func.count(QuizQuestion.id))
+            .filter(QuizQuestion.book_id.in_(book_ids), QuizQuestion.is_deleted == 0)
+            .group_by(QuizQuestion.book_id)
+            .all()
+        )
+        return {book_id: count for book_id, count in rows}
