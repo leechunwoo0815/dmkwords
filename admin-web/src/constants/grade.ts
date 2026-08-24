@@ -1,4 +1,4 @@
-// 适读阶段下拉选项（3-15 岁）
+// 适读阶段下拉选项（与 backend/domain/catalog/constants.py 保持一致）
 export const GRADE_OPTIONS = [
   { value: "3-4岁（幼儿园）", label: "3-4岁（幼儿园）" },
   { value: "5-6岁（幼儿园大班）", label: "5-6岁（幼儿园大班）" },

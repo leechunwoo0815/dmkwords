@@ -26,7 +26,10 @@ def test_import_template_download(client: TestClient):
     headers = [c.value for c in ws[1]]
     assert headers[0] == "ISBN"
     assert headers[1] == "书名*"
+    assert headers[6] == "适读阶段"
     assert headers[7] == "副本数"
+    # 适读阶段列存在下拉校验
+    assert any("G" in str(dv.sqref) for dv in ws.data_validations.dataValidation)
     # 原样导入模板（非上传文件路径）-> 不产生任何数据
     resp = client.post(
         "/api/admin/books/import",

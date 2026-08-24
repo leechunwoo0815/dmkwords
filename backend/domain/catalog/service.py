@@ -326,7 +326,7 @@ IMPORT_TEMPLATE_HEADERS = [
     "AR值",
     "词数*",
     "主题",
-    "年级(如 G1)",
+    "适读阶段",
     "副本数",
 ]
 
@@ -338,6 +338,9 @@ def build_import_template() -> bytes:
     from io import BytesIO
 
     from openpyxl import Workbook
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    from backend.domain.catalog.constants import GRADE_OPTIONS
 
     wb = Workbook()
     ws = wb.active
@@ -351,8 +354,21 @@ def build_import_template() -> bytes:
     ws.column_dimensions["D"].width = 10
     ws.column_dimensions["E"].width = 10
     ws.column_dimensions["F"].width = 12
-    ws.column_dimensions["G"].width = 12
+    ws.column_dimensions["G"].width = 20
     ws.column_dimensions["H"].width = 10
+
+    # 适读阶段下拉（G 列，除表头外全部单元格）
+    grade_dv = DataValidation(
+        type="list",
+        formula1=f'"{",".join(GRADE_OPTIONS)}"',
+        allow_blank=True,
+    )
+    grade_dv.error = "请从下拉选项中选择适读阶段"
+    grade_dv.errorTitle = "输入错误"
+    grade_dv.prompt = "请选择适读阶段"
+    grade_dv.promptTitle = "适读阶段"
+    ws.add_data_validation(grade_dv)
+    grade_dv.add("G2:G1048576")
 
     guide = wb.create_sheet("填写说明")
     guide.append(["列", "是否必填", "说明"])
@@ -362,11 +378,13 @@ def build_import_template() -> bytes:
     guide.append(["AR值", "否", "与孩子 AR 差值超范围时借书仅提示"])
     guide.append(["词数", "是", "正整数"])
     guide.append(["主题", "否", ""])
-    guide.append(["年级(如 G1)", "否", ""])
+    guide.append(["适读阶段", "否", "请从下拉选项中选择；管理端也统一为阶段"])
     guide.append(["副本数", "否", "空=1；范围 0-999"])
     guide.append([])
     guide.append(["示例行（正式导入时请删除或改为真实数据）"])
-    guide.append(["9780545582889", "示例书名", "示例作者", "3.5", "1200", "动物", "G1", "1"])
+    guide.append(
+        ["9780545582889", "示例书名", "示例作者", "3.5", "1200", "动物", "7-8岁（小学低年级）", "1"]
+    )
 
     buf = BytesIO()
     wb.save(buf)
