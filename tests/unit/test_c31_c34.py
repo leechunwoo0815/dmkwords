@@ -239,36 +239,46 @@ def test_filter_no_cover_no_audio_quiz_incomplete(client: TestClient):
 
     # 给 b_cover 传封面
     from PIL import Image
+
     img = Image.new("RGB", (10, 10), color="blue")
     buf = io.BytesIO()
     img.save(buf, format="JPEG")
     buf.seek(0)
-    assert client.post(
-        f"/api/admin/books/{b_cover['id']}/cover",
-        files={"file": ("x.jpg", buf, "image/jpeg")},
-        headers=h,
-    ).status_code == 200
+    assert (
+        client.post(
+            f"/api/admin/books/{b_cover['id']}/cover",
+            files={"file": ("x.jpg", buf, "image/jpeg")},
+            headers=h,
+        ).status_code
+        == 200
+    )
 
     # 给 b_audio 传音频
     audio = b"\xff\xfb\x90\x00" + b"\x00" * 125000
-    assert client.post(
-        f"/api/admin/books/{b_audio['id']}/audio",
-        files={"file": ("a.mp3", io.BytesIO(audio), "audio/mpeg")},
-        headers=h,
-    ).status_code == 200
+    assert (
+        client.post(
+            f"/api/admin/books/{b_audio['id']}/audio",
+            files={"file": ("a.mp3", io.BytesIO(audio), "audio/mpeg")},
+            headers=h,
+        ).status_code
+        == 200
+    )
 
     # 给 b_quiz 录 5 道题
     for i in range(5):
-        assert client.post(
-            f"/api/admin/books/{b_quiz['id']}/questions",
-            json={
-                "question_type": "single",
-                "question_text": f"Q{i}?",
-                "options": ["A", "B", "C", "D"],
-                "answer": "A",
-            },
-            headers=h,
-        ).status_code == 200
+        assert (
+            client.post(
+                f"/api/admin/books/{b_quiz['id']}/questions",
+                json={
+                    "question_type": "single",
+                    "question_text": f"Q{i}?",
+                    "options": ["A", "B", "C", "D"],
+                    "answer": "A",
+                },
+                headers=h,
+            ).status_code
+            == 200
+        )
 
     # 未传封面筛选
     resp = client.get("/api/admin/books", params={"no_cover": True}, headers=h)

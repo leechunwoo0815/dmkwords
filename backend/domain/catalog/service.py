@@ -90,9 +90,7 @@ class BookService:
             from backend.domain.catalog.models import QuizQuestion
 
             active_count = (
-                self.db.query(
-                    QuizQuestion.book_id, func.count(QuizQuestion.id).label("cnt")
-                )
+                self.db.query(QuizQuestion.book_id, func.count(QuizQuestion.id).label("cnt"))
                 .filter(QuizQuestion.is_deleted == 0, QuizQuestion.is_active == 1)
                 .group_by(QuizQuestion.book_id)
                 .subquery()
