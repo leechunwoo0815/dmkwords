@@ -149,6 +149,7 @@ export default function BookManage() {
         dataSource={books}
         size="middle"
         pagination={{ current: page, pageSize: 15, total, showSizeChanger: false, onChange: setPage }}
+        scroll={{ x: "max-content" }}
         columns={[
           { title: "书名", dataIndex: "title", width: 220, render: (t: string, r) => (
             <a onClick={() => window.open(`/books/${r.id}`, "_self")}>{t}</a>
