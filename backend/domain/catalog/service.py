@@ -160,7 +160,9 @@ class BookService:
         return book
 
     def delete_book(self, admin, book_id: int) -> None:
-        """软删书目（仅无在借副本时允许）。"""
+        """软删书目（仅无在借副本时允许）；联动删除 uploads 中的封面与音频。"""
+        from backend.common.file_storage import remove_book_media
+
         book = self.book_repo.get_by_id_or_raise(book_id)
         borrowed = (
             self.db.query(BookCopy)
@@ -178,6 +180,7 @@ class BookService:
             {"title": book.title, "isbn": book.isbn, "internal_code": book.internal_code},
         )
         self.db.commit()
+        remove_book_media(book.cover_path, book.audio_path)
 
     def add_copies(self, admin, book_id: int, count: int) -> list[BookCopy]:
         book = self.book_repo.get_by_id_or_raise(book_id)

@@ -17,6 +17,22 @@ def _uploads_root() -> str:
     return root
 
 
+def remove_book_media(cover_path: str | None, audio_path: str | None) -> None:
+    """删除书目关联的媒体文件（软删联动清理）。路径穿越防护与 media 端点一致。"""
+    root = os.path.abspath(get_settings().UPLOADS_DIR)
+    for rel in (cover_path, audio_path):
+        if not rel:
+            continue
+        full = os.path.abspath(os.path.join(root, rel))
+        if not full.startswith(root):
+            continue
+        if os.path.isfile(full):
+            try:
+                os.remove(full)
+            except OSError:
+                pass
+
+
 def save_cover_jpg(book, data: bytes, ext: str) -> str:
     """封面存储：统一转 JPG（Pillow）；路径 cover/{isbn前4位}/{code}.jpg；无 ISBN 走 local/。"""
     ext = ext.lower()

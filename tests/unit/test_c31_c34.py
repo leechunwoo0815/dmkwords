@@ -135,13 +135,54 @@ def test_list_and_detail_include_question_count(client: TestClient):
 
 
 def test_delete_book_success(client: TestClient):
-    """C32：书目可删除，删除后列表不再出现。"""
+    """C32/C35：书目可删除，删除后列表不再出现，且 uploads 中媒体文件被清理。"""
+    import os
+
+    from PIL import Image
+
+    from backend.config import get_settings
+
     h = _h(client)
     book = _create_book(client, h, title="To Delete")
+
+    # 上传封面
+    img = Image.new("RGB", (10, 10), color="red")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    buf.seek(0)
+    resp = client.post(
+        f"/api/admin/books/{book['id']}/cover",
+        files={"file": ("x.jpg", buf, "image/jpeg")},
+        headers=h,
+    )
+    assert resp.status_code == 200
+    cover_path = resp.json()["cover_path"]
+
+    # 上传音频
+    audio = b"\xff\xfb\x90\x00" + b"\x00" * 125000
+    resp = client.post(
+        f"/api/admin/books/{book['id']}/audio",
+        files={"file": ("a.mp3", io.BytesIO(audio), "audio/mpeg")},
+        headers=h,
+    )
+    assert resp.status_code == 200
+    audio_path = resp.json()["audio_path"]
+
+    root = os.path.abspath(get_settings().UPLOADS_DIR)
+    cover_full = os.path.abspath(os.path.join(root, cover_path))
+    audio_full = os.path.abspath(os.path.join(root, audio_path))
+    assert os.path.isfile(cover_full)
+    assert os.path.isfile(audio_full)
+
+    # 删除书目
     resp = client.delete(f"/api/admin/books/{book['id']}", headers=h)
     assert resp.status_code == 200
     resp = client.get("/api/admin/books", headers=h)
     assert not any(b["id"] == book["id"] for b in resp.json()["items"])
+
+    # 媒体文件应被清理
+    assert not os.path.isfile(cover_full)
+    assert not os.path.isfile(audio_full)
 
 
 def test_cover_media_endpoint_returns_file(client: TestClient):
