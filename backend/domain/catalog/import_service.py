@@ -10,12 +10,14 @@ from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
 from backend.domain.catalog.audit_events import publish_audit
+from backend.domain.catalog.constants import GRADE_OPTIONS
 from backend.domain.catalog.models import Book, BookCopy
 from backend.domain.catalog.repository import BookCopyRepository, BookRepository
 
 ISBN_RE = re.compile(r"^\d{9}[\dXx]$|^\d{13}$")
 
-HEADER = ["ISBN", "书名", "作者", "AR值", "总词数", "主题", "年级", "副本数量"]
+# 与 build_import_template 表头保持一致；程序按列索引解析，不依赖字面量。
+HEADER = ["ISBN", "书名*", "作者", "AR值", "词数*", "主题", "适读阶段", "副本数"]
 
 
 def _cell_str(v) -> str:
@@ -88,6 +90,9 @@ def import_books(db: Session, admin, file_bytes: bytes) -> dict:
                 raise ValueError
         except ValueError:
             errors.append(f"第{row_num}行: 副本数量须在 1-99 之间")
+            continue
+        if grade and grade not in GRADE_OPTIONS:
+            errors.append(f"第{row_num}行: 适读阶段不在选项中（{grade}）")
             continue
 
         if isbn:

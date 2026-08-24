@@ -289,6 +289,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/books/batch-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Batch Delete Books */
+        post: operations["batch_delete_books_api_admin_books_batch_delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/books/{book_id}/copies": {
         parameters: {
             query?: never;
@@ -2141,6 +2158,14 @@ export interface components {
              */
             created_at: string;
         };
+        /** BatchDeleteRequest */
+        BatchDeleteRequest: {
+            /**
+             * Ids
+             * @description 待删除书目 ID 列表
+             */
+            ids: number[];
+        };
         /** Body_import_books_excel_api_admin_books_import_post */
         Body_import_books_excel_api_admin_books_import_post: {
             /** File */
@@ -3723,6 +3748,9 @@ export interface operations {
                 keyword?: string | null;
                 ar_pending?: boolean;
                 status?: number | null;
+                no_cover?: boolean;
+                no_audio?: boolean;
+                quiz_incomplete?: boolean;
             };
             header?: never;
             path?: never;
@@ -3859,6 +3887,39 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    batch_delete_books_api_admin_books_batch_delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchDeleteRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

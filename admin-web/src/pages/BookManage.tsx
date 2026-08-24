@@ -15,9 +15,18 @@ import {
   Typography,
   Upload,
 } from "antd";
-import { InboxOutlined, PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, InboxOutlined, PlusOutlined } from "@ant-design/icons";
 
-import { apiCreateBook, apiDeleteBook, apiDownloadImportTemplate, apiImportBooks, apiListBooks, apiToggleBookStatus, type Book } from "../api/catalog";
+import {
+  apiBatchDeleteBooks,
+  apiCreateBook,
+  apiDeleteBook,
+  apiDownloadImportTemplate,
+  apiImportBooks,
+  apiListBooks,
+  apiToggleBookStatus,
+  type Book,
+} from "../api/catalog";
 import { GRADE_OPTIONS } from "../constants/grade";
 
 export default function BookManage() {
@@ -38,14 +47,12 @@ export default function BookManage() {
     errors: string[];
   } | null>(null);
   const [searchValue, setSearchValue] = useState("");
+  const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
 
-  const doSearch = useCallback(
-    (v: string) => {
-      setKeyword(v);
-      setPage(1);
-    },
-    []
-  );
+  const doSearch = useCallback((v: string) => {
+    setKeyword(v);
+    setPage(1);
+  }, []);
 
   const load = useCallback(
     (targetPage: number) => {
@@ -56,6 +63,9 @@ export default function BookManage() {
         keyword: keyword || undefined,
         ar_pending: tab === "ar",
         status: tab === "on" ? 1 : tab === "off" ? 0 : undefined,
+        no_cover: tab === "no_cover",
+        no_audio: tab === "no_audio",
+        quiz_incomplete: tab === "quiz_incomplete",
       })
         .then((result) => {
           setBooks(result.items ?? []);
@@ -95,6 +105,18 @@ export default function BookManage() {
     }
   };
 
+  const handleBatchDelete = async () => {
+    if (selectedRowKeys.length === 0) return;
+    try {
+      const result = await apiBatchDeleteBooks(selectedRowKeys);
+      message.success(`批量删除完成：成功 ${result.success}，失败 ${result.failed}`);
+      setSelectedRowKeys([]);
+      load(page);
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : "批量删除失败");
+    }
+  };
+
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -129,6 +151,15 @@ export default function BookManage() {
           onSearch={doSearch}
           onClear={() => doSearch("")}
         />
+        {selectedRowKeys.length > 0 && (
+          <Popconfirm
+            title={`确认删除选中的 ${selectedRowKeys.length} 条书目？`}
+            description="删除后不可恢复，已借出副本会阻止删除。"
+            onConfirm={handleBatchDelete}
+          >
+            <Button danger icon={<DeleteOutlined />}>批量删除 ({selectedRowKeys.length})</Button>
+          </Popconfirm>
+        )}
       </Space>
       <Tabs
         activeKey={tab}
@@ -141,6 +172,9 @@ export default function BookManage() {
           { key: "on", label: "上架中" },
           { key: "off", label: "已下架" },
           { key: "ar", label: "AR 待配置" },
+          { key: "no_cover", label: "未传封面" },
+          { key: "no_audio", label: "未传音频" },
+          { key: "quiz_incomplete", label: "测验未满 5 道" },
         ]}
       />
       <Table<Book>
@@ -150,6 +184,11 @@ export default function BookManage() {
         size="middle"
         pagination={{ current: page, pageSize: 15, total, showSizeChanger: false, onChange: setPage }}
         scroll={{ x: "max-content" }}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: (keys) => setSelectedRowKeys(keys as number[]),
+          preserveSelectedRowKeys: false,
+        }}
         columns={[
           { title: "书名", dataIndex: "title", width: 220, render: (t: string, r) => (
             <a onClick={() => window.open(`/books/${r.id}`, "_self")}>{t}</a>
@@ -260,7 +299,7 @@ export default function BookManage() {
         destroyOnClose
       >
         <Typography.Paragraph type="secondary">
-          列顺序：ISBN、书名、作者、AR值、总词数、主题、年级、副本数量。
+          列顺序：ISBN、书名、作者、AR 值、总词数、主题、适读阶段、副本数量。
           同 ISBN 再次导入 = 增加副本；错误行不影响其他行。
         </Typography.Paragraph>
         <Upload.Dragger

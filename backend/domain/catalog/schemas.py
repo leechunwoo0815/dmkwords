@@ -52,6 +52,9 @@ class BookListQuery(BaseSchema):
     keyword: str | None = Field(None, max_length=100, description="书名/作者/ISBN 模糊")
     ar_pending: bool = Field(False, description="AR 待配置筛选")
     status: int | None = Field(None, description="上下架筛选")
+    no_cover: bool = Field(False, description="未传封面筛选")
+    no_audio: bool = Field(False, description="未传音频筛选")
+    quiz_incomplete: bool = Field(False, description="测验题目少于 5 道筛选")
 
 
 class CopyResponse(BaseSchema):
@@ -98,6 +101,10 @@ class QuizQuestionResponse(BaseSchema):
 
             return _json.loads(v)
         return v
+
+
+class BatchDeleteRequest(BaseSchema):
+    ids: list[int] = Field(..., min_length=1, description="待删除书目 ID 列表")
 
 
 class ImportResultResponse(BaseSchema):

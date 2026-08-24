@@ -15,6 +15,9 @@ export function apiListBooks(params: {
   keyword?: string;
   ar_pending?: boolean;
   status?: number;
+  no_cover?: boolean;
+  no_audio?: boolean;
+  quiz_incomplete?: boolean;
 }): Promise<PaginatedBooks> {
   const query = new URLSearchParams({
     page: String(params.page),
@@ -23,6 +26,9 @@ export function apiListBooks(params: {
   if (params.keyword) query.set("keyword", params.keyword);
   if (params.ar_pending) query.set("ar_pending", "true");
   if (params.status !== undefined) query.set("status", String(params.status));
+  if (params.no_cover) query.set("no_cover", "true");
+  if (params.no_audio) query.set("no_audio", "true");
+  if (params.quiz_incomplete) query.set("quiz_incomplete", "true");
   return request(`/api/admin/books?${query.toString()}`);
 }
 
@@ -44,6 +50,10 @@ export function apiToggleBookStatus(id: number): Promise<Book> {
 
 export function apiDeleteBook(id: number): Promise<{ detail: string }> {
   return request(`/api/admin/books/${id}`, { method: "DELETE" });
+}
+
+export function apiBatchDeleteBooks(ids: number[]): Promise<{ detail: string; success: number; failed: number; errors: string[] }> {
+  return request("/api/admin/books/batch-delete", { method: "POST", body: JSON.stringify({ ids }) });
 }
 
 export function apiListCopies(bookId: number): Promise<BookCopy[]> {

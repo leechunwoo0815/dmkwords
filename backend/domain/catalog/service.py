@@ -55,8 +55,18 @@ class BookService:
         )
 
     def list_books(
-        self, page: int, page_size: int, keyword: str | None, ar_pending: bool, status: int | None
+        self,
+        page: int,
+        page_size: int,
+        keyword: str | None,
+        ar_pending: bool,
+        status: int | None,
+        no_cover: bool = False,
+        no_audio: bool = False,
+        quiz_incomplete: bool = False,
     ):
+        from sqlalchemy import func
+
         q = self.db.query(Book).filter(Book.is_deleted == 0)
         if keyword:
             like = f"%{keyword}%"
@@ -72,6 +82,24 @@ class BookService:
             q = q.filter(Book.ar_level.is_(None))
         if status is not None:
             q = q.filter(Book.status == status)
+        if no_cover:
+            q = q.filter(Book.cover_path.is_(None))
+        if no_audio:
+            q = q.filter(Book.audio_path.is_(None))
+        if quiz_incomplete:
+            from backend.domain.catalog.models import QuizQuestion
+
+            active_count = (
+                self.db.query(
+                    QuizQuestion.book_id, func.count(QuizQuestion.id).label("cnt")
+                )
+                .filter(QuizQuestion.is_deleted == 0, QuizQuestion.is_active == 1)
+                .group_by(QuizQuestion.book_id)
+                .subquery()
+            )
+            q = q.outerjoin(active_count, active_count.c.book_id == Book.id).filter(
+                (active_count.c.cnt.is_(None)) | (active_count.c.cnt < 5)
+            )
         total = q.count()
         books = q.order_by(Book.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
         counts = self.copy_repo.copy_counts_by_book([b.id for b in books])
@@ -181,6 +209,18 @@ class BookService:
         )
         self.db.commit()
         remove_book_media(book.cover_path, book.audio_path)
+
+    def batch_delete_books(self, admin, book_ids: list[int]) -> dict:
+        """Batch soft-delete books; delegate per-book delete_book checks."""
+        success = 0
+        errors: list[str] = []
+        for book_id in book_ids:
+            try:
+                self.delete_book(admin, book_id)
+                success += 1
+            except Exception as exc:
+                errors.append(f"ID {book_id}: {exc}")
+        return {"success": success, "failed": len(errors), "errors": errors[:50]}
 
     def add_copies(self, admin, book_id: int, count: int) -> list[BookCopy]:
         book = self.book_repo.get_by_id_or_raise(book_id)

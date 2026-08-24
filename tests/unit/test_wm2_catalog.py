@@ -123,7 +123,7 @@ def test_excel_import_with_error_rows(client: TestClient):
     wb = Workbook()
     ws = wb.active
     ws.append(["ISBN", "书名", "作者", "AR值", "总词数", "主题", "年级", "副本数量"])
-    ws.append(["7777777777777", "Import A", "Auth", "1.5", 800, "绘本", "一年级", 1])
+    ws.append(["7777777777777", "Import A", "Auth", "1.5", 800, "绘本", "7-8岁（小学低年级）", 1])
     ws.append(["bad-isbn", "Import B", "", "", 100, "", "", 1])  # 错误行
     ws.append(["8888888888888", "Import C", "", "", 500, "", "", 2])
     ws.append([None, None, None, None, None, None, None, None])  # 空行跳过

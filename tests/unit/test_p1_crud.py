@@ -42,6 +42,34 @@ def test_import_template_download(client: TestClient):
     assert body["failed_count"] == 0, body
 
 
+def test_import_grade_whitelist(client: TestClient):
+    """F1：非法适读阶段被拦截，合法阶段可正常导入。"""
+    h = _h(client)
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "图书导入"
+    ws.append(["ISBN", "书名*", "作者", "AR值", "词数*", "主题", "适读阶段", "副本数"])
+    # 非法 grade
+    ws.append(["", "坏书目", "作者", "", "100", "", "垃圾年级", "1"])
+    # 合法 grade
+    ws.append(["", "好书目", "作者", "", "100", "", "7-8岁（小学低年级）", "1"])
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    r = client.post(
+        "/api/admin/books/import",
+        files={"file": ("grade.xlsx", buf, "application/octet-stream")},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["success_count"] == 1, body
+    assert body["failed_count"] == 1, body
+    assert any("适读阶段不在选项中" in e for e in body["errors"]), body
+
+
 def test_staff_crud_permissions(client: TestClient):
     """C12：超管可建/改/禁/重置密码；staff 无权限（403）。"""
     h = _h(client)

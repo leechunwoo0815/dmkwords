@@ -18,6 +18,7 @@ from backend.common.exceptions import NotFoundError
 from backend.domain.catalog.import_service import import_books
 from backend.domain.catalog.repository import QuizQuestionRepository
 from backend.domain.catalog.schemas import (
+    BatchDeleteRequest,
     BookCreateRequest,
     BookResponse,
     BookUpdateRequest,
@@ -137,10 +138,15 @@ def list_books(
     keyword: str | None = Query(None),
     ar_pending: bool = Query(False),
     status: int | None = Query(None),
+    no_cover: bool = Query(False),
+    no_audio: bool = Query(False),
+    quiz_incomplete: bool = Query(False),
     admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
-    books, counts, total = BookService(db).list_books(page, page_size, keyword, ar_pending, status)
+    books, counts, total = BookService(db).list_books(
+        page, page_size, keyword, ar_pending, status, no_cover, no_audio, quiz_incomplete
+    )
     question_counts = QuizQuestionRepository(db).question_counts_by_book([b.id for b in books])
     return PaginatedResponse[BookResponse].create(
         items=[
@@ -194,6 +200,16 @@ def delete_book(
 ):
     BookService(db).delete_book(admin, book_id)
     return {"detail": "已删除"}
+
+
+@router.post("/books/batch-delete")
+def batch_delete_books(
+    body: BatchDeleteRequest,
+    admin: Any = Depends(require_perm("book.manage")),
+    db: Session = Depends(get_db),
+):
+    result = BookService(db).batch_delete_books(admin, body.ids)
+    return {"detail": "批量删除完成", **result}
 
 
 @router.post("/books/{book_id}/copies", response_model=list[CopyResponse])
