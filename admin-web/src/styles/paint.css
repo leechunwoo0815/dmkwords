@@ -437,13 +437,6 @@ h1, h2, h3, h4, h5, h6,
 }
 
 /* ===== 动画 keyframes ===== */
-@keyframes paint-bounce-in {
-  0% { opacity: 0; transform: scale(0.3); }
-  50% { opacity: 1; transform: scale(1.05); }
-  70% { transform: scale(0.95); }
-  100% { transform: scale(1); }
-}
-
 @keyframes paint-wiggle {
   0%, 100% { transform: rotate(0deg); }
   25% { transform: rotate(-3deg); }
