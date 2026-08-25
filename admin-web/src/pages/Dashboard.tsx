@@ -65,7 +65,7 @@ export default function Dashboard() {
           <Col xs={24} sm={8}>
             <Card size="small" styles={{ body: { padding: "14px 16px" } }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <TeamOutlined style={{ fontSize: 22, color: "#2c4a6e" }} />
+                <TeamOutlined style={{ fontSize: 22, color: "var(--paint-ink)" }} />
                 <div>
                   <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
                     {overview?.admin_count ?? "—"}
@@ -80,7 +80,7 @@ export default function Dashboard() {
           <Col xs={24} sm={8}>
             <Card size="small" styles={{ body: { padding: "14px 16px" } }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <ClockCircleOutlined style={{ fontSize: 22, color: "#2c4a6e" }} />
+                <ClockCircleOutlined style={{ fontSize: 22, color: "var(--paint-ink)" }} />
                 <div>
                   <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
                     {overview?.today_logins ?? "—"}
@@ -95,7 +95,7 @@ export default function Dashboard() {
           <Col xs={24} sm={8}>
             <Card size="small" styles={{ body: { padding: "14px 16px" } }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <CheckCircleOutlined style={{ fontSize: 22, color: "#35703c" }} />
+                <CheckCircleOutlined style={{ fontSize: 22, color: "var(--paint-secondary)" }} />
                 <div>
                   <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
                     {overview?.config_count ?? "—"}
@@ -126,7 +126,7 @@ export default function Dashboard() {
                   display: "flex",
                   justifyContent: "space-between",
                   padding: "8px 0",
-                  borderBottom: i < (overview?.recent_config_changes.length ?? 0) - 1 ? "1px dashed #e4dcc8" : "none",
+                  borderBottom: i < (overview?.recent_config_changes.length ?? 0) - 1 ? "1px dashed var(--paint-border)" : "none",
                 }}
               >
                 <span>
@@ -157,12 +157,12 @@ export default function Dashboard() {
             <Col key={cell.label} xs={12} sm={6}>
               <Card
                 size="small"
-                style={{ background: "#f6f2e9", borderColor: "#e4dcc8" }}
+                style={{ background: "var(--paint-canvas)", borderColor: "var(--paint-border)" }}
                 styles={{ body: { padding: "12px 16px" } }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <Typography.Text type="secondary">{cell.label}</Typography.Text>
-                  <BookOutlined style={{ color: "#a39a86" }} />
+                  <BookOutlined style={{ color: "var(--paint-ink-light)" }} />
                 </div>
                 <div style={{ marginTop: 6, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                   <Typography.Text style={{ fontSize: 20, fontWeight: 700, fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>

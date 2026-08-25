@@ -1,3 +1,4 @@
+import PaintEmpty from "../components/PaintEmpty";
 import { useCallback, useEffect, useState } from "react";
 import {
   App as AntdApp,
@@ -90,7 +91,7 @@ export default function DepositManage() {
         />
       </Space>
 
-      <Table<Deposit>
+      <Table<Deposit> locale={{ emptyText: <PaintEmpty character="cat" /> }}
         rowKey="id" loading={loading} dataSource={deposits} size="middle"
         pagination={{ current: page, pageSize: 15, total, showSizeChanger: false, onChange: setPage }}
         columns={[
@@ -140,7 +141,7 @@ export default function DepositManage() {
           <Typography.Text type="secondary">暂无流水</Typography.Text>
         ) : (
           ledgers.map((l) => (
-            <div key={l.id} style={{ padding: "10px 0", borderBottom: "1px dashed #e4dcc8" }}>
+            <div key={l.id} style={{ padding: "10px 0", borderBottom: "1px dashed var(--paint-border)" }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <Tag color={l.entry_type === "deduct" ? "red" : l.entry_type === "pay" || l.entry_type === "supplement" ? "green" : "default"}>
                   {ENTRY_LABEL[l.entry_type] ?? l.entry_type}

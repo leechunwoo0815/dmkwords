@@ -1,3 +1,4 @@
+import PaintEmpty from "../components/PaintEmpty";
 // 退款中心（WM10：订单/押金退款 + 退会 + 转让，超管逐单审核）
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -139,7 +140,7 @@ export default function RefundCenter() {
             key: "refunds",
             label: `退款待审（${pendingRefunds.length}）`,
             children: (
-              <Table<RefundRequestItem>
+              <Table<RefundRequestItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
                 rowKey="id" dataSource={refunds} size="middle"
                 pagination={{ pageSize: 15, showSizeChanger: false }}
                 columns={[
@@ -150,7 +151,7 @@ export default function RefundCenter() {
                       r.order_no ? (
                         <div>
                           <Typography.Text code style={{ fontSize: 12 }}>{r.order_no}</Typography.Text>
-                          <div style={{ fontSize: 12, color: "#6f685a" }}>
+                          <div style={{ fontSize: 12, color: "var(--paint-ink-light)" }}>
                             {ORDER_TYPE_LABEL[r.order_type ?? ""] ?? r.order_type}
                             {r.pay_method ? ` · ${r.pay_method}` : ""}
                           </div>
@@ -190,7 +191,7 @@ export default function RefundCenter() {
             key: "withdrawals",
             label: `退会待审（${pendingWithdrawals.length}）`,
             children: (
-              <Table<WithdrawalItem>
+              <Table<WithdrawalItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
                 rowKey="id" dataSource={withdrawals} size="middle"
                 pagination={{ pageSize: 15, showSizeChanger: false }}
                 columns={[
@@ -226,7 +227,7 @@ export default function RefundCenter() {
             key: "transfers",
             label: `转让待审（${pendingTransfers.length}）`,
             children: (
-              <Table<TransferItem>
+              <Table<TransferItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
                 rowKey="id" dataSource={transfers} size="middle"
                 pagination={{ pageSize: 15, showSizeChanger: false }}
                 columns={[

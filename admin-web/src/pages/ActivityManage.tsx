@@ -1,3 +1,4 @@
+import PaintEmpty from "../components/PaintEmpty";
 // 活动管理（WM9：发布/取消/报名/签到/退款审核）
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -142,7 +143,7 @@ export default function ActivityManage() {
           {
             key: "activities", label: `活动列表（${activities.length}）`,
             children: (
-              <Table<ActivityItem>
+              <Table<ActivityItem> locale={{ emptyText: <PaintEmpty character="star" /> }}
                 rowKey="id" loading={loading} dataSource={activities} size="middle"
                 pagination={{ pageSize: 15, showSizeChanger: false }}
                 columns={[
@@ -183,7 +184,7 @@ export default function ActivityManage() {
           {
             key: "refunds", label: `退款待审（${refunds.length}）`,
             children: (
-              <Table<EnrollmentItem>
+              <Table<EnrollmentItem> locale={{ emptyText: <PaintEmpty character="star" /> }}
                 rowKey={(r) => String(r.enrollment_id ?? r.id)} dataSource={refunds} size="middle"
                 pagination={false}
                 columns={[
@@ -212,7 +213,7 @@ export default function ActivityManage() {
         width={640} open={!!enrollActivity}
         onClose={() => setEnrollActivity(null)}
       >
-        <Table<EnrollmentItem>
+        <Table<EnrollmentItem> locale={{ emptyText: <PaintEmpty character="star" /> }}
           rowKey="id" dataSource={enrollments} size="small" pagination={false}
           columns={[
             { title: "孩子", dataIndex: "child_name", width: 90 },

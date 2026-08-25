@@ -48,6 +48,9 @@
   --paint-shadow-sm: 2px 2px 0 var(--paint-ink);
   --paint-shadow-lg: 5px 5px 0 var(--paint-ink);
   --paint-card-shadow: 4px 4px 0 rgba(59, 47, 47, 0.08);
+
+  --font-display: 'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-body: 'Nunito', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', system-ui, sans-serif;
 }
 
 /* 全局纸质感 */
@@ -281,6 +284,8 @@ body {
 /* ===== 表格：行卡片化 ===== */
 .ant-table {
   background: transparent !important;
+  border-collapse: separate !important;
+  border-spacing: 0 10px !important;
 }
 
 .ant-table-container {
@@ -295,33 +300,24 @@ body {
   border-radius: var(--paint-radius) !important;
 }
 
-.ant-table-tbody > tr.ant-table-row {
+.ant-table-tbody > tr.ant-table-row > td {
+  border-top: 2px solid var(--paint-ink) !important;
+  border-bottom: 2px solid var(--paint-ink) !important;
   background: var(--paint-paper) !important;
-  border: 2px solid var(--paint-ink) !important;
-  border-radius: var(--paint-radius) !important;
-  box-shadow: var(--paint-card-shadow) !important;
-  margin-bottom: 10px !important;
-  display: table-row;
-  transition: transform 0.15s ease;
 }
 
-.ant-table-tbody > tr.ant-table-row:hover {
-  background: #FFF9F0 !important;
-  transform: translateY(-2px);
-  box-shadow: 4px 4px 0 rgba(59, 47, 47, 0.12) !important;
-}
-
-.ant-table-tbody > tr > td {
-  border-bottom: none !important;
-  background: transparent !important;
-}
-
-.ant-table-tbody > tr.ant-table-row:first-child td:first-child {
+.ant-table-tbody > tr.ant-table-row > td:first-child {
+  border-left: 2px solid var(--paint-ink) !important;
   border-radius: var(--paint-radius) 0 0 var(--paint-radius) !important;
 }
 
-.ant-table-tbody > tr.ant-table-row:first-child td:last-child {
+.ant-table-tbody > tr.ant-table-row > td:last-child {
+  border-right: 2px solid var(--paint-ink) !important;
   border-radius: 0 var(--paint-radius) var(--paint-radius) 0 !important;
+}
+
+.ant-table-tbody > tr.ant-table-row:hover > td {
+  background: #FFF9F0 !important;
 }
 
 /* 分页 */
@@ -473,8 +469,7 @@ h1, h2, h3, h4, h5, h6,
 }
 
 /* Modal / 卡片 进入动效 */
-.ant-modal-mask,
-.ant-modal-wrap {
+.ant-modal-wrap .ant-modal {
   animation: paint-bounce-in 0.3s ease-out;
 }
 

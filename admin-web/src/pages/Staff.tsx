@@ -1,3 +1,4 @@
+import PaintEmpty from "../components/PaintEmpty";
 // 员工管理（WM1 §11.1 超管职责：创建/禁用/改角色/重置密码，仅超管可见）
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -89,7 +90,7 @@ export default function Staff() {
       <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
         员工=运营专员（借还/图书/活动/会员办理）；角色变更与停用仅超管可操作，全部操作留审计。
       </Typography.Paragraph>
-      <Table<AdminUser>
+      <Table<AdminUser> locale={{ emptyText: <PaintEmpty character="default" /> }}
         rowKey="id" dataSource={rows} size="middle" pagination={false}
         columns={[
           { title: "登录名", dataIndex: "username", width: 160, render: (v) => <Typography.Text code>{v}</Typography.Text> },

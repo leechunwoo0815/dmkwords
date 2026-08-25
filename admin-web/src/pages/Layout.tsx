@@ -58,7 +58,6 @@ export default function Layout() {
       ...item,
       icon: (
         <span
-          className="paint-menu-icon"
           style={{ background: iconBgMap[item.key], color: ["/", "/circulation", "/growth"].includes(item.key) ? "#3B2F2F" : "#fff" }}
         >
           {item.icon}

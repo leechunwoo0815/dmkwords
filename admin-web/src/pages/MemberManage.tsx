@@ -270,7 +270,7 @@ export default function MemberManage() {
               options={Object.entries(MEMBER_LABEL).map(([value, label]) => ({ value, label }))}
             />
           </Space>
-          <Table<Child>
+          <Table<Child> locale={{ emptyText: <PaintEmpty character="star" /> }}
             rowKey="id" loading={loading} dataSource={children} size="middle"
             pagination={{ current: childPage, pageSize: 15, total: childTotal, showSizeChanger: false, onChange: setChildPage }}
             columns={[
@@ -328,7 +328,7 @@ export default function MemberManage() {
               options={Object.entries(ORDER_STATUS_LABEL).map(([value, label]) => ({ value, label }))}
             />
           </Space>
-          <Table<Order>
+          <Table<Order> locale={{ emptyText: <PaintEmpty character="star" /> }}
             rowKey="id" dataSource={orders} size="middle"
             pagination={{ current: orderPage, pageSize: 15, total: orderTotal, showSizeChanger: false, onChange: setOrderPage }}
             columns={[

@@ -11,7 +11,7 @@ import PaintEmpty from "./components/PaintEmpty";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ConfigProvider theme={paintTheme} locale={zhCN} renderEmpty={() => <PaintEmpty />}>
+    <ConfigProvider theme={paintTheme} locale={zhCN} renderEmpty={() => <PaintEmpty character="default" />}>
       <AntdApp>
         <BrowserRouter>
           <App />

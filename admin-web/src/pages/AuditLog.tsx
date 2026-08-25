@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { App as AntdApp, Select, Space, Table, Tag, Typography } from "antd";
+import PaintEmpty from "../components/PaintEmpty";
 
 import { apiListAuditLogs, type AuditLog } from "../api/admin";
 
@@ -104,7 +105,7 @@ export default function AuditLogPage() {
           options={Object.entries(ACTION_LABEL).map(([value, label]) => ({ value, label }))}
         />
       </Space>
-      <Table<AuditLog>
+      <Table<AuditLog> locale={{ emptyText: <PaintEmpty character="bird" /> }}
         rowKey="id"
         loading={loading}
         dataSource={logs}

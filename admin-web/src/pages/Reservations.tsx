@@ -1,6 +1,7 @@
 // 预约管理（WM6：列表 / 状态筛选 / 核销转借阅）
 import { useCallback, useEffect, useState } from "react";
 import { App as AntdApp, Button, Select, Space, Table, Tag, Typography } from "antd";
+import PaintEmpty from "../components/PaintEmpty";
 
 import {
   apiCheckoutReservation,
@@ -63,7 +64,7 @@ export default function Reservations() {
           家长在小程序发起预约后，副本锁定 72 小时；到店取书时在此核销转借阅。
         </Typography.Text>
       </Space>
-      <Table<ReservationItem>
+      <Table<ReservationItem> locale={{ emptyText: <PaintEmpty character="bear" /> }}
         rowKey="id" loading={loading} dataSource={items} size="middle"
         pagination={{ pageSize: 15, showSizeChanger: false }}
         columns={[

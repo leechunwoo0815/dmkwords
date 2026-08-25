@@ -1,3 +1,4 @@
+import PaintEmpty from "../components/PaintEmpty";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -188,7 +189,7 @@ export default function CirculationDesk() {
         <>
           {/* 孩子卡片 */}
           <Card
-            size="small" style={{ marginBottom: 16, border: card.overdue_count > 0 ? "1px solid #b54028" : undefined }}
+            size="small" style={{ marginBottom: 16, border: card.overdue_count > 0 ? "1px solid var(--paint-danger)" : undefined }}
             title={
               <Space>
                 <Typography.Text strong style={{ fontSize: 16 }}>{card.name}</Typography.Text>
@@ -200,8 +201,8 @@ export default function CirculationDesk() {
           >
             <Row gutter={16}>
               <Col span={4}><Card size="small"><Typography.Text type="secondary">在借</Typography.Text><div style={{ fontSize: 22, fontWeight: 700 }}>{card.active_borrows}</div></Card></Col>
-              <Col span={4}><Card size="small"><Typography.Text type="secondary">逾期</Typography.Text><div style={{ fontSize: 22, fontWeight: 700, color: card.overdue_count > 0 ? "#b54028" : undefined }}>{card.overdue_count}</div></Card></Col>
-              <Col span={4}><Card size="small"><Typography.Text type="secondary">可借</Typography.Text><div style={{ fontSize: 22, fontWeight: 700, color: "#35703c" }}>{card.available_quota}</div></Card></Col>
+              <Col span={4}><Card size="small"><Typography.Text type="secondary">逾期</Typography.Text><div style={{ fontSize: 22, fontWeight: 700, color: card.overdue_count > 0 ? "var(--paint-danger)" : undefined }}>{card.overdue_count}</div></Card></Col>
+              <Col span={4}><Card size="small"><Typography.Text type="secondary">可借</Typography.Text><div style={{ fontSize: 22, fontWeight: 700, color: "var(--paint-secondary)" }}>{card.available_quota}</div></Card></Col>
               <Col span={4}><Card size="small"><Typography.Text type="secondary">押金</Typography.Text><div style={{ marginTop: 6 }}>{card.deposit_status === "paid" ? <Tag color="green">已缴 ￥{Number(card.deposit_available).toLocaleString()}</Tag> : <Tag color="red">{card.deposit_status === "unpaid" ? "未缴" : "异常"}</Tag>}</div></Card></Col>
             </Row>
           </Card>
@@ -219,7 +220,7 @@ export default function CirculationDesk() {
           </Card>
 
           {/* 在借列表 */}
-          <Table
+          <Table locale={{ emptyText: <PaintEmpty character="bear" /> }}
             rowKey="id" size="small" pagination={false} dataSource={card.records}
             columns={[
               { title: "借出时间", dataIndex: "borrowed_at", width: 170, render: (v: string) => v?.slice(0, 16) },
@@ -244,7 +245,7 @@ export default function CirculationDesk() {
       <Typography.Title level={5} style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif", marginTop: 24 }}>
         逾期名单（{overdue.length}）
       </Typography.Title>
-      <Table<OverdueItem>
+      <Table<OverdueItem> locale={{ emptyText: <PaintEmpty character="bear" /> }}
         rowKey="record_id" size="small" pagination={false} dataSource={overdue}
         columns={[
           { title: "孩子", dataIndex: "child_name", width: 100 },

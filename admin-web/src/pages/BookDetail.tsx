@@ -1,3 +1,4 @@
+import PaintEmpty from "../components/PaintEmpty";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -169,11 +170,11 @@ export default function BookDetail() {
                   alt="封面"
                   width={72}
                   height={100}
-                  style={{ objectFit: "cover", borderRadius: 6, border: "1px solid #e4dcc8" }}
+                  style={{ objectFit: "cover", borderRadius: 6, border: "1px solid var(--paint-border)" }}
                   preview={{ mask: "预览" }}
                 />
               ) : (
-                <div style={{ width: 72, height: 100, borderRadius: 6, border: "1px dashed #e4dcc8", display: "flex", alignItems: "center", justifyContent: "center", color: "#a39a86", fontSize: 12 }}>未上传</div>
+                <div style={{ width: 72, height: 100, borderRadius: 6, border: "1px dashed var(--paint-border)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--paint-ink-light)", fontSize: 12 }}>未上传</div>
               )}
             </div>
             <Upload
@@ -248,7 +249,7 @@ export default function BookDetail() {
           </Popconfirm>
         }
       >
-        <Table<BookCopy>
+        <Table<BookCopy> locale={{ emptyText: <PaintEmpty character="bookworm" /> }}
           rowKey="id" dataSource={copies} size="small" pagination={false}
           columns={[
             { title: "副本码", dataIndex: "copy_code", width: 160, render: (v) => <Typography.Text code>{v}</Typography.Text> },
@@ -293,7 +294,7 @@ export default function BookDetail() {
           setQuestionOpen(true);
         }}>添加题目</Button>}
       >
-        <Table<QuizQuestion>
+        <Table<QuizQuestion> locale={{ emptyText: <PaintEmpty character="bookworm" /> }}
           rowKey="id" dataSource={questions} size="small" pagination={false}
           columns={[
             { title: "#", dataIndex: "sort_order", width: 50 },

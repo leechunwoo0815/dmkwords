@@ -3,7 +3,7 @@ import { Button, Card, Form, Input, Typography, App as AntdApp } from "antd";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth";
-import { hardShadow } from "../theme";
+import { hardShadow } from "../theme-paint";
 
 export default function Login() {
   const { login } = useAuth();
@@ -28,15 +28,15 @@ export default function Login() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#f6f2e9", // 暖纸米白
+        background: "var(--paint-canvas)", // 暖纸米白
       }}
     >
       <Card
-        style={{ width: 380, boxShadow: hardShadow, borderColor: "#e4dcc8" }}
+        style={{ width: 380, boxShadow: hardShadow, borderColor: "var(--paint-border)" }}
         styles={{ body: { padding: 32 } }}
       >
         <div style={{ textAlign: "center", marginBottom: 8 }}>
-          <BookFilled style={{ fontSize: 40, color: "#c9a227" }} />
+          <BookFilled style={{ fontSize: 40, color: "var(--paint-yellow)" }} />
         </div>
         <Typography.Title
           level={3}

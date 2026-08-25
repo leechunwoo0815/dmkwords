@@ -1,3 +1,4 @@
+import PaintEmpty from "../components/PaintEmpty";
 // 成长与测验管理（WM7：词数流水/积分明细/测验重置/积分调整/等级重算）
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -141,7 +142,7 @@ export default function GrowthManage() {
         </Typography.Text>
       </Space>
 
-      <Table<Child>
+      <Table<Child> locale={{ emptyText: <PaintEmpty character="rabbit" /> }}
         rowKey="id" dataSource={children} size="middle"
         pagination={{ pageSize: 15, showSizeChanger: false }}
         columns={[
@@ -191,7 +192,7 @@ export default function GrowthManage() {
                 {
                   key: "words", label: `词数流水（${growth.words_ledger.length}）`,
                   children: (
-                    <Table
+                    <Table locale={{ emptyText: <PaintEmpty character="rabbit" /> }}
                       rowKey="id" size="small" dataSource={growth.words_ledger}
                       pagination={false}
                       columns={[
@@ -205,13 +206,13 @@ export default function GrowthManage() {
                 {
                   key: "points", label: `积分明细（${growth.points_ledger.length}）`,
                   children: (
-                    <Table
+                    <Table locale={{ emptyText: <PaintEmpty character="rabbit" /> }}
                       rowKey="id" size="small" dataSource={growth.points_ledger}
                       pagination={false}
                       columns={[
                         { title: "类型", dataIndex: "reason_type", width: 110, render: (t) => REASON_LABEL[t] ?? t },
                         { title: "说明", dataIndex: "detail" },
-                        { title: "积分", dataIndex: "points", width: 80, render: (v) => <Typography.Text strong style={{ color: "#35703c" }}>+{v}</Typography.Text> },
+                        { title: "积分", dataIndex: "points", width: 80, render: (v) => <Typography.Text strong style={{ color: "var(--paint-secondary)" }}>+{v}</Typography.Text> },
                         { title: "时间", dataIndex: "created_at", width: 170 },
                       ]}
                     />
@@ -220,7 +221,7 @@ export default function GrowthManage() {
                 {
                   key: "quiz", label: `测验记录（${growth.quiz_overview.length}）`,
                   children: (
-                    <Table
+                    <Table locale={{ emptyText: <PaintEmpty character="rabbit" /> }}
                       rowKey="book_id" size="small" dataSource={growth.quiz_overview}
                       pagination={false}
                       columns={[

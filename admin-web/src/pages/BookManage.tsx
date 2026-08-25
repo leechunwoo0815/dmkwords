@@ -1,3 +1,4 @@
+import PaintEmpty from "../components/PaintEmpty";
 import { useCallback, useEffect, useState } from "react";
 import {
   App as AntdApp,
@@ -177,7 +178,7 @@ export default function BookManage() {
           { key: "quiz_incomplete", label: "测验未满 5 道" },
         ]}
       />
-      <Table<Book>
+      <Table<Book> locale={{ emptyText: <PaintEmpty character="bookworm" /> }}
         rowKey="id"
         loading={loading}
         dataSource={books}
@@ -329,7 +330,7 @@ export default function BookManage() {
             {importResult.errors.length > 0 && (
               <div style={{ marginTop: 8, maxHeight: 200, overflow: "auto", background: "#FFFDF7", border: "2px solid #3B2F2F", padding: 12, borderRadius: 12 }}>
                 {importResult.errors.map((e, i) => (
-                  <div key={i} style={{ color: "#b54028", fontSize: 13 }}>{e}</div>
+                  <div key={i} style={{ color: "var(--paint-danger)", fontSize: 13 }}>{e}</div>
                 ))}
               </div>
             )}

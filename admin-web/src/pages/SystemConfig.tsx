@@ -1,3 +1,4 @@
+import PaintEmpty from "../components/PaintEmpty";
 import { useEffect, useMemo, useState } from "react";
 import {
   App as AntdApp,
@@ -92,7 +93,7 @@ export default function SystemConfigPage() {
         onChange={setCategory}
         items={categories.map((c) => ({ key: c, label: c }))}
       />
-      <Table<SystemConfig>
+      <Table<SystemConfig> locale={{ emptyText: <PaintEmpty character="default" /> }}
         rowKey="config_key"
         loading={loading}
         dataSource={filtered}
