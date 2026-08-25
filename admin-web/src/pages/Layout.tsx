@@ -24,6 +24,21 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const iconBgMap: Record<string, string> = {
+    "/": "#FCD34D",
+    "/books": "#FF6B35",
+    "/members": "#60A5FA",
+    "/deposits": "#A78BFA",
+    "/circulation": "#4ADE80",
+    "/reservations": "#F472B6",
+    "/growth": "#FCD34D",
+    "/activities": "#FF6B35",
+    "/refund-center": "#EF4444",
+    "/staff": "#60A5FA",
+    "/configs": "#6B5B5B",
+    "/audit-logs": "#A78BFA",
+  };
+
   const items = [
     { key: "/", icon: <DashboardOutlined />, label: "仪表盘", perm: "dashboard.view" },
     { key: "/books", icon: <BookOutlined />, label: "图书管理", perm: "book.manage" },
@@ -37,24 +52,37 @@ export default function Layout() {
     { key: "/staff", icon: <UserOutlined />, label: "员工管理", perm: "staff.manage" },
     { key: "/configs", icon: <SettingOutlined />, label: "系统配置", perm: "config.view" },
     { key: "/audit-logs", icon: <AuditOutlined />, label: "审计日志", perm: "audit.view" },
-  ].filter((item) => hasPermission(permissions, item.perm));
+  ]
+    .filter((item) => hasPermission(permissions, item.perm))
+    .map((item) => ({
+      ...item,
+      icon: (
+        <span
+          className="paint-menu-icon"
+          style={{ background: iconBgMap[item.key], color: ["/", "/circulation", "/growth"].includes(item.key) ? "#3B2F2F" : "#fff" }}
+        >
+          {item.icon}
+        </span>
+      ),
+    }));
 
   const selected = location.pathname === "/" ? "/" : `/${location.pathname.split("/")[1] ?? ""}`;
 
   return (
     <AntLayout style={{ minHeight: "100vh" }}>
-      <Sider theme="light" width={208} style={{ borderRight: "1px solid #e4dcc8" }}>
+      <Sider theme="light" width={240} style={{ borderRight: "2px solid #3B2F2F" }}>
         <div
           style={{
-            padding: "20px 16px 16px",
-            fontFamily: "Georgia, 'Songti SC', serif",
-            fontSize: 18,
-            fontWeight: 700,
-            color: "#2c4a6e",
+            padding: "22px 18px 18px",
+            fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif",
+            fontSize: 22,
+            fontWeight: 800,
+            color: "#FF6B35",
+            letterSpacing: 1,
           }}
         >
           DmkWords
-          <div style={{ fontSize: 12, fontWeight: 400, color: "#6f685a", marginTop: 2 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#6B5B5B", marginTop: 4 }}>
             少儿英语分级阅读
           </div>
         </div>
@@ -69,8 +97,8 @@ export default function Layout() {
       <AntLayout>
         <Header
           style={{
-            background: "#fffefa",
-            borderBottom: "1px solid #e4dcc8",
+            background: "rgba(255, 253, 247, 0.96)",
+            borderBottom: "2px solid #3B2F2F",
             display: "flex",
             justifyContent: "flex-end",
             alignItems: "center",

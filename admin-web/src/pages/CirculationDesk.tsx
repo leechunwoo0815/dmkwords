@@ -157,7 +157,7 @@ export default function CirculationDesk() {
 
   return (
     <>
-      <Typography.Title level={4} style={{ fontFamily: "Georgia, 'Songti SC', serif" }}>
+      <Typography.Title level={4} style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
         借阅操作台
       </Typography.Title>
       <Typography.Paragraph type="secondary">
@@ -241,7 +241,7 @@ export default function CirculationDesk() {
       )}
 
       {/* 逾期名单 */}
-      <Typography.Title level={5} style={{ fontFamily: "Georgia, 'Songti SC', serif", marginTop: 24 }}>
+      <Typography.Title level={5} style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif", marginTop: 24 }}>
         逾期名单（{overdue.length}）
       </Typography.Title>
       <Table<OverdueItem>

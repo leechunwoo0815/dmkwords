@@ -39,7 +39,7 @@ export const hardShadowSm = '2px 2px 0 rgba(38, 36, 25, 0.10)';
 export const hardShadowLg = '5px 5px 0 rgba(38, 36, 25, 0.10)';
 export const focusRing = '0 0 0 3px rgba(44, 74, 110, 0.16)';
 export const fontDisplay =
-  "Georgia, 'Times New Roman', 'Songti SC', 'STSong', 'SimSun', 'Noto Serif SC', serif";
+  "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', 'Microsoft YaHei', 'Noto Serif SC', serif";
 export const fontBody =
   "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', system-ui, sans-serif";
 

@@ -22,6 +22,7 @@ import { Upload } from "antd";
 import type { UploadFile } from "antd";
 
 import { useAuth } from "../auth";
+import PaintEmpty from "../components/PaintEmpty";
 
 import {
   apiGetChildReading,
@@ -237,7 +238,7 @@ export default function MemberManage() {
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <Typography.Title level={4} style={{ fontFamily: "Georgia, 'Songti SC', serif", margin: 0 }}>
+        <Typography.Title level={4} style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif", margin: 0 }}>
           会员管理
         </Typography.Title>
         <Space>
@@ -543,7 +544,7 @@ export default function MemberManage() {
             <List
               size="small"
               dataSource={readingProfile.finished_books}
-              locale={{ emptyText: "还没有听完的书" }}
+              locale={{ emptyText: <PaintEmpty character="bookworm" message="还没有听完的书" /> }}
               renderItem={(b) => (
                 <List.Item>
                   <List.Item.Meta

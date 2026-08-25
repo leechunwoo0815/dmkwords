@@ -1,0 +1,551 @@
+/* ZCOOL KuaiLe 站酷快乐体 — 免费商用 */
+@font-face {
+  font-family: 'ZCOOL KuaiLe';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('https://cdn.jsdelivr.net/fontsource/fonts/zcool-kuaile@5.3.0/chinese-simplified-400-normal.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/fontsource/fonts/zcool-kuaile@5.3.0/chinese-simplified-400-normal.woff') format('woff');
+  unicode-range: U+4E00-9FFF, U+3400-4DBF, U+20000-2A6DF;
+}
+
+@font-face {
+  font-family: 'ZCOOL KuaiLe';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('https://cdn.jsdelivr.net/fontsource/fonts/zcool-kuaile@5.3.0/latin-400-normal.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/fontsource/fonts/zcool-kuaile@5.3.0/latin-400-normal.woff') format('woff');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* DmkWords 绘本风全局样式覆盖 — paint.css */
+/* 原则：只改形态/颜色/动效，不改布局尺寸与业务逻辑 */
+
+:root {
+  --paint-ink: #3B2F2F;
+  --paint-ink-light: #6B5B5B;
+  --paint-canvas: #FDF8F0;
+  --paint-paper: #FFFDF7;
+  --paint-paper-dim: #FFF5E6;
+  --paint-border: #D4C5B5;
+  --paint-primary: #FF6B35;
+  --paint-primary-hover: #E85A28;
+  --paint-primary-soft: #FFEDE5;
+  --paint-secondary: #4ADE80;
+  --paint-secondary-soft: #E0FCEA;
+  --paint-yellow: #FCD34D;
+  --paint-blue: #60A5FA;
+  --paint-pink: #F472B6;
+  --paint-purple: #A78BFA;
+  --paint-danger: #EF4444;
+  --paint-danger-hover: #DC2626;
+  --paint-brown: #8B5E3C;
+  --paint-radius: 12px;
+  --paint-radius-lg: 20px;
+  --paint-radius-xl: 24px;
+  --paint-shadow: 3px 3px 0 var(--paint-ink);
+  --paint-shadow-sm: 2px 2px 0 var(--paint-ink);
+  --paint-shadow-lg: 5px 5px 0 var(--paint-ink);
+  --paint-card-shadow: 4px 4px 0 rgba(59, 47, 47, 0.08);
+}
+
+/* 全局纸质感 */
+html,
+body,
+#root,
+.ant-layout {
+  background: var(--paint-canvas) !important;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--paint-ink);
+}
+
+/* 水彩纹理（通用） */
+.paint-texture {
+  position: relative;
+  z-index: 0;
+}
+.paint-texture::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.08;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ===== 按钮：大胶囊 + 粗边框 + 硬阴影 + 按压 ===== */
+.ant-btn {
+  border-width: 2px !important;
+  border-color: var(--paint-ink) !important;
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+  transition: all 0.15s ease !important;
+}
+
+.ant-btn:not(.ant-btn-link):not(.ant-btn-text) {
+  box-shadow: var(--paint-shadow-sm);
+}
+
+.ant-btn:not(.ant-btn-link):not(.ant-btn-text):active {
+  box-shadow: 1px 1px 0 var(--paint-ink) !important;
+  transform: translate(1px, 1px);
+}
+
+.ant-btn-primary {
+  background: var(--paint-primary) !important;
+  color: #fff !important;
+  border-color: var(--paint-ink) !important;
+  box-shadow: var(--paint-shadow);
+}
+
+.ant-btn-primary:hover {
+  background: var(--paint-primary-hover) !important;
+  transform: scale(1.02);
+}
+
+.ant-btn-primary:active {
+  background: var(--paint-primary-hover) !important;
+}
+
+.ant-btn-default {
+  background: var(--paint-paper) !important;
+  color: var(--paint-ink) !important;
+}
+
+.ant-btn-default:hover {
+  background: var(--paint-paper-dim) !important;
+  transform: scale(1.02);
+}
+
+.ant-btn-dashed {
+  border-style: dashed !important;
+  background: var(--paint-paper) !important;
+}
+
+.ant-btn-dangerous:not(.ant-btn-link):not(.ant-btn-text) {
+  background: var(--paint-danger) !important;
+  color: #fff !important;
+  box-shadow: var(--paint-shadow);
+}
+
+.ant-btn-dangerous:not(.ant-btn-link):not(.ant-btn-text):hover {
+  background: var(--paint-danger-hover) !important;
+  transform: scale(1.02);
+}
+
+.ant-btn-link,
+.ant-btn-text {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.ant-btn-link:hover,
+.ant-btn-text:hover {
+  transform: none;
+}
+
+/* 小按钮也胶囊 */
+.ant-btn-sm {
+  border-radius: 999px !important;
+}
+
+/* ===== 输入框 ===== */
+.ant-input,
+.ant-input-number,
+.ant-select-selector,
+.ant-picker,
+.ant-input-affix-wrapper {
+  border-width: 2px !important;
+  border-color: var(--paint-border) !important;
+  border-radius: var(--paint-radius) !important;
+  background: var(--paint-paper) !important;
+}
+
+.ant-input:hover,
+.ant-input-number:hover,
+.ant-select-selector:hover,
+.ant-picker:hover,
+.ant-input-affix-wrapper:hover {
+  border-color: var(--paint-ink) !important;
+}
+
+.ant-input:focus,
+.ant-input-focused,
+.ant-input-number-focused,
+.ant-select-focused .ant-select-selector,
+.ant-picker-focused,
+.ant-input-affix-wrapper-focused {
+  border-color: var(--paint-ink) !important;
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.18) !important;
+}
+
+/* ===== 标签：贴纸 pill ===== */
+.ant-tag {
+  border: 2px solid var(--paint-ink) !important;
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+  padding: 2px 10px !important;
+}
+
+.ant-tag-green,
+.ant-tag-success {
+  background: var(--paint-secondary-soft) !important;
+  color: #166534 !important;
+}
+
+.ant-tag-orange,
+.ant-tag-warning {
+  background: #FFEDD5 !important;
+  color: #9A3412 !important;
+}
+
+.ant-tag-red,
+.ant-tag-error {
+  background: #FEE2E2 !important;
+  color: #991B1B !important;
+}
+
+.ant-tag-blue,
+.ant-tag-processing {
+  background: #DBEAFE !important;
+  color: #1E40AF !important;
+}
+
+/* ===== 卡片 ===== */
+.ant-card {
+  border: 2px solid var(--paint-ink) !important;
+  border-radius: var(--paint-radius-lg) !important;
+  box-shadow: var(--paint-card-shadow) !important;
+  background: var(--paint-paper) !important;
+}
+
+.ant-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 5px 5px 0 rgba(59, 47, 47, 0.12) !important;
+}
+
+/* ===== Modal ===== */
+.ant-modal-content {
+  border: 2.5px solid var(--paint-ink) !important;
+  border-radius: var(--paint-radius-xl) !important;
+  box-shadow: var(--paint-shadow-lg) !important;
+  background: var(--paint-paper) !important;
+}
+
+.ant-modal-header {
+  border-bottom: 2px dashed var(--paint-border) !important;
+  border-radius: var(--paint-radius-xl) var(--paint-radius-xl) 0 0 !important;
+}
+
+.ant-modal-footer {
+  border-top: 2px dashed var(--paint-border) !important;
+}
+
+/* ===== Tabs：贴纸条 ===== */
+.ant-tabs-nav {
+  margin-bottom: 16px !important;
+}
+
+.ant-tabs-tab {
+  border: 2px solid transparent !important;
+  border-radius: 999px !important;
+  padding: 6px 16px !important;
+  font-weight: 700 !important;
+  transition: all 0.15s ease !important;
+}
+
+.ant-tabs-tab:hover {
+  background: var(--paint-paper-dim) !important;
+}
+
+.ant-tabs-tab-active {
+  background: var(--paint-primary-soft) !important;
+  border-color: var(--paint-ink) !important;
+  box-shadow: var(--paint-shadow-sm);
+}
+
+.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--paint-ink) !important;
+}
+
+.ant-tabs-ink-bar {
+  display: none !important;
+}
+
+/* ===== 表格：行卡片化 ===== */
+.ant-table {
+  background: transparent !important;
+}
+
+.ant-table-container {
+  border: none !important;
+}
+
+.ant-table-thead > tr > th {
+  border: none !important;
+  background: var(--paint-paper-dim) !important;
+  font-weight: 800 !important;
+  color: var(--paint-ink) !important;
+  border-radius: var(--paint-radius) !important;
+}
+
+.ant-table-tbody > tr.ant-table-row {
+  background: var(--paint-paper) !important;
+  border: 2px solid var(--paint-ink) !important;
+  border-radius: var(--paint-radius) !important;
+  box-shadow: var(--paint-card-shadow) !important;
+  margin-bottom: 10px !important;
+  display: table-row;
+  transition: transform 0.15s ease;
+}
+
+.ant-table-tbody > tr.ant-table-row:hover {
+  background: #FFF9F0 !important;
+  transform: translateY(-2px);
+  box-shadow: 4px 4px 0 rgba(59, 47, 47, 0.12) !important;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom: none !important;
+  background: transparent !important;
+}
+
+.ant-table-tbody > tr.ant-table-row:first-child td:first-child {
+  border-radius: var(--paint-radius) 0 0 var(--paint-radius) !important;
+}
+
+.ant-table-tbody > tr.ant-table-row:first-child td:last-child {
+  border-radius: 0 var(--paint-radius) var(--paint-radius) 0 !important;
+}
+
+/* 分页 */
+.ant-pagination-item,
+.ant-pagination-prev,
+.ant-pagination-next {
+  border: 2px solid var(--paint-ink) !important;
+  border-radius: 10px !important;
+  background: var(--paint-paper) !important;
+}
+
+.ant-pagination-item-active {
+  background: var(--paint-primary) !important;
+  border-color: var(--paint-ink) !important;
+}
+
+.ant-pagination-item-active a {
+  color: #fff !important;
+}
+
+/* ===== 侧边栏菜单：彩色图标圆圈 ===== */
+.ant-layout-sider {
+  border-right: 2px solid var(--paint-ink) !important;
+  box-shadow: 3px 0 0 rgba(59, 47, 47, 0.06) !important;
+}
+
+.ant-menu {
+  background: transparent !important;
+  border-inline-end: none !important;
+}
+
+.ant-menu-item {
+  border-radius: 999px !important;
+  margin: 6px 12px !important;
+  padding-left: 14px !important;
+  font-weight: 700 !important;
+  color: var(--paint-ink) !important;
+  transition: all 0.15s ease !important;
+}
+
+.ant-menu-item:hover {
+  background: var(--paint-paper-dim) !important;
+}
+
+.ant-menu-item-selected {
+  background: var(--paint-primary-soft) !important;
+  box-shadow: inset 3px 3px 0 rgba(59, 47, 47, 0.06);
+}
+
+.ant-menu-item-icon {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  border-radius: 50% !important;
+  border: 2px solid var(--paint-ink) !important;
+  margin-right: 10px !important;
+  font-size: 16px !important;
+  background: var(--paint-yellow);
+  color: var(--paint-ink);
+}
+
+/* 菜单图标底色（按顺序匹配常见菜单） */
+.ant-menu-item:nth-child(1) .ant-menu-item-icon { background: var(--paint-yellow); }
+.ant-menu-item:nth-child(2) .ant-menu-item-icon { background: var(--paint-primary); color: #fff; }
+.ant-menu-item:nth-child(3) .ant-menu-item-icon { background: var(--paint-blue); color: #fff; }
+.ant-menu-item:nth-child(4) .ant-menu-item-icon { background: var(--paint-purple); color: #fff; }
+.ant-menu-item:nth-child(5) .ant-menu-item-icon { background: var(--paint-secondary); }
+.ant-menu-item:nth-child(6) .ant-menu-item-icon { background: var(--paint-pink); color: #fff; }
+.ant-menu-item:nth-child(7) .ant-menu-item-icon { background: var(--paint-yellow); }
+.ant-menu-item:nth-child(8) .ant-menu-item-icon { background: var(--paint-primary); color: #fff; }
+.ant-menu-item:nth-child(9) .ant-menu-item-icon { background: var(--paint-danger); color: #fff; }
+.ant-menu-item:nth-child(10) .ant-menu-item-icon { background: var(--paint-blue); color: #fff; }
+.ant-menu-item:nth-child(11) .ant-menu-item-icon { background: var(--paint-ink-light); color: #fff; }
+.ant-menu-item:nth-child(12) .ant-menu-item-icon { background: var(--paint-purple); color: #fff; }
+
+/* ===== Layout Header ===== */
+.ant-layout-header {
+  border-bottom: 2px solid var(--paint-ink) !important;
+  background: rgba(255, 253, 247, 0.96) !important;
+  backdrop-filter: blur(6px);
+}
+
+/* ===== Upload Dragger ===== */
+.ant-upload-drag {
+  border: 3px dashed var(--paint-border) !important;
+  border-radius: var(--paint-radius-lg) !important;
+  background: var(--paint-paper) !important;
+}
+
+.ant-upload-drag:hover {
+  border-color: var(--paint-primary) !important;
+  background: var(--paint-primary-soft) !important;
+}
+
+.ant-upload-drag-icon {
+  color: var(--paint-primary) !important;
+}
+
+/* ===== Dropdown / Popover ===== */
+.ant-dropdown-menu,
+.ant-popover-inner {
+  border: 2px solid var(--paint-ink) !important;
+  border-radius: var(--paint-radius) !important;
+  box-shadow: var(--paint-shadow) !important;
+  background: var(--paint-paper) !important;
+}
+
+/* ===== Popconfirm ===== */
+.ant-popconfirm-inner-content {
+  border-radius: var(--paint-radius) !important;
+}
+
+/* ===== Form ===== */
+.ant-form-item-label > label {
+  font-weight: 700 !important;
+  color: var(--paint-ink) !important;
+}
+
+/* ===== Typography 标题 ===== */
+h1, h2, h3, h4, h5, h6,
+.ant-typography h1,
+.ant-typography h2,
+.ant-typography h3,
+.ant-typography h4 {
+  font-family: var(--font-display);
+  color: var(--paint-ink);
+}
+
+/* ===== 动画 keyframes ===== */
+@keyframes paint-bounce-in {
+  0% { opacity: 0; transform: scale(0.3); }
+  50% { opacity: 1; transform: scale(1.05); }
+  70% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+@keyframes paint-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg); }
+  75% { transform: rotate(3deg); }
+}
+
+@keyframes paint-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* Modal / 卡片 进入动效 */
+.ant-modal-mask,
+.ant-modal-wrap {
+  animation: paint-bounce-in 0.3s ease-out;
+}
+
+/* 通用工具类 */
+.paint-font-display {
+  font-family: var(--font-display);
+}
+
+.paint-card {
+  background: var(--paint-paper);
+  border: 2px solid var(--paint-ink);
+  border-radius: var(--paint-radius-lg);
+  box-shadow: var(--paint-card-shadow);
+}
+
+.paint-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 2.5px solid var(--paint-ink);
+  border-radius: 999px;
+  font-weight: 700;
+  box-shadow: var(--paint-shadow);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.paint-button:active {
+  box-shadow: 1px 1px 0 var(--paint-ink);
+  transform: translate(2px, 2px);
+}
+
+.paint-button--primary {
+  background: var(--paint-primary);
+  color: #fff;
+}
+
+.paint-button--secondary {
+  background: var(--paint-paper);
+  color: var(--paint-ink);
+}
+
+.paint-button--success {
+  background: var(--paint-secondary);
+  color: #fff;
+}
+
+.paint-button--danger {
+  background: var(--paint-danger);
+  color: #fff;
+}
+
+.paint-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border: 2px solid var(--paint-ink);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* 角色空闲动画 */
+.paint-character-idle {
+  animation: paint-wiggle 3s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
+.paint-character-float {
+  animation: paint-float 2.5s ease-in-out infinite;
+}

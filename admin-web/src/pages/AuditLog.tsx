@@ -85,7 +85,7 @@ export default function AuditLogPage() {
 
   return (
     <>
-      <Typography.Title level={4} style={{ fontFamily: "Georgia, 'Songti SC', serif" }}>
+      <Typography.Title level={4} style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
         审计日志
       </Typography.Title>
       <Typography.Paragraph type="secondary">

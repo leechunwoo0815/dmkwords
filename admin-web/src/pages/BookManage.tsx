@@ -120,7 +120,7 @@ export default function BookManage() {
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <Typography.Title level={4} style={{ fontFamily: "Georgia, 'Songti SC', serif", marginBottom: 0 }}>
+        <Typography.Title level={4} style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif", marginBottom: 0 }}>
           图书管理
         </Typography.Title>
         <Space>
@@ -327,7 +327,7 @@ export default function BookManage() {
               共 {importResult.total_rows} 行：成功 {importResult.success_count}，失败 {importResult.failed_count}
             </Typography.Text>
             {importResult.errors.length > 0 && (
-              <div style={{ marginTop: 8, maxHeight: 200, overflow: "auto", background: "#f6f2e9", padding: 12, borderRadius: 8 }}>
+              <div style={{ marginTop: 8, maxHeight: 200, overflow: "auto", background: "#FFFDF7", border: "2px solid #3B2F2F", padding: 12, borderRadius: 12 }}>
                 {importResult.errors.map((e, i) => (
                   <div key={i} style={{ color: "#b54028", fontSize: 13 }}>{e}</div>
                 ))}

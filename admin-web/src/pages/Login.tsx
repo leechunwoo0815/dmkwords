@@ -40,7 +40,7 @@ export default function Login() {
         </div>
         <Typography.Title
           level={3}
-          style={{ textAlign: "center", marginBottom: 4, fontFamily: "Georgia, 'Songti SC', serif" }}
+          style={{ textAlign: "center", marginBottom: 4, fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}
         >
           DmkWords 管理后台
         </Typography.Title>

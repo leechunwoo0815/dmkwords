@@ -5,11 +5,13 @@ import { App as AntdApp, ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 
 import App from "./App";
-import { appTheme } from "./theme";
+import { paintTheme } from "./theme-paint";
+import "./styles/paint.css";
+import PaintEmpty from "./components/PaintEmpty";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ConfigProvider theme={appTheme} locale={zhCN}>
+    <ConfigProvider theme={paintTheme} locale={zhCN} renderEmpty={() => <PaintEmpty />}>
       <AntdApp>
         <BrowserRouter>
           <App />

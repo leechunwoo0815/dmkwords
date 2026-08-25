@@ -49,7 +49,7 @@ export default function Dashboard() {
   return (
     <>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-        <Typography.Title level={4} style={{ fontFamily: "Georgia, 'Songti SC', serif", marginBottom: 0 }}>
+        <Typography.Title level={4} style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif", marginBottom: 0 }}>
           今日概览
         </Typography.Title>
         <Button icon={<ReloadOutlined />} size="small" type="text" onClick={load}>
@@ -67,7 +67,7 @@ export default function Dashboard() {
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <TeamOutlined style={{ fontSize: 22, color: "#2c4a6e" }} />
                 <div>
-                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "Georgia, 'Songti SC', serif" }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
                     {overview?.admin_count ?? "—"}
                   </div>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -82,7 +82,7 @@ export default function Dashboard() {
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <ClockCircleOutlined style={{ fontSize: 22, color: "#2c4a6e" }} />
                 <div>
-                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "Georgia, 'Songti SC', serif" }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
                     {overview?.today_logins ?? "—"}
                   </div>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -97,7 +97,7 @@ export default function Dashboard() {
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <CheckCircleOutlined style={{ fontSize: 22, color: "#35703c" }} />
                 <div>
-                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "Georgia, 'Songti SC', serif" }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
                     {overview?.config_count ?? "—"}
                   </div>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -111,7 +111,7 @@ export default function Dashboard() {
 
         <Typography.Title
           level={5}
-          style={{ fontFamily: "Georgia, 'Songti SC', serif", marginTop: 20, marginBottom: 8 }}
+          style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif", marginTop: 20, marginBottom: 8 }}
         >
           最近配置变更
         </Typography.Title>
@@ -148,7 +148,7 @@ export default function Dashboard() {
 
         <Typography.Title
           level={5}
-          style={{ fontFamily: "Georgia, 'Songti SC', serif", marginTop: 20, marginBottom: 8 }}
+          style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif", marginTop: 20, marginBottom: 8 }}
         >
           经营看板
         </Typography.Title>
@@ -165,7 +165,7 @@ export default function Dashboard() {
                   <BookOutlined style={{ color: "#a39a86" }} />
                 </div>
                 <div style={{ marginTop: 6, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <Typography.Text style={{ fontSize: 20, fontWeight: 700, fontFamily: "Georgia, 'Songti SC', serif" }}>
+                  <Typography.Text style={{ fontSize: 20, fontWeight: 700, fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
                     {cellValue(overview, cell.valueKey) ?? "—"}
                   </Typography.Text>
                   <Tag color="green" style={{ fontSize: 11 }}>{cell.unit}</Tag>
