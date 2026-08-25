@@ -494,7 +494,39 @@
 
 ---
 
+## 十一、admin-web 实施记录与技术坑（2026-08-25）
+
+### 实施方式
+
+admin-web 端未按本规范原定的 4 个迭代分阶段实施，而是一次性整体落地，以配合用户全量审查验收。
+
+### 已落地范围
+
+- `admin-web/src/theme-paint.ts`：绘本调色板、圆角/边框/阴影 token
+- `admin-web/src/styles/paint.css`：Button/Input/Tag/Card/Modal/Tabs/Table/Pagination/Menu/Upload/Dropdown/Form/Typography 全局覆盖
+- `admin-web/src/components/PaintEmpty.tsx`：8 角色空状态插画
+- `admin-web/src/components/PaintLoading.tsx`：7 角色加载态插画
+- `admin-web/index.html`：Nunito + ZCOOL KuaiLe 字体加载
+- `admin-web/src/pages/Layout.tsx`：Sidebar 加宽 240px、菜单图标按 route key 彩色化
+- 10 个页面标题字体替换为 `var(--font-display)`
+- 各页面 `Table` 按模块传入 `PaintEmpty` 角色
+
+### 已规避的技术坑
+
+| 坑 | 根因 | 修复 |
+|---|---|---|
+| 弹窗按钮全部失效 | `paint.css` 给 `.ant-modal-wrap .ant-modal` 加了 `animation: paint-bounce-in`（含 `transform: scale()`），破坏 antd 5 pointer-events 层级 | 删除 Modal 自定义动画，回退到 antd 自带动画 |
+| 按钮偶尔点不上 | `.ant-btn:active { transform: translate(1px,1px) }` 使按钮按下时移出鼠标点击区域 | 删除 `:active` 时的 `transform` |
+| 菜单图标颜色随权限错位 | 用 `.ant-menu-item:nth-child(N)` 匹配颜色，但 `Layout.tsx` 按权限过滤后菜单数量变化 | 改为 `Layout.tsx` 按 route key 传 `iconBgMap` + `iconColorMap` |
+| 字体硬编码难维护 | 16 处内联 `fontFamily: "'ZCOOL KuaiLe', ..."` | 统一改为 `var(--font-display)` |
+
+### 未实施项
+
+- **miniapp 小程序端绘本风**：本规范同样适用，但尚未在小程序端实施，需单独安排迭代。
+
+---
+
 *规范制定：外部专家*  
 *日期：2026-08-25*  
-*版本：V1.0*  
-*关联文档：theme.ts, Layout.tsx, BookManage.tsx, Dashboard.tsx, miniapp/app.wxss*
+*版本：V1.1*  
+*关联文档：theme-paint.ts, Layout.tsx, BookManage.tsx, Dashboard.tsx, miniapp/app.wxss*
