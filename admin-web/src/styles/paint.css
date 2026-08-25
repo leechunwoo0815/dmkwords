@@ -97,7 +97,6 @@ body {
 
 .ant-btn:not(.ant-btn-link):not(.ant-btn-text):active {
   box-shadow: 1px 1px 0 var(--paint-ink) !important;
-  transform: translate(1px, 1px);
 }
 
 .ant-btn-primary {
@@ -468,10 +467,7 @@ h1, h2, h3, h4, h5, h6,
   50% { transform: translateY(-4px); }
 }
 
-/* Modal / 卡片 进入动效 */
-.ant-modal-wrap .ant-modal {
-  animation: paint-bounce-in 0.3s ease-out;
-}
+/* Modal 进入动效：antd 自带动画，不覆盖以避免 pointer-events 异常 */
 
 /* 通用工具类 */
 .paint-font-display {
@@ -501,7 +497,6 @@ h1, h2, h3, h4, h5, h6,
 
 .paint-button:active {
   box-shadow: 1px 1px 0 var(--paint-ink);
-  transform: translate(2px, 2px);
 }
 
 .paint-button--primary {
