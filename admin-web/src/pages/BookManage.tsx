@@ -121,7 +121,7 @@ export default function BookManage() {
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <Typography.Title level={4} style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif", marginBottom: 0 }}>
+        <Typography.Title level={4} style={{ fontFamily: "var(--font-display)", marginBottom: 0 }}>
           图书管理
         </Typography.Title>
         <Space>

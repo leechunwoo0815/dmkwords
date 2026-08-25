@@ -72,7 +72,7 @@ export default function DepositManage() {
 
   return (
     <>
-      <Typography.Title level={4} style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
+      <Typography.Title level={4} style={{ fontFamily: "var(--font-display)" }}>
         押金与赔偿
       </Typography.Title>
       <Typography.Paragraph type="secondary">

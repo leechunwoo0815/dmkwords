@@ -238,7 +238,7 @@ export default function MemberManage() {
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <Typography.Title level={4} style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif", margin: 0 }}>
+        <Typography.Title level={4} style={{ fontFamily: "var(--font-display)", margin: 0 }}>
           会员管理
         </Typography.Title>
         <Space>

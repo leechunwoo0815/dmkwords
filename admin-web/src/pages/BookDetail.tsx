@@ -141,7 +141,7 @@ export default function BookDetail() {
     <>
       <Space style={{ marginBottom: 12 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate("/books")}>返回</Button>
-        <Typography.Title level={4} style={{ margin: 0, fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
+        <Typography.Title level={4} style={{ margin: 0, fontFamily: "var(--font-display)" }}>
           {book.title}
         </Typography.Title>
         {book.status === 1 ? <Tag color="green">上架</Tag> : <Tag>下架</Tag>}

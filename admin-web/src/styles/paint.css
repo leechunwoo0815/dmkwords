@@ -381,19 +381,7 @@ body {
   color: var(--paint-ink);
 }
 
-/* 菜单图标底色（按顺序匹配常见菜单） */
-.ant-menu-item:nth-child(1) .ant-menu-item-icon { background: var(--paint-yellow); }
-.ant-menu-item:nth-child(2) .ant-menu-item-icon { background: var(--paint-primary); color: #fff; }
-.ant-menu-item:nth-child(3) .ant-menu-item-icon { background: var(--paint-blue); color: #fff; }
-.ant-menu-item:nth-child(4) .ant-menu-item-icon { background: var(--paint-purple); color: #fff; }
-.ant-menu-item:nth-child(5) .ant-menu-item-icon { background: var(--paint-secondary); }
-.ant-menu-item:nth-child(6) .ant-menu-item-icon { background: var(--paint-pink); color: #fff; }
-.ant-menu-item:nth-child(7) .ant-menu-item-icon { background: var(--paint-yellow); }
-.ant-menu-item:nth-child(8) .ant-menu-item-icon { background: var(--paint-primary); color: #fff; }
-.ant-menu-item:nth-child(9) .ant-menu-item-icon { background: var(--paint-danger); color: #fff; }
-.ant-menu-item:nth-child(10) .ant-menu-item-icon { background: var(--paint-blue); color: #fff; }
-.ant-menu-item:nth-child(11) .ant-menu-item-icon { background: var(--paint-ink-light); color: #fff; }
-.ant-menu-item:nth-child(12) .ant-menu-item-icon { background: var(--paint-purple); color: #fff; }
+/* 菜单图标彩色圆圈（颜色由 Layout.tsx 按 route key 传入，避免 :nth-child 随权限错位） */
 
 /* ===== Layout Header ===== */
 .ant-layout-header {

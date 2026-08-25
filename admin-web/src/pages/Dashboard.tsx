@@ -6,8 +6,9 @@ import {
   ReloadOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Col, Row, Spin, Tag, Typography } from "antd";
+import { Button, Card, Col, Row, Tag, Typography } from "antd";
 
+import PaintLoading from "../components/PaintLoading";
 import { apiDashboardOverview } from "../api/admin";
 import type { components } from "../api/schema";
 
@@ -49,7 +50,7 @@ export default function Dashboard() {
   return (
     <>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-        <Typography.Title level={4} style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif", marginBottom: 0 }}>
+        <Typography.Title level={4} style={{ fontFamily: "var(--font-display)", marginBottom: 0 }}>
           今日概览
         </Typography.Title>
         <Button icon={<ReloadOutlined />} size="small" type="text" onClick={load}>
@@ -60,14 +61,17 @@ export default function Dashboard() {
         门店运营实时数据；下方经营看板将随各业务模块上线逐步点亮。
       </Typography.Paragraph>
 
-      <Spin spinning={loading}>
-        <Row gutter={[12, 12]}>
+      {loading ? (
+        <PaintLoading character="rainbow" />
+      ) : (
+        <>
+          <Row gutter={[12, 12]}>
           <Col xs={24} sm={8}>
             <Card size="small" styles={{ body: { padding: "14px 16px" } }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <TeamOutlined style={{ fontSize: 22, color: "var(--paint-ink)" }} />
                 <div>
-                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-display)" }}>
                     {overview?.admin_count ?? "—"}
                   </div>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -82,7 +86,7 @@ export default function Dashboard() {
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <ClockCircleOutlined style={{ fontSize: 22, color: "var(--paint-ink)" }} />
                 <div>
-                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-display)" }}>
                     {overview?.today_logins ?? "—"}
                   </div>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -97,7 +101,7 @@ export default function Dashboard() {
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <CheckCircleOutlined style={{ fontSize: 22, color: "var(--paint-secondary)" }} />
                 <div>
-                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-display)" }}>
                     {overview?.config_count ?? "—"}
                   </div>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -111,7 +115,7 @@ export default function Dashboard() {
 
         <Typography.Title
           level={5}
-          style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif", marginTop: 20, marginBottom: 8 }}
+          style={{ fontFamily: "var(--font-display)", marginTop: 20, marginBottom: 8 }}
         >
           最近配置变更
         </Typography.Title>
@@ -148,7 +152,7 @@ export default function Dashboard() {
 
         <Typography.Title
           level={5}
-          style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif", marginTop: 20, marginBottom: 8 }}
+          style={{ fontFamily: "var(--font-display)", marginTop: 20, marginBottom: 8 }}
         >
           经营看板
         </Typography.Title>
@@ -164,7 +168,7 @@ export default function Dashboard() {
                   <BookOutlined style={{ color: "var(--paint-ink-light)" }} />
                 </div>
                 <div style={{ marginTop: 6, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <Typography.Text style={{ fontSize: 20, fontWeight: 700, fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
+                  <Typography.Text style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-display)" }}>
                     {cellValue(overview, cell.valueKey) ?? "—"}
                   </Typography.Text>
                   <Tag color="green" style={{ fontSize: 11 }}>{cell.unit}</Tag>
@@ -173,7 +177,8 @@ export default function Dashboard() {
             </Col>
           ))}
         </Row>
-      </Spin>
+        </>
+      )}
     </>
   );
 }

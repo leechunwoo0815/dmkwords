@@ -114,7 +114,7 @@ export default function PaintEmpty({
       image={CHARACTER_SVGS[character]}
       description={
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', sans-serif", fontSize: 16, color: "#3B2F2F" }}>
+          <div style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "#3B2F2F" }}>
             {message}
           </div>
           {description && (

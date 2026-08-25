@@ -35,9 +35,8 @@ export const palette = {
   brown: '#8B5E3C',        // 借阅熊棕
 };
 
-export const hardShadow = `3px 3px 0 ${ink}`;
-export const hardShadowSm = `2px 2px 0 ${ink}`;
-export const hardShadowLg = `5px 5px 0 ${ink}`;
+const hardShadow = `3px 3px 0 ${ink}`;
+const hardShadowSm = `2px 2px 0 ${ink}`;
 export const cardShadow = `4px 4px 0 rgba(59, 47, 47, 0.08)`;
 
 export const fontDisplay =

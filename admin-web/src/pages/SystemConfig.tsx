@@ -82,7 +82,7 @@ export default function SystemConfigPage() {
 
   return (
     <>
-      <Typography.Title level={4} style={{ fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif" }}>
+      <Typography.Title level={4} style={{ fontFamily: "var(--font-display)" }}>
         系统配置
       </Typography.Title>
       <Typography.Paragraph type="secondary">

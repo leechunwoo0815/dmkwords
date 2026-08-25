@@ -39,6 +39,21 @@ export default function Layout() {
     "/audit-logs": "#A78BFA",
   };
 
+  const iconColorMap: Record<string, string> = {
+    "/": "#3B2F2F",
+    "/books": "#FFFFFF",
+    "/members": "#FFFFFF",
+    "/deposits": "#FFFFFF",
+    "/circulation": "#3B2F2F",
+    "/reservations": "#FFFFFF",
+    "/growth": "#3B2F2F",
+    "/activities": "#FFFFFF",
+    "/refund-center": "#FFFFFF",
+    "/staff": "#FFFFFF",
+    "/configs": "#FFFFFF",
+    "/audit-logs": "#FFFFFF",
+  };
+
   const items = [
     { key: "/", icon: <DashboardOutlined />, label: "仪表盘", perm: "dashboard.view" },
     { key: "/books", icon: <BookOutlined />, label: "图书管理", perm: "book.manage" },
@@ -58,7 +73,7 @@ export default function Layout() {
       ...item,
       icon: (
         <span
-          style={{ background: iconBgMap[item.key] }}
+          style={{ background: iconBgMap[item.key], color: iconColorMap[item.key] }}
         >
           {item.icon}
         </span>
@@ -69,11 +84,11 @@ export default function Layout() {
 
   return (
     <AntLayout style={{ minHeight: "100vh" }}>
-      <Sider theme="light" width={240} style={{ borderRight: "2px solid #3B2F2F" }}>
+      <Sider className="paint-texture" theme="light" width={240} style={{ borderRight: "2px solid var(--paint-ink)" }}>
         <div
           style={{
             padding: "22px 18px 18px",
-            fontFamily: "'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', sans-serif",
+            fontFamily: "var(--font-display)",
             fontSize: 22,
             fontWeight: 800,
             color: "#FF6B35",
