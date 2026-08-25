@@ -157,7 +157,6 @@ export default function Dashboard() {
             <Col key={cell.label} xs={12} sm={6}>
               <Card
                 size="small"
-                style={{ background: "var(--paint-canvas)", borderColor: "var(--paint-border)" }}
                 styles={{ body: { padding: "12px 16px" } }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

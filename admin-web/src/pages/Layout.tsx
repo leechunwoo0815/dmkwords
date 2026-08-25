@@ -58,7 +58,7 @@ export default function Layout() {
       ...item,
       icon: (
         <span
-          style={{ background: iconBgMap[item.key], color: ["/", "/circulation", "/growth"].includes(item.key) ? "#3B2F2F" : "#fff" }}
+          style={{ background: iconBgMap[item.key] }}
         >
           {item.icon}
         </span>

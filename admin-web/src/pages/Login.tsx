@@ -3,7 +3,6 @@ import { Button, Card, Form, Input, Typography, App as AntdApp } from "antd";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth";
-import { hardShadow } from "../theme-paint";
 
 export default function Login() {
   const { login } = useAuth();
@@ -32,7 +31,7 @@ export default function Login() {
       }}
     >
       <Card
-        style={{ width: 380, boxShadow: hardShadow, borderColor: "var(--paint-border)" }}
+        style={{ width: 380 }}
         styles={{ body: { padding: 32 } }}
       >
         <div style={{ textAlign: "center", marginBottom: 8 }}>
