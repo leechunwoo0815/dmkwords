@@ -23,6 +23,7 @@ import type { UploadFile } from "antd";
 
 import { useAuth } from "../auth";
 import PaintEmpty from "../components/PaintEmpty";
+import PaintPagination from "../components/PaintPagination";
 
 import {
   apiGetChildReading,
@@ -44,6 +45,7 @@ import {
   type Child,
   type Order,
 } from "../api/members";
+import { usePaintPagination } from "../hooks/usePaintPagination";
 
 const MEMBER_LABEL: Record<string, string> = {
   none: "未入会", observation: "观察期", pending_evaluation: "待评估",
@@ -78,15 +80,15 @@ export default function MemberManage() {
   // 孩子列表
   const [children, setChildren] = useState<Child[]>([]);
   const [childTotal, setChildTotal] = useState(0);
-  const [childPage, setChildPage] = useState(1);
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
   // 订单列表
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderTotal, setOrderTotal] = useState(0);
-  const [orderPage, setOrderPage] = useState(1);
   const [orderStatus, setOrderStatus] = useState<string | undefined>();
+  const childPg = usePaintPagination();
+  const orderPg = usePaintPagination();
   // 弹窗
   const [parentOpen, setParentOpen] = useState(false);
   const [childOpen, setChildOpen] = useState(false);
@@ -108,24 +110,24 @@ export default function MemberManage() {
   const loadChildren = useCallback(
     (page: number) => {
       setLoading(true);
-      apiListChildren({ page, page_size: 15, keyword: keyword || undefined, status: statusFilter })
+      apiListChildren({ page, page_size: childPg.pageSize, keyword: keyword || undefined, status: statusFilter })
         .then((r) => { setChildren(r.items ?? []); setChildTotal(r.total); })
         .catch((e: Error) => message.error(e.message))
         .finally(() => setLoading(false));
     },
-    [keyword, statusFilter, message]
+    [keyword, statusFilter, childPg.pageSize, message]
   );
 
   const loadOrders = useCallback(
     (page: number) => {
-      apiListOrders({ page, page_size: 15, status: orderStatus })
+      apiListOrders({ page, page_size: orderPg.pageSize, status: orderStatus })
         .then((r) => { setOrders(r.items ?? []); setOrderTotal(r.total); })
         .catch((e: Error) => message.error(e.message));
     },
-    [orderStatus, message]
+    [orderStatus, orderPg.pageSize, message]
   );
 
-  useEffect(() => { if (tab === "children") loadChildren(childPage); }, [loadChildren, childPage, tab]);
+  useEffect(() => { if (tab === "children") loadChildren(childPg.page); }, [loadChildren, childPg.page, tab]);
 
   const onRefundOrder = (o: Order) => {
     let remarkInput = "";
@@ -144,7 +146,7 @@ export default function MemberManage() {
         try {
           await apiRefundOrder(o.id, remarkInput || "退款执行");
           message.success("订单已退款");
-          loadOrders(orderPage);
+          loadOrders(orderPg.page);
         } catch (e) {
           message.error((e as Error).message);
         }
@@ -188,7 +190,7 @@ export default function MemberManage() {
         try {
           const r = await apiMarkPendingEvaluation(c.id, reason.trim() || "观察期到期，标记待评估");
           message.success(`${r.name} 已标记为待评估`);
-          loadChildren(childPage);
+          loadChildren(childPg.page);
         } catch (e) {
           message.error((e as Error).message);
           return Promise.reject(e);
@@ -233,7 +235,7 @@ export default function MemberManage() {
       .catch((e: Error) => message.error(e.message))
       .finally(() => setReadingLoading(false));
   }, [message]);
-  useEffect(() => { if (tab === "orders") loadOrders(orderPage); }, [loadOrders, orderPage, tab]);
+  useEffect(() => { if (tab === "orders") loadOrders(orderPg.page); }, [loadOrders, orderPg.page, tab]);
 
   return (
     <>
@@ -262,17 +264,17 @@ export default function MemberManage() {
           <Space style={{ marginBottom: 12 }}>
             <Input.Search
               placeholder="孩子姓名 / 英文名 / 家长手机号" allowClear style={{ width: 260 }}
-              onSearch={(v) => { setKeyword(v); setChildPage(1); }}
+              onSearch={(v) => { setKeyword(v); childPg.setPage(1); }}
             />
             <Select
               placeholder="会员状态" allowClear style={{ width: 130 }} value={statusFilter}
-              onChange={(v) => { setStatusFilter(v); setChildPage(1); }}
+              onChange={(v) => { setStatusFilter(v); childPg.setPage(1); }}
               options={Object.entries(MEMBER_LABEL).map(([value, label]) => ({ value, label }))}
             />
           </Space>
           <Table<Child> locale={{ emptyText: <PaintEmpty character="star" /> }}
             rowKey="id" loading={loading} dataSource={children} size="middle"
-            pagination={{ current: childPage, pageSize: 15, total: childTotal, showSizeChanger: false, onChange: setChildPage }}
+            pagination={false}
             columns={[
               { title: "孩子", key: "child", width: 170, render: (_, r) => (
                 <div>
@@ -316,6 +318,7 @@ export default function MemberManage() {
               },
             ]}
           />
+          <PaintPagination current={childPg.page} pageSize={childPg.pageSize} total={childTotal} onChange={childPg.onChange} />
         </>
       )}
 
@@ -324,13 +327,13 @@ export default function MemberManage() {
           <Space style={{ marginBottom: 12 }}>
             <Select
               placeholder="订单状态" allowClear style={{ width: 140 }} value={orderStatus}
-              onChange={(v) => { setOrderStatus(v); setOrderPage(1); }}
+              onChange={(v) => { setOrderStatus(v); orderPg.setPage(1); }}
               options={Object.entries(ORDER_STATUS_LABEL).map(([value, label]) => ({ value, label }))}
             />
           </Space>
           <Table<Order> locale={{ emptyText: <PaintEmpty character="star" /> }}
             rowKey="id" dataSource={orders} size="middle"
-            pagination={{ current: orderPage, pageSize: 15, total: orderTotal, showSizeChanger: false, onChange: setOrderPage }}
+            pagination={false}
             columns={[
               { title: "订单号", dataIndex: "order_no", width: 200, render: (v) => <Typography.Text code style={{ fontSize: 12 }}>{v}</Typography.Text> },
               { title: "类型", dataIndex: "order_type", width: 120, render: (t: string) => ORDER_TYPE_LABEL[t] ?? t },
@@ -353,7 +356,7 @@ export default function MemberManage() {
                         <Button type="link" size="small" onClick={() => { confirmForm.resetFields(); setConfirmOrder(r); }}>
                           确认收款
                         </Button>
-                        <Popconfirm title="确认取消该订单？" onConfirm={async () => { await apiCancelOrder(r.id); message.success("已取消"); loadOrders(orderPage); }}>
+                        <Popconfirm title="确认取消该订单？" onConfirm={async () => { await apiCancelOrder(r.id); message.success("已取消"); loadOrders(orderPg.page); }}>
                           <Button type="link" size="small" danger>取消</Button>
                         </Popconfirm>
                       </>
@@ -366,6 +369,7 @@ export default function MemberManage() {
               },
             ]}
           />
+          <PaintPagination current={orderPg.page} pageSize={orderPg.pageSize} total={orderTotal} onChange={orderPg.onChange} />
         </>
       )}
 
@@ -481,7 +485,7 @@ export default function MemberManage() {
             await apiConfirmPayment(confirmOrder.id, { pay_method: v.pay_method, remark: v.remark ?? "" });
             message.success("收款确认成功，会员权益已开通");
             setConfirmOrder(null);
-            loadOrders(orderPage);
+            loadOrders(orderPg.page);
           } catch (e) {
             message.error(e instanceof Error ? e.message : "确认失败");
           }
@@ -575,7 +579,7 @@ export default function MemberManage() {
             });
             message.success("已保存");
             setEditChild(null);
-            loadChildren(childPage);
+            loadChildren(childPg.page);
           } catch (e) {
             if ((e as Error).message) message.error((e as Error).message);
           }

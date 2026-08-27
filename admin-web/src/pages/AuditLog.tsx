@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { App as AntdApp, Select, Space, Table, Tag, Typography } from "antd";
 import PaintEmpty from "../components/PaintEmpty";
+import PaintPagination from "../components/PaintPagination";
 
 import { apiListAuditLogs, type AuditLog } from "../api/admin";
+import { usePaintPagination } from "../hooks/usePaintPagination";
 
 const ACTION_LABEL: Record<string, string> = {
   login: "登录",
@@ -50,7 +52,7 @@ export default function AuditLogPage() {
   const { message } = AntdApp.useApp();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination();
   const [action, setAction] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [configNames, setConfigNames] = useState<Record<string, string>>({});
@@ -69,7 +71,7 @@ export default function AuditLogPage() {
   const load = useCallback(
     (targetPage: number) => {
       setLoading(true);
-      apiListAuditLogs({ page: targetPage, page_size: 15, action })
+      apiListAuditLogs({ page: targetPage, page_size: pageSize, action })
         .then((result) => {
           setLogs(result.items ?? []);
           setTotal(result.total);
@@ -77,7 +79,7 @@ export default function AuditLogPage() {
         .catch((e: Error) => message.error(e.message))
         .finally(() => setLoading(false));
     },
-    [action, message]
+    [action, pageSize, message]
   );
 
   useEffect(() => {
@@ -110,13 +112,7 @@ export default function AuditLogPage() {
         loading={loading}
         dataSource={logs}
         size="middle"
-        pagination={{
-          current: page,
-          pageSize: 15,
-          total,
-          showSizeChanger: false,
-          onChange: setPage,
-        }}
+        pagination={false}
         columns={[
           { title: "时间", dataIndex: "created_at", width: 170 },
           { title: "操作人", dataIndex: "actor_name", width: 110 },
@@ -150,6 +146,7 @@ export default function AuditLogPage() {
           { title: "原因", dataIndex: "reason", ellipsis: true, width: 180 },
         ]}
       />
+      <PaintPagination current={page} pageSize={pageSize} total={total} onChange={onPageChange} />
     </>
   );
 }

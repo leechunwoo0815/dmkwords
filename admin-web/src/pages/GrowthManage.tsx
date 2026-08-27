@@ -1,4 +1,5 @@
 import PaintEmpty from "../components/PaintEmpty";
+import PaintPagination from "../components/PaintPagination";
 // 成长与测验管理（WM7：词数流水/积分明细/测验重置/积分调整/等级重算）
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -12,6 +13,7 @@ import {
 } from "../api/growth";
 import { getToken } from "../api/client";
 import { apiListChildren, type Child } from "../api/members";
+import { usePaintPagination } from "../hooks/usePaintPagination";
 
 const REASON_LABEL: Record<string, string> = {
   words_convert: "词数折算", quiz_first_pass: "测验首过",
@@ -22,7 +24,9 @@ const REASON_LABEL: Record<string, string> = {
 export default function GrowthManage() {
   const { message, modal } = AntdApp.useApp();
   const [children, setChildren] = useState<Child[]>([]);
+  const [childrenTotal, setChildrenTotal] = useState(0);
   const [keyword, setKeyword] = useState("");
+  const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination();
   const [growth, setGrowth] = useState<ChildGrowth | null>(null);
   const [growChild, setGrowChild] = useState<Child | null>(null);
   const [loading, setLoading] = useState(false);
@@ -33,13 +37,19 @@ export default function GrowthManage() {
   const [report, setReport] = useState<{ url: string; data: ReportData } | null>(null);
   const [reportUrl, setReportUrl] = useState<string>("");
 
-  const load = useCallback(() => {
-    apiListChildren({ page: 1, page_size: 50, keyword: keyword || undefined })
-      .then((r) => setChildren(r.items ?? []))
-      .catch((e: Error) => message.error(e.message));
-  }, [keyword, message]);
+  const load = useCallback(
+    (targetPage: number) => {
+      apiListChildren({ page: targetPage, page_size: pageSize, keyword: keyword || undefined })
+        .then((r) => {
+          setChildren(r.items ?? []);
+          setChildrenTotal(r.total);
+        })
+        .catch((e: Error) => message.error(e.message));
+    },
+    [keyword, pageSize, message]
+  );
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(page); }, [load, page]);
 
   const openGrowth = (c: Child) => {
     setGrowChild(c);
@@ -134,7 +144,7 @@ export default function GrowthManage() {
       <Space style={{ marginBottom: 12 }}>
         <Input.Search
           placeholder="孩子姓名 / 家长手机号" allowClear style={{ width: 260 }}
-          onSearch={(v) => { setKeyword(v); }}
+          onSearch={(v) => { setKeyword(v); setPage(1); }}
         />
         <Button onClick={onRecalc}>等级阈值重算</Button>
         <Typography.Text type="secondary">
@@ -144,7 +154,7 @@ export default function GrowthManage() {
 
       <Table<Child> locale={{ emptyText: <PaintEmpty character="rabbit" /> }}
         rowKey="id" dataSource={children} size="middle"
-        pagination={{ pageSize: 15, showSizeChanger: false }}
+        pagination={false}
         columns={[
           { title: "孩子", dataIndex: "name", width: 110, render: (_, r) => `${r.name}${r.english_name ? `（${r.english_name}）` : ""}` },
           { title: "家长", key: "p", width: 160, render: (_, r) => `${r.parent_name} ${r.parent_phone}` },
@@ -156,6 +166,7 @@ export default function GrowthManage() {
           },
         ]}
       />
+      <PaintPagination current={page} pageSize={pageSize} total={childrenTotal} onChange={onPageChange} />
 
       <Drawer
         title={growChild ? `${growChild.name} 的成长档案` : "成长档案"}

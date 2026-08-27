@@ -1,4 +1,5 @@
 import PaintEmpty from "../components/PaintEmpty";
+import PaintPagination from "../components/PaintPagination";
 import { useEffect, useMemo, useState } from "react";
 import {
   App as AntdApp,
@@ -14,6 +15,7 @@ import {
 
 import { apiListConfigs, apiUpdateConfig, type SystemConfig } from "../api/admin";
 import { hasPermission, useAuth } from "../auth";
+import { usePaintPagination } from "../hooks/usePaintPagination";
 
 const TYPE_LABEL: Record<string, string> = {
   int: "整数",
@@ -34,6 +36,7 @@ export default function SystemConfigPage() {
   const { message } = AntdApp.useApp();
   const [configs, setConfigs] = useState<SystemConfig[]>([]);
   const [loading, setLoading] = useState(true);
+  const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination();
   const [category, setCategory] = useState<string>("全部");
   const [editing, setEditing] = useState<SystemConfig | null>(null);
   const [saving, setSaving] = useState(false);
@@ -90,15 +93,15 @@ export default function SystemConfigPage() {
       </Typography.Paragraph>
       <Tabs
         activeKey={category}
-        onChange={setCategory}
+        onChange={(c) => { setCategory(c); setPage(1); }}
         items={categories.map((c) => ({ key: c, label: c }))}
       />
       <Table<SystemConfig> locale={{ emptyText: <PaintEmpty character="default" /> }}
         rowKey="config_key"
         loading={loading}
-        dataSource={filtered}
+        dataSource={filtered.slice((page - 1) * pageSize, page * pageSize)}
         size="middle"
-        pagination={{ pageSize: 15, showSizeChanger: false, hideOnSinglePage: true }}
+        pagination={false}
         columns={[
           {
             title: "配置项",
@@ -165,6 +168,7 @@ export default function SystemConfigPage() {
           },
         ]}
       />
+      <PaintPagination current={page} pageSize={pageSize} total={filtered.length} onChange={onPageChange} />
       <Modal
         title={`修改：${editing?.display_name || editing?.description || ""}`}
         open={editing !== null}

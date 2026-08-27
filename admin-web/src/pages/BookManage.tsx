@@ -1,4 +1,5 @@
 import PaintEmpty from "../components/PaintEmpty";
+import PaintPagination from "../components/PaintPagination";
 import { useCallback, useEffect, useState } from "react";
 import {
   App as AntdApp,
@@ -29,12 +30,13 @@ import {
   type Book,
 } from "../api/catalog";
 import { GRADE_OPTIONS } from "../constants/grade";
+import { usePaintPagination } from "../hooks/usePaintPagination";
 
 export default function BookManage() {
   const { message } = AntdApp.useApp();
   const [books, setBooks] = useState<Book[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination();
   const [keyword, setKeyword] = useState("");
   const [tab, setTab] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -60,7 +62,7 @@ export default function BookManage() {
       setLoading(true);
       apiListBooks({
         page: targetPage,
-        page_size: 15,
+        page_size: pageSize,
         keyword: keyword || undefined,
         ar_pending: tab === "ar",
         status: tab === "on" ? 1 : tab === "off" ? 0 : undefined,
@@ -75,7 +77,7 @@ export default function BookManage() {
         .catch((e: Error) => message.error(e.message))
         .finally(() => setLoading(false));
     },
-    [keyword, tab, message]
+    [keyword, tab, pageSize, message]
   );
 
   useEffect(() => {
@@ -183,7 +185,7 @@ export default function BookManage() {
         loading={loading}
         dataSource={books}
         size="middle"
-        pagination={{ current: page, pageSize: 15, total, showSizeChanger: false, onChange: setPage }}
+        pagination={false}
         scroll={{ x: "max-content" }}
         rowSelection={{
           selectedRowKeys,
@@ -244,6 +246,7 @@ export default function BookManage() {
           },
         ]}
       />
+      <PaintPagination current={page} pageSize={pageSize} total={total} onChange={onPageChange} />
 
       <Modal
         title="新书入库"

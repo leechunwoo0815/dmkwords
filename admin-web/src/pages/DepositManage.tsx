@@ -1,4 +1,5 @@
 import PaintEmpty from "../components/PaintEmpty";
+import PaintPagination from "../components/PaintPagination";
 import { useCallback, useEffect, useState } from "react";
 import {
   App as AntdApp,
@@ -24,6 +25,7 @@ import {
   type Deposit,
   type DepositLedger,
 } from "../api/deposits";
+import { usePaintPagination } from "../hooks/usePaintPagination";
 
 const STATUS_LABEL: Record<string, string> = {
   unpaid: "未缴纳", paid: "已缴纳",
@@ -43,7 +45,7 @@ export default function DepositManage() {
   const { message } = AntdApp.useApp();
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination();
   const [status, setStatus] = useState<string | undefined>();
   const [keyword, setKeyword] = useState("");
   const [loading, setLoading] = useState(true);
@@ -55,12 +57,12 @@ export default function DepositManage() {
   const load = useCallback(
     (targetPage: number) => {
       setLoading(true);
-      apiListDeposits({ page: targetPage, page_size: 15, status, keyword: keyword || undefined })
+      apiListDeposits({ page: targetPage, page_size: pageSize, status, keyword: keyword || undefined })
         .then((r) => { setDeposits(r.items ?? []); setTotal(r.total); })
         .catch((e: Error) => message.error(e.message))
         .finally(() => setLoading(false));
     },
-    [status, keyword, message]
+    [status, keyword, pageSize, message]
   );
 
   useEffect(() => { load(page); }, [load, page]);
@@ -93,7 +95,7 @@ export default function DepositManage() {
 
       <Table<Deposit> locale={{ emptyText: <PaintEmpty character="cat" /> }}
         rowKey="id" loading={loading} dataSource={deposits} size="middle"
-        pagination={{ current: page, pageSize: 15, total, showSizeChanger: false, onChange: setPage }}
+        pagination={false}
         columns={[
           { title: "孩子", dataIndex: "child_name", width: 110 },
           { title: "押金状态", dataIndex: "status", width: 110, render: (s: string) => <Tag color={STATUS_COLOR[s]}>{STATUS_LABEL[s] ?? s}</Tag> },
@@ -132,6 +134,7 @@ export default function DepositManage() {
           },
         ]}
       />
+      <PaintPagination current={page} pageSize={pageSize} total={total} onChange={onPageChange} />
 
       <Drawer
         title={`押金流水 — ${ledgerChild?.child_name ?? ""}`}

@@ -2,12 +2,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { App as AntdApp, Button, Select, Space, Table, Tag, Typography } from "antd";
 import PaintEmpty from "../components/PaintEmpty";
+import PaintPagination from "../components/PaintPagination";
 
 import {
   apiCheckoutReservation,
   apiListReservations,
   type ReservationItem,
 } from "../api/reservations";
+import { usePaintPagination } from "../hooks/usePaintPagination";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "锁定中", expired: "已超时", cancelled: "已取消",
@@ -23,6 +25,7 @@ export default function Reservations() {
   const [items, setItems] = useState<ReservationItem[]>([]);
   const [status, setStatus] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
+  const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -57,7 +60,7 @@ export default function Reservations() {
       <Space style={{ marginBottom: 12 }}>
         <Select
           placeholder="预约状态" allowClear style={{ width: 140 }} value={status}
-          onChange={setStatus}
+          onChange={(v) => { setStatus(v); setPage(1); }}
           options={Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))}
         />
         <Typography.Text type="secondary">
@@ -65,8 +68,8 @@ export default function Reservations() {
         </Typography.Text>
       </Space>
       <Table<ReservationItem> locale={{ emptyText: <PaintEmpty character="bear" /> }}
-        rowKey="id" loading={loading} dataSource={items} size="middle"
-        pagination={{ pageSize: 15, showSizeChanger: false }}
+        rowKey="id" loading={loading} dataSource={items.slice((page - 1) * pageSize, page * pageSize)} size="middle"
+        pagination={false}
         columns={[
           { title: "孩子", dataIndex: "child_name", width: 100 },
           {
@@ -97,6 +100,7 @@ export default function Reservations() {
           },
         ]}
       />
+      <PaintPagination current={page} pageSize={pageSize} total={items.length} onChange={onPageChange} />
     </div>
   );
 }

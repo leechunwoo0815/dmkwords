@@ -1,4 +1,5 @@
 import PaintEmpty from "../components/PaintEmpty";
+import PaintPagination from "../components/PaintPagination";
 // 退款中心（WM10：订单/押金退款 + 退会 + 转让，超管逐单审核）
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -10,6 +11,7 @@ import {
   apiReviewRefund, apiReviewTransfer, apiReviewWithdrawal, apiExecuteRefund,
   type RefundRequestItem, type TransferItem, type WithdrawalItem,
 } from "../api/refunds";
+import { usePaintPagination } from "../hooks/usePaintPagination";
 
 const KIND_LABEL: Record<string, string> = { order: "订单退款", deposit: "押金退款" };
 const ORDER_TYPE_LABEL: Record<string, string> = {
@@ -60,6 +62,9 @@ export default function RefundCenter() {
   } | null>(null);
   const [execSuccess, setExecSuccess] = useState(true);
   const [execRemark, setExecRemark] = useState("");
+  const refundPg = usePaintPagination();
+  const withdrawalPg = usePaintPagination();
+  const transferPg = usePaintPagination();
 
   const load = useCallback(() => {
     apiListRefunds().then(setRefunds).catch((e: Error) => message.error(e.message));
@@ -139,10 +144,10 @@ export default function RefundCenter() {
           {
             key: "refunds",
             label: `退款待审（${pendingRefunds.length}）`,
-            children: (
+            children: (<>
               <Table<RefundRequestItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
-                rowKey="id" dataSource={refunds} size="middle"
-                pagination={{ pageSize: 15, showSizeChanger: false }}
+                rowKey="id" dataSource={refunds.slice((refundPg.page - 1) * refundPg.pageSize, refundPg.page * refundPg.pageSize)} size="middle"
+                pagination={false}
                 columns={[
                   { title: "类型", dataIndex: "kind", width: 100, render: (k) => KIND_LABEL[k] ?? k },
                   { title: "孩子", dataIndex: "child_name", width: 90 },
@@ -185,15 +190,17 @@ export default function RefundCenter() {
                   },
                 ]}
               />
-            ),
+              <PaintPagination current={refundPg.page} pageSize={refundPg.pageSize} total={refunds.length} onChange={refundPg.onChange} />
+            </>),
+
           },
           {
             key: "withdrawals",
             label: `退会待审（${pendingWithdrawals.length}）`,
-            children: (
+            children: (<>
               <Table<WithdrawalItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
-                rowKey="id" dataSource={withdrawals} size="middle"
-                pagination={{ pageSize: 15, showSizeChanger: false }}
+                rowKey="id" dataSource={withdrawals.slice((withdrawalPg.page - 1) * withdrawalPg.pageSize, withdrawalPg.page * withdrawalPg.pageSize)} size="middle"
+                pagination={false}
                 columns={[
                   { title: "孩子", dataIndex: "child_name", width: 100 },
                   { title: "当前状态", dataIndex: "member_status", width: 100 },
@@ -221,15 +228,17 @@ export default function RefundCenter() {
                   },
                 ]}
               />
-            ),
+              <PaintPagination current={withdrawalPg.page} pageSize={withdrawalPg.pageSize} total={withdrawals.length} onChange={withdrawalPg.onChange} />
+            </>),
+
           },
           {
             key: "transfers",
             label: `转让待审（${pendingTransfers.length}）`,
-            children: (
+            children: (<>
               <Table<TransferItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
-                rowKey="id" dataSource={transfers} size="middle"
-                pagination={{ pageSize: 15, showSizeChanger: false }}
+                rowKey="id" dataSource={transfers.slice((transferPg.page - 1) * transferPg.pageSize, transferPg.page * transferPg.pageSize)} size="middle"
+                pagination={false}
                 columns={[
                   { title: "转出方", dataIndex: "source_name", width: 100 },
                   { title: "受让方", dataIndex: "target_name", width: 100 },
@@ -253,7 +262,9 @@ export default function RefundCenter() {
                   },
                 ]}
               />
-            ),
+              <PaintPagination current={transferPg.page} pageSize={transferPg.pageSize} total={transfers.length} onChange={transferPg.onChange} />
+            </>),
+
           },
         ]}
       />

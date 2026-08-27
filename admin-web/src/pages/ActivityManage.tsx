@@ -1,4 +1,5 @@
 import PaintEmpty from "../components/PaintEmpty";
+import PaintPagination from "../components/PaintPagination";
 // 活动管理（WM9：发布/取消/报名/签到/退款审核）
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -11,6 +12,7 @@ import {
   apiListEnrollments, apiReviewActivityRefund, apiSignin,
   type ActivityItem, type EnrollmentItem,
 } from "../api/activities";
+import { usePaintPagination } from "../hooks/usePaintPagination";
 
 const TYPE_OPTIONS = [
   { value: "lecture", label: "宣讲会" },
@@ -34,6 +36,7 @@ export default function ActivityManage() {
   const { message, modal } = AntdApp.useApp();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const activityPg = usePaintPagination();
   const [createOpen, setCreateOpen] = useState(false);
   const [enrollActivity, setEnrollActivity] = useState<ActivityItem | null>(null);
   const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
@@ -143,42 +146,45 @@ export default function ActivityManage() {
           {
             key: "activities", label: `活动列表（${activities.length}）`,
             children: (
-              <Table<ActivityItem> locale={{ emptyText: <PaintEmpty character="star" /> }}
-                rowKey="id" loading={loading} dataSource={activities} size="middle"
-                pagination={{ pageSize: 15, showSizeChanger: false }}
-                columns={[
-                  { title: "活动", dataIndex: "title", width: 200 },
-                  { title: "类型", dataIndex: "activity_type", width: 110, render: (t) => TYPE_OPTIONS.find((o) => o.value === t)?.label ?? t },
-                  { title: "开始时间", dataIndex: "start_at", width: 170, render: (v) => v.replace("T", " ").slice(0, 16) },
-                  { title: "地点", dataIndex: "location", width: 130 },
-                  { title: "费用", dataIndex: "fee_display", width: 90 },
-                  {
-                    title: "名额", key: "quota", width: 110, render: (_, r) => (
-                      <span>
-                        {r.quota_used}/{r.max_quota}
-                        {r.full ? <Tag color="red" style={{ marginLeft: 6 }}>满</Tag> : null}
-                      </span>
-                    ),
-                  },
-                  {
-                    title: "状态", dataIndex: "status", width: 90, render: (s) => (
-                      <Tag color={s === "published" ? "green" : s === "cancelled" ? "default" : "blue"}>
-                        {s === "published" ? "报名中" : s === "cancelled" ? "已取消" : "已结束"}
-                      </Tag>
-                    ),
-                  },
-                  {
-                    title: "操作", key: "op", width: 180, render: (_, r) => (
-                      <Space>
-                        <Button type="link" size="small" onClick={() => openEnrollments(r)}>报名名单</Button>
-                        {r.status === "published" && (
-                          <Button type="link" size="small" danger onClick={() => onCancelActivity(r)}>取消活动</Button>
-                        )}
-                      </Space>
-                    ),
-                  },
-                ]}
-              />
+              <>
+                <Table<ActivityItem> locale={{ emptyText: <PaintEmpty character="star" /> }}
+                  rowKey="id" loading={loading} dataSource={activities.slice((activityPg.page - 1) * activityPg.pageSize, activityPg.page * activityPg.pageSize)} size="middle"
+                  pagination={false}
+                  columns={[
+                    { title: "活动", dataIndex: "title", width: 200 },
+                    { title: "类型", dataIndex: "activity_type", width: 110, render: (t) => TYPE_OPTIONS.find((o) => o.value === t)?.label ?? t },
+                    { title: "开始时间", dataIndex: "start_at", width: 170, render: (v) => v.replace("T", " ").slice(0, 16) },
+                    { title: "地点", dataIndex: "location", width: 130 },
+                    { title: "费用", dataIndex: "fee_display", width: 90 },
+                    {
+                      title: "名额", key: "quota", width: 110, render: (_, r) => (
+                        <span>
+                          {r.quota_used}/{r.max_quota}
+                          {r.full ? <Tag color="red" style={{ marginLeft: 6 }}>满</Tag> : null}
+                        </span>
+                      ),
+                    },
+                    {
+                      title: "状态", dataIndex: "status", width: 90, render: (s) => (
+                        <Tag color={s === "published" ? "green" : s === "cancelled" ? "default" : "blue"}>
+                          {s === "published" ? "报名中" : s === "cancelled" ? "已取消" : "已结束"}
+                        </Tag>
+                      ),
+                    },
+                    {
+                      title: "操作", key: "op", width: 180, render: (_, r) => (
+                        <Space>
+                          <Button type="link" size="small" onClick={() => openEnrollments(r)}>报名名单</Button>
+                          {r.status === "published" && (
+                            <Button type="link" size="small" danger onClick={() => onCancelActivity(r)}>取消活动</Button>
+                          )}
+                        </Space>
+                      ),
+                    },
+                  ]}
+                />
+                <PaintPagination current={activityPg.page} pageSize={activityPg.pageSize} total={activities.length} onChange={activityPg.onChange} />
+              </>
             ),
           },
           {
