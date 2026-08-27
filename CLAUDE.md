@@ -144,7 +144,25 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 
 ---
 
-## 八、验证与门禁（命令原文，禁缩范围）
+## 八、验证与门禁（分级纪律，立即生效）
+
+> **改动验证成本必须与风险成正比，禁止"一行样式跑全量"。** 本节约束第六节「完工门禁命令全量复制」的绝对化表述，以本节分级为准。
+
+### 门禁分级
+
+| 级别 | 改动范围 | 本地提交前必须验证 | 是否可信任 CI 跑全量 | 备注 |
+| :--- | :--- | :--- | :--- | :--- |
+| **A 级** | 仅 `admin-web/**` 纯前端文件 | `cd admin-web && pnpm exec tsc --noEmit` | ✅ 可以 | push 后 CI 会跑全量 gate；本地 commit 前只需 tsc 绿 |
+| **B 级** | 仅 `backend/**` 或 `tests/**` 单域 | 相关域 pytest 单文件 + `ruff check backend/ tests/` | ❌ 推荐再跑 `bash scripts/gate.sh full` 但非强制 | 例：`pytest tests/unit/test_wm2_catalog.py -q`（约 20-60s） |
+| **C 级** | `models/`、迁移、公共层、跨域调用 | `bash scripts/gate.sh full` | ❌ 必须本地绿 | 高传播面，本地全量 + CI 绿 |
+
+### 不变纪律
+
+- **A/B/C 级如需跑 pytest，必须先 `bash scripts/dev.sh stop`**，因为 pytest 与 dev.sh 共库。
+- **禁止以"反正 CI 会跑"为由本地完全不验证**：A 级至少 tsc；B 级至少相关域单文件 + ruff；C 级必须本地全量 gate。
+- **完成 = 退出码 0 + 输出贴原文**（第六节 DoD 仍然成立，但"门禁命令"按本节分级选取）。
+
+### 全量门禁命令（C 级或 CI 使用）
 
 ```bash
 # 1 lint
@@ -174,8 +192,6 @@ python -m pytest tests/ --cov=backend --cov-fail-under=85
 # 7 全量门禁（退出码 0 才算数）
 bash scripts/gate.sh full
 ```
-
-**完成 = 退出码 0 + 输出贴原文。**
 
 ---
 
