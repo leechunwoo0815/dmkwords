@@ -107,6 +107,11 @@ class BatchDeleteRequest(BaseSchema):
     ids: list[int] = Field(..., min_length=1, description="待删除书目 ID 列表")
 
 
+class BatchToggleStatusRequest(BaseSchema):
+    ids: list[int] = Field(..., min_length=1, description="待上下架书目 ID 列表")
+    status: int = Field(..., ge=0, le=1, description="目标状态：1=上架，0=下架")
+
+
 class ImportResultResponse(BaseSchema):
     total_rows: int
     success_count: int

@@ -56,6 +56,16 @@ export function apiBatchDeleteBooks(ids: number[]): Promise<{ detail: string; su
   return request("/api/admin/books/batch-delete", { method: "POST", body: JSON.stringify({ ids }) });
 }
 
+export function apiBatchToggleBookStatus(
+  ids: number[],
+  status: 0 | 1
+): Promise<{ detail: string; success: number; failed: number; errors: string[] }> {
+  return request("/api/admin/books/batch-toggle-status", {
+    method: "POST",
+    body: JSON.stringify({ ids, status }),
+  });
+}
+
 export function apiListCopies(bookId: number): Promise<BookCopy[]> {
   return request(`/api/admin/books/${bookId}/copies`);
 }

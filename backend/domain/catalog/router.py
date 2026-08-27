@@ -19,6 +19,7 @@ from backend.domain.catalog.import_service import import_books
 from backend.domain.catalog.repository import QuizQuestionRepository
 from backend.domain.catalog.schemas import (
     BatchDeleteRequest,
+    BatchToggleStatusRequest,
     BookCreateRequest,
     BookResponse,
     BookUpdateRequest,
@@ -210,6 +211,17 @@ def batch_delete_books(
 ):
     result = BookService(db).batch_delete_books(admin, body.ids)
     return {"detail": "批量删除完成", **result}
+
+
+@router.post("/books/batch-toggle-status")
+def batch_toggle_book_status(
+    body: BatchToggleStatusRequest,
+    admin: Any = Depends(require_perm("book.manage")),
+    db: Session = Depends(get_db),
+):
+    result = BookService(db).batch_toggle_status(admin, body.ids, body.status)
+    action = "上架" if body.status == 1 else "下架"
+    return {"detail": f"批量{action}完成", **result}
 
 
 @router.post("/books/{book_id}/copies", response_model=list[CopyResponse])

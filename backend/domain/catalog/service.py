@@ -220,6 +220,27 @@ class BookService:
                 errors.append(f"ID {book_id}: {exc}")
         return {"success": success, "failed": len(errors), "errors": errors[:50]}
 
+    def batch_toggle_status(self, admin, book_ids: list[int], status: int) -> dict:
+        """Batch set book status to on (1) or off (0)."""
+        success = 0
+        errors: list[str] = []
+        for book_id in book_ids:
+            try:
+                book = self.book_repo.get_by_id_or_raise(book_id)
+                book.status = status
+                self.book_repo.update(book)
+                self._audit(
+                    admin,
+                    "book.batch_toggle_status",
+                    str(book.id),
+                    {"new_status": status},
+                )
+                self.db.commit()
+                success += 1
+            except Exception as exc:
+                errors.append(f"ID {book_id}: {exc}")
+        return {"success": success, "failed": len(errors), "errors": errors[:50]}
+
     def add_copies(self, admin, book_id: int, count: int) -> list[BookCopy]:
         book = self.book_repo.get_by_id_or_raise(book_id)
         next_seq = self._max_copy_seq(book) + 1

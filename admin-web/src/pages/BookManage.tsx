@@ -17,10 +17,11 @@ import {
   Typography,
   Upload,
 } from "antd";
-import { DeleteOutlined, InboxOutlined, PlusOutlined } from "@ant-design/icons";
+import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, InboxOutlined, PlusOutlined } from "@ant-design/icons";
 
 import {
   apiBatchDeleteBooks,
+  apiBatchToggleBookStatus,
   apiCreateBook,
   apiDeleteBook,
   apiDownloadImportTemplate,
@@ -120,6 +121,19 @@ export default function BookManage() {
     }
   };
 
+  const handleBatchToggle = async (status: 0 | 1) => {
+    if (selectedRowKeys.length === 0) return;
+    const action = status === 1 ? "上架" : "下架";
+    try {
+      const result = await apiBatchToggleBookStatus(selectedRowKeys, status);
+      message.success(`批量${action}完成：成功 ${result.success}，失败 ${result.failed}`);
+      setSelectedRowKeys([]);
+      load(page);
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : `批量${action}失败`);
+    }
+  };
+
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -155,13 +169,21 @@ export default function BookManage() {
           onClear={() => doSearch("")}
         />
         {selectedRowKeys.length > 0 && (
-          <Popconfirm
-            title={`确认删除选中的 ${selectedRowKeys.length} 条书目？`}
-            description="删除后不可恢复，已借出副本会阻止删除。"
-            onConfirm={handleBatchDelete}
-          >
-            <Button danger icon={<DeleteOutlined />}>批量删除 ({selectedRowKeys.length})</Button>
-          </Popconfirm>
+          <>
+            <Button icon={<ArrowUpOutlined />} onClick={() => handleBatchToggle(1)}>
+              批量上架 ({selectedRowKeys.length})
+            </Button>
+            <Button icon={<ArrowDownOutlined />} onClick={() => handleBatchToggle(0)}>
+              批量下架 ({selectedRowKeys.length})
+            </Button>
+            <Popconfirm
+              title={`确认删除选中的 ${selectedRowKeys.length} 条书目？`}
+              description="删除后不可恢复，已借出副本会阻止删除。"
+              onConfirm={handleBatchDelete}
+            >
+              <Button danger icon={<DeleteOutlined />}>批量删除 ({selectedRowKeys.length})</Button>
+            </Popconfirm>
+          </>
         )}
       </Space>
       <Tabs
@@ -190,7 +212,7 @@ export default function BookManage() {
         rowSelection={{
           selectedRowKeys,
           onChange: (keys) => setSelectedRowKeys(keys as number[]),
-          preserveSelectedRowKeys: false,
+          preserveSelectedRowKeys: true,
         }}
         columns={[
           { title: "书名", dataIndex: "title", width: 220, render: (t: string, r) => (
