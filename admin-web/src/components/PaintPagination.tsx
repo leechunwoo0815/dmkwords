@@ -1,4 +1,6 @@
-import { Col, InputNumber, Pagination, Row, Space, Typography } from "antd";
+import { Button, Col, InputNumber, Pagination, Row, Space, Typography } from "antd";
+
+const PRESETS = [15, 30, 50, 70, 100];
 
 interface PaintPaginationProps {
   current: number;
@@ -21,6 +23,18 @@ export default function PaintPagination({ current, pageSize, total, onChange }: 
             style={{ width: 70 }}
           />
           <Typography.Text>条</Typography.Text>
+          <Space size={4}>
+            {PRESETS.map((n) => (
+              <Button
+                key={n}
+                size="small"
+                type={pageSize === n ? "primary" : "default"}
+                onClick={() => onChange(1, n)}
+              >
+                {n}
+              </Button>
+            ))}
+          </Space>
         </Space>
       </Col>
       <Col>
