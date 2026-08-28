@@ -83,8 +83,8 @@ export default function Layout() {
   const selected = location.pathname === "/" ? "/" : `/${location.pathname.split("/")[1] ?? ""}`;
 
   return (
-    <AntLayout style={{ minHeight: "100vh" }}>
-      <Sider className="paint-texture" theme="light" width={240} style={{ borderRight: "2px solid var(--paint-ink)" }}>
+    <AntLayout style={{ height: "100vh", overflow: "hidden" }}>
+      <Sider className="paint-texture" theme="light" width={240} style={{ borderRight: "2px solid var(--paint-ink)", height: "100vh", position: "sticky", top: 0 }}>
         <div
           style={{
             padding: "22px 18px 18px",
@@ -108,7 +108,7 @@ export default function Layout() {
           style={{ borderInlineEnd: "none" }}
         />
       </Sider>
-      <AntLayout style={{ minWidth: 0 }}>
+      <AntLayout style={{ minWidth: 0, height: "100vh", overflow: "hidden" }}>
         <Header
           style={{
             background: "rgba(255, 253, 247, 0.96)",
@@ -117,6 +117,7 @@ export default function Layout() {
             justifyContent: "flex-end",
             alignItems: "center",
             paddingInline: 24,
+            flexShrink: 0,
           }}
         >
           <Dropdown
@@ -132,7 +133,7 @@ export default function Layout() {
             </Typography.Text>
           </Dropdown>
         </Header>
-        <Content style={{ padding: 24, minWidth: 0 }}>
+        <Content style={{ padding: 24, minWidth: 0, flex: "1 1 auto", overflow: "auto" }}>
           <Outlet />
         </Content>
       </AntLayout>

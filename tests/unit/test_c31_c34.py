@@ -303,3 +303,69 @@ def test_filter_no_cover_no_audio_quiz_incomplete(client: TestClient):
     assert b_cover["id"] in ids
     assert b_audio["id"] in ids
     assert b_quiz["id"] not in ids
+
+
+def test_reupload_media_creates_new_path_and_removes_old(client: TestClient):
+    """重传封面/音频应生成新文件路径（URL 换新，浏览器缓存失效）并删除旧文件。"""
+    import os
+
+    from PIL import Image
+
+    from backend.config import get_settings
+
+    h = _h(client)
+    book = _create_book(client, h, title="Reupload Media")
+
+    # 第一次上传封面
+    img = Image.new("RGB", (10, 10), color="red")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    buf.seek(0)
+    resp1 = client.post(
+        f"/api/admin/books/{book['id']}/cover",
+        files={"file": ("x.jpg", buf, "image/jpeg")},
+        headers=h,
+    )
+    assert resp1.status_code == 200
+    path1 = resp1.json()["cover_path"]
+
+    # 第二次上传封面（不同内容）
+    img2 = Image.new("RGB", (10, 10), color="blue")
+    buf2 = io.BytesIO()
+    img2.save(buf2, format="JPEG")
+    buf2.seek(0)
+    resp2 = client.post(
+        f"/api/admin/books/{book['id']}/cover",
+        files={"file": ("y.jpg", buf2, "image/jpeg")},
+        headers=h,
+    )
+    assert resp2.status_code == 200
+    path2 = resp2.json()["cover_path"]
+    assert path1 != path2
+
+    root = os.path.abspath(get_settings().UPLOADS_DIR)
+    assert not os.path.isfile(os.path.join(root, path1)), "旧封面文件应被删除"
+    assert os.path.isfile(os.path.join(root, path2))
+
+    # 第一次上传音频
+    audio1 = b"\xff\xfb\x90\x00" + b"\x00" * 125000
+    r1 = client.post(
+        f"/api/admin/books/{book['id']}/audio",
+        files={"file": ("a.mp3", io.BytesIO(audio1), "audio/mpeg")},
+        headers=h,
+    )
+    assert r1.status_code == 200
+    ap1 = r1.json()["audio_path"]
+
+    # 第二次上传音频（时长不同）
+    audio2 = b"\xff\xfb\x90\x00" + b"\x00" * 250000
+    r2 = client.post(
+        f"/api/admin/books/{book['id']}/audio",
+        files={"file": ("b.mp3", io.BytesIO(audio2), "audio/mpeg")},
+        headers=h,
+    )
+    assert r2.status_code == 200
+    ap2 = r2.json()["audio_path"]
+    assert ap1 != ap2
+    assert not os.path.isfile(os.path.join(root, ap1)), "旧音频文件应被删除"
+    assert os.path.isfile(os.path.join(root, ap2))

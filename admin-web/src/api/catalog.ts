@@ -198,9 +198,13 @@ export function apiUpdateQuestion(
   return request(`/api/admin/questions/${questionId}`, { method: "PUT", body: JSON.stringify(body) });
 }
 
-export function apiMediaUrl(bookId: number, kind: "cover" | "audio"): string {
+export function apiMediaUrl(bookId: number, kind: "cover" | "audio", version?: string): string {
   const token = localStorage.getItem("dmkwords_admin_token");
-  return `/api/admin/books/${bookId}/${kind}-media${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+  const q = new URLSearchParams();
+  if (token) q.set("token", token);
+  if (version) q.set("v", version);
+  const qs = q.toString();
+  return `/api/admin/books/${bookId}/${kind}-media${qs ? `?${qs}` : ""}`;
 }
 
 export function apiToggleQuestion(id: number): Promise<QuizQuestion> {

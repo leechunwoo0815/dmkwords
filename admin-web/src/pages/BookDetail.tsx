@@ -169,7 +169,7 @@ export default function BookDetail() {
             <div style={{ margin: "4px 0 8px" }}>
               {book.cover_path ? (
                 <Image
-                  src={apiMediaUrl(bookId, "cover")}
+                  src={apiMediaUrl(bookId, "cover", book.cover_path ?? undefined)}
                   alt="封面"
                   width={72}
                   height={100}
@@ -213,7 +213,7 @@ export default function BookDetail() {
                   {book.audio_duration_seconds ? <Typography.Text type="secondary">约 {Math.ceil(book.audio_duration_seconds / 60)} 分钟</Typography.Text> : null}
                   <audio
                     controls preload="metadata" style={{ width: 320, height: 36 }}
-                    src={apiMediaUrl(bookId, "audio")}
+                    src={apiMediaUrl(bookId, "audio", book.audio_path ?? undefined)}
                   />
                 </Space>
               ) : (

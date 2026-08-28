@@ -282,25 +282,30 @@ class BookService:
         return copy
 
     def upload_cover(self, admin, book_id: int, data: bytes, ext: str) -> Book:
-        """封面上传：统一转 JPG 存储（Pillow），路径 cover/{isbn前4}/{code}.jpg。"""
+        """封面上传：统一转 JPG 存储（Pillow），路径 cover/{isbn前4}/{code}_{token}.jpg。"""
         book = self.book_repo.get_by_id_or_raise(book_id)
-        from backend.common.file_storage import save_cover_jpg
+        from backend.common.file_storage import remove_book_media, save_cover_jpg
 
+        old = book.cover_path
         book.cover_path = save_cover_jpg(book, data, ext)
+        if old and old != book.cover_path:
+            remove_book_media(old, None)
         self.book_repo.update(book)
         self._audit(admin, "book.cover", str(book.id), {"path": book.cover_path})
         self.db.commit()
         return book
 
     def upload_audio(self, admin, book_id: int, data: bytes, filename: str) -> Book:
-        """音频上传：仅 MP3；路径 book_audio/{code}/audio.mp3；解析时长。"""
+        """音频上传：仅 MP3；路径 book_audio/{code}/audio_{token}.mp3；解析时长。"""
         if not filename.lower().endswith(".mp3"):
             raise ValidationError("音频仅支持 MP3 格式")
         book = self.book_repo.get_by_id_or_raise(book_id)
-        from backend.common.file_storage import save_audio_mp3
+        from backend.common.file_storage import remove_book_media, save_audio_mp3
 
-        duration = save_audio_mp3(book, data)
-        book.audio_path = f"book_audio/{book.book_code}/audio.mp3"
+        old = book.audio_path
+        book.audio_path, duration = save_audio_mp3(book, data)
+        if old and old != book.audio_path:
+            remove_book_media(None, old)
         book.audio_duration_seconds = duration
         self.book_repo.update(book)
         self._audit(

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 import struct
 
 from backend.config import get_settings
@@ -53,9 +54,9 @@ def save_cover_jpg(book, data: bytes, ext: str) -> str:
         raise ValidationError("封面文件无法解析为图片") from e
 
     if book.isbn:
-        rel = os.path.join("cover", book.isbn[:4], f"{book.isbn}.jpg")
+        rel = os.path.join("cover", book.isbn[:4], f"{book.isbn}_{secrets.token_hex(6)}.jpg")
     else:
-        rel = os.path.join("cover", "local", f"{book.book_code}.jpg")
+        rel = os.path.join("cover", "local", f"{book.book_code}_{secrets.token_hex(6)}.jpg")
     abs_path = os.path.join(_uploads_root(), rel)
     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
     img.save(abs_path, "JPEG", quality=88)
@@ -99,17 +100,17 @@ def _mp3_duration(data: bytes) -> int:
     return 0
 
 
-def save_audio_mp3(book, data: bytes) -> int:
-    """音频存储：book_audio/{code}/audio.mp3；返回时长（秒）。
+def save_audio_mp3(book, data: bytes) -> tuple[str, int]:
+    """音频存储：book_audio/{code}/audio_{token}.mp3；返回 (相对路径, 时长秒)。
     C26：解析时长为 0 时拒绝——先解析后写盘（不入库不写文件）。"""
     duration = _mp3_duration(data)
     if duration <= 0:
         from backend.common.exceptions import ValidationError
 
         raise ValidationError("音频解析时长为 0，请检查文件")
-    rel = os.path.join("book_audio", book.book_code, "audio.mp3")
+    rel = os.path.join("book_audio", book.book_code, f"audio_{secrets.token_hex(6)}.mp3")
     abs_path = os.path.join(_uploads_root(), rel)
     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
     with open(abs_path, "wb") as f:
         f.write(data)
-    return duration
+    return rel.replace(os.sep, "/"), duration
