@@ -1,4 +1,4 @@
-# DmkWords 绘本视觉系统规范 V1.0
+# DmkWords 绘本视觉系统规范 V1.1
 
 > 适用范围：admin-web（管理后台）+ miniapp（微信小程序）  
 > 核心目标：让界面"活"起来——像翻开一本少儿绘本，不是走进一间档案室  
@@ -526,7 +526,58 @@ admin-web 端未按本规范原定的 4 个迭代分阶段实施，而是一次�
 
 ---
 
+## 十二、运营增强组件（2026-08-28）
+
+### 12.1 PaintPagination 分页组件
+
+admin-web 列表页统一使用绘本风分页底栏，替代 antd 原生 Pagination。
+
+**行为**：
+- 显示当前页码范围、总条数、总页数
+- 快速跳转输入框 + 15/30/50/70/100 每页条数预设按钮
+- 与 `usePaintPagination` 配套，统一 `pageSize` / `currentPage` 状态
+- 已接入 9 个列表页：`BookManage`、`AuditLog`、`DepositManage`、`MemberManage`、`Reservations`、`RefundCenter`、`ActivityManage`、`GrowthManage`、`SystemConfig`
+
+**视觉约束**：
+- 使用 `theme-paint.ts` 圆角/边框/阴影 token
+- 当前页高亮用 `primary` 橙色
+- 保持与 `paint.css` 按钮形态一致
+
+### 12.2 批量操作模式
+
+**使用场景**：BookManage 图书批量上架/下架。
+
+**交互**：
+- 表格行首复选框支持跨页选择（`preserveSelectedRowKeys: true`）
+- 顶部批量操作栏显示已选数量
+- 二次确认后调用后端批量接口，刷新当前页
+
+**后端约定**：
+- `POST /api/admin/books/batch-toggle-status`
+- Body: `{ ids: number[], status: 0 | 1 }`
+- 事务内逐个切换，失败回滚
+
+### 12.3 上传进度反馈
+
+**使用场景**：BookDetail 封面/音频上传。
+
+**实现**：
+- 前端改用 `XMLHttpRequest`，监听 `onprogress`
+- 实时更新 `Progress` 组件百分比
+- 上传中禁用保存/返回按钮，防止并发
+
+### 12.4 表格横向滚动条显式化
+
+**问题**：macOS 默认 overlay 滚动条在表格内隐藏，用户看不到可横向滚动。
+
+**修复**：
+- `Layout.tsx` 内层 `AntLayout` / `Content` 设置 `minWidth: 0`，防止分页组件撑开整页
+- `paint.css` 为 `.ant-table-body` / `.ant-table-content` 增加显式 `::-webkit-scrollbar` 与 `scrollbar-color` 样式
+- `BookManage` 保持 `scroll.x: "max-content"`，恢复页内横向滚动
+
+---
+
 *规范制定：外部专家*  
-*日期：2026-08-25*  
+*日期：2026-08-25（运营增强同步至 2026-08-28）*  
 *版本：V1.1*  
 *关联文档：theme-paint.ts, Layout.tsx, BookManage.tsx, Dashboard.tsx, miniapp/app.wxss*
