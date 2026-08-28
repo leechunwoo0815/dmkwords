@@ -81,30 +81,60 @@ export function apiUpdateCopyStatus(
   return request(`/api/admin/copies/${copyId}/status`, { method: "PUT", body: JSON.stringify(body) });
 }
 
-export async function apiUploadCover(bookId: number, file: File): Promise<Book> {
-  const form = new FormData();
-  form.append("file", file);
-  const token = localStorage.getItem("dmkwords_admin_token");
-  const res = await fetch(`/api/admin/books/${bookId}/cover`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: form,
+function uploadWithProgress(
+  url: string,
+  file: File,
+  onProgress?: (percent: number) => void
+): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const token = localStorage.getItem("dmkwords_admin_token");
+    xhr.open("POST", url);
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText));
+        } catch {
+          resolve(xhr.responseText);
+        }
+      } else {
+        let detail = "上传失败";
+        try {
+          detail = JSON.parse(xhr.responseText).detail || detail;
+        } catch {
+          /* ignore */
+        }
+        reject(new Error(detail));
+      }
+    };
+    xhr.onerror = () => reject(new Error("网络错误"));
+    xhr.onabort = () => reject(new Error("上传已取消"));
+    const form = new FormData();
+    form.append("file", file);
+    xhr.send(form);
   });
-  if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { detail?: string }).detail ?? "上传失败");
-  return res.json() as Promise<Book>;
 }
 
-export async function apiUploadAudio(bookId: number, file: File): Promise<Book> {
-  const form = new FormData();
-  form.append("file", file);
-  const token = localStorage.getItem("dmkwords_admin_token");
-  const res = await fetch(`/api/admin/books/${bookId}/audio`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: form,
-  });
-  if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { detail?: string }).detail ?? "上传失败");
-  return res.json() as Promise<Book>;
+export function apiUploadCover(
+  bookId: number,
+  file: File,
+  onProgress?: (percent: number) => void
+): Promise<Book> {
+  return uploadWithProgress(`/api/admin/books/${bookId}/cover`, file, onProgress) as Promise<Book>;
+}
+
+export function apiUploadAudio(
+  bookId: number,
+  file: File,
+  onProgress?: (percent: number) => void
+): Promise<Book> {
+  return uploadWithProgress(`/api/admin/books/${bookId}/audio`, file, onProgress) as Promise<Book>;
 }
 
 export async function apiImportBooks(file: File): Promise<{

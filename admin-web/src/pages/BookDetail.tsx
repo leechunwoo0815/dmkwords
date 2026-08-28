@@ -11,6 +11,7 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Progress,
   Radio,
   Select,
   Space,
@@ -58,6 +59,8 @@ export default function BookDetail() {
   const [book, setBook] = useState<Book | null>(null);
   const [copies, setCopies] = useState<BookCopy[]>([]);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [coverProgress, setCoverProgress] = useState<number | null>(null);
+  const [audioProgress, setAudioProgress] = useState<number | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [questionOpen, setQuestionOpen] = useState(false);
   const [qEditing, setQEditing] = useState<QuizQuestion | null>(null);
@@ -179,20 +182,27 @@ export default function BookDetail() {
             </div>
             <Upload
               accept=".jpg,.jpeg,.png,.webp" maxCount={1} showUploadList={false}
+              disabled={coverProgress !== null}
               customRequest={async ({ file, onSuccess, onError }) => {
+                setCoverProgress(0);
                 try {
-                  const updated = await apiUploadCover(bookId, file as File);
+                  const updated = await apiUploadCover(bookId, file as File, (p) => setCoverProgress(p));
                   setBook(updated);
                   message.success("封面上传成功（已统一转 JPG）");
+                  setCoverProgress(null);
                   onSuccess?.(null);
                 } catch (e) {
                   message.error(e instanceof Error ? e.message : "上传失败");
+                  setCoverProgress(null);
                   onError?.(e as Error);
                 }
               }}
             >
-              <Button size="small">上传封面</Button>
+              <Button size="small" loading={coverProgress !== null}>上传封面</Button>
             </Upload>
+            {coverProgress !== null && (
+              <Progress percent={coverProgress} size="small" status="active" style={{ width: 160, marginTop: 6 }} />
+            )}
           </div>
           <div>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>配套音频（仅 MP3）</Typography.Text>
@@ -212,20 +222,27 @@ export default function BookDetail() {
             </div>
             <Upload
               accept=".mp3" maxCount={1} showUploadList={false}
+              disabled={audioProgress !== null}
               customRequest={async ({ file, onSuccess, onError }) => {
+                setAudioProgress(0);
                 try {
-                  const updated = await apiUploadAudio(bookId, file as File);
+                  const updated = await apiUploadAudio(bookId, file as File, (p) => setAudioProgress(p));
                   setBook(updated);
                   message.success("音频上传成功");
+                  setAudioProgress(null);
                   onSuccess?.(null);
                 } catch (e) {
                   message.error(e instanceof Error ? e.message : "上传失败");
+                  setAudioProgress(null);
                   onError?.(e as Error);
                 }
               }}
             >
-              <Button size="small">上传音频</Button>
+              <Button size="small" loading={audioProgress !== null}>上传音频</Button>
             </Upload>
+            {audioProgress !== null && (
+              <Progress percent={audioProgress} size="small" status="active" style={{ width: 320, marginTop: 6 }} />
+            )}
           </div>
         </Space>
       </Card>
