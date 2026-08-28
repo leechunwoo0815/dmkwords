@@ -7,7 +7,6 @@ from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
-from backend.common.base_schema import PaginatedResponse
 from backend.config import get_settings
 from backend.database import get_db
 
@@ -21,6 +20,7 @@ from backend.domain.catalog.schemas import (
     BatchDeleteRequest,
     BatchToggleStatusRequest,
     BookCreateRequest,
+    BookListResponse,
     BookResponse,
     BookUpdateRequest,
     CopyResponse,
@@ -111,7 +111,9 @@ def book_audio_media(
     return _media_response(book, "audio_path", "audio/mpeg")
 
 
-def _to_book_response(book, copy_count: int, question_count: int = 0) -> BookResponse:
+def _to_book_response(
+    book, copy_count: int, question_count: int = 0, question_active_count: int = 0
+) -> BookResponse:
     return BookResponse(
         id=book.id,
         isbn=book.isbn,
@@ -129,10 +131,11 @@ def _to_book_response(book, copy_count: int, question_count: int = 0) -> BookRes
         status=book.status,
         copy_count=copy_count,
         question_count=question_count,
+        question_active_count=question_active_count,
     )
 
 
-@router.get("/books", response_model=PaginatedResponse[BookResponse])
+@router.get("/books", response_model=BookListResponse)
 def list_books(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -142,20 +145,40 @@ def list_books(
     no_cover: bool = Query(False),
     no_audio: bool = Query(False),
     quiz_incomplete: bool = Query(False),
+    sort: str | None = Query(None),
+    order: str | None = Query(None),
     admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
     books, counts, total = BookService(db).list_books(
-        page, page_size, keyword, ar_pending, status, no_cover, no_audio, quiz_incomplete
+        page,
+        page_size,
+        keyword,
+        ar_pending,
+        status,
+        no_cover,
+        no_audio,
+        quiz_incomplete,
+        sort,
+        order,
     )
-    question_counts = QuizQuestionRepository(db).question_counts_by_book([b.id for b in books])
-    return PaginatedResponse[BookResponse].create(
+    quiz_repo = QuizQuestionRepository(db)
+    question_counts = quiz_repo.question_counts_by_book([b.id for b in books])
+    question_active_counts = quiz_repo.question_active_counts_by_book([b.id for b in books])
+    return BookListResponse(
         items=[
-            _to_book_response(b, counts.get(b.id, 0), question_counts.get(b.id, 0)) for b in books
+            _to_book_response(
+                b,
+                counts.get(b.id, 0),
+                question_counts.get(b.id, 0),
+                question_active_counts.get(b.id, 0),
+            )
+            for b in books
         ],
         total=total,
         page=page,
         page_size=page_size,
+        counts=BookService(db).tab_counts(keyword),
     )
 
 
@@ -176,8 +199,10 @@ def get_book(
     db: Session = Depends(get_db),
 ):
     book, copies = BookService(db).get_book(book_id)
-    question_count = len(QuizQuestionRepository(db).list_by_book(book_id, active_only=False))
-    return _to_book_response(book, len(copies), question_count)
+    quiz_repo = QuizQuestionRepository(db)
+    question_count = len(quiz_repo.list_by_book(book_id, active_only=False))
+    question_active_count = len(quiz_repo.list_by_book(book_id, active_only=True))
+    return _to_book_response(book, len(copies), question_count, question_active_count)
 
 
 @router.put("/books/{book_id}", response_model=BookResponse)
@@ -189,8 +214,10 @@ def update_book(
 ):
     book = BookService(db).update_book(admin, book_id, body)
     _, copies = BookService(db).get_book(book_id)
-    question_count = len(QuizQuestionRepository(db).list_by_book(book_id, active_only=False))
-    return _to_book_response(book, len(copies), question_count)
+    quiz_repo = QuizQuestionRepository(db)
+    question_count = len(quiz_repo.list_by_book(book_id, active_only=False))
+    question_active_count = len(quiz_repo.list_by_book(book_id, active_only=True))
+    return _to_book_response(book, len(copies), question_count, question_active_count)
 
 
 @router.delete("/books/{book_id}")

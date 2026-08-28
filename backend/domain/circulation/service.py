@@ -222,9 +222,16 @@ class CirculationService:
         if quota <= 0:
             warnings.append(f"超上限放行（逾期 {overdue_count}，在借 {active_count}）")
 
-        # 副本状态
+        # 副本状态（C2：状态名中文化，禁止英文状态码泄漏给馆员）
         if copy.status != BookCopy.STATUS_AVAILABLE:
-            raise ConflictError(f"副本状态为 {copy.status}，不可借出")
+            status_zh = {
+                BookCopy.STATUS_RESERVED: "预约锁定",
+                BookCopy.STATUS_BORROWED: "已借出",
+                BookCopy.STATUS_MAINTENANCE: "维护中",
+                BookCopy.STATUS_LOST: "遗失",
+            }.get(copy.status, copy.status)
+            suffix = "（预约锁定请走预约核销）" if copy.status == BookCopy.STATUS_RESERVED else ""
+            raise ConflictError(f"副本当前状态：{status_zh}，不可借出{suffix}")
 
         # AR 超范围软提示（FEAT-031：提示不拦截；阈值走配置 ar_warning_range）
         if child.ar_level and book.ar_level:

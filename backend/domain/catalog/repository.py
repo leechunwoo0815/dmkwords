@@ -78,3 +78,19 @@ class QuizQuestionRepository(BaseRepository[QuizQuestion]):
             .all()
         )
         return {book_id: count for book_id, count in rows}
+
+    def question_active_counts_by_book(self, book_ids: list[int]) -> dict[int, int]:
+        """P2-5：启用题数（is_active=1）——与「测验未满 5 道」筛选同一口径。"""
+        if not book_ids:
+            return {}
+        rows = (
+            self.db.query(QuizQuestion.book_id, func.count(QuizQuestion.id))
+            .filter(
+                QuizQuestion.book_id.in_(book_ids),
+                QuizQuestion.is_deleted == 0,
+                QuizQuestion.is_active == 1,
+            )
+            .group_by(QuizQuestion.book_id)
+            .all()
+        )
+        return {book_id: count for book_id, count in rows}

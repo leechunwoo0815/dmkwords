@@ -4,17 +4,15 @@
 from __future__ import annotations
 
 import io
-import re
 
 from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
 from backend.domain.catalog.audit_events import publish_audit
-from backend.domain.catalog.constants import GRADE_OPTIONS
+from backend.domain.catalog.constants import GRADE_OPTIONS, ISBN_RE, clean_isbn
 from backend.domain.catalog.models import Book, BookCopy
 from backend.domain.catalog.repository import BookCopyRepository, BookRepository
-
-ISBN_RE = re.compile(r"^\d{9}[\dXx]$|^\d{13}$")
+from backend.domain.catalog.schemas import AR_LEVEL_MAX, AR_LEVEL_RE
 
 # 与 build_import_template 表头保持一致；程序按列索引解析，不依赖字面量。
 HEADER = ["ISBN", "书名*", "作者", "AR值", "词数*", "主题", "适读阶段", "副本数"]
@@ -71,15 +69,25 @@ def import_books(db: Session, admin, file_bytes: bytes) -> dict:
         )
 
         # ---- 行级校验 ----
+        isbn = clean_isbn(isbn)  # P2-8：行级清洗（半角连字符/空白）
         if not title:
             errors.append(f"第{row_num}行: 书名不能为空")
             continue
         if isbn and not ISBN_RE.match(isbn):
             errors.append(f"第{row_num}行: ISBN 格式不正确（{isbn}）")
             continue
+        # R7：AR 值与 schema 同规则（格式 + 0-12.9），防脏值漏进「AR 待配置」筛选
+        if ar:
+            if not AR_LEVEL_RE.match(ar):
+                errors.append(f"第{row_num}行: AR 值格式不正确（{ar}）")
+                continue
+            if float(ar) > AR_LEVEL_MAX:
+                errors.append(f"第{row_num}行: AR 值超出范围（{ar}），上限 {AR_LEVEL_MAX}")
+                continue
         try:
             wc = int(float(word_count)) if word_count else 0
-            if wc < 0:
+            # P2-12：0 词书目无业务意义（WM7 入账依据），最小 1
+            if wc < 1:
                 raise ValueError
         except ValueError:
             errors.append(f"第{row_num}行: 总词数必须是正整数")

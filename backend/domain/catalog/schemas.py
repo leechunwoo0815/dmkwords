@@ -1,30 +1,62 @@
 # backend/domain/catalog/schemas.py — catalog 域 API Schema
+import re
+
 from pydantic import Field, field_validator
 
-from backend.common.base_schema import BaseSchema
+from backend.common.base_schema import BaseSchema, PaginatedResponse
+
+# R7：AR 值三路统一校验（schema/导入/前端共用同一规则）
+# 上限 12.9 = 美国常规学校标准最高值（用户 2026-08-28 裁定）
+AR_LEVEL_RE = re.compile(r"^\d+(\.\d+)?$")
+AR_LEVEL_MAX = 12.9
+
+
+def validate_ar_level(value: str | None) -> str | None:
+    """空/None 放行（AR 可后补）；否则校验格式与范围，非法抛 ValueError → 422。"""
+    if value is None:
+        return value
+    s = value.strip()
+    if not s:
+        return None
+    if not AR_LEVEL_RE.match(s):
+        raise ValueError(f"AR 值格式不正确（{s}），需为 0-{AR_LEVEL_MAX} 的数字")
+    if float(s) > AR_LEVEL_MAX:
+        raise ValueError(f"AR 值超出范围（{s}），上限 {AR_LEVEL_MAX}")
+    return s
 
 
 class BookCreateRequest(BaseSchema):
     isbn: str | None = Field(None, max_length=20, description="ISBN；无 ISBN 书目传空")
     title: str = Field(..., min_length=1, max_length=200)
     author: str = Field("", max_length=100)
-    word_count: int = Field(..., ge=0)
+    # P2-12：word_count 是 WM7 词数入账依据，0 词书目无业务意义（用户 2026-08-28 裁定 min 1）
+    word_count: int = Field(..., ge=1)
     ar_level: str | None = Field(None, max_length=10)
     topic: str = Field("", max_length=50)
     grade: str = Field("", max_length=50)
     description: str | None = Field(None, max_length=2000)
     copy_count: int = Field(1, ge=1, le=99, description="入库副本数（默认1）")
 
+    @field_validator("ar_level")
+    @classmethod
+    def _ar_level_ok(cls, v: str | None) -> str | None:
+        return validate_ar_level(v)
+
 
 class BookUpdateRequest(BaseSchema):
     isbn: str | None = Field(None, max_length=20, description="ISBN；可后补或修改")
     title: str = Field(..., min_length=1, max_length=200)
     author: str = Field("", max_length=100)
-    word_count: int = Field(..., ge=0)
+    word_count: int = Field(..., ge=1)
     ar_level: str | None = Field(None, max_length=10)
     topic: str = Field("", max_length=50)
     grade: str = Field("", max_length=50)
     description: str | None = Field(None, max_length=2000)
+
+    @field_validator("ar_level")
+    @classmethod
+    def _ar_level_ok(cls, v: str | None) -> str | None:
+        return validate_ar_level(v)
 
 
 class BookResponse(BaseSchema):
@@ -43,7 +75,9 @@ class BookResponse(BaseSchema):
     description: str | None
     status: int
     copy_count: int = Field(0, description="在册副本总数")
-    question_count: int = Field(0, description="测验题目数量")
+    question_count: int = Field(0, description="测验题目数量（含停用）")
+    # P2-5：启用题数——与「测验未满 5 道」Tab 同口径（is_active=1）
+    question_active_count: int = Field(0, description="启用题目数量")
 
 
 class BookListQuery(BaseSchema):
@@ -117,3 +151,9 @@ class ImportResultResponse(BaseSchema):
     success_count: int
     failed_count: int
     errors: list[str] = Field(default_factory=list, description="行号+原因")
+
+
+class BookListResponse(PaginatedResponse[BookResponse]):
+    """C3：图书列表响应 = 分页结构 + 7 个筛选 Tab 的计数。"""
+
+    counts: dict[str, int] = Field(default_factory=dict, description="Tab 计数（与列表筛选同口径）")

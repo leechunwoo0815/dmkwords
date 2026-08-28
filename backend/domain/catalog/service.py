@@ -4,13 +4,13 @@
 from __future__ import annotations
 
 import json
-import re
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from backend.common.exceptions import ConflictError, ValidationError
 from backend.domain.catalog.audit_events import publish_audit
+from backend.domain.catalog.constants import ISBN_RE, clean_isbn
 from backend.domain.catalog.models import Book, BookCopy, QuizQuestion
 from backend.domain.catalog.repository import (
     BookCopyRepository,
@@ -19,7 +19,8 @@ from backend.domain.catalog.repository import (
 )
 from backend.domain.catalog.schemas import BookCreateRequest, BookUpdateRequest
 
-ISBN_RE = re.compile(r"^\d{9}[\dXx]$|^\d{13}$")
+# P2-7：排序白名单（copy_count 需 join 子查询）
+SORT_WHITELIST = {"id", "word_count", "copy_count"}
 
 
 class BookService:
@@ -54,10 +55,8 @@ class BookService:
             reason=reason or "图书管理",
         )
 
-    def list_books(
+    def _filtered_query(
         self,
-        page: int,
-        page_size: int,
         keyword: str | None,
         ar_pending: bool,
         status: int | None,
@@ -65,8 +64,7 @@ class BookService:
         no_audio: bool = False,
         quiz_incomplete: bool = False,
     ):
-        from sqlalchemy import func
-
+        """C3：列表筛选的单一事实源——list_books 与 tab_counts 共用，防口径漂移。"""
         q = self.db.query(Book).filter(Book.is_deleted == 0)
         if keyword:
             like = f"%{keyword}%"
@@ -87,21 +85,79 @@ class BookService:
         if no_audio:
             q = q.filter(Book.audio_path.is_(None))
         if quiz_incomplete:
-            from backend.domain.catalog.models import QuizQuestion
+            sub = self._active_quiz_subq()
+            q = q.outerjoin(sub, sub.c.book_id == Book.id).filter(
+                (sub.c.cnt.is_(None)) | (sub.c.cnt < 5)
+            )
+        return q
 
-            active_count = (
-                self.db.query(QuizQuestion.book_id, func.count(QuizQuestion.id).label("cnt"))
-                .filter(QuizQuestion.is_deleted == 0, QuizQuestion.is_active == 1)
-                .group_by(QuizQuestion.book_id)
-                .subquery()
-            )
-            q = q.outerjoin(active_count, active_count.c.book_id == Book.id).filter(
-                (active_count.c.cnt.is_(None)) | (active_count.c.cnt < 5)
-            )
+    def _active_quiz_subq(self):
+        active_count = (
+            self.db.query(QuizQuestion.book_id, func.count(QuizQuestion.id).label("cnt"))
+            .filter(QuizQuestion.is_deleted == 0, QuizQuestion.is_active == 1)
+            .group_by(QuizQuestion.book_id)
+            .subquery()
+        )
+        return active_count
+
+    def list_books(
+        self,
+        page: int,
+        page_size: int,
+        keyword: str | None,
+        ar_pending: bool,
+        status: int | None,
+        no_cover: bool = False,
+        no_audio: bool = False,
+        quiz_incomplete: bool = False,
+        sort: str | None = None,
+        order: str | None = None,
+    ):
+        q = self._filtered_query(keyword, ar_pending, status, no_cover, no_audio, quiz_incomplete)
+
+        # P2-7：受控排序；非法 sort/order 静默回默认 id desc
+        if sort in SORT_WHITELIST:
+            if sort == "copy_count":
+                cnt = (
+                    self.db.query(BookCopy.book_id, func.count(BookCopy.id).label("cnt"))
+                    .filter(BookCopy.is_deleted == 0)
+                    .group_by(BookCopy.book_id)
+                    .subquery()
+                )
+                q = q.outerjoin(cnt, cnt.c.book_id == Book.id)
+                col = func.coalesce(cnt.c.cnt, 0)
+            else:
+                col = Book.word_count if sort == "word_count" else Book.id
+            q = q.order_by(col.asc() if order == "asc" else col.desc(), Book.id.desc())
+        else:
+            q = q.order_by(Book.id.desc())
+
         total = q.count()
-        books = q.order_by(Book.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        books = q.offset((page - 1) * page_size).limit(page_size).all()
         counts = self.copy_repo.copy_counts_by_book([b.id for b in books])
         return books, counts, total
+
+    def tab_counts(self, keyword: str | None = None) -> dict[str, int]:
+        """C3：7 个 Tab 计数——逐 Tab 复用 _filtered_query 同一筛选构造。
+
+        all = 仅 is_deleted=0（不带 Tab 筛选）；keyword 为搜索条件，各口径一致生效，
+        保证计数与用户当前看到的筛选结果一致。
+        """
+
+        def n(ar_pending=False, status=None, no_cover=False, no_audio=False, quiz_incomplete=False):
+            return self._filtered_query(
+                keyword, ar_pending, status, no_cover, no_audio, quiz_incomplete
+            ).count()
+
+        return {
+            "all": self._filtered_query(keyword, False, None).count(),
+            "on": n(status=1),
+            "off": n(status=0),
+            "ar": n(ar_pending=True),
+            "no_cover": n(no_cover=True),
+            "no_audio": n(no_audio=True),
+            "quiz_incomplete": n(quiz_incomplete=True),
+        }
 
     def get_book(self, book_id: int) -> tuple[Book, list[BookCopy]]:
         book = self.book_repo.get_by_id_or_raise(book_id)
@@ -109,7 +165,7 @@ class BookService:
         return book, copies
 
     def create_book(self, admin, req: BookCreateRequest) -> Book:
-        isbn = req.isbn.strip() if req.isbn else ""
+        isbn = clean_isbn(req.isbn)
         if isbn:
             if not ISBN_RE.match(isbn):
                 raise ValidationError(f"ISBN 格式不正确: {isbn}")
@@ -151,14 +207,17 @@ class BookService:
             "ar_level": book.ar_level,
             "isbn": book.isbn,
         }
-        # ISBN 可后补/修改：校验格式 + 唯一性（不含自己）
-        new_isbn = (req.isbn or "").strip() or None
+        # ISBN 可后补/修改：清洗 + 校验格式 + 唯一性（不含自己）
+        new_isbn = clean_isbn(req.isbn) or None
         if new_isbn != book.isbn:
             if new_isbn and not ISBN_RE.match(new_isbn):
                 raise ValidationError(f"ISBN 格式不正确: {new_isbn}")
             if new_isbn and self.book_repo.get_by_isbn(new_isbn):
                 raise ConflictError(f"ISBN {new_isbn} 已存在（补货请走副本管理增加副本）")
             book.isbn = new_isbn
+        # R1：清空 ISBN 后若从未有内部编号（创建时带 ISBN），补生成，保证 book_code 恒非空
+        if not book.isbn and not book.internal_code:
+            book.internal_code = f"LOCAL-{book.id:06d}"
         book.title = req.title.strip()
         book.author = req.author.strip()
         book.word_count = req.word_count
@@ -242,13 +301,20 @@ class BookService:
         return {"success": success, "failed": len(errors), "errors": errors[:50]}
 
     def add_copies(self, admin, book_id: int, count: int) -> list[BookCopy]:
+        from sqlalchemy.exc import IntegrityError
+
         book = self.book_repo.get_by_id_or_raise(book_id)
         next_seq = self._max_copy_seq(book) + 1
         created = [
             BookCopy(book_id=book.id, copy_code=self.copy_repo.next_copy_code(book, next_seq + i))
             for i in range(count)
         ]
-        self.copy_repo.bulk_create(created)
+        try:
+            self.copy_repo.bulk_create(created)
+        except IntegrityError:
+            # P2-10：并发下撞 uq_copy_code → 回滚并转业务异常（禁止裸 500）
+            self.db.rollback()
+            raise ConflictError("副本编码冲突（可能他人正在操作此书），请重试") from None
         self._audit(admin, "book.add_copies", str(book.id), {"added": count})
         self.db.commit()
         return created
@@ -282,21 +348,23 @@ class BookService:
         return copy
 
     def upload_cover(self, admin, book_id: int, data: bytes, ext: str) -> Book:
-        """封面上传：统一转 JPG 存储（Pillow），路径 cover/{isbn前4}/{code}_{token}.jpg。"""
+        """封面上传：统一转 JPG 存储（Pillow），路径 cover/{isbn前4}/{code}_{token}.jpg。
+        R2：旧文件只在 commit 成功后删除（对齐 delete_book），防 DB 指向已删文件。"""
         book = self.book_repo.get_by_id_or_raise(book_id)
         from backend.common.file_storage import remove_book_media, save_cover_jpg
 
         old = book.cover_path
         book.cover_path = save_cover_jpg(book, data, ext)
-        if old and old != book.cover_path:
-            remove_book_media(old, None)
         self.book_repo.update(book)
         self._audit(admin, "book.cover", str(book.id), {"path": book.cover_path})
         self.db.commit()
+        if old and old != book.cover_path:
+            remove_book_media(old, None)
         return book
 
     def upload_audio(self, admin, book_id: int, data: bytes, filename: str) -> Book:
-        """音频上传：仅 MP3；路径 book_audio/{code}/audio_{token}.mp3；解析时长。"""
+        """音频上传：仅 MP3；路径 book_audio/{code}/audio_{token}.mp3；解析时长。
+        R2：旧文件只在 commit 成功后删除（对齐 delete_book），防 DB 指向已删文件。"""
         if not filename.lower().endswith(".mp3"):
             raise ValidationError("音频仅支持 MP3 格式")
         book = self.book_repo.get_by_id_or_raise(book_id)
@@ -304,14 +372,14 @@ class BookService:
 
         old = book.audio_path
         book.audio_path, duration = save_audio_mp3(book, data)
-        if old and old != book.audio_path:
-            remove_book_media(None, old)
         book.audio_duration_seconds = duration
         self.book_repo.update(book)
         self._audit(
             admin, "book.audio", str(book.id), {"path": book.audio_path, "duration": duration}
         )
         self.db.commit()
+        if old and old != book.audio_path:
+            remove_book_media(None, old)
         return book
 
 
@@ -319,6 +387,18 @@ class QuizQuestionService:
     def __init__(self, db: Session):
         self.db = db
         self.question_repo = QuizQuestionRepository(db)
+
+    def _audit(self, admin, action: str, book_id: int, question_id: int, detail: dict) -> None:
+        """R9：题目写操作留痕（影响 WM7 计分，必须可追溯）。"""
+        publish_audit(
+            self.db,
+            admin=admin,
+            action=action,
+            target_type="book",
+            target_id=str(book_id),
+            detail={"question_id": question_id, **detail},
+            reason="测验题库",
+        )
 
     def list_by_book(self, book_id: int) -> list[QuizQuestion]:
         return self.question_repo.list_by_book(book_id, active_only=False)
@@ -355,6 +435,13 @@ class QuizQuestionService:
             sort_order=(max_sort or 0) + 1,
         )
         self.question_repo.create(q)
+        self._audit(
+            admin,
+            "quiz.create",
+            book_id,
+            q.id,
+            {"question_type": q.question_type, "question_text": q.question_text},
+        )
         self.db.commit()
         return q
 
@@ -367,6 +454,17 @@ class QuizQuestionService:
         q.options = json.dumps(req.options, ensure_ascii=False)
         q.answer = req.answer
         self.question_repo.update(q)
+        self._audit(
+            admin,
+            "quiz.update",
+            q.book_id,
+            q.id,
+            {
+                "question_type": q.question_type,
+                "question_text": q.question_text,
+                "answer": q.answer,
+            },
+        )
         self.db.commit()
         return q
 
@@ -374,12 +472,14 @@ class QuizQuestionService:
         q = self.question_repo.get_by_id_or_raise(question_id)
         q.is_active = 0 if q.is_active == 1 else 1
         self.question_repo.update(q)
+        self._audit(admin, "quiz.toggle", q.book_id, q.id, {"is_active": q.is_active})
         self.db.commit()
         return q
 
     def delete(self, admin, question_id: int) -> None:
-        self.question_repo.get_by_id_or_raise(question_id)
+        q = self.question_repo.get_by_id_or_raise(question_id)
         self.question_repo.soft_delete(question_id)
+        self._audit(admin, "quiz.delete", q.book_id, q.id, {"question_text": q.question_text})
         self.db.commit()
 
 
@@ -443,7 +543,7 @@ def build_import_template() -> bytes:
     guide.append(["词数", "是", "正整数"])
     guide.append(["主题", "否", ""])
     guide.append(["适读阶段", "否", "请从下拉选项中选择；管理端也统一为阶段"])
-    guide.append(["副本数", "否", "空=1；范围 0-999"])
+    guide.append(["副本数", "否", "空=1；范围 1-99"])
     guide.append([])
     guide.append(["示例行（正式导入时请删除或改为真实数据）"])
     guide.append(
