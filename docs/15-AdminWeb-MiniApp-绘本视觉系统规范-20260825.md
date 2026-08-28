@@ -1,4 +1,4 @@
-# DmkWords 绘本视觉系统规范 V1.1
+# DmkWords 绘本视觉系统规范 V1.2
 
 > 适用范围：admin-web（管理后台）+ miniapp（微信小程序）  
 > 核心目标：让界面"活"起来——像翻开一本少儿绘本，不是走进一间档案室  
@@ -568,16 +568,34 @@ admin-web 列表页统一使用绘本风分页底栏，替代 antd 原生 Pagina
 
 ### 12.4 表格横向滚动条显式化
 
-**问题**：macOS 默认 overlay 滚动条在表格内隐藏，用户看不到可横向滚动。
+**问题**：macOS 默认 overlay 滚动条在表格内隐藏，鼠标用户看不到可横向滚动；纯 CSS `::-webkit-scrollbar` 无法强制。
 
-**修复**：
-- `Layout.tsx` 内层 `AntLayout` / `Content` 设置 `minWidth: 0`，防止分页组件撑开整页
-- `paint.css` 为 `.ant-table-body` / `.ant-table-content` 增加显式 `::-webkit-scrollbar` 与 `scrollbar-color` 样式
-- `BookManage` 保持 `scroll.x: "max-content"`，恢复页内横向滚动
+**最终方案（`c369b4b`）**：
+- 新增 `PaintHScrollbar` 组件：表格下方自绘可拖动 thumb + 点击轨道跳转，100% 始终可见
+- `paint.css` 隐藏 `.ant-table-content::-webkit-scrollbar:horizontal`，避免与自定义滚动条重复
+- `Layout.tsx` 内层 `AntLayout` / `Content` 设 `minWidth: 0`，防止分页组件撑开整页
+
+### 12.5 布局：侧边栏固定、内容独立滚动
+
+**问题**：整页随内容滚动，左侧导航滚出屏幕。
+
+**规约（`5980516`）**：
+- 外层 `AntLayout`：`height: 100vh; overflow: hidden`
+- `Sider`：`position: sticky; top: 0; height: 100vh`
+- 右侧 `Content`：`flex: 1 1 auto; overflow: auto`（Header 固定不滚）
+
+### 12.6 媒体上传覆盖后的缓存失效
+
+**问题**：封面/音频固定文件名 + 固定 URL，重传后浏览器/audio 元素仍显示旧内容。
+
+**规约（`5980516`）**：
+- 后端存储文件名带随机后缀（`save_cover_jpg` / `save_audio_mp3`），重传生成新路径并删除旧文件
+- 前端 `apiMediaUrl(bookId, kind, version)` 追加 `v=<文件路径>` 参数；BookDetail 传 `book.cover_path` / `book.audio_path`
+- 重传后路径变 → URL 变 → 浏览器/`<audio>` 强制加载新内容（含新时长）
 
 ---
 
 *规范制定：外部专家*  
 *日期：2026-08-25（运营增强同步至 2026-08-28）*  
-*版本：V1.1*  
-*关联文档：theme-paint.ts, Layout.tsx, BookManage.tsx, Dashboard.tsx, miniapp/app.wxss*
+*版本：V1.2*  
+*关联文档：theme-paint.ts, Layout.tsx, BookManage.tsx, BookDetail.tsx, Dashboard.tsx, miniapp/app.wxss*

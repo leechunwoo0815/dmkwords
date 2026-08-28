@@ -15,6 +15,7 @@
 | WM1 | 平台基座（登录/RBAC/配置/审计 + admin-web 骨架 + dev.sh） | ACCEPTED | 2026-08-24 用户手动验收通过（11 步全过，含 C21 仪表盘 + C12 员工菜单核对） | 登录/RBAC/配置/审计/仪表盘/员工管理 |
 | admin-web-ui | admin-web 绘本风视觉系统改造 | ACCEPTED | tsc 0 errors；gate.sh 147 passed / 78.11%；专家复验通过；commit dee28e5 | 不含 miniapp；含弹窗点击修复、P0/P1/P2 清理 |
 | F1-F4 | 图书管理运营增强（分页/批量/进度条/滚动条） | MANUAL_TEST | tsc 0 errors；CI 绿；commits `e4da393`（分页）/`4a43752`（批量）/`0bfe411`（进度条）/`7e4a38f`（滚动条恢复） | 等用户完成全部手动验收；已确认滚动条恢复 |
+| admin-web-fix | 侧边栏固定 + 媒体重传缓存失效修复 | DONE | gate full PASS（148 passed / 77.94%）；tsc 0 错；commit `5980516` | 侧边栏不再随内容滚动；封面/音频重传后 URL 带 v 版本参数强制刷新；用户已验收 |
 | WM2 | 图书资产 | MANUAL_TEST | gate.sh full exit 0（详见 20260822 提交 aa6e164/35ab440/7a195b8）| 书目/副本/导入/封面音频/题目；等手动验收 |
 | WM3 | 会员与订单（人工收款路径） | MANUAL_TEST | gate.sh full exit 0（提交 710d56d/543593a/448ede2）| 家长孩子/订单/收款/会员状态机/二孩折扣；等手动验收 |
 | WM4 | 押金与赔偿 | MANUAL_TEST | gate.sh full exit 0（提交 74efe86）| 押金状态机/扣除/补缴/待结清；等手动验收 |
