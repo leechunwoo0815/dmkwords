@@ -181,7 +181,8 @@ class BookService:
             topic=req.topic,
             grade=req.grade,
             description=req.description,
-            status=Book.STATUS_ON,
+            # D1：新书一律下架入库——完善封面/音频/AR/测验后再上架
+            status=Book.STATUS_OFF,
         )
         self.book_repo.create(book)
         # 无 ISBN 书目生成内部编号
@@ -280,12 +281,14 @@ class BookService:
         return {"success": success, "failed": len(errors), "errors": errors[:50]}
 
     def batch_toggle_status(self, admin, book_ids: list[int], status: int) -> dict:
-        """Batch set book status to on (1) or off (0)."""
+        """Batch set book status to on (1) or off (0). D1：目标上架逐本校验，失败进明细（部分成功）。"""
         success = 0
         errors: list[str] = []
         for book_id in book_ids:
             try:
                 book = self.book_repo.get_by_id_or_raise(book_id)
+                if status == 1:
+                    self._assert_can_onboard(book)
                 book.status = status
                 self.book_repo.update(book)
                 self._audit(
@@ -299,6 +302,47 @@ class BookService:
             except Exception as exc:
                 errors.append(f"ID {book_id}: {exc}")
         return {"success": success, "failed": len(errors), "errors": errors[:50]}
+
+    def _onboarding_missing(self, book: Book) -> list[str]:
+        """D1：上架完整性五项检查——封面/音频/AR/词数≥1/启用测验题≥5，返回中文缺失清单。"""
+        missing: list[str] = []
+        if not book.cover_path:
+            missing.append("未传封面")
+        if not book.audio_path:
+            missing.append("未传音频")
+        if not book.ar_level:
+            missing.append("未配置 AR 值")
+        if not book.word_count or book.word_count < 1:
+            missing.append("词数无效（需≥1）")
+        active = (
+            self.db.query(func.count(QuizQuestion.id))
+            .filter(
+                QuizQuestion.book_id == book.id,
+                QuizQuestion.is_deleted == 0,
+                QuizQuestion.is_active == 1,
+            )
+            .scalar()
+        )
+        if active < 5:
+            missing.append(f"未满 5 道测验题（当前 {active} 道）")
+        return missing
+
+    def _assert_can_onboard(self, book: Book) -> None:
+        """D1：上架拦截。配置 book_onboarding_check=false 时跳过（演示/特殊场景）。"""
+        from backend.common.config_service import ConfigService
+
+        if ConfigService(self.db).get_value("book_onboarding_check", "true").lower() != "true":
+            return
+        missing = self._onboarding_missing(book)
+        if missing:
+            raise ConflictError(f"无法上架：《{book.title}》{'、'.join(missing)}")
+
+    def get_onboarding_missing(self, book_id: int) -> list[str]:
+        """D1：详情接口缺失清单——仅下架态计算，上架态恒空。"""
+        book = self.book_repo.get_by_id_or_raise(book_id)
+        if book.status != Book.STATUS_OFF:
+            return []
+        return self._onboarding_missing(book)
 
     def add_copies(self, admin, book_id: int, count: int) -> list[BookCopy]:
         from sqlalchemy.exc import IntegrityError
@@ -320,8 +364,11 @@ class BookService:
         return created
 
     def toggle_status(self, admin, book_id: int) -> Book:
-        """上下架切换。下架影响：隐藏/禁借/停音频/禁新测验；已借仍可还；词数不回收。"""
+        """上下架切换。下架影响：隐藏/禁借/停音频/禁新测验；已借仍可还；词数不回收。
+        D1：下架→上架方向做完整性校验（开关 book_onboarding_check 可关）；上架→下架不校验。"""
         book = self.book_repo.get_by_id_or_raise(book_id)
+        if book.status == Book.STATUS_OFF:
+            self._assert_can_onboard(book)
         book.status = Book.STATUS_OFF if book.status == Book.STATUS_ON else Book.STATUS_ON
         self.book_repo.update(book)
         self._audit(admin, "book.toggle_status", str(book.id), {"new_status": book.status})

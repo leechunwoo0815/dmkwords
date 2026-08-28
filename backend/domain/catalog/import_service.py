@@ -127,7 +127,8 @@ def import_books(db: Session, admin, file_bytes: bytes) -> dict:
             ar_level=ar or None,
             topic=topic,
             grade=grade,
-            status=Book.STATUS_ON,
+            # D1：导入一律下架入库——馆员逐本完善后再上架
+            status=Book.STATUS_OFF,
         )
         book_repo.create(book)
         if not isbn:

@@ -10,6 +10,15 @@ from backend.domain.admin.repository import SystemConfigRepository
 
 # (key, value, type, category, description, display_name)
 CONFIG_SEEDS = [
+    # 图书
+    (
+        "book_onboarding_check",
+        "true",
+        "bool",
+        "图书",
+        "开启后，缺少封面/音频/AR 值/词数/满 5 道测验题的书无法上架",
+        "图书上架完整性校验",
+    ),
     # 借阅
     ("borrow_limit", "30", "int", "借阅", "可借上限（本）", "可借上限（本）"),
     ("borrow_days", "30", "int", "借阅", "借期（天）", "借期天数（天）"),

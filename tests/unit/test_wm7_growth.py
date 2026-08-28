@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
+from tests.unit.helpers import force_book_on
+
 
 def _h(client, username="admin"):
     r = client.post("/api/admin/login", json={"username": username, "password": "dmkwords123"})
@@ -28,6 +30,8 @@ def _setup_finished_book(client, h, phone, isbn, word_count=2500, duration=600):
         json={"isbn": isbn, "title": f"Book {isbn[-4:]}", "word_count": word_count},
         headers=h,
     ).json()
+    # D1：新书默认下架入库；完播/测验链路需要上架态书
+    force_book_on(client, h, book["id"])
     # 5 道题（答案分别为 A/A/A/A/对）
     for i in range(1, 5):
         client.post(
@@ -231,6 +235,7 @@ def test_quiz_locked_without_finish(client: TestClient):
         json={"isbn": "9787100000013", "title": "Locked", "word_count": 100},
         headers=h,
     ).json()
+    force_book_on(client, h, other["id"])
     q = client.get(f"/api/miniapp/quiz/{other['id']}?child_id={c['id']}", headers=mini).json()
     assert q["unlocked"] is False
     assert q["status"] == "locked"
@@ -268,6 +273,7 @@ def test_points_remainder_pool_and_full_marks(client: TestClient):
         json={"isbn": "9787100000014", "title": "B2", "word_count": 560},
         headers=h,
     ).json()
+    force_book_on(client, h, book2["id"])
     for i in range(1, 6):
         client.post(
             f"/api/admin/books/{book2['id']}/questions",
@@ -432,6 +438,7 @@ def test_checkin_streak_points(client: TestClient):
         json={"isbn": "9787100000017", "title": "Streak", "word_count": 100},
         headers=h,
     ).json()
+    force_book_on(client, h, book2["id"])
     import io
 
     mp3 = b"\xff\xfb\x90\x00" + b"\x00" * 125000

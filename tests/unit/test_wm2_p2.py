@@ -258,7 +258,9 @@ def test_c2_borrow_reserved_copy_chinese_error(client: TestClient):
 
 
 def test_c3_tab_counts_exact(client: TestClient):
-    """counts 7 键与各口径精确匹配；下架一本 → on-1/off+1。"""
+    """counts 7 键与各口径精确匹配；下架一本 → on-1/off+1。（D1：新书默认下架入库）"""
+    from tests.unit.helpers import force_book_on
+
     h = _h(client)
     b1 = _create_book(client, h, title="C3-1", ar_level="3.5")
     _create_book(client, h, title="C3-2", ar_level="3.5")
@@ -272,11 +274,13 @@ def test_c3_tab_counts_exact(client: TestClient):
         headers=h,
     )
     assert up.status_code == 200
-    # b2 下架 → on 3 / off 1
-    b2 = next(
-        b for b in client.get("/api/admin/books", headers=h).json()["items"] if b["title"] == "C3-2"
-    )
-    assert client.post(f"/api/admin/books/{b2['id']}/toggle-status", headers=h).status_code == 200
+    # 上架 b1-b4（force 过完整性）→ on 4 / off 1
+    by_title = {
+        b["title"]: b["id"] for b in client.get("/api/admin/books", headers=h).json()["items"]
+    }
+    for t in ["C3-1", "C3-2", "C3-3", "C3-4"]:
+        r = force_book_on(client, h, by_title[t])
+        assert r.status_code == 200
 
     data = client.get("/api/admin/books", headers=h).json()
     counts = data["counts"]
@@ -290,11 +294,8 @@ def test_c3_tab_counts_exact(client: TestClient):
         "quiz_incomplete": 5,
     }, counts
 
-    # 再下架 b3 → on-1/off+1
-    b3 = next(
-        b for b in client.get("/api/admin/books", headers=h).json()["items"] if b["title"] == "C3-3"
-    )
-    client.post(f"/api/admin/books/{b3['id']}/toggle-status", headers=h)
+    # 再下架 C3-3（on→off 方向不校验）→ on-1/off+1
+    client.post(f"/api/admin/books/{by_title['C3-3']}/toggle-status", headers=h)
     counts2 = client.get("/api/admin/books", headers=h).json()["counts"]
     assert counts2["on"] == counts["on"] - 1
     assert counts2["off"] == counts["off"] + 1

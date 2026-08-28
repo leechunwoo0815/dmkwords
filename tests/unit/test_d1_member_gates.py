@@ -135,6 +135,9 @@ def test_expired_formal_audio_only_holding(client: TestClient, db):
         import io
 
         book = _book(client, h, isbn, title)
+        from tests.unit.helpers import force_book_on
+
+        force_book_on(client, h, book["id"])  # D1：音频播放校验上架态
         mp3 = b"\xff\xfb\x90\x00" + b"\x00" * 125000
         client.post(
             f"/api/admin/books/{book['id']}/audio",

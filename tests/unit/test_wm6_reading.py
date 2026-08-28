@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
+from tests.unit.helpers import force_book_on
+
 
 def _h(client, username="admin"):
     r = client.post("/api/admin/login", json={"username": username, "password": "dmkwords123"})
@@ -36,6 +38,8 @@ def _setup(client, h, phone="13800000601", isbn="9780545582889", duration=600):
     book = client.post(
         "/api/admin/books", json={"isbn": isbn, "title": "Dog Man", "word_count": 2500}, headers=h
     ).json()
+    # D1：新书默认下架入库；reading 链路需要上架态书
+    force_book_on(client, h, book["id"])
     # 造 MP3（最小帧头）并上传 → duration 解析可能为 0，直接改库设时长
     import io
 
@@ -214,6 +218,8 @@ def _setup_book_with_audio(client, h, isbn, title="Dog Man", duration=600):
     book = client.post(
         "/api/admin/books", json={"isbn": isbn, "title": title, "word_count": 2500}, headers=h
     ).json()
+    # D1：新书默认下架入库；reading 链路需要上架态书
+    force_book_on(client, h, book["id"])
     import io
 
     mp3 = b"\xff\xfb\x90\x00" + b"\x00" * 125000

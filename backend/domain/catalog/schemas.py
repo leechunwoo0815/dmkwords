@@ -78,6 +78,10 @@ class BookResponse(BaseSchema):
     question_count: int = Field(0, description="测验题目数量（含停用）")
     # P2-5：启用题数——与「测验未满 5 道」Tab 同口径（is_active=1）
     question_active_count: int = Field(0, description="启用题目数量")
+    # D1：上架完整性缺失清单（仅下架态计算，仅详情接口填充）
+    missing: list[str] = Field(
+        default_factory=list, description="下架态缺失项（封面/音频/AR/词数/测验）"
+    )
 
 
 class BookListQuery(BaseSchema):

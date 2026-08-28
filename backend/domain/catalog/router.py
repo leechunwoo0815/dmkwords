@@ -112,7 +112,11 @@ def book_audio_media(
 
 
 def _to_book_response(
-    book, copy_count: int, question_count: int = 0, question_active_count: int = 0
+    book,
+    copy_count: int,
+    question_count: int = 0,
+    question_active_count: int = 0,
+    missing: list[str] | None = None,
 ) -> BookResponse:
     return BookResponse(
         id=book.id,
@@ -132,6 +136,7 @@ def _to_book_response(
         copy_count=copy_count,
         question_count=question_count,
         question_active_count=question_active_count,
+        missing=missing or [],
     )
 
 
@@ -202,7 +207,8 @@ def get_book(
     quiz_repo = QuizQuestionRepository(db)
     question_count = len(quiz_repo.list_by_book(book_id, active_only=False))
     question_active_count = len(quiz_repo.list_by_book(book_id, active_only=True))
-    return _to_book_response(book, len(copies), question_count, question_active_count)
+    missing = BookService(db).get_onboarding_missing(book_id)
+    return _to_book_response(book, len(copies), question_count, question_active_count, missing)
 
 
 @router.put("/books/{book_id}", response_model=BookResponse)

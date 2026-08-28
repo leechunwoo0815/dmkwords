@@ -247,7 +247,10 @@ def test_favorites_flow(client: TestClient):
         "/api/miniapp/favorites", json={"child_id": c["id"], "book_id": book["id"]}, headers=m
     )
     assert r2.status_code == 409
-    # 下架书仍可见但标注
+    # 下架书仍可见但标注（D1：先 force_on 再下架）
+    from tests.unit.helpers import force_book_on
+
+    force_book_on(client, h, book["id"])
     client.post(f"/api/admin/books/{book['id']}/toggle-status", headers=h)
     lst = client.get(f"/api/miniapp/favorites?child_id={c['id']}", headers=m).json()
     assert lst[0]["off_shelf"] is True

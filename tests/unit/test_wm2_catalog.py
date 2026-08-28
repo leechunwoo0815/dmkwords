@@ -22,7 +22,7 @@ def test_create_book_with_isbn(client: TestClient):
     h = _h(client)
     book = _create_book(client, h, isbn="9780545582889", title="Dog Man", word_count=2500)
     assert book["isbn"] == "9780545582889"
-    assert book["status"] == 1
+    assert book["status"] == 0  # D1：新书一律下架入库
     assert book["copy_count"] == 1
 
 
@@ -66,11 +66,19 @@ def test_ar_pending_filter(client: TestClient):
 
 
 def test_toggle_status_and_audit(client: TestClient):
+    """D1 后：上架需过完整性校验，测试用 force_book_on 走通上架方向。"""
+    from tests.unit.helpers import force_book_on
+
     h = _h(client)
     book = _create_book(client, h, isbn="4444444444444", title="Toggle")
-    resp = client.post(f"/api/admin/books/{book['id']}/toggle-status", headers=h)
-    assert resp.json()["status"] == 0
-    resp = client.get("/api/admin/books", params={"status": 0}, headers=h)
+    # 不完整书直接上架 → 409 拦截
+    blocked = client.post(f"/api/admin/books/{book['id']}/toggle-status", headers=h)
+    assert blocked.status_code == 409
+    assert "无法上架" in blocked.json()["detail"]
+    # force 上架成功
+    resp = force_book_on(client, h, book["id"])
+    assert resp.json()["status"] == 1
+    resp = client.get("/api/admin/books", params={"status": 1}, headers=h)
     assert any(b["title"] == "Toggle" for b in resp.json()["items"])
 
 
