@@ -208,7 +208,7 @@ export default function BookManage() {
         dataSource={books}
         size="middle"
         pagination={false}
-        scroll={{ x: 1300 }}
+        scroll={{ x: "max-content" }}
         rowSelection={{
           selectedRowKeys,
           onChange: (keys) => setSelectedRowKeys(keys as number[]),
@@ -239,7 +239,7 @@ export default function BookManage() {
             render: (s: number) => (s === 1 ? <Tag color="green">上架</Tag> : <Tag>下架</Tag>),
           },
           {
-            title: "操作", key: "op", width: 160,
+            title: "操作", key: "op", width: 160, fixed: "right",
             render: (_, r) => (
               <Space size="small">
                 <Button type="link" size="small" onClick={() => window.open(`/books/${r.id}`, "_self")}>编辑</Button>

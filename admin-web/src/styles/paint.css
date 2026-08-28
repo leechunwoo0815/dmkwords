@@ -319,6 +319,28 @@ body {
   background: #FFF9F0 !important;
 }
 
+/* 表格横向滚动条显式化（macOS overlay 滚动条默认隐藏，鼠标用户找不到） */
+.ant-table-body::-webkit-scrollbar,
+.ant-table-content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.ant-table-body::-webkit-scrollbar-thumb,
+.ant-table-content::-webkit-scrollbar-thumb {
+  background: var(--paint-ink-light);
+  border-radius: 4px;
+}
+.ant-table-body::-webkit-scrollbar-track,
+.ant-table-content::-webkit-scrollbar-track {
+  background: var(--paint-paper-dim);
+  border-radius: 4px;
+}
+.ant-table-body,
+.ant-table-content {
+  scrollbar-width: thin;
+  scrollbar-color: var(--paint-ink-light) var(--paint-paper-dim);
+}
+
 /* 分页 */
 .ant-pagination-item,
 .ant-pagination-prev,
