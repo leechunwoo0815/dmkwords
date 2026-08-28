@@ -208,7 +208,7 @@ export default function BookManage() {
         dataSource={books}
         size="middle"
         pagination={false}
-        scroll={{ x: "max-content" }}
+        scroll={{ x: 1300 }}
         rowSelection={{
           selectedRowKeys,
           onChange: (keys) => setSelectedRowKeys(keys as number[]),
