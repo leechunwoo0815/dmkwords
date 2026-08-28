@@ -14,9 +14,9 @@
 | M0.5 | Feature 全量清单 + Gherkin 初稿 | DONE | commit 78388a1; 230 场景解析通过 | 2026-08-22 |
 | WM1 | 平台基座（登录/RBAC/配置/审计 + admin-web 骨架 + dev.sh） | ACCEPTED | 2026-08-24 用户手动验收通过（11 步全过，含 C21 仪表盘 + C12 员工菜单核对） | 登录/RBAC/配置/审计/仪表盘/员工管理 |
 | admin-web-ui | admin-web 绘本风视觉系统改造 | ACCEPTED | tsc 0 errors；gate.sh 147 passed / 78.11%；专家复验通过；commit dee28e5 | 不含 miniapp；含弹窗点击修复、P0/P1/P2 清理 |
-| F1-F4 | 图书管理运营增强（分页/批量/进度条/滚动条） | MANUAL_TEST | tsc 0 errors；CI 绿；commits `e4da393`（分页）/`4a43752`（批量）/`0bfe411`（进度条）/`7e4a38f`（滚动条恢复） | 等用户完成全部手动验收；已确认滚动条恢复 |
+| F1-F4 | 图书管理运营增强（分页/批量/进度条/滚动条） | ACCEPTED | 用户在 WM2 验收过程中逐项确认；commits `e4da393`/`4a43752`/`0bfe411`/`7e4a38f`/`c369b4b` | 已随 WM2 验收闭环 |
 | admin-web-fix | 侧边栏固定 + 媒体重传缓存失效修复 | DONE | gate full PASS（148 passed / 77.94%）；tsc 0 错；commit `5980516` | 侧边栏不再随内容滚动；封面/音频重传后 URL 带 v 版本参数强制刷新；用户已验收 |
-| WM2 | 图书资产 | MANUAL_TEST | gate.sh full exit 0（详见 20260822 提交 aa6e164/35ab440/7a195b8）；2026-08-28 外部终审 R1-R9 + P2 十二项 + C1-C3 全部修复（gate PASS 174 passed/78.33%，gate-runs/2026-08-28/gate-wm2-p1.log + gate-wm2-p2.log）| 书目/副本/导入/封面音频/题目 + 运营增强 + P1/P2 修复；D1 上架强校验已接入（新书下架入库 + 五项完整性拦截 + book_onboarding_check 开关，gate-wm2-d1d3.log PASS 187 passed/78.72%）；等用户最终验收 → ACCEPTED + acceptance-baseline tag |
+| WM2 | 图书资产 | ACCEPTED | **2026-08-28 用户手动验收通过**；外部终审 R1-R9 + P2 十二项 + C1-C3 + D1-D3 全部修复；gate PASS 187 passed/78.72%（gate-runs/2026-08-28/ 下 gate-wm2-p1.log、gate-wm2-p2.log、gate-wm2-d1d3.log 三份日志）；tag `acceptance-baseline-wm3-wm10`（固定于 ed60377） | 书目/副本/导入/封面音频/题目 + 运营增强 + 上架强校验（新书下架入库 + 五项完整性拦截 + book_onboarding_check 开关）|
 | WM3 | 会员与订单（人工收款路径） | MANUAL_TEST | gate.sh full exit 0（提交 710d56d/543593a/448ede2）| 家长孩子/订单/收款/会员状态机/二孩折扣；等手动验收 |
 | WM4 | 押金与赔偿 | MANUAL_TEST | gate.sh full exit 0（提交 74efe86）| 押金状态机/扣除/补缴/待结清；等手动验收 |
 | WM5 | 借阅操作台 | MANUAL_TEST | gate.sh full exit 0（提交 7b5a8ee）| 借/还/续/逾期扣减/人工放行/未入会开关；等手动验收 |
@@ -38,7 +38,7 @@
 | T2 | 按图施工手册（docs/07） | PENDING | WM1 Demo 走完后产出 |
 | T3 | 微信资质确认（小程序主体/类目/商户号/订阅模板） | PENDING | 甲方跟进，阻塞 WM12 |
 | T4 | 需求签字状态跟踪 | PENDING | P3+ 业务域以签字为前提 |
-| T5 | PRD 复审补充任务（P0×4/P1×6/P2×10/债×4） | IN_DEV | 详单 docs/09-补充任务清单.md；P0/P1 已全部修完（gate 133 passed/77.08%）；D3 已修（CI 重写，首绿 run）；剩余 P2×8（C2/C3/C5/C6/C9/C10/C11/C18）与 WM11 统筹 |
+| T5 | PRD 复审补充任务（P0×4/P1×6/P2×10/债×4） | IN_DEV | 详单 docs/09-补充任务清单.md；P0/P1 已全部修完（门禁证据见 gate-runs/ 最新日志）；D3 已修（CI 重写，首绿 run）；剩余 P2×8（C2/C3/C5/C6/C9/C10/C11/C18）与 WM11 统筹 |
 
 ## 状态机
 

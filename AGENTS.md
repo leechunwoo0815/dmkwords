@@ -23,6 +23,6 @@
 
 ## 记忆衔接
 
-- 跨会话记忆 = `docs/项目交接-20260823.md` + `docs/LEDGER.md` + git log
+- 跨会话记忆 = `docs/项目交接-20260824.md` + `docs/LEDGER.md` + git log
 - 重大节点（模块交付/事故修复/方向变更）要更新交接卡或 LEDGER，让下一个会话零成本恢复
 - 手动验收状态在 LEDGER：MANUAL_TEST = 等用户测；ACCEPTED = 用户已确认
