@@ -239,7 +239,7 @@ export default function BookManage() {
             render: (s: number) => (s === 1 ? <Tag color="green">上架</Tag> : <Tag>下架</Tag>),
           },
           {
-            title: "操作", key: "op", width: 160, fixed: "right",
+            title: "操作", key: "op", width: 160,
             render: (_, r) => (
               <Space size="small">
                 <Button type="link" size="small" onClick={() => window.open(`/books/${r.id}`, "_self")}>编辑</Button>
