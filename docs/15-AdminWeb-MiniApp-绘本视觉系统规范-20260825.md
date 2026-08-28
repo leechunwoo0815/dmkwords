@@ -535,6 +535,7 @@ admin-web 列表页统一使用绘本风分页底栏，替代 antd 原生 Pagina
 **行为**：
 - 显示当前页码范围、总条数、总页数
 - 快速跳转输入框 + 15/30/50/70/100 每页条数预设按钮
+- **跳至页输入即时生效**：输入合法页码即跳转，无需回车/失焦（与「每页显示」输入一致）；用 `lastJumpRef` 去重，避免重复请求
 - 与 `usePaintPagination` 配套，统一 `pageSize` / `currentPage` 状态
 - 已接入 9 个列表页：`BookManage`、`AuditLog`、`DepositManage`、`MemberManage`、`Reservations`、`RefundCenter`、`ActivityManage`、`GrowthManage`、`SystemConfig`
 
