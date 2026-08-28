@@ -108,7 +108,7 @@ export default function Layout() {
           style={{ borderInlineEnd: "none" }}
         />
       </Sider>
-      <AntLayout>
+      <AntLayout style={{ minWidth: 0 }}>
         <Header
           style={{
             background: "rgba(255, 253, 247, 0.96)",
@@ -132,7 +132,7 @@ export default function Layout() {
             </Typography.Text>
           </Dropdown>
         </Header>
-        <Content style={{ padding: 24 }}>
+        <Content style={{ padding: 24, minWidth: 0 }}>
           <Outlet />
         </Content>
       </AntLayout>
