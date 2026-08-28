@@ -2276,6 +2276,12 @@ export interface components {
              * @default 0
              */
             question_active_count: number;
+            /**
+             * Missing
+             * @description 下架态缺失项（封面/音频/AR/词数/测验）
+             * @default
+             */
+            missing?: string[];
         };
         /** BookUpdateRequest */
         BookUpdateRequest: {

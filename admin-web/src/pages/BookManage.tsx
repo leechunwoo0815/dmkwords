@@ -143,7 +143,7 @@ export default function BookManage() {
         description: values.description || null,
         copy_count: values.copy_count ?? 1,
       });
-      message.success(`《${values.title}》入库成功`);
+      message.success(`《${values.title}》已入库（下架状态），完善封面/音频/AR/测验后上架`);
       setCreateOpen(false);
       form.resetFields();
       load(1);
@@ -393,7 +393,15 @@ export default function BookManage() {
             <Input />
           </Form.Item>
           <Space size="large">
-            <Form.Item name="word_count" label="总词数" rules={[{ required: true, message: "请输入总词数" }]}>
+            <Form.Item
+              name="word_count"
+              label="总词数"
+              rules={[
+                { required: true, message: "请输入总词数" },
+                // D2：InputNumber min 会静默 clamp，必须用 validator 显式拦截
+                { validator: (_r, v) => (v === null || v === undefined || v >= 1 ? Promise.resolve() : Promise.reject(new Error("总词数至少为 1"))) },
+              ]}
+            >
               <InputNumber min={1} style={{ width: 140 }} />
             </Form.Item>
             <Form.Item name="ar_level" label="AR 值（可后补）" rules={[AR_LEVEL_RULE]}>

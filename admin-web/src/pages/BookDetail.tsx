@@ -203,6 +203,10 @@ export default function BookDetail() {
           {book.title}
         </Typography.Title>
         {book.status === 1 ? <Tag color="green">上架</Tag> : <Tag>下架</Tag>}
+        {/* D1：下架态展示缺失清单，指引馆员完善 */}
+        {book.status === 0 && (book.missing?.length ?? 0) > 0 && (
+          <Tag color="orange">待完善：{(book.missing ?? []).join("、")}</Tag>
+        )}
         <Button onClick={openEdit}>编辑信息</Button>
       </Space>
 
@@ -413,13 +417,23 @@ export default function BookDetail() {
         okText="保存" cancelText="取消" destroyOnClose
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="isbn" label="ISBN（留空则使用系统编号，填写后不可清空）">
+          <Form.Item name="isbn" label="ISBN（可留空或修改；清空后自动转为内部编号）">
             <Input placeholder="如 9780545582889" />
           </Form.Item>
           <Form.Item name="title" label="书名" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="author" label="作者"><Input /></Form.Item>
           <Space size="large">
-            <Form.Item name="word_count" label="总词数" rules={[{ required: true }]}><InputNumber min={1} style={{ width: 140 }} /></Form.Item>
+            <Form.Item
+              name="word_count"
+              label="总词数"
+              rules={[
+                { required: true },
+                // D2：显式拦截静默 clamp
+                { validator: (_r, v) => (v === null || v === undefined || v >= 1 ? Promise.resolve() : Promise.reject(new Error("总词数至少为 1"))) },
+              ]}
+            >
+              <InputNumber min={1} style={{ width: 140 }} />
+            </Form.Item>
             <Form.Item name="ar_level" label="AR 值" rules={[AR_LEVEL_RULE]}><Input style={{ width: 140 }} /></Form.Item>
           </Space>
           <Space size="large">
