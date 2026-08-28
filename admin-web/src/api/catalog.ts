@@ -7,7 +7,7 @@ export type BookCopy = components["schemas"]["CopyResponse"];
 export type QuizQuestion = components["schemas"]["QuizQuestionResponse"];
 type BookCreate = components["schemas"]["BookCreateRequest"];
 type BookUpdate = components["schemas"]["BookUpdateRequest"];
-type PaginatedBooks = components["schemas"]["PaginatedResponse_BookResponse_"];
+type PaginatedBooks = components["schemas"]["BookListResponse"];
 
 export function apiListBooks(params: {
   page: number;
@@ -18,6 +18,8 @@ export function apiListBooks(params: {
   no_cover?: boolean;
   no_audio?: boolean;
   quiz_incomplete?: boolean;
+  sort?: string;
+  order?: string;
 }): Promise<PaginatedBooks> {
   const query = new URLSearchParams({
     page: String(params.page),
@@ -29,6 +31,8 @@ export function apiListBooks(params: {
   if (params.no_cover) query.set("no_cover", "true");
   if (params.no_audio) query.set("no_audio", "true");
   if (params.quiz_incomplete) query.set("quiz_incomplete", "true");
+  if (params.sort) query.set("sort", params.sort);
+  if (params.order) query.set("order", params.order);
   return request(`/api/admin/books?${query.toString()}`);
 }
 

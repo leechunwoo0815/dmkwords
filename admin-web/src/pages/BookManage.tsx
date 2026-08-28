@@ -2,6 +2,7 @@ import PaintEmpty from "../components/PaintEmpty";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
 import PaintPagination from "../components/PaintPagination";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   App as AntdApp,
   Button,
@@ -32,15 +33,21 @@ import {
   type Book,
 } from "../api/catalog";
 import { GRADE_OPTIONS } from "../constants/grade";
+import { AR_LEVEL_RULE } from "../constants/book";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 
 export default function BookManage() {
   const { message } = AntdApp.useApp();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // P2-6：挂载时从 URL 恢复筛选/页码/关键词（URL 为写后镜像，replace 不堆栈）
+  const urlTab = searchParams.get("tab") ?? "all";
+  const urlPage = Math.max(1, Number(searchParams.get("page")) || 1);
+  const urlKeyword = searchParams.get("keyword") ?? "";
   const [books, setBooks] = useState<Book[]>([]);
   const [total, setTotal] = useState(0);
-  const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination();
-  const [keyword, setKeyword] = useState("");
-  const [tab, setTab] = useState("all");
+  const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination(15, urlPage);
+  const [keyword, setKeyword] = useState(urlKeyword);
+  const [tab, setTab] = useState(urlTab);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -51,15 +58,32 @@ export default function BookManage() {
     failed_count: number;
     errors: string[];
   } | null>(null);
-  const [searchValue, setSearchValue] = useState("");
+  const [searchValue, setSearchValue] = useState(urlKeyword);
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [batchErrors, setBatchErrors] = useState<string[] | null>(null);
+  // C3：Tab 计数（与列表筛选同口径，后端 counts 返回）
+  const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
   const tableWrapRef = useRef<HTMLDivElement>(null);
   const [tableContent, setTableContent] = useState<HTMLElement | null>(null);
+
+  // P2-6：tab/page/keyword 变化时写回 URL（replace 不堆历史；初始空参数时替换为无参）
+  useEffect(() => {
+    const params: Record<string, string> = {};
+    if (tab !== "all") params.tab = tab;
+    if (page !== 1) params.page = String(page);
+    if (keyword) params.keyword = keyword;
+    setSearchParams(params, { replace: true });
+  }, [tab, page, keyword, setSearchParams]);
 
   const doSearch = useCallback((v: string) => {
     setKeyword(v);
     setPage(1);
   }, []);
+
+  // P2-7：受控排序状态（null = 未排序，回默认 id desc）
+  const [sortField, setSortField] = useState<"id" | "word_count" | "copy_count" | null>(null);
+  const [sortOrder, setSortOrder] = useState<"ascend" | "descend" | null>(null);
 
   const load = useCallback(
     (targetPage: number) => {
@@ -73,15 +97,18 @@ export default function BookManage() {
         no_cover: tab === "no_cover",
         no_audio: tab === "no_audio",
         quiz_incomplete: tab === "quiz_incomplete",
+        sort: sortField ?? undefined,
+        order: sortField && sortOrder ? (sortOrder === "ascend" ? "asc" : "desc") : undefined,
       })
         .then((result) => {
           setBooks(result.items ?? []);
           setTotal(result.total);
+          setTabCounts(result.counts ?? {});
         })
         .catch((e: Error) => message.error(e.message))
         .finally(() => setLoading(false));
     },
-    [keyword, tab, pageSize, message]
+    [keyword, tab, pageSize, sortField, sortOrder, message]
   );
 
   useEffect(() => {
@@ -106,7 +133,7 @@ export default function BookManage() {
     const values = await form.validateFields();
     try {
       await apiCreateBook({
-        isbn: values.isbn || null,
+        isbn: (values.isbn || "").replace(/[\s\-]/g, "") || null, // P2-8：提交前清洗
         title: values.title,
         author: values.author ?? "",
         word_count: values.word_count,
@@ -130,6 +157,7 @@ export default function BookManage() {
     if (selectedRowKeys.length === 0) return;
     try {
       const result = await apiBatchDeleteBooks(selectedRowKeys);
+      setBatchErrors(result.failed > 0 ? result.errors : null);
       message.success(`批量删除完成：成功 ${result.success}，失败 ${result.failed}`);
       setSelectedRowKeys([]);
       load(page);
@@ -143,6 +171,7 @@ export default function BookManage() {
     const action = status === 1 ? "上架" : "下架";
     try {
       const result = await apiBatchToggleBookStatus(selectedRowKeys, status);
+      setBatchErrors(result.failed > 0 ? result.errors : null);
       message.success(`批量${action}完成：成功 ${result.success}，失败 ${result.failed}`);
       setSelectedRowKeys([]);
       load(page);
@@ -203,6 +232,16 @@ export default function BookManage() {
           </>
         )}
       </Space>
+      {batchErrors && (
+        <div style={{ marginBottom: 12 }}>
+          <Typography.Text type="danger">批量操作部分失败明细：</Typography.Text>
+          <div style={{ marginTop: 4, maxHeight: 200, overflow: "auto", background: "#FFFDF7", border: "2px solid #3B2F2F", padding: 12, borderRadius: 12 }}>
+            {batchErrors.map((e, i) => (
+              <div key={i} style={{ color: "var(--paint-danger)", fontSize: 13 }}>{e}</div>
+            ))}
+          </div>
+        </div>
+      )}
       <Tabs
         activeKey={tab}
         onChange={(k) => {
@@ -210,13 +249,13 @@ export default function BookManage() {
           setPage(1);
         }}
         items={[
-          { key: "all", label: "全部" },
-          { key: "on", label: "上架中" },
-          { key: "off", label: "已下架" },
-          { key: "ar", label: "AR 待配置" },
-          { key: "no_cover", label: "未传封面" },
-          { key: "no_audio", label: "未传音频" },
-          { key: "quiz_incomplete", label: "测验未满 5 道" },
+          { key: "all", label: `全部（${tabCounts.all ?? 0}）` },
+          { key: "on", label: `上架中（${tabCounts.on ?? 0}）` },
+          { key: "off", label: `已下架（${tabCounts.off ?? 0}）` },
+          { key: "ar", label: `AR 待配置（${tabCounts.ar ?? 0}）` },
+          { key: "no_cover", label: `未传封面（${tabCounts.no_cover ?? 0}）` },
+          { key: "no_audio", label: `未传音频（${tabCounts.no_audio ?? 0}）` },
+          { key: "quiz_incomplete", label: `测验未满 5 道（${tabCounts.quiz_incomplete ?? 0}）` },
         ]}
       />
       <div ref={tableWrapRef} style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
@@ -227,6 +266,17 @@ export default function BookManage() {
           size="middle"
           pagination={false}
           scroll={{ x: "max-content" }}
+          onChange={(_pagination, _filters, sorter) => {
+            const s = Array.isArray(sorter) ? sorter[0] : sorter;
+            if (s && s.order && (s.field === "word_count" || s.field === "copy_count")) {
+              setSortField(s.field as "word_count" | "copy_count");
+              setSortOrder(s.order);
+            } else {
+              setSortField(null);
+              setSortOrder(null);
+            }
+            setPage(1);
+          }}
           rowSelection={{
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys as number[]),
@@ -241,8 +291,17 @@ export default function BookManage() {
             <Typography.Text code style={{ fontSize: 12 }}>{r.isbn ?? r.internal_code}</Typography.Text>
           ) },
           { title: "AR", dataIndex: "ar_level", width: 70, render: (v) => v ?? <Tag color="orange">待配置</Tag> },
-          { title: "词数", dataIndex: "word_count", width: 80, render: (v: number) => v.toLocaleString() },
-          { title: "副本", dataIndex: "copy_count", width: 60 },
+          {
+            title: "词数", dataIndex: "word_count", width: 90,
+            sorter: true,
+            sortOrder: sortField === "word_count" ? (sortOrder ?? null) : null,
+            render: (v: number) => v.toLocaleString(),
+          },
+          {
+            title: "副本", dataIndex: "copy_count", width: 70,
+            sorter: true,
+            sortOrder: sortField === "copy_count" ? (sortOrder ?? null) : null,
+          },
           {
             title: "封面", dataIndex: "cover_path", width: 60,
             render: (v) => (v ? <Tag color="green">已传</Tag> : <Tag>未传</Tag>),
@@ -264,9 +323,13 @@ export default function BookManage() {
                 <Popconfirm
                   title={r.status === 1 ? "下架后小程序不可见、不可借阅预约，已借出的仍需归还" : "确认恢复上架？"}
                   onConfirm={async () => {
-                    await apiToggleBookStatus(r.id);
-                    message.success(r.status === 1 ? "已下架" : "已上架");
-                    load(page);
+                    try {
+                      await apiToggleBookStatus(r.id);
+                      message.success(r.status === 1 ? "已下架" : "已上架");
+                      load(page);
+                    } catch (e) {
+                      message.error(e instanceof Error ? e.message : "操作失败");
+                    }
                   }}
                 >
                   <Button type="link" size="small">{r.status === 1 ? "下架" : "上架"}</Button>
@@ -274,9 +337,13 @@ export default function BookManage() {
                 <Popconfirm
                   title="确认删除该书目？删除后不可恢复"
                   onConfirm={async () => {
-                    await apiDeleteBook(r.id);
-                    message.success("已删除");
-                    load(page);
+                    try {
+                      await apiDeleteBook(r.id);
+                      message.success("已删除");
+                      load(page);
+                    } catch (e) {
+                      message.error(e instanceof Error ? e.message : "删除失败");
+                    }
                   }}
                 >
                   <Button type="link" size="small" danger>删除</Button>
@@ -294,7 +361,23 @@ export default function BookManage() {
         title="新书入库"
         open={createOpen}
         onOk={submitCreate}
-        onCancel={() => setCreateOpen(false)}
+        onCancel={() => {
+          if (form.isFieldsTouched()) {
+            Modal.confirm({
+              title: "有未保存的修改",
+              content: "确定放弃当前编辑内容？",
+              okText: "放弃修改",
+              okButtonProps: { danger: true },
+              cancelText: "继续编辑",
+              onOk: () => {
+                setCreateOpen(false);
+                form.resetFields();
+              },
+            });
+          } else {
+            setCreateOpen(false);
+          }
+        }}
         okText="入库"
         cancelText="取消"
         destroyOnClose
@@ -311,9 +394,9 @@ export default function BookManage() {
           </Form.Item>
           <Space size="large">
             <Form.Item name="word_count" label="总词数" rules={[{ required: true, message: "请输入总词数" }]}>
-              <InputNumber min={0} style={{ width: 140 }} />
+              <InputNumber min={1} style={{ width: 140 }} />
             </Form.Item>
-            <Form.Item name="ar_level" label="AR 值（可后补）">
+            <Form.Item name="ar_level" label="AR 值（可后补）" rules={[AR_LEVEL_RULE]}>
               <Input placeholder="如 2.5" style={{ width: 140 }} />
             </Form.Item>
           </Space>
@@ -352,20 +435,25 @@ export default function BookManage() {
           accept=".xlsx,.xls"
           maxCount={1}
           showUploadList={false}
+          disabled={importing}
           customRequest={async ({ file, onSuccess, onError }) => {
+            setImporting(true);
             try {
               const result = await apiImportBooks(file as File);
               setImportResult(result);
-              load(1);
+              if (page === 1) load(1);
+              else setPage(1);
               onSuccess?.(result);
             } catch (e) {
               message.error(e instanceof Error ? e.message : "导入失败");
               onError?.(e as Error);
+            } finally {
+              setImporting(false);
             }
           }}
         >
           <p className="ant-upload-drag-icon"><InboxOutlined /></p>
-          <p className="ant-upload-text">点击或拖拽 Excel 文件到此处</p>
+          <p className="ant-upload-text">{importing ? "导入中，请稍候…" : "点击或拖拽 Excel 文件到此处"}</p>
         </Upload.Dragger>
         {importResult && (
           <div style={{ marginTop: 16 }}>

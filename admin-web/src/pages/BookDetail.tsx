@@ -1,5 +1,5 @@
 import PaintEmpty from "../components/PaintEmpty";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   App as AntdApp,
@@ -41,14 +41,37 @@ import {
   type QuizQuestion,
 } from "../api/catalog";
 import { GRADE_OPTIONS } from "../constants/grade";
+import { AR_LEVEL_RULE } from "../constants/book";
 
 const COPY_STATUS_LABEL: Record<string, string> = {
-  available: "在馆", reserved: "预约锁定", borrowed: "借出",
+  available: "在馆", reserved: "预约锁定", borrowed: "已借出",
   maintenance: "维护中", lost: "遗失",
 };
 const COPY_STATUS_COLOR: Record<string, string> = {
   available: "green", reserved: "blue", borrowed: "orange",
   maintenance: "default", lost: "red",
+};
+
+// R3：副本状态下拉按当前状态动态渲染（后端转移矩阵的运维安全子集；
+// available→reserved/borrowed 不开放手工转移——预约/借阅必须走各自业务流程）
+const COPY_STATUS_TRANSITIONS: Record<string, { value: string; label: string }[]> = {
+  available: [
+    { value: "maintenance", label: "转维护" },
+    { value: "lost", label: "标记遗失" },
+  ],
+  reserved: [
+    { value: "available", label: "释放锁定" },
+    { value: "maintenance", label: "转维护" },
+  ],
+  borrowed: [],
+  maintenance: [
+    { value: "available", label: "恢复在馆" },
+    { value: "lost", label: "标记遗失" },
+  ],
+  lost: [
+    { value: "available", label: "找回恢复" },
+    { value: "maintenance", label: "转维护" },
+  ],
 };
 
 export default function BookDetail() {
@@ -68,11 +91,41 @@ export default function BookDetail() {
   const [qAnswerIdx, setQAnswerIdx] = useState(0);
   const [form] = Form.useForm();
   const [qForm] = Form.useForm();
+  // P2-1：留痕原因/增加副本改正经 Modal（替代 window.prompt）
+  const [addCopiesOpen, setAddCopiesOpen] = useState(false);
+  const [addCopiesCount, setAddCopiesCount] = useState<number>(1);
+  const [pendingCopy, setPendingCopy] = useState<{ copyId: number; newStatus: string; label: string } | null>(null);
+  const [copyReason, setCopyReason] = useState("");
+  // P2-11：题目 Modal 打开时快照（受控 state 的脏判定用对比实现，判断题 ["对","错"] 恒非空不可用 touched/非空启发式）
+  const qSnapshotRef = useRef("");
+  const takeQSnapshot = (opts: string[], idx: number) => {
+    qSnapshotRef.current = JSON.stringify({ v: qForm.getFieldsValue(), o: opts, a: idx });
+  };
+  const isQDirty = () =>
+    JSON.stringify({ v: qForm.getFieldsValue(), o: qOptions, a: qAnswerIdx }) !== qSnapshotRef.current;
+  const confirmDiscardIfDirty = (dirty: boolean, onClose: () => void) => {
+    if (!dirty) {
+      onClose();
+      return;
+    }
+    Modal.confirm({
+      title: "有未保存的修改",
+      content: "确定放弃当前编辑内容？",
+      okText: "放弃修改",
+      okButtonProps: { danger: true },
+      cancelText: "继续编辑",
+      onOk: onClose,
+    });
+  };
 
   const load = () => {
     apiGetBook(bookId).then(setBook).catch((e: Error) => message.error(e.message));
-    apiListCopies(bookId).then(setCopies).catch(() => undefined);
-    apiListQuestions(bookId).then(setQuestions).catch(() => undefined);
+    apiListCopies(bookId)
+      .then(setCopies)
+      .catch(() => message.error("副本列表加载失败，请刷新重试"));
+    apiListQuestions(bookId)
+      .then(setQuestions)
+      .catch(() => message.error("题目列表加载失败，请刷新重试"));
   };
 
   useEffect(load, [bookId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -95,9 +148,11 @@ export default function BookDetail() {
       bool_answer: q.answer,
     });
     setQEditing(q);
-    setQOptions(q.question_type === "boolean" ? ["对", "错"] : [...q.options, "", "", "", ""].slice(0, Math.max(4, q.options.length)));
+    const opts = q.question_type === "boolean" ? ["对", "错"] : [...q.options, "", "", "", ""].slice(0, Math.max(4, q.options.length));
     const idx = q.options.indexOf(q.answer);
+    setQOptions(opts);
     setQAnswerIdx(idx >= 0 ? idx : 0);
+    takeQSnapshot(opts, idx >= 0 ? idx : 0);
     setQuestionOpen(true);
   };
 
@@ -252,18 +307,7 @@ export default function BookDetail() {
         title="实体副本"
         size="small" style={{ marginBottom: 16 }}
         extra={
-          <Popconfirm
-            title={`增加几本副本？`}
-            onConfirm={async () => {
-              const count = window.prompt("增加几本副本？", "1");
-              if (!count) return;
-              await apiAddCopies(bookId, Math.max(1, Math.min(99, Number(count) || 1)));
-              message.success("副本已增加");
-              load();
-            }}
-          >
-            <Button size="small" icon={<PlusOutlined />}>增加副本</Button>
-          </Popconfirm>
+          <Button size="small" icon={<PlusOutlined />} onClick={() => setAddCopiesOpen(true)}>增加副本</Button>
         }
       >
         <Table<BookCopy> locale={{ emptyText: <PaintEmpty character="bookworm" /> }}
@@ -271,30 +315,25 @@ export default function BookDetail() {
           columns={[
             { title: "副本码", dataIndex: "copy_code", width: 160, render: (v) => <Typography.Text code>{v}</Typography.Text> },
             { title: "状态", dataIndex: "status", width: 110, render: (s: string) => <Tag color={COPY_STATUS_COLOR[s]}>{COPY_STATUS_LABEL[s] ?? s}</Tag> },
-            {
-              title: "操作", key: "op", width: 160,
-              render: (_, r) => (
-                <Select
-                  size="small" style={{ width: 120 }} value={r.status} disabled={r.status === "borrowed"}
-                  onChange={async (v) => {
-                    const reason = window.prompt("操作原因（留痕）", "");
-                    if (!reason) return;
-                    try {
-                      await apiUpdateCopyStatus(r.id, { status: v, reason });
-                      message.success("副本状态已更新");
-                      load();
-                    } catch (e) {
-                      message.error(e instanceof Error ? e.message : "操作失败");
-                    }
-                  }}
-                  options={[
-                    { value: "available", label: "在馆" },
-                    { value: "maintenance", label: "转维护" },
-                    { value: "lost", label: "标记遗失" },
-                  ]}
-                />
-              ),
-            },
+          {
+            title: "操作", key: "op", width: 160,
+            render: (_, r) => (
+              <Select
+                size="small" style={{ width: 120 }} value={r.status}
+                disabled={COPY_STATUS_TRANSITIONS[r.status]?.length === 0}
+                onChange={(v) => {
+                  const label = COPY_STATUS_TRANSITIONS[r.status]?.find((o) => o.value === v)?.label ?? v;
+                  setPendingCopy({ copyId: r.id, newStatus: v, label });
+                  setCopyReason("");
+                }}
+                options={[
+                  // 复核修复：当前状态必须作为禁用首选项，否则 Select 找不到匹配项会显示英文原始值
+                  { value: r.status, label: COPY_STATUS_LABEL[r.status] ?? r.status, disabled: true },
+                  ...(COPY_STATUS_TRANSITIONS[r.status] ?? []),
+                ]}
+              />
+            ),
+          },
           ]}
         />
       </Card>
@@ -308,6 +347,7 @@ export default function BookDetail() {
           setQEditing(null);
           setQOptions(["", "", "", ""]);
           setQAnswerIdx(0);
+          takeQSnapshot(["", "", "", ""], 0);
           setQuestionOpen(true);
         }}>添加题目</Button>}
       >
@@ -325,10 +365,25 @@ export default function BookDetail() {
               render: (_, r) => (
                 <Space>
                   <Button type="link" size="small" onClick={() => openQuestionEditor(r)}>编辑</Button>
-                  <Button type="link" size="small" onClick={async () => { await apiToggleQuestion(r.id); load(); }}>
+                  <Button type="link" size="small" onClick={async () => {
+                    try {
+                      await apiToggleQuestion(r.id);
+                      load();
+                    } catch (e) {
+                      message.error(e instanceof Error ? e.message : "操作失败");
+                    }
+                  }}>
                     {r.is_active === 1 ? "停用" : "启用"}
                   </Button>
-                  <Popconfirm title="确认删除该题目？" onConfirm={async () => { await apiDeleteQuestion(r.id); message.success("已删除"); load(); }}>
+                  <Popconfirm title="确认删除该题目？" onConfirm={async () => {
+                    try {
+                      await apiDeleteQuestion(r.id);
+                      message.success("已删除");
+                      load();
+                    } catch (e) {
+                      message.error(e instanceof Error ? e.message : "删除失败");
+                    }
+                  }}>
                     <Button type="link" size="small" danger>删除</Button>
                   </Popconfirm>
                 </Space>
@@ -342,12 +397,20 @@ export default function BookDetail() {
         title="编辑书目信息" open={editOpen}
         onOk={async () => {
           const values = await form.validateFields();
-          await apiUpdateBook(bookId, values);
-          message.success("已保存");
-          setEditOpen(false);
-          load();
+          try {
+            await apiUpdateBook(bookId, {
+              ...values,
+              isbn: (values.isbn || "").replace(/[\s\-]/g, "") || null, // P2-8：提交前清洗
+            });
+            message.success("已保存");
+            setEditOpen(false);
+            load();
+          } catch (e) {
+            message.error(e instanceof Error ? e.message : "保存失败");
+          }
         }}
-        onCancel={() => setEditOpen(false)} okText="保存" cancelText="取消" destroyOnClose
+        onCancel={() => confirmDiscardIfDirty(form.isFieldsTouched(), () => setEditOpen(false))}
+        okText="保存" cancelText="取消" destroyOnClose
       >
         <Form form={form} layout="vertical">
           <Form.Item name="isbn" label="ISBN（留空则使用系统编号，填写后不可清空）">
@@ -356,8 +419,8 @@ export default function BookDetail() {
           <Form.Item name="title" label="书名" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="author" label="作者"><Input /></Form.Item>
           <Space size="large">
-            <Form.Item name="word_count" label="总词数" rules={[{ required: true }]}><InputNumber min={0} style={{ width: 140 }} /></Form.Item>
-            <Form.Item name="ar_level" label="AR 值"><Input style={{ width: 140 }} /></Form.Item>
+            <Form.Item name="word_count" label="总词数" rules={[{ required: true }]}><InputNumber min={1} style={{ width: 140 }} /></Form.Item>
+            <Form.Item name="ar_level" label="AR 值" rules={[AR_LEVEL_RULE]}><Input style={{ width: 140 }} /></Form.Item>
           </Space>
           <Space size="large">
             <Form.Item name="topic" label="主题"><Input style={{ width: 140 }} /></Form.Item>
@@ -368,9 +431,67 @@ export default function BookDetail() {
       </Modal>
 
       <Modal
+        title="增加副本" open={addCopiesOpen}
+        onOk={async () => {
+          try {
+            await apiAddCopies(bookId, addCopiesCount);
+            message.success(`已增加 ${addCopiesCount} 本副本`);
+            setAddCopiesOpen(false);
+            setAddCopiesCount(1);
+            load();
+          } catch (e) {
+            message.error(e instanceof Error ? e.message : "增加副本失败");
+          }
+        }}
+        onCancel={() => { setAddCopiesOpen(false); setAddCopiesCount(1); }}
+        okText="确认增加" cancelText="取消"
+      >
+        <Space direction="vertical" style={{ width: "100%" }}>
+          <Typography.Text type="secondary">
+            副本码按书目编号自动生成，增加后可在下方副本表查看。
+          </Typography.Text>
+          <div>
+            <Typography.Text>数量（1-99）：</Typography.Text>
+            <InputNumber min={1} max={99} value={addCopiesCount} onChange={(v) => setAddCopiesCount(v ?? 1)} style={{ width: 100, marginLeft: 8 }} />
+          </div>
+        </Space>
+      </Modal>
+
+      <Modal
+        title={pendingCopy ? `副本状态变更：${pendingCopy.label}` : "操作原因（留痕）"}
+        open={pendingCopy !== null}
+        onOk={async () => {
+          if (!pendingCopy) return;
+          try {
+            await apiUpdateCopyStatus(pendingCopy.copyId, { status: pendingCopy.newStatus, reason: copyReason.trim() });
+            message.success("副本状态已更新");
+            setPendingCopy(null);
+            load();
+          } catch (e) {
+            message.error(e instanceof Error ? e.message : "操作失败");
+          }
+        }}
+        onCancel={() => setPendingCopy(null)}
+        okText="确认变更" cancelText="取消"
+        okButtonProps={{ disabled: !copyReason.trim() }}
+      >
+        <Space direction="vertical" style={{ width: "100%" }}>
+          <Typography.Text type="secondary">操作原因将写入审计日志（必填，≤200 字）</Typography.Text>
+          <Input.TextArea
+            rows={3}
+            maxLength={200}
+            showCount
+            value={copyReason}
+            placeholder="如：预约超时释放 / 修复破损 / 找回遗失副本"
+            onChange={(e) => setCopyReason(e.target.value)}
+          />
+        </Space>
+      </Modal>
+
+      <Modal
         title={qEditing ? "编辑题目" : "添加测验题目"} open={questionOpen}
         onOk={onQuestionSubmit}
-        onCancel={() => setQuestionOpen(false)}
+        onCancel={() => confirmDiscardIfDirty(isQDirty(), () => setQuestionOpen(false))}
         okText={qEditing ? "保存" : "添加"} cancelText="取消" destroyOnClose
       >
         <Form form={qForm} layout="vertical" initialValues={{ question_type: "single" }}>

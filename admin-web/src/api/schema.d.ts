@@ -2266,10 +2266,16 @@ export interface components {
             copy_count: number;
             /**
              * Question Count
-             * @description 测验题目数量
+             * @description 测验题目数量（含停用）
              * @default 0
              */
             question_count: number;
+            /**
+             * Question Active Count
+             * @description 启用题目数量
+             * @default 0
+             */
+            question_active_count: number;
         };
         /** BookUpdateRequest */
         BookUpdateRequest: {
@@ -2843,6 +2849,45 @@ export interface components {
              * @default false
              */
             has_next: boolean;
+        };
+        /** BookListResponse */
+        BookListResponse: {
+            /**
+             * Items
+             * @description 数据列表
+             */
+            items?: components["schemas"]["BookResponse"][];
+            /**
+             * Total
+             * @description 总数
+             * @default 0
+             */
+            total: number;
+            /**
+             * Page
+             * @description 当前页码
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @description 每页数量
+             * @default 20
+             */
+            page_size: number;
+            /**
+             * Has Next
+             * @description 是否有下一页
+             * @default false
+             */
+            has_next: boolean;
+            /**
+             * Counts
+             * @description Tab 计数（与列表筛选同口径）
+             */
+            counts?: {
+                [key: string]: number;
+            };
         };
         /** PaginatedResponse[BookResponse] */
         PaginatedResponse_BookResponse_: {
@@ -3764,7 +3809,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PaginatedResponse_BookResponse_"];
+                    "application/json": components["schemas"]["BookListResponse"];
                 };
             };
             /** @description Validation Error */

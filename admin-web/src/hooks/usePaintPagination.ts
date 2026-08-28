@@ -21,9 +21,9 @@ export interface PaintPaginationState {
   onChange: (page: number, pageSize: number) => void;
 }
 
-export function usePaintPagination(defaultPageSize: number = 15): PaintPaginationState {
+export function usePaintPagination(defaultPageSize: number = 15, initialPage: number = 1): PaintPaginationState {
   const [pageSize, setPageSizeState] = useState(() => readStoredPageSize(defaultPageSize));
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => (Number.isFinite(initialPage) && initialPage >= 1 ? Math.floor(initialPage) : 1));
 
   const setPageSize = useCallback((size: number) => {
     const valid = Math.max(MIN_PAGE_SIZE, Math.min(MAX_PAGE_SIZE, size));
