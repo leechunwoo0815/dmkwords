@@ -319,26 +319,21 @@ body {
   background: #FFF9F0 !important;
 }
 
-/* 表格横向滚动条显式化（macOS overlay 滚动条默认隐藏，鼠标用户找不到） */
-.ant-table-body::-webkit-scrollbar,
-.ant-table-content::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* 表格横向滚动条：隐藏原生 overlay 滚动条，由 PaintHScrollbar 组件提供可拖动自定义滚动条 */
+.ant-table-wrapper .ant-table-content::-webkit-scrollbar:horizontal {
+  height: 0 !important;
 }
-.ant-table-body::-webkit-scrollbar-thumb,
-.ant-table-content::-webkit-scrollbar-thumb {
-  background: var(--paint-ink-light);
-  border-radius: 4px;
+.ant-table-wrapper .ant-table-content {
+  scrollbar-width: none;
 }
-.ant-table-body::-webkit-scrollbar-track,
-.ant-table-content::-webkit-scrollbar-track {
-  background: var(--paint-paper-dim);
-  border-radius: 4px;
+
+/* 自定义横向滚动条容器 */
+.paint-hscrollbar-track {
+  display: flex;
+  align-items: flex-start;
 }
-.ant-table-body,
-.ant-table-content {
-  scrollbar-width: thin;
-  scrollbar-color: var(--paint-ink-light) var(--paint-paper-dim);
+.paint-hscrollbar-track > div:active {
+  cursor: grabbing;
 }
 
 /* 分页 */

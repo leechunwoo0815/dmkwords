@@ -1,6 +1,7 @@
 import PaintEmpty from "../components/PaintEmpty";
+import { PaintHScrollbar } from "../components/PaintHScrollbar";
 import PaintPagination from "../components/PaintPagination";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   App as AntdApp,
   Button,
@@ -52,6 +53,8 @@ export default function BookManage() {
   } | null>(null);
   const [searchValue, setSearchValue] = useState("");
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
+  const tableWrapRef = useRef<HTMLDivElement>(null);
+  const [tableContent, setTableContent] = useState<HTMLElement | null>(null);
 
   const doSearch = useCallback((v: string) => {
     setKeyword(v);
@@ -84,6 +87,20 @@ export default function BookManage() {
   useEffect(() => {
     load(page);
   }, [load, page]);
+
+  useEffect(() => {
+    const find = () => {
+      const el = tableWrapRef.current?.querySelector('.ant-table-content') as HTMLElement | null;
+      if (el && el !== tableContent) setTableContent(el);
+    };
+    find();
+    const id = requestAnimationFrame(find);
+    const timer = setTimeout(find, 500);
+    return () => {
+      cancelAnimationFrame(id);
+      clearTimeout(timer);
+    };
+  }, [books, loading, tableContent]);
 
   const submitCreate = async () => {
     const values = await form.validateFields();
@@ -202,19 +219,20 @@ export default function BookManage() {
           { key: "quiz_incomplete", label: "测验未满 5 道" },
         ]}
       />
-      <Table<Book> locale={{ emptyText: <PaintEmpty character="bookworm" /> }}
-        rowKey="id"
-        loading={loading}
-        dataSource={books}
-        size="middle"
-        pagination={false}
-        scroll={{ x: "max-content" }}
-        rowSelection={{
-          selectedRowKeys,
-          onChange: (keys) => setSelectedRowKeys(keys as number[]),
-          preserveSelectedRowKeys: true,
-        }}
-        columns={[
+      <div ref={tableWrapRef} style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <Table<Book> locale={{ emptyText: <PaintEmpty character="bookworm" /> }}
+          rowKey="id"
+          loading={loading}
+          dataSource={books}
+          size="middle"
+          pagination={false}
+          scroll={{ x: "max-content" }}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: (keys) => setSelectedRowKeys(keys as number[]),
+            preserveSelectedRowKeys: true,
+          }}
+          columns={[
           { title: "书名", dataIndex: "title", width: 220, render: (t: string, r) => (
             <a onClick={() => window.open(`/books/${r.id}`, "_self")}>{t}</a>
           ) },
@@ -268,6 +286,8 @@ export default function BookManage() {
           },
         ]}
       />
+        <PaintHScrollbar target={tableContent} />
+      </div>
       <PaintPagination current={page} pageSize={pageSize} total={total} onChange={onPageChange} />
 
       <Modal
