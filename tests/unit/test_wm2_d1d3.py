@@ -232,3 +232,35 @@ def test_d1_detail_missing_field(client: TestClient):
     )
     detail2 = client.get(f"/api/admin/books/{complete['id']}", headers=h).json()
     assert detail2["missing"] == []
+
+
+def test_d1_upload_response_contains_fresh_missing(client: TestClient):
+    """D1 收尾：上传/编辑响应必须重算 missing（前端据其渲染「待完善」Tag）。"""
+    h = _h(client)
+    book = _create_book(client, h, title="Missing 响应书")
+
+    # 传封面后：响应 missing 不再含「未传封面」，但仍有其他缺失
+    r1 = _upload_cover(client, h, book["id"])
+    assert r1.status_code == 200
+    m1 = r1.json()["missing"]
+    assert "未传封面" not in m1
+    assert "未传音频" in m1
+    assert "未配置 AR 值" in m1
+
+    # 传音频后：「未传音频」消失
+    r2 = _upload_audio(client, h, book["id"])
+    assert r2.status_code == 200
+    m2 = r2.json()["missing"]
+    assert "未传音频" not in m2
+    assert "未配置 AR 值" in m2
+
+    # 编辑补 AR：update 响应同样重算 missing
+    r3 = client.put(
+        f"/api/admin/books/{book['id']}",
+        json={"isbn": None, "title": "Missing 响应书", "word_count": 100, "ar_level": "3.5"},
+        headers=h,
+    )
+    assert r3.status_code == 200
+    m3 = r3.json()["missing"]
+    assert "未配置 AR 值" not in m3
+    assert any("未满 5 道测验题" in m for m in m3)

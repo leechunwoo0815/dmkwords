@@ -245,8 +245,9 @@ export default function BookDetail() {
               customRequest={async ({ file, onSuccess, onError }) => {
                 setCoverProgress(0);
                 try {
-                  const updated = await apiUploadCover(bookId, file as File, (p) => setCoverProgress(p));
-                  setBook(updated);
+                  await apiUploadCover(bookId, file as File, (p) => setCoverProgress(p));
+                  // D1 收尾：load() 全量刷新（missing 等派生字段以后端最新计算为准）
+                  load();
                   message.success("封面上传成功（已统一转 JPG）");
                   setCoverProgress(null);
                   onSuccess?.(null);
@@ -285,8 +286,9 @@ export default function BookDetail() {
               customRequest={async ({ file, onSuccess, onError }) => {
                 setAudioProgress(0);
                 try {
-                  const updated = await apiUploadAudio(bookId, file as File, (p) => setAudioProgress(p));
-                  setBook(updated);
+                  await apiUploadAudio(bookId, file as File, (p) => setAudioProgress(p));
+                  // D1 收尾：load() 全量刷新（missing/时长等派生字段以后端最新计算为准）
+                  load();
                   message.success("音频上传成功");
                   setAudioProgress(null);
                   onSuccess?.(null);

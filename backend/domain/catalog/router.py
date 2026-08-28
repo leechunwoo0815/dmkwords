@@ -223,7 +223,9 @@ def update_book(
     quiz_repo = QuizQuestionRepository(db)
     question_count = len(quiz_repo.list_by_book(book_id, active_only=False))
     question_active_count = len(quiz_repo.list_by_book(book_id, active_only=True))
-    return _to_book_response(book, len(copies), question_count, question_active_count)
+    # D1 收尾：编辑响应重算 missing（编辑是补 AR/词数的主路径）
+    missing = BookService(db).get_onboarding_missing(book_id)
+    return _to_book_response(book, len(copies), question_count, question_active_count, missing)
 
 
 @router.delete("/books/{book_id}")
@@ -310,7 +312,8 @@ async def upload_cover(
     data = await file.read()
     ext = os.path.splitext(file.filename or "")[1]
     book = BookService(db).upload_cover(admin, book_id, data, ext)
-    return _to_book_response(book, 0)
+    # D1 收尾：上传响应重算 missing（前端「待完善」Tag 依据）
+    return _to_book_response(book, 0, missing=BookService(db).get_onboarding_missing(book_id))
 
 
 @router.post("/books/{book_id}/audio", response_model=BookResponse)
@@ -322,7 +325,8 @@ async def upload_audio(
 ):
     data = await file.read()
     book = BookService(db).upload_audio(admin, book_id, data, file.filename or "")
-    return _to_book_response(book, 0)
+    # D1 收尾：上传响应重算 missing（前端「待完善」Tag 依据）
+    return _to_book_response(book, 0, missing=BookService(db).get_onboarding_missing(book_id))
 
 
 @router.post("/books/import", response_model=ImportResultResponse)
