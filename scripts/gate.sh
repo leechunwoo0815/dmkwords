@@ -63,6 +63,7 @@ else
 fi
 
 step 7 "覆盖率（WM1 基线 25%，随模块逐级抬升，终态整体85/关键域90）"
+# 宪法目标 85/90，当前实测 ~78.7%，抬线决策见 docs/09 偿债窗口条目（验收期不抬）
 run python -m pytest tests/ -q --cov=backend --cov-fail-under=25 --cov-report=term-missing:skip-covered
 
 step 8 "前端类型检查（tsc）"
