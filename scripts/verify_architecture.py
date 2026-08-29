@@ -68,6 +68,8 @@ def check_sqlite_ban(errors: list[str]) -> None:
     for py in list(BACKEND.rglob("*.py")) + list(ROOT.joinpath("scripts").rglob("*.py")):
         if "__pycache__" in py.parts or py.name == "verify_architecture.py":
             continue  # 跳过自身（检查器含禁词字面量）
+        if py.name == "import_ecdict.py":
+            continue  # C5 一次性导入工具：ECDICT 源文件 data/ecdict.db 本就是 SQLite，运行时库仍 MySQL-only
         text = py.read_text(encoding="utf-8").lower()
         if "sqlite" in text:
             errors.append(f"{py.relative_to(ROOT)}: 检测到 sqlite（宪法禁令）")

@@ -7,36 +7,66 @@
 背景：Nightly 2.02 废弃 cli auto --auto-port 端口注入（wechat-automation/helper.mjs 已失效），
 官方通道即 wechatide mcp（stdio JSON-RPC）。项目路径默认 dmkwords/miniapp。
 """
-import json, subprocess, sys, time
 
-p = subprocess.Popen(["/usr/local/bin/wechatide", "mcp"], stdin=subprocess.PIPE,
-                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1)
+import json
+import subprocess
+import sys
+import time
+
+p = subprocess.Popen(
+    ["/usr/local/bin/wechatide", "mcp"],
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.DEVNULL,
+    text=True,
+    bufsize=1,
+)
+
 
 def send(obj):
-    p.stdin.write(json.dumps(obj) + "\n"); p.stdin.flush()
+    p.stdin.write(json.dumps(obj) + "\n")
+    p.stdin.flush()
+
 
 def recv_until(want_id, timeout=120):
     t0 = time.time()
     while time.time() - t0 < timeout:
         line = p.stdout.readline()
-        if not line: break
+        if not line:
+            break
         line = line.strip()
-        if not line: continue
-        try: msg = json.loads(line)
-        except json.JSONDecodeError: continue
-        if msg.get("id") == want_id: return msg
+        if not line:
+            continue
+        try:
+            msg = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if msg.get("id") == want_id:
+            return msg
     return {"error": "timeout"}
 
-send({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
-    "protocolVersion": "2024-11-05", "capabilities": {},
-    "clientInfo": {"name": "probe", "version": "0.0.1"}}})
+
+send(
+    {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "probe", "version": "0.0.1"},
+        },
+    }
+)
 recv_until(1)
 send({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
 tool = sys.argv[1]
 args = json.loads(sys.argv[2]) if len(sys.argv) > 2 else {}
 args.setdefault("project", "/Users/litianyu/cc-projects/dmkwords/miniapp")
-send({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": tool, "arguments": args}})
+send(
+    {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": tool, "arguments": args}}
+)
 r = recv_until(2)
 for c in r.get("result", {}).get("content", []):
     if c.get("type") == "text":
