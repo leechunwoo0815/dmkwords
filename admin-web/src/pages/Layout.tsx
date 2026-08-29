@@ -11,6 +11,8 @@ import {
   DashboardOutlined,
   SettingOutlined,
   UserOutlined,
+  NotificationOutlined,
+  ScheduleOutlined,
 } from "@ant-design/icons";
 import { Dropdown, Layout as AntLayout, Menu, Typography } from "antd";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -37,6 +39,8 @@ export default function Layout() {
     "/staff": "#60A5FA",
     "/configs": "#6B5B5B",
     "/audit-logs": "#A78BFA",
+    "/notifications": "#F472B6",
+    "/tasks": "#4ADE80",
   };
 
   const iconColorMap: Record<string, string> = {
@@ -52,6 +56,8 @@ export default function Layout() {
     "/staff": "#FFFFFF",
     "/configs": "#FFFFFF",
     "/audit-logs": "#FFFFFF",
+    "/notifications": "#FFFFFF",
+    "/tasks": "#3B2F2F",
   };
 
   const items = [
@@ -64,6 +70,8 @@ export default function Layout() {
     { key: "/growth", icon: <TrophyOutlined />, label: "成长与测验", perm: "member.manage" },
     { key: "/activities", icon: <CalendarOutlined />, label: "线下活动", perm: "member.manage" },
     { key: "/refund-center", icon: <SafetyCertificateOutlined />, label: "退款中心", perm: "audit.view" },
+    { key: "/notifications", icon: <NotificationOutlined />, label: "通知中心", perm: "dashboard.view" },
+    { key: "/tasks", icon: <ScheduleOutlined />, label: "任务看板", perm: "dashboard.view" },
     { key: "/staff", icon: <UserOutlined />, label: "员工管理", perm: "staff.manage" },
     { key: "/configs", icon: <SettingOutlined />, label: "系统配置", perm: "config.view" },
     { key: "/audit-logs", icon: <AuditOutlined />, label: "审计日志", perm: "audit.view" },

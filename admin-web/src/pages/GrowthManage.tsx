@@ -37,6 +37,8 @@ export default function GrowthManage() {
   const [report, setReport] = useState<{ url: string; data: ReportData } | null>(null);
   const [reportUrl, setReportUrl] = useState<string>("");
 
+  const [highlightId, setHighlightId] = useState<number | null>(null);
+
   const load = useCallback(
     (targetPage: number) => {
       apiListChildren({ page: targetPage, page_size: pageSize, keyword: keyword || undefined })
@@ -50,6 +52,20 @@ export default function GrowthManage() {
   );
 
   useEffect(() => { load(page); }, [load, page]);
+
+  // Q3 裁决：通知中心"查看关联(report)"跳转定位——?child_id= 打开对应孩子成长档案并高亮
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const cid = Number(params.get("child_id"));
+    if (cid && children.length && !growChild) {
+      const found = children.find((c) => c.id === cid);
+      if (found) {
+        setHighlightId(cid);
+        openGrowth(found);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [children, growChild]);
 
   const openGrowth = (c: Child) => {
     setGrowChild(c);
@@ -155,6 +171,7 @@ export default function GrowthManage() {
       <Table<Child> locale={{ emptyText: <PaintEmpty character="rabbit" /> }}
         rowKey="id" dataSource={children} size="middle"
         pagination={false}
+        onRow={(r) => ({ style: r.id === highlightId ? { background: "#fff7e6" } : {} })}
         columns={[
           { title: "孩子", dataIndex: "name", width: 110, render: (_, r) => `${r.name}${r.english_name ? `（${r.english_name}）` : ""}` },
           { title: "家长", key: "p", width: 160, render: (_, r) => `${r.parent_name} ${r.parent_phone}` },

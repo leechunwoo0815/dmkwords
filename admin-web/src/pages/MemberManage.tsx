@@ -76,7 +76,10 @@ const PAY_METHOD_OPTIONS = [
 export default function MemberManage() {
   const { message } = AntdApp.useApp();
   const { user } = useAuth();
-  const [tab, setTab] = useState("children");
+  const [tab, setTab] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("tab") === "orders" ? "orders" : "children";
+  });
   // 孩子列表
   const [children, setChildren] = useState<Child[]>([]);
   const [childTotal, setChildTotal] = useState(0);

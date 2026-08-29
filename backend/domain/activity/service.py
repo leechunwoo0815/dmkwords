@@ -15,8 +15,15 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
+from backend.common.notification_models import Notification
+from backend.common.notifications import (
+    SCENE_ACTIVITY_CANCEL,
+    SCENE_ACTIVITY_ENROLL,
+    SCENE_ACTIVITY_REMIND,
+    NotificationService,
+)
 from backend.domain.catalog.audit_events import publish_audit
-from backend.domain.identity.models import Child, Order
+from backend.domain.identity.models import Child, Order, Parent
 
 from .models import Activity, ActivityEnrollment
 
@@ -195,6 +202,26 @@ class ActivityService:
                 e.cancel_reason = "活动取消，待退款审核"
                 refund_cnt += 1
             # checked_in / refund_pending / refunded / cancelled 不动
+        # WM11：活动取消通知已报名家庭（每家庭一条，去重）
+        from backend.domain.identity.models import Parent
+
+        parent_ids: set[int] = set()
+        for e in enrollments:
+            c = self.db.query(Child).filter(Child.id == e.child_id).first()
+            if c:
+                parent_ids.add(c.parent_id)
+        for pid in parent_ids:
+            p = self.db.query(Parent).filter(Parent.id == pid).first()
+            NotificationService(self.db).send(
+                parent_id=pid,
+                scene=SCENE_ACTIVITY_CANCEL,
+                title="活动取消",
+                content=f"《{a.title}》活动已取消，已付费用将进入退款审核流程。",
+                category=Notification.CATEGORY_ACTIVITY,
+                ref_type="activity",
+                ref_id=str(activity_id),
+                openid=p.wechat_openid if p else None,
+            )
         publish_audit(
             self.db,
             admin=admin,
@@ -380,6 +407,18 @@ class ActivityService:
         )
         self.db.add(e)
         self.db.flush()
+        # WM11：报名成功通知家长
+        NotificationService(self.db).send(
+            parent_id=child.parent_id,
+            scene=SCENE_ACTIVITY_ENROLL,
+            title="报名成功",
+            content=f"《{a.title}》报名成功，开始时间 {a.start_at:%Y-%m-%d %H:%M}。",
+            category=Notification.CATEGORY_ACTIVITY,
+            child_id=child.id,
+            ref_type="activity",
+            ref_id=str(activity_id),
+            dedup_key=str(e.id),
+        )
         self.db.commit()
         return {"enrollment": self._enrollment_view(e), "order_id": order.id if order else None}
 
@@ -395,6 +434,109 @@ class ActivityService:
         if e.status == ActivityEnrollment.STATUS_PENDING_PAYMENT:
             e.status = ActivityEnrollment.STATUS_ENROLLED
         return e
+
+    def cancel_enrollment_by_order(self, order: Order) -> None:
+        """订单超时取消 → 活动报名取消释放名额（WM11 僵尸单清理联动）。"""
+        e = (
+            self.db.query(ActivityEnrollment)
+            .filter(ActivityEnrollment.order_id == order.id, ActivityEnrollment.is_deleted == 0)
+            .first()
+        )
+        if e and e.status == ActivityEnrollment.STATUS_PENDING_PAYMENT:
+            e.status = ActivityEnrollment.STATUS_CANCELLED
+            e.cancel_reason = "订单超时未支付，自动取消"
+
+    def activity_remind(self) -> int:
+        """活动开始前 3/2/1/当天 提醒已报名家长（PRD §9.4；每节点一次）。"""
+        from backend.common.config_service import ConfigService
+
+        remind_days = [
+            int(x)
+            for x in ConfigService(self.db).get_value("activity_remind_days", "3,2,1,0").split(",")
+            if x.strip() != ""
+        ]
+        if not remind_days:
+            return 0
+        now = datetime.now()
+        sent = 0
+        for days in sorted(set(remind_days)):
+            target_day = (now + timedelta(days=days)).date()
+            start = datetime.combine(target_day, datetime.min.time())
+            acts = (
+                self.db.query(Activity)
+                .filter(
+                    Activity.is_deleted == 0,
+                    Activity.status == Activity.STATUS_PUBLISHED,
+                    Activity.start_at >= start,
+                    Activity.start_at < start + timedelta(days=1),
+                )
+                .all()
+            )
+            for a in acts:
+                enrolls = (
+                    self.db.query(ActivityEnrollment)
+                    .filter(
+                        ActivityEnrollment.activity_id == a.id,
+                        ActivityEnrollment.status == ActivityEnrollment.STATUS_ENROLLED,
+                        ActivityEnrollment.is_deleted == 0,
+                    )
+                    .all()
+                )
+                for e in enrolls:
+                    c = self.db.query(Child).filter(Child.id == e.child_id).first()
+                    if not c:
+                        continue
+                    parent = self.db.query(Parent).filter(Parent.id == c.parent_id).first()
+                    label = "今天" if days == 0 else f"{days} 天后"
+                    if NotificationService(self.db).send(
+                        parent_id=c.parent_id,
+                        scene=SCENE_ACTIVITY_REMIND,
+                        title="活动提醒",
+                        content=(
+                            f"《{a.title}》将于{label}（{a.start_at:%Y-%m-%d %H:%M}）开始，"
+                            f"地点：{a.location}，请提前到场。"
+                        ),
+                        category=Notification.CATEGORY_ACTIVITY,
+                        child_id=c.id,
+                        ref_type="activity",
+                        ref_id=str(a.id),
+                        dedup_key=str(days),
+                        openid=parent.wechat_openid if parent else None,
+                    ):
+                        sent += 1
+        if sent:
+            self.db.commit()
+        return sent
+
+    def activity_auto_finish(self) -> int:
+        """已开始超过 1 天且无进行中报名 → finished（活动状态机收口）。"""
+        cutoff = datetime.now() - timedelta(days=1)
+        acts = (
+            self.db.query(Activity)
+            .filter(
+                Activity.is_deleted == 0,
+                Activity.status == Activity.STATUS_PUBLISHED,
+                Activity.start_at < cutoff,
+            )
+            .all()
+        )
+        finished = 0
+        for a in acts:
+            active_cnt = (
+                self.db.query(func.count(ActivityEnrollment.id))
+                .filter(
+                    ActivityEnrollment.activity_id == a.id,
+                    ActivityEnrollment.status.in_(ActivityEnrollment.ACTIVE_STATUSES),
+                    ActivityEnrollment.is_deleted == 0,
+                )
+                .scalar()
+            )
+            if active_cnt == 0:
+                a.status = Activity.STATUS_FINISHED
+                finished += 1
+        if finished:
+            self.db.commit()
+        return finished
 
     def my_enrollments(self, child: Child) -> list[dict]:
         rows = (

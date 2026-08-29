@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
@@ -73,6 +74,95 @@ def my_orders(child_id: int, auth: Any = Depends(get_current_parent)):
         }
         for r in rows
     ]
+
+
+# ---------- WM11 消息中心（家长端站内消息） ----------
+
+
+class ReadNotificationsRequest(BaseSchema):
+    ids: list[int] = []
+    all: bool = False
+
+
+@router.get("/notifications")
+def my_notifications(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    category: str | None = Query(None),
+    auth: Any = Depends(get_current_parent),
+):
+    parent, db = auth
+    from backend.common.notification_models import Notification
+
+    unread = (
+        db.query(func.count(Notification.id))
+        .filter(
+            Notification.parent_id == parent.id,
+            Notification.is_deleted == 0,
+            Notification.read_at.is_(None),
+        )
+        .scalar()
+        or 0
+    )
+    q = db.query(Notification).filter(
+        Notification.parent_id == parent.id, Notification.is_deleted == 0
+    )
+    if category:
+        q = q.filter(Notification.category == category)
+    total = q.count()
+    rows = q.order_by(Notification.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    return {
+        "unread": unread,
+        "total": total,
+        "items": [
+            {
+                "id": n.id,
+                "category": n.category,
+                "scene": n.scene,
+                "title": n.title,
+                "content": n.content,
+                "read": n.is_read,
+                "created_at": n.create_time.strftime("%Y-%m-%d %H:%M") if n.create_time else "",
+            }
+            for n in rows
+        ],
+    }
+
+
+@router.post("/notifications/read")
+def mark_notifications_read(
+    body: ReadNotificationsRequest, auth: Any = Depends(get_current_parent)
+):
+    parent, db = auth
+    from datetime import datetime
+
+    from backend.common.notification_models import Notification
+
+    if body.all:
+        rows = (
+            db.query(Notification)
+            .filter(
+                Notification.parent_id == parent.id,
+                Notification.is_deleted == 0,
+                Notification.read_at.is_(None),
+            )
+            .all()
+        )
+    else:
+        rows = (
+            db.query(Notification)
+            .filter(
+                Notification.parent_id == parent.id,
+                Notification.id.in_(body.ids),
+                Notification.is_deleted == 0,
+            )
+            .all()
+        )
+    for n in rows:
+        if n.read_at is None:
+            n.read_at = datetime.now()
+    db.commit()
+    return {"ok": True, "marked": len(rows)}
 
 
 # ---------- 退款 ----------

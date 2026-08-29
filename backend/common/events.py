@@ -153,6 +153,19 @@ class LevelAdvancedEvent(DomainEvent):
 
 
 @dataclass
+class MilestoneAchievedEvent(DomainEvent):
+    """里程碑达成事件（WM11 新增：勋章达成即时通知家长与馆员）
+
+    发布者：growth QuizService.submit（on_quiz_passed 返回 new_milestones 时）
+    订阅者：notification（达成里程碑）
+    """
+
+    event_type: str = "milestone.achieved"
+    child_id: int = 0
+    nodes: tuple = ()
+
+
+@dataclass
 class OrderPaidEvent(DomainEvent):
     """订单支付成功事件
 

@@ -176,4 +176,14 @@ module.exports = {
   createSupplementOrder(childId) {
     return req.post('/api/miniapp/deposits/supplement-orders', { child_id: childId })
   },
+
+  // 消息中心（WM11）
+  notifications(page = 1, pageSize = 20, category = '') {
+    const params = { page, page_size: pageSize }
+    if (category) params.category = category
+    return req.get('/api/miniapp/notifications', null, { params })
+  },
+  markNotificationsRead(ids = [], all = false) {
+    return req.post('/api/miniapp/notifications/read', { ids, all })
+  },
 }

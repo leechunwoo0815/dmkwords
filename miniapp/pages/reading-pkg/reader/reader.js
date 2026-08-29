@@ -21,6 +21,7 @@ Page({
     dictError: '',
     showDict: false,
     childId: null,
+    bookId: null,
     childName: '',
     playing: false,
     currentTime: 0,
@@ -42,8 +43,12 @@ Page({
   onLoad(options) {
     let book = {}
     try { book = JSON.parse(decodeURIComponent(options.book || '{}')) } catch (e) { /* ignore */ }
+    // C52 同款兜底：reLaunch/分享进入只有 URL 参数，补齐 id/title
+    if (!book.id && options.book_id) book.id = Number(options.book_id)
+    if (!book.title && options.book_title) book.title = decodeURIComponent(options.book_title)
     this.setData({
       book,
+      bookId: book.id || null,
       childId: options.child_id ? Number(options.child_id) : null,
       childName: options.child_name ? decodeURIComponent(options.child_name) : '',
       duration: book.audio_duration || 0,
@@ -69,10 +74,10 @@ Page({
   },
 
   async loadProgress() {
-    const { book, childId } = this.data
-    if (!childId) return
+    const { bookId, childId } = this.data
+    if (!childId || !bookId) return
     try {
-      const p = await api.getProgress(book.id, childId)
+      const p = await api.getProgress(bookId, childId)
       this.setData({
         coveragePercent: p.coverage_percent || 0,
         finished: !!p.finished,
@@ -215,7 +220,7 @@ Page({
       }
     }
     try {
-      const res = await api.reportProgress(childId, book.id, position, sessionStart)
+      const res = await api.reportProgress(childId, this.data.bookId, position, sessionStart)
       done(res)
     } catch (e) {
       fail(e)
@@ -233,9 +238,12 @@ Page({
 
   async onDictSearch() {
     const w = (this.data.dictWord || '').trim()
-    if (!w) return
+    if (!w) {
+      wx.showToast({ title: '先输入要查的单词', icon: 'none' })
+      return
+    }
     try {
-      const r = await api.lookupWord(w, this.data.childId, this.data.book.id)
+      const r = await api.lookupWord(w, this.data.childId, this.data.bookId)
       this.setData({
         dictResult: r,
         dictError: '',

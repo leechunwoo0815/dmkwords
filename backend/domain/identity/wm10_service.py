@@ -26,6 +26,11 @@ from backend.domain.identity.models import (
     TransferRequest,
     WithdrawalRequest,
 )
+from backend.domain.identity.wm_notify import (
+    notify_refund_executed,
+    notify_refund_reviewed,
+    notify_withdrawal_reviewed,
+)
 
 
 def _ensure_not_locked(child: Child) -> None:
@@ -299,6 +304,10 @@ class RefundService:
             detail={"approve": approve, "amount": str(req.amount), "kind": req.kind},
             reason=remark or ("退款审核通过，待执行" if approve else "退款拒绝"),
         )
+        # WM11：退款审核结果通知家长
+        child = self.db.query(Child).filter(Child.id == req.child_id).first()
+        if child:
+            notify_refund_reviewed(self.db, child, req, approve, remark)
         self.db.commit()
         return {"id": req.id, "status": req.status}
 
@@ -380,6 +389,10 @@ class RefundService:
             detail={"success": success, "amount": str(req.amount), "kind": req.kind},
             reason=remark or ("退款执行成功" if success else "退款执行失败"),
         )
+        # WM11：退款到账 / 退款失败通知家长
+        child = self.db.query(Child).filter(Child.id == req.child_id).first()
+        if child:
+            notify_refund_executed(self.db, child, req, success, remark)
         self.db.commit()
         # 聚合推进关联退会流程（全部退款完成 → completed）
         if success:
@@ -777,10 +790,11 @@ class WithdrawalService:
         req.review_remark = remark or None
         req.reviewed_by = admin.id
         req.reviewed_at = datetime.now()
+        # WM11：退会审核结果通知家长
+        notify_withdrawal_reviewed(self.db, child, request_id, approve, remark)
         self.db.commit()
         return {"id": req.id, "status": req.status}
 
 
-# 权益转让已拆至 transfer_service.py（单文件 ≤800 行架构铁律）
-# 保留 re-export 兼容既有 import：from backend.domain.identity.wm10_service import TransferService
+# 权益转让已拆至 transfer_service.py；保留 re-export 兼容既有 import
 from backend.domain.identity.transfer_service import TransferService  # noqa: E402, F401  # isort: skip

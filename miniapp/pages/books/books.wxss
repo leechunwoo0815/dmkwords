@@ -594,3 +594,18 @@
   color: var(--muted);
 }
 
+
+/* C49：列表封面（无封面显示绘本占位） */
+.book-cover {
+  width: 96rpx;
+  height: 128rpx;
+  border-radius: 12rpx;
+  border: 2rpx solid var(--border, #e8e0d4);
+  flex-shrink: 0;
+  margin-right: 20rpx;
+  background: var(--paper, #fffdf7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44rpx;
+}

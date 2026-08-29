@@ -221,5 +221,24 @@ class ReportAdminService:
             detail={"kind": kind, "path": rel},
             reason="报告图片生成",
         )
+        # WM11：周报/月报生成通知家长
+        from backend.common.notification_models import Notification
+        from backend.common.notifications import SCENE_REPORT_GENERATED, NotificationService
+
+        NotificationService(self.db).send(
+            parent_id=child.parent_id,
+            scene=SCENE_REPORT_GENERATED,
+            title="阅读报告已生成",
+            content=(
+                "周报已生成，可查看孩子本周阅读成果。"
+                if kind == "weekly"
+                else "月报已生成，可查看孩子本月阅读成果。"
+            ),
+            category=Notification.CATEGORY_REPORT,
+            child_id=child.id,
+            ref_type="child",
+            ref_id=str(child.id),
+            dedup_key=kind,
+        )
         self.db.commit()
         return {"path": rel, "url": f"/api/admin/uploads/{rel}", "data": data}

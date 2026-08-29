@@ -16,6 +16,11 @@ from sqlalchemy.orm import Session
 
 from backend.common.config_service import ConfigService
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
+from backend.common.notification_models import Notification
+from backend.common.notifications import (
+    SCENE_RESERVATION_EXPIRING,
+    NotificationService,
+)
 from backend.domain.catalog.models import Book, BookCopy
 from backend.domain.circulation.models import BorrowRecord
 from backend.domain.identity.models import Child, Parent
@@ -354,6 +359,81 @@ class ReservationService:
         self.db.commit()
         return res
 
+    def expire_due(self) -> int:
+        """预约超时释放（FEAT-019/PRD §4）：expired + 副本回 available + 通知家长。幂等。"""
+        from backend.common.events import ReservationExpiredEvent, event_bus
+
+        now = datetime.now()
+        due = (
+            self.db.query(Reservation)
+            .filter(
+                Reservation.is_deleted == 0,
+                Reservation.status == Reservation.STATUS_ACTIVE,
+                Reservation.expires_at < now,
+            )
+            .all()
+        )
+        for res in due:
+            res.status = Reservation.STATUS_EXPIRED
+            copy = self.db.query(BookCopy).filter(BookCopy.id == res.copy_id).first()
+            if copy and copy.status == BookCopy.STATUS_RESERVED:
+                copy.status = BookCopy.STATUS_AVAILABLE
+            event_bus.publish(
+                ReservationExpiredEvent(
+                    child_id=res.child_id,
+                    book_id=res.book_id,
+                    reservation_id=res.id,
+                ),
+                db=self.db,
+            )
+        if due:
+            self.db.commit()
+        return len(due)
+
+    def expire_remind(self) -> int:
+        """预约即将到期提醒（距 expires_at ≤ remind_hours 且未过；每次预约一条）。"""
+        from backend.common.config_service import ConfigService
+
+        hours = int(ConfigService(self.db).get_value("reservation_remind_hours", "24"))
+        now = datetime.now()
+        window_end = now + timedelta(hours=hours)
+        upcoming = (
+            self.db.query(Reservation)
+            .filter(
+                Reservation.is_deleted == 0,
+                Reservation.status == Reservation.STATUS_ACTIVE,
+                Reservation.expires_at > now,
+                Reservation.expires_at <= window_end,
+            )
+            .all()
+        )
+        sent = 0
+        for res in upcoming:
+            child = self.db.query(Child).filter(Child.id == res.child_id).first()
+            if not child:
+                continue
+            book = self.db.query(Book).filter(Book.id == res.book_id).first()
+            title = book.title if book else f"书目#{res.book_id}"
+            parent = self.db.query(Parent).filter(Parent.id == child.parent_id).first()
+            if NotificationService(self.db).send(
+                parent_id=child.parent_id,
+                scene=SCENE_RESERVATION_EXPIRING,
+                title="预约即将到期",
+                content=(
+                    f"《{title}》的预约将于 {res.expires_at:%Y-%m-%d %H:%M} 到期，"
+                    f"请尽快到馆取书，超时自动释放。"
+                ),
+                category=Notification.CATEGORY_RESERVATION,
+                child_id=child.id,
+                ref_type="reservation",
+                ref_id=str(res.id),
+                openid=parent.wechat_openid if parent else None,
+            ):
+                sent += 1
+        if sent:
+            self.db.commit()
+        return sent
+
     def list_mine(self, child: Child) -> list[dict]:
         rows = (
             self.db.query(Reservation, Book)
@@ -510,19 +590,23 @@ class VocabularyService:
         if not entry:
             raise NotFoundError(f"词库里没有「{w}」（第一期支持精确查询）")
         # 自动收录（同词唯一；重复查更新来源书记录但不重复）
+        # 含软删行一起查：唯一索引 uq_vocab_child_word 不含 is_deleted，
+        # 软删行会挡住重新 INSERT（C50：删词后再查同词曾 500）
         existing = (
             self.db.query(Vocabulary)
-            .filter(
-                Vocabulary.child_id == child.id, Vocabulary.word == w, Vocabulary.is_deleted == 0
-            )
+            .filter(Vocabulary.child_id == child.id, Vocabulary.word == w)
             .first()
         )
         recorded = False
         if not existing:
             self.db.add(Vocabulary(child_id=child.id, word=w, book_id=book_id))
             recorded = True
-        elif book_id and not existing.book_id:
-            existing.book_id = book_id
+        else:
+            if existing.is_deleted:  # 删除后再查 → 复活收录
+                existing.is_deleted = 0
+                recorded = True
+            if book_id and not existing.book_id:
+                existing.book_id = book_id
         self.db.commit()
         return {
             "word": entry.word,
@@ -594,6 +678,7 @@ class FavoriteService:
                 "author": b.author,
                 "word_count": b.word_count,
                 "ar_level": b.ar_level,
+                "cover_url": f"/api/miniapp/covers/{b.id}" if b.cover_path else None,
                 "has_audio": bool(b.audio_path),
                 "off_shelf": b.status != Book.STATUS_ON,
                 "created_at": str(f.created_at),
@@ -662,6 +747,7 @@ class ShelfService:
                 "title": b.title,
                 "author": b.author,
                 "word_count": b.word_count,
+                "cover_url": f"/api/miniapp/covers/{b.id}" if b.cover_path else None,
                 "has_audio": bool(b.audio_path),
                 "borrowed_at": str(r.borrowed_at),
                 "due_at": str(r.due_at),

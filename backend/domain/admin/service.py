@@ -222,6 +222,78 @@ class DashboardService:
             or 0
         )
 
+        # ---- WM11 看板补全（D5/FEAT-069：维护/遗失/续费率/退会率/测验通过率/里程碑） ----
+        from backend.domain.growth.models import MilestoneAward, QuizAttempt
+
+        copy_maintenance = (
+            self.db.query(func.count(BookCopy.id))
+            .filter(BookCopy.is_deleted == 0, BookCopy.status == BookCopy.STATUS_MAINTENANCE)
+            .scalar()
+            or 0
+        )
+        copy_lost = (
+            self.db.query(func.count(BookCopy.id))
+            .filter(BookCopy.is_deleted == 0, BookCopy.status == BookCopy.STATUS_LOST)
+            .scalar()
+            or 0
+        )
+        returned_total = (
+            self.db.query(func.count(BorrowRecord.id))
+            .filter(
+                BorrowRecord.is_deleted == 0, BorrowRecord.status == BorrowRecord.STATUS_RETURNED
+            )
+            .scalar()
+            or 0
+        )
+        renewed_total = (
+            self.db.query(func.count(BorrowRecord.id))
+            .filter(
+                BorrowRecord.is_deleted == 0,
+                BorrowRecord.renew_used > 0,
+                BorrowRecord.status == BorrowRecord.STATUS_RETURNED,
+            )
+            .scalar()
+            or 0
+        )
+        renew_rate = round(renewed_total * 100 / returned_total, 1) if returned_total else 0.0
+        withdrawn_total = (
+            self.db.query(func.count(Child.id))
+            .filter(Child.is_deleted == 0, Child.member_status == Child.MEMBER_WITHDRAWN)
+            .scalar()
+            or 0
+        )
+        withdrawal_rate = (
+            round(withdrawn_total * 100 / (member_total + withdrawn_total), 1)
+            if (member_total + withdrawn_total)
+            else 0.0
+        )
+        quiz_total = (
+            self.db.query(func.count(QuizAttempt.id)).filter(QuizAttempt.is_deleted == 0).scalar()
+            or 0
+        )
+        quiz_passed = (
+            self.db.query(func.count(QuizAttempt.id))
+            .filter(QuizAttempt.is_deleted == 0, QuizAttempt.passed == 1)
+            .scalar()
+            or 0
+        )
+        quiz_pass_rate = round(quiz_passed * 100 / quiz_total, 1) if quiz_total else 0.0
+        milestone_count = (
+            self.db.query(func.count(MilestoneAward.id))
+            .filter(MilestoneAward.is_deleted == 0)
+            .scalar()
+            or 0
+        )
+        pending_evaluation_count = (
+            self.db.query(func.count(Child.id))
+            .filter(
+                Child.is_deleted == 0,
+                Child.member_status == Child.MEMBER_PENDING_EVALUATION,
+            )
+            .scalar()
+            or 0
+        )
+
         recent_changes = (
             self.db.query(AuditLog)
             .filter(
@@ -262,7 +334,313 @@ class DashboardService:
             "member_total": member_total,
             "member_new_week": member_new_week,
             "activity_enroll_recent": activity_enroll_recent,
+            "copy_maintenance": copy_maintenance,
+            "copy_lost": copy_lost,
+            "renew_rate": renew_rate,
+            "withdrawal_rate": withdrawal_rate,
+            "quiz_pass_rate": quiz_pass_rate,
+            "milestone_count": milestone_count,
+            "pending_evaluation_count": pending_evaluation_count,
         }
+
+
+class NotifyAdminService:
+    """WM11 通知记录中心（管理端）。"""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def list_notifications(
+        self,
+        page: int,
+        page_size: int,
+        category: str | None = None,
+        scene: str | None = None,
+        parent_name: str | None = None,
+        unread: bool | None = None,
+        read: bool | None = None,
+    ) -> tuple[list[dict], int, int, int]:
+        """通知记录列表。返回 (items, total, unread_count, all_count)。
+
+        - unread_count：当前筛选（category/scene/parent_name）下的未读数，Tab 计数口径（不动）；
+        - all_count：当前筛选下、不含已读过滤的总数（Tab「全部（N）」计数口径，C41）；
+        - unread=True 时 total 下沉为 SQL 未读数（分页页数正确，审查必修 bug）；
+        - read=True 时 total 下沉为 SQL 已读数（Tab「已读」，C42）；unread/read 同传时 unread 优先；
+        - unread/read 过滤是 SQL 条件而非页内 Python 过滤。
+        """
+        from backend.common.notification_models import Notification
+        from backend.domain.identity.models import Parent
+
+        q = self.db.query(Notification, Parent).join(
+            Parent, Notification.parent_id == Parent.id, isouter=True
+        )
+        q = q.filter(Notification.is_deleted == 0)
+        if category:
+            q = q.filter(Notification.category == category)
+        if scene:
+            q = q.filter(Notification.scene == scene)
+        if parent_name:
+            q = q.filter(Parent.name.like(f"%{parent_name}%"))
+        all_count = q.count()
+        unread_count = q.filter(Notification.read_at.is_(None)).count()
+        if unread:
+            q = q.filter(Notification.read_at.is_(None))
+        elif read:
+            q = q.filter(Notification.read_at.is_not(None))
+        total = q.count()
+        rows = (
+            q.order_by(Notification.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        )
+        items = [
+            {
+                "id": n.id,
+                "parent_name": p.name if p else f"#{n.parent_id}",
+                "parent_id": n.parent_id,
+                "child_id": n.child_id,
+                "scene": n.scene,
+                "category": n.category,
+                "title": n.title,
+                "content": n.content,
+                "ref_type": n.ref_type,
+                "ref_id": n.ref_id,
+                "wechat_status": n.wechat_status,
+                "wechat_error": n.wechat_error,
+                "read": n.is_read,
+                "created_at": n.create_time.strftime("%Y-%m-%d %H:%M") if n.create_time else "",
+            }
+            for n, p in rows
+        ]
+        return items, total, unread_count, all_count
+
+    def toggle_read(self, admin, notification_id: int, read: bool, reason: str = "") -> dict:
+        """管理端代家长标记已读/未读（运营介入，审计留痕——Q2 裁决）。"""
+        from datetime import datetime
+
+        from backend.common.notification_models import Notification
+
+        n = (
+            self.db.query(Notification)
+            .filter(Notification.id == notification_id, Notification.is_deleted == 0)
+            .first()
+        )
+        if not n:
+            raise NotFoundError("通知不存在")
+        n.read_at = datetime.now() if read else None
+        self.db.flush()
+        from backend.domain.catalog.audit_events import publish_audit
+
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="notification.toggle_read",
+            target_type="notification",
+            target_id=str(notification_id),
+            detail={"read": read, "parent_id": n.parent_id, "scene": n.scene},
+            reason=reason or ("管理端标记已读" if read else "管理端标记未读"),
+        )
+        self.db.commit()
+        # 全局口径计数随响应返回（F1b/C37）：前端 Tab 计数以服务端为准，不再本地推算
+        from backend.common.notification_models import Notification as NModel
+
+        unread_count = (
+            self.db.query(NModel).filter(NModel.is_deleted == 0, NModel.read_at.is_(None)).count()
+        )
+        total = self.db.query(NModel).filter(NModel.is_deleted == 0).count()
+        return {
+            "id": notification_id,
+            "read": bool(read),
+            "unread_count": unread_count,
+            "total": total,
+        }
+
+    def export_excel(self) -> bytes:
+        """通知记录导出 Excel（与审计导出同用 openpyxl）。"""
+        from io import BytesIO
+
+        from openpyxl import Workbook
+        from openpyxl.styles import Font
+
+        rows, _, _, _ = self.list_notifications(1, 10000)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "通知记录"
+        headers = ["ID", "家长", "分类", "场景", "标题", "内容", "微信状态", "已读", "时间"]
+        ws.append(headers)
+        for c in ws[1]:
+            c.font = Font(bold=True)
+        for r in rows:
+            ws.append(
+                [
+                    r["id"],
+                    r["parent_name"],
+                    r["category"],
+                    r["scene"],
+                    r["title"],
+                    r["content"],
+                    r["wechat_status"],
+                    "是" if r["read"] else "否",
+                    r["created_at"],
+                ]
+            )
+        buf = BytesIO()
+        wb.save(buf)
+        return buf.getvalue()
+
+
+class TaskAdminService:
+    """WM11 定时任务看板（任务清单/运行记录/手动触发）。"""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def specs(self) -> list[dict]:
+        from backend.common.notification_models import TaskRunLog
+        from backend.tasks.registry import list_task_specs
+
+        specs = list_task_specs()
+        # 每个任务的最新一条运行记录（Q2 裁决：last_run join；空值前端显示"从未运行"）
+        by_task: dict[str, dict] = {}
+        rows = (
+            self.db.query(TaskRunLog)
+            .filter(TaskRunLog.is_deleted == 0)
+            .order_by(TaskRunLog.id.desc())
+            .limit(500)
+            .all()
+        )
+        for r in rows:
+            by_task.setdefault(
+                r.task_name,
+                {
+                    "status": r.status,
+                    "processed": r.processed,
+                    "error": r.error,
+                    "started_at": r.started_at.strftime("%Y-%m-%d %H:%M:%S")
+                    if r.started_at
+                    else "",
+                },
+            )
+        for s in specs:
+            last = by_task.get(s["name"])
+            s["last_run"] = last or None
+        return specs
+
+    def recent_runs(self, limit: int = 20) -> list[dict]:
+        from backend.common.notification_models import TaskRunLog
+
+        rows = (
+            self.db.query(TaskRunLog)
+            .filter(TaskRunLog.is_deleted == 0)
+            .order_by(TaskRunLog.id.desc())
+            .limit(limit)
+            .all()
+        )
+        return [
+            {
+                "task_name": r.task_name,
+                "status": r.status,
+                "processed": r.processed,
+                "error": r.error,
+                "started_at": r.started_at.strftime("%Y-%m-%d %H:%M:%S") if r.started_at else "",
+                "finished_at": r.finished_at.strftime("%Y-%m-%d %H:%M:%S") if r.finished_at else "",
+            }
+            for r in rows
+        ]
+
+    def run(self, task_name: str, manual: bool = False, admin=None) -> dict:
+        from backend.tasks.registry import run_task
+
+        return run_task(task_name, manual=manual, admin=admin)
+
+
+class AuditExportService:
+    """审计日志 Excel 导出（C18：FEAT-005「可查询导出」）。"""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def export_excel(self) -> bytes:
+        from io import BytesIO
+
+        from openpyxl import Workbook
+        from openpyxl.styles import Font
+
+        rows = (
+            self.db.query(AuditLog)
+            .filter(AuditLog.is_deleted == 0)
+            .order_by(AuditLog.id.desc())
+            .limit(10000)
+            .all()
+        )
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "操作审计"
+        headers = ["ID", "操作人", "动作", "对象类型", "对象ID", "详情", "原因", "时间"]
+        ws.append(headers)
+        for c in ws[1]:
+            c.font = Font(bold=True)
+        for r in rows:
+            ws.append(
+                [
+                    r.id,
+                    r.actor_name,
+                    r.action,
+                    r.target_type,
+                    r.target_id,
+                    r.detail or "",
+                    r.reason,
+                    r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
+                ]
+            )
+        buf = BytesIO()
+        wb.save(buf)
+        return buf.getvalue()
+
+
+class DashboardExportService:
+    """数据看板 Excel 导出（docs/04 WM11 步骤 7：导出任意报表 Excel）。"""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def export_excel(self) -> bytes:
+        from io import BytesIO
+
+        from openpyxl import Workbook
+        from openpyxl.styles import Font
+
+        data = DashboardService(self.db).overview()
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "数据看板"
+        ws.append(["指标", "数值"])
+        for c in ws[1]:
+            c.font = Font(bold=True)
+        label_map = {
+            "admin_count": "后台账号",
+            "today_logins": "今日登录",
+            "config_count": "业务配置项",
+            "copy_total": "总藏书量",
+            "copy_available": "在馆",
+            "copy_borrowed": "借出",
+            "copy_maintenance": "维护",
+            "copy_lost": "遗失",
+            "today_borrowed": "今日借出",
+            "today_returned": "今日归还",
+            "overdue_active": "当前逾期",
+            "member_total": "会员总数",
+            "member_new_week": "本周新增会员",
+            "pending_evaluation_count": "待评估人数",
+            "activity_enroll_recent": "近7天活动报名",
+            "renew_rate": "续费率(%)",
+            "withdrawal_rate": "退会率(%)",
+            "quiz_pass_rate": "测验通过率(%)",
+            "milestone_count": "里程碑达成人数",
+        }
+        for key, label in label_map.items():
+            ws.append([label, data.get(key, 0)])
+        buf = BytesIO()
+        wb.save(buf)
+        return buf.getvalue()
 
 
 class StaffService:

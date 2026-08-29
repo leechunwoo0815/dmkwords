@@ -886,3 +886,8 @@
   color: var(--surface);
 }
 
+
+/* C49：书架行封面 */
+.cover-img {
+  border: 2rpx solid var(--border, #e8e0d4);
+}

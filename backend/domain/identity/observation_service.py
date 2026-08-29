@@ -8,6 +8,8 @@ import uuid
 from sqlalchemy.orm import Session
 
 from backend.common.exceptions import NotFoundError, ValidationError
+from backend.common.notification_models import Notification
+from backend.common.notifications import SCENE_OTHER_EVALUATION_UPLOADED, NotificationService
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, ObservationReport
 
@@ -49,6 +51,17 @@ class ObservationReportService:
             uploaded_by=admin.id,
         )
         self.db.add(report)
+        # WM11：评估报告上传通知家长
+        NotificationService(self.db).send(
+            parent_id=child.parent_id,
+            scene=SCENE_OTHER_EVALUATION_UPLOADED,
+            title="评估报告已上传",
+            content=f"孩子的评估报告已更新（{len(paths)} 张图片），可在「我的 → 评估报告」查看。",
+            category=Notification.CATEGORY_OTHER,
+            child_id=child.id,
+            ref_type="child",
+            ref_id=str(child.id),
+        )
         publish_audit(
             self.db,
             admin=admin,

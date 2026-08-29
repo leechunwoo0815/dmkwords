@@ -37,7 +37,8 @@
         "reservation/reservation",
         "refund-apply/refund-apply",
         "benefit-transfer/benefit-transfer",
-        "deposit/deposit"
+        "deposit/deposit",
+        "messages/messages"
       ]
     },
     {

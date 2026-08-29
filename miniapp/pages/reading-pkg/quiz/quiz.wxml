@@ -25,7 +25,7 @@
       <view wx:for="{{questions[current].options}}" wx:key="*this"
         class="option {{selected === index ? 'option-selected' : ''}}"
         data-index="{{index}}" bindtap="onPick">
-        <view class="option-letter {{selected === index ? 'option-letter-active' : ''}}">{{index < 6 ? 'ABCD'[index] : ''}}</view>
+        <view class="option-letter {{selected === index ? 'option-letter-active' : ''}}">{{['A', 'B', 'C', 'D'][index] || ''}}</view>
         <view class="option-text">{{item}}</view>
       </view>
     </view>

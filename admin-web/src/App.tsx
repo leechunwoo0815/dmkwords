@@ -15,8 +15,10 @@ import MemberManage from "./pages/MemberManage";
 import Dashboard from "./pages/Dashboard";
 import Layout from "./pages/Layout";
 import Login from "./pages/Login";
+import Notifications from "./pages/Notifications";
 import Staff from "./pages/Staff";
 import SystemConfig from "./pages/SystemConfig";
+import TaskBoard from "./pages/TaskBoard";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -50,6 +52,8 @@ export default function App() {
           <Route path="growth" element={<GrowthManage />} />
           <Route path="activities" element={<ActivityManage />} />
           <Route path="refund-center" element={<RefundCenter />} />
+          <Route path="notifications" element={<Notifications />} />
+          <Route path="tasks" element={<TaskBoard />} />
           <Route path="staff" element={<Staff />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

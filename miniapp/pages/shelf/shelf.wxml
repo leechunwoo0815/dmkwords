@@ -17,7 +17,8 @@
       <view class="empty-desc">到店借书后会自动上架，到期时间一目了然</view>
     </view>
     <view wx:for="{{borrows}}" wx:key="record_id" class="book-row" data-book="{{item}}" bindtap="goDetail">
-      <view class="book-row-cover">{{item.has_audio ? '🎧' : '📘'}}</view>
+      <image wx:if="{{item.cover_url}}" class="book-row-cover cover-img" src="{{item.cover_url}}" mode="aspectFill" />
+      <view wx:else class="book-row-cover">{{item.has_audio ? '🎧' : '📘'}}</view>
       <view class="book-row-info">
         <view class="br-title">{{item.title}}</view>
         <view class="br-meta">
@@ -35,7 +36,8 @@
       <view class="empty-desc">在书籍详情页点「收藏」，标记想读的书（不占借阅额度）</view>
     </view>
     <view wx:for="{{favorites}}" wx:key="id" class="book-row">
-      <view class="book-row-cover">{{item.off_shelf ? '📦' : '⭐'}}</view>
+      <image wx:if="{{item.cover_url}}" class="book-row-cover cover-img" src="{{item.cover_url}}" mode="aspectFill" />
+      <view wx:else class="book-row-cover">{{item.off_shelf ? '📦' : '⭐'}}</view>
       <view class="book-row-info" data-book="{{item}}" bindtap="goDetail">
         <view class="br-title">{{item.title}}{{item.off_shelf ? '（已下架）' : ''}}</view>
         <view class="br-meta">

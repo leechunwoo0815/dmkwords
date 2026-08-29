@@ -10,7 +10,10 @@ from decimal import Decimal
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.common.events import OrderPaidEvent, event_bus
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
+from backend.common.notification_models import Notification
+from backend.common.notifications import SCENE_MEMBER_EXPIRE_REMIND, NotificationService
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, Order, Parent
 
@@ -221,6 +224,104 @@ class ChildService:
         )
         return rows, total
 
+    def expire_due_members(self) -> int:
+        """D1 第 3 层（WM11 定时任务）：到期会员落库。
+
+        - 正式会员 member_expire 已过 → expired（读时判定是拦截防线，落库是状态口径/榜单历史）
+        - 观察期到期未评估 → pending_evaluation（C13 自动转换；馆员待评估名单）
+        幂等：落库后状态不在查询范围，重复跑无副作用。不发家长通知（PRD §十无"已到期"通知项）。
+        """
+        today = date.today()
+        due = (
+            self.db.query(Child)
+            .filter(
+                Child.is_deleted == 0,
+                Child.member_status.in_([Child.MEMBER_FORMAL, Child.MEMBER_OBSERVATION]),
+                Child.member_expire.isnot(None),
+                Child.member_expire < today,
+            )
+            .all()
+        )
+        changed = 0
+        for child in due:
+            if child.member_status == Child.MEMBER_FORMAL:
+                self._transition(child, Child.MEMBER_EXPIRED)
+            elif child.member_status == Child.MEMBER_OBSERVATION:
+                self._transition(child, Child.MEMBER_PENDING_EVALUATION)
+            changed += 1
+        if changed:
+            self.db.commit()
+        return changed
+
+    def pending_evaluation_weekly(self) -> int:
+        """待评估每周名单（PRD §12 提醒行）：超过 N 天未评估的待评估孩子计数（馆员看板跟进）。"""
+        from backend.common.config_service import ConfigService
+
+        threshold = int(ConfigService(self.db).get_value("pending_evaluation_remind_days", "7"))
+        cutoff = datetime.now() - timedelta(days=threshold)
+        return (
+            self.db.query(func.count(Child.id))
+            .filter(
+                Child.is_deleted == 0,
+                Child.member_status == Child.MEMBER_PENDING_EVALUATION,
+                Child.update_time < cutoff,
+            )
+            .scalar()
+        )
+
+    def member_expire_remind(self) -> int:
+        """会员到期提醒（PRD §12：前 30/14/7 天 + 当天；每节点只发一次）。
+
+        幂等：dedup_key=提醒节点值，唯一索引防重复。只提醒 formal 且未过期。
+        """
+        from backend.common.config_service import ConfigService
+
+        notify_days = [
+            int(x)
+            for x in ConfigService(self.db)
+            .get_value("member_expire_remind_days", "30,14,7,0")
+            .split(",")
+            if x.strip() != ""
+        ]
+        if not notify_days:
+            return 0
+        today = date.today()
+        sent = 0
+        for days in sorted(set(notify_days)):
+            target = today + timedelta(days=days)
+            children = (
+                self.db.query(Child)
+                .filter(
+                    Child.is_deleted == 0,
+                    Child.member_status == Child.MEMBER_FORMAL,
+                    Child.member_expire.isnot(None),
+                    Child.member_expire == target,
+                )
+                .all()
+            )
+            for child in children:
+                parent = self.db.query(Parent).filter(Parent.id == child.parent_id).first()
+                label = "今天" if days == 0 else f"{days} 天后"
+                if NotificationService(self.db).send(
+                    parent_id=child.parent_id,
+                    scene=SCENE_MEMBER_EXPIRE_REMIND,
+                    title="会员续费提醒",
+                    content=(
+                        f"孩子 {child.name} 的正式会员将在{label}（{target:%Y-%m-%d}）到期，"
+                        f"请及时续费以免影响阅读。"
+                    ),
+                    category=Notification.CATEGORY_MEMBER,
+                    child_id=child.id,
+                    ref_type="child",
+                    ref_id=str(child.id),
+                    dedup_key=str(days),
+                    openid=parent.wechat_openid if parent else None,
+                ):
+                    sent += 1
+        if sent:
+            self.db.commit()
+        return sent
+
 
 class OrderService:
     """订单创建与人工收款确认（WM3 主路径）；金额从 SystemConfig 读取（数值全配置化）。"""
@@ -419,6 +520,15 @@ class OrderService:
             },
             reason=req.remark or "人工收款确认",
         )
+        event_bus.publish(
+            OrderPaidEvent(
+                order_id=order.id,
+                child_id=order.child_id,
+                order_type=order.order_type,
+                amount=order.amount,
+            ),
+            db=self.db,
+        )
         self.db.commit()
         return order
 
@@ -475,3 +585,73 @@ class OrderService:
         )
         self.db.commit()
         return order
+
+    def cancel_timeout_orders(self) -> int:
+        """僵尸单清理（P4/FEAT-019）：待支付/待人工确认订单超时自动取消。
+
+        - 超时订单 → cancelled（不发起家长通知，非 PRD 通知项）
+        - 活动费订单 → 联动活动报名取消，释放名额
+        幂等：已取消状态不在查询范围。
+        """
+        from backend.common.config_service import ConfigService
+
+        hours = int(ConfigService(self.db).get_value("pending_payment_timeout_hours", "48"))
+        cutoff = datetime.now() - timedelta(hours=hours)
+        orders = (
+            self.db.query(Order)
+            .filter(
+                Order.is_deleted == 0,
+                Order.status.in_([Order.STATUS_PENDING_PAYMENT, Order.STATUS_PENDING_MANUAL]),
+                Order.create_time < cutoff,
+            )
+            .all()
+        )
+        if not orders:
+            return 0
+        for order in orders:
+            order.status = Order.STATUS_CANCELLED
+            self.db.flush()
+            if order.order_type == Order.TYPE_ACTIVITY:
+                from backend.domain.activity.service import ActivityService
+
+                ActivityService(self.db).cancel_enrollment_by_order(order)
+        self.db.commit()
+        return len(orders)
+
+    def first_activity_90d_remind(self) -> int:
+        """99 元首场活动购后 90 天提醒转年费（FEAT-068）。每家长一条。"""
+        from backend.common.config_service import ConfigService
+        from backend.common.notifications import SCENE_MEMBER_EXPIRE_REMIND
+
+        days = int(ConfigService(self.db).get_value("first_activity_90d_remind_days", "90"))
+        cutoff = datetime.now() - timedelta(days=days)
+        rows = (
+            self.db.query(Order)
+            .filter(
+                Order.is_deleted == 0,
+                Order.order_type == Order.TYPE_FIRST_ACTIVITY,
+                Order.status == Order.STATUS_PAID,
+                Order.paid_at.isnot(None),
+                Order.paid_at < cutoff,
+            )
+            .all()
+        )
+        sent = 0
+        for order in rows:
+            parent = self.db.query(Parent).filter(Parent.id == order.parent_id).first()
+            if NotificationService(self.db).send(
+                parent_id=order.parent_id,
+                scene=SCENE_MEMBER_EXPIRE_REMIND,
+                title="续费提醒",
+                content="您孩子参与的首场 99 元活动已过去 90 天，如需继续阅读成长，可办理正式会员。",
+                category=Notification.CATEGORY_MEMBER,
+                child_id=order.child_id,
+                ref_type="parent",
+                ref_id=str(order.parent_id),
+                dedup_key="first_activity_90d",
+                openid=parent.wechat_openid if parent else None,
+            ):
+                sent += 1
+        if sent:
+            self.db.commit()
+        return sent

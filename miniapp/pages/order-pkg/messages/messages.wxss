@@ -253,3 +253,20 @@
   opacity: 0.6;
 }
 
+.msg-content.one-line {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.msg-content.expanded {
+  white-space: normal;
+}
+
+.load-end {
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 24rpx;
+  padding: 24rpx 0 40rpx;
+}
+

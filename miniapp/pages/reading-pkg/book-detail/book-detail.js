@@ -14,6 +14,7 @@ Page({
   onLoad(options) {
     let book = {}
     try { book = JSON.parse(decodeURIComponent(options.book || '{}')) } catch (e) { /* ignore */ }
+    if (!book.id && book.book_id) book.id = Number(book.book_id) // C52：书架进入时只有 book_id
     this.setData({
       book,
       childId: options.child_id ? Number(options.child_id) : null,

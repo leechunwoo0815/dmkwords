@@ -9,7 +9,6 @@ from datetime import datetime
 import httpx
 
 from backend.common.exceptions import PaymentError, ValidationError
-from backend.domain.wechat.service import WeChatService
 from backend.integrations.wechat.config import SubscribeTemplate
 
 logger = logging.getLogger(__name__)
@@ -148,6 +147,8 @@ async def _get_access_token() -> dict:
     与 /wechat/qr-code 共享同一份带双重检查锁定的缓存，
     避免多套 token 管理机制并发刷新导致相互失效。
     """
+    from backend.integrations.wechat.service import WeChatService
+
     service = WeChatService()
     try:
         token = await asyncio.to_thread(service.get_access_token)

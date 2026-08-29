@@ -74,6 +74,10 @@ Page({
     wx.navigateTo({ url: `/pages/member-pkg/checkin/checkin?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
 
+  goMessages() {
+    wx.navigateTo({ url: '/pages/order-pkg/messages/messages' })
+  },
+
   goRefund() {
     const c = this.data.currentChild
     if (!c) return

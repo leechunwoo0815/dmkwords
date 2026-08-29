@@ -84,6 +84,16 @@ class DepositService:
             detail={"amount": str(order.amount), "child": child.name},
             reason="押金收款确认",
         )
+        from backend.common.events import DepositPaidEvent, event_bus
+
+        event_bus.publish(
+            DepositPaidEvent(
+                child_id=child.id,
+                deposit_id=dep.id,
+                amount=order.amount,
+            ),
+            db=self.db,
+        )
         return dep
 
     def create_deposit_order(self, admin, child_id: int) -> Order:

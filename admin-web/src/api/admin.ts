@@ -1,5 +1,5 @@
 // 管理端 API（类型由 openapi-typescript 从后端 OpenAPI 生成，禁止手写 — 宪法五-3）
-import { request } from "./client";
+import { ApiError, getToken, request } from "./client";
 import type { components } from "./schema";
 
 export type AdminUser = components["schemas"]["AdminUserResponse"];
@@ -76,4 +76,106 @@ export function apiListAuditLogs(params: {
 
 export function apiDashboardOverview(): Promise<components["schemas"]["DashboardOverviewResponse"]> {
   return request("/api/admin/dashboard");
+}
+
+// ---------- WM11 通知中心 / 定时任务看板 / 导出 ----------
+
+export interface AdminNotification {
+  id: number;
+  parent_name: string;
+  parent_id: number;
+  child_id: number | null;
+  category: string;
+  scene: string;
+  title: string;
+  content: string;
+  ref_type: string;
+  ref_id: string;
+  wechat_status: string;
+  wechat_error: string;
+  read: boolean;
+  created_at: string;
+}
+
+export function apiListNotifications(params: {
+  page: number;
+  page_size: number;
+  category?: string;
+  scene?: string;
+  parent_name?: string;
+  unread?: boolean;
+  read?: boolean;
+}): Promise<{ items: AdminNotification[]; total: number; unread: number; all_count: number }> {
+  const query = new URLSearchParams({ page: String(params.page), page_size: String(params.page_size) });
+  if (params.category) query.set("category", params.category);
+  if (params.scene) query.set("scene", params.scene);
+  if (params.parent_name) query.set("parent_name", params.parent_name);
+  if (params.unread) query.set("unread", "true");
+  if (params.read) query.set("read", "true");
+  return request(`/api/admin/notifications?${query.toString()}`);
+}
+
+export function apiToggleNotificationRead(
+  id: number,
+  read: boolean,
+  reason = ""
+): Promise<{ id: number; read: boolean; unread_count: number; total: number }> {
+  return request(`/api/admin/notifications/${id}/read-status`, {
+    method: "POST",
+    body: JSON.stringify({ read, reason }),
+  });
+}
+
+export interface TaskSpecItem {
+  name: string;
+  display_name: string;
+  group: string;
+  interval_seconds: number;
+  last_run?: { status: string; processed: number; error: string | null; started_at: string } | null;
+}
+
+export interface TaskRunItem {
+  task_name: string;
+  status: string;
+  processed: number;
+  error: string | null;
+  started_at: string;
+  finished_at: string;
+}
+
+export function apiTaskSpecs(): Promise<{ items: TaskSpecItem[] }> {
+  return request("/api/admin/tasks");
+}
+
+export function apiTaskRuns(limit = 20): Promise<{ items: TaskRunItem[] }> {
+  return request(`/api/admin/tasks/runs?limit=${limit}`);
+}
+
+export function apiRunTask(taskName: string): Promise<{ task: string; status: string; processed?: number; error?: string }> {
+  return request(`/api/admin/tasks/${taskName}/run`, { method: "POST" });
+}
+
+async function downloadExcel(path: string, filename: string): Promise<void> {
+  const token = getToken();
+  const res = await fetch(path, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) throw new ApiError(res.status, ((await res.json().catch(() => ({}))) as { detail?: string }).detail ?? "导出失败");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function apiExportAuditLogs(): Promise<void> {
+  return downloadExcel("/api/admin/audit-logs/export", "audit-logs.xlsx");
+}
+
+export function apiExportDashboard(): Promise<void> {
+  return downloadExcel("/api/admin/dashboard/export", "dashboard.xlsx");
+}
+
+export function apiExportNotifications(): Promise<void> {
+  return downloadExcel("/api/admin/notifications/export", "notifications.xlsx");
 }

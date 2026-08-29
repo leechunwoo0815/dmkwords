@@ -367,7 +367,8 @@ body {
 
 .ant-menu-item {
   border-radius: 999px !important;
-  margin: 6px 12px !important;
+  margin: 6px 16px 6px 12px !important;
+  width: auto !important;
   padding-left: 14px !important;
   font-weight: 700 !important;
   color: var(--paint-ink) !important;
@@ -375,12 +376,17 @@ body {
 }
 
 .ant-menu-item:hover {
-  background: var(--paint-paper-dim) !important;
+  background: var(--paint-yellow) !important;
 }
 
 .ant-menu-item-selected {
-  background: var(--paint-primary-soft) !important;
-  box-shadow: inset 3px 3px 0 rgba(59, 47, 47, 0.06);
+  background: var(--paint-primary) !important;
+  color: #fff !important;
+  box-shadow: 2px 2px 0 rgba(59, 47, 47, 0.25) !important;
+}
+
+.ant-menu-item-selected .ant-menu-title-content {
+  color: #fff !important;
 }
 
 .ant-menu-item-icon {

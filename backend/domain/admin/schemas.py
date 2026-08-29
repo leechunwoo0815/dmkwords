@@ -6,6 +6,11 @@ from pydantic import Field
 from backend.common.base_schema import BaseSchema
 
 
+class NotificationReadStatusRequest(BaseSchema):
+    read: bool = Field(..., description="true=标记已读 false=标记未读")
+    reason: str = Field("", max_length=200, description="运营介入原因（可选留痕）")
+
+
 class LoginRequest(BaseSchema):
     username: str = Field(..., min_length=1, max_length=191)
     password: str = Field(..., min_length=1, max_length=128)
@@ -100,3 +105,10 @@ class DashboardOverviewResponse(BaseSchema):
     member_total: int = 0
     member_new_week: int = 0
     activity_enroll_recent: int = 0
+    copy_maintenance: int = 0
+    copy_lost: int = 0
+    renew_rate: float = 0.0
+    withdrawal_rate: float = 0.0
+    quiz_pass_rate: float = 0.0
+    milestone_count: int = 0
+    pending_evaluation_count: int = 0

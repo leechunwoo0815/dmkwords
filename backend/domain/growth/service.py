@@ -16,6 +16,13 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.common.config_service import ConfigService
+from backend.common.events import (
+    LevelAdvancedEvent,
+    MilestoneAchievedEvent,
+    QuizFailedEvent,
+    QuizPassedEvent,
+    event_bus,
+)
 from backend.common.exceptions import NotFoundError, ValidationError
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.catalog.models import Book, QuizQuestion
@@ -163,7 +170,9 @@ class GrowthService:
                 result["points_detail"].append({"type": "quiz_first_pass", "points": pass_bonus})
 
         # 4) 等级 + 里程碑
+        prev_level = state.level
         result["level_up"] = self._check_level_up(state)
+        result["from_level"] = prev_level
         result["new_level"] = state.level
         result["new_milestones"] = self._check_milestones(state)
         return result
@@ -621,6 +630,46 @@ class QuizService:
                 growth = self.growth.on_quiz_passed(child, book, score, total_q)
                 result.update(growth)
                 result["just_passed"] = True
+
+        # WM11：测验成绩 / 等级升级 / 里程碑达成 通知事件（同一事务）
+        if passed:
+            event_bus.publish(
+                QuizPassedEvent(
+                    child_id=child.id,
+                    book_id=book_id,
+                    quiz_id=book_id,
+                    word_count=book.word_count,
+                    submission_id=None,
+                ),
+                db=self.db,
+            )
+        else:
+            event_bus.publish(
+                QuizFailedEvent(
+                    child_id=child.id,
+                    book_id=book_id,
+                    quiz_id=book_id,
+                    score=score,
+                ),
+                db=self.db,
+            )
+        if result.get("level_up"):
+            event_bus.publish(
+                LevelAdvancedEvent(
+                    child_id=child.id,
+                    from_level=result.get("from_level", ""),
+                    to_level=result.get("new_level", ""),
+                ),
+                db=self.db,
+            )
+        if result.get("new_milestones"):
+            event_bus.publish(
+                MilestoneAchievedEvent(
+                    child_id=child.id,
+                    nodes=tuple(result["new_milestones"]),
+                ),
+                db=self.db,
+            )
         self.db.commit()
         return result
 

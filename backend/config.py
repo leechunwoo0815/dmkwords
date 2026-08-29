@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     WECHAT_APP_ID: str = ""
     WECHAT_APP_SECRET: str = ""
 
+    # 微信订阅消息（WM11 通知双通道：站内必达 + 订阅尽力）
+    WECHAT_SUBSCRIBE_ENABLED: bool = False
+
+    # 定时任务调度器（WM11/F5：验收期与排障可经 .env 置 false 关闭，进程内任务不自动跑）
+    SCHEDULER_ENABLED: bool = True
+
     # 微信支付 V3
     WECHAT_MCH_ID: str = ""
     WECHAT_API_KEY_V3: str = ""

@@ -16,3 +16,9 @@ gate-runs/
 .DS_Store
 .dev-logs/
 *.tsbuildinfo
+data/*.db
+# 微信开发者工具误生成的根目录项目文件（真项目在 miniapp/）
+/project.config.json
+/project.private.config.json
+# 小程序本地私人配置（官方规范不入库）
+miniapp/project.private.config.json

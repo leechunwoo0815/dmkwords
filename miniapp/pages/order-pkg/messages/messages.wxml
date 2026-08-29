@@ -1,0 +1,34 @@
+<view class="page-bg">
+  <view class="cat-tabs">
+    <view wx:for="{{categories}}" wx:key="key"
+      class="cat-tab {{activeCat === item.key ? 'active' : ''}}"
+      data-key="{{item.key}}" bindtap="switchCat">
+      {{item.label}}
+    </view>
+  </view>
+
+  <view class="unread-bar" wx:if="{{unread > 0}}" bindtap="markAllRead">
+    <text>{{unread}} 条未读，点击全部已读</text>
+  </view>
+
+  <view wx:if="{{loading && list.length === 0}}" class="loading">加载中…</view>
+  <view wx:elif="{{error && list.length === 0}}" class="empty-state">加载失败，下拉重试</view>
+  <view wx:elif="{{list.length === 0}}" class="empty-state">暂无消息</view>
+
+  <view class="msg-list" wx:else>
+    <view wx:for="{{list}}" wx:key="id"
+      class="msg-item {{item.read ? 'read' : 'unread'}}"
+      data-id="{{item.id}}" bindtap="toggleExpand">
+      <view class="msg-top">
+        <text class="msg-cat">{{item.category}}</text>
+        <text class="msg-title">{{item.title}}</text>
+        <text wx:if="{{!item.read}}" class="msg-dot">●</text>
+      </view>
+      <view wx:if="{{expandedId === item.id}}" class="msg-content expanded">{{item.content}}</view>
+      <view wx:else class="msg-content one-line">{{item.content}}</view>
+      <view class="msg-time">{{item.created_at}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{list.length > 0 && list.length >= total}}" class="load-end">没有更多了</view>
+</view>

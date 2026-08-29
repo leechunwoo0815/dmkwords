@@ -123,6 +123,145 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Notifications */
+        get: operations["list_notifications_api_admin_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/notifications/{notification_id}/read-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Toggle Notification Read
+         * @description 管理端代家长标记已读/未读（运营介入，审计留痕）。
+         */
+        post: operations["toggle_notification_read_api_admin_notifications__notification_id__read_status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/notifications/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Notifications */
+        get: operations["export_notifications_api_admin_notifications_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Task Specs */
+        get: operations["task_specs_api_admin_tasks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/tasks/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Task Runs */
+        get: operations["task_runs_api_admin_tasks_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/tasks/{task_name}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Task Run */
+        post: operations["task_run_api_admin_tasks__task_name__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/audit-logs/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Audit Logs */
+        get: operations["export_audit_logs_api_admin_audit_logs_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/dashboard/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Dashboard */
+        get: operations["export_dashboard_api_admin_dashboard_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/staff": {
         parameters: {
             query?: never;
@@ -300,6 +439,23 @@ export interface paths {
         put?: never;
         /** Batch Delete Books */
         post: operations["batch_delete_books_api_admin_books_batch_delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/books/batch-toggle-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Batch Toggle Book Status */
+        post: operations["batch_toggle_book_status_api_admin_books_batch_toggle_status_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1535,6 +1691,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/miniapp/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Notifications */
+        get: operations["my_notifications_api_miniapp_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark Notifications Read */
+        post: operations["mark_notifications_read_api_miniapp_notifications_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/miniapp/refund-preview": {
         parameters: {
             query?: never;
@@ -2166,6 +2356,19 @@ export interface components {
              */
             ids: number[];
         };
+        /** BatchToggleStatusRequest */
+        BatchToggleStatusRequest: {
+            /**
+             * Ids
+             * @description 待上下架书目 ID 列表
+             */
+            ids: number[];
+            /**
+             * Status
+             * @description 目标状态：1=上架，0=下架
+             */
+            status: number;
+        };
         /** Body_import_books_excel_api_admin_books_import_post */
         Body_import_books_excel_api_admin_books_import_post: {
             /** File */
@@ -2228,6 +2431,48 @@ export interface components {
              */
             copy_count: number;
         };
+        /**
+         * BookListResponse
+         * @description C3：图书列表响应 = 分页结构 + 7 个筛选 Tab 的计数。
+         */
+        BookListResponse: {
+            /**
+             * Items
+             * @description 数据列表
+             */
+            items?: components["schemas"]["BookResponse"][];
+            /**
+             * Total
+             * @description 总数
+             * @default 0
+             */
+            total: number;
+            /**
+             * Page
+             * @description 当前页码
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @description 每页数量
+             * @default 20
+             */
+            page_size: number;
+            /**
+             * Has Next
+             * @description 是否有下一页
+             * @default false
+             */
+            has_next: boolean;
+            /**
+             * Counts
+             * @description Tab 计数（与列表筛选同口径）
+             */
+            counts?: {
+                [key: string]: number;
+            };
+        };
         /** BookResponse */
         BookResponse: {
             /** Id */
@@ -2279,7 +2524,6 @@ export interface components {
             /**
              * Missing
              * @description 下架态缺失项（封面/音频/AR/词数/测验）
-             * @default
              */
             missing?: string[];
         };
@@ -2595,6 +2839,41 @@ export interface components {
              * @default 0
              */
             activity_enroll_recent: number;
+            /**
+             * Copy Maintenance
+             * @default 0
+             */
+            copy_maintenance: number;
+            /**
+             * Copy Lost
+             * @default 0
+             */
+            copy_lost: number;
+            /**
+             * Renew Rate
+             * @default 0
+             */
+            renew_rate: number;
+            /**
+             * Withdrawal Rate
+             * @default 0
+             */
+            withdrawal_rate: number;
+            /**
+             * Quiz Pass Rate
+             * @default 0
+             */
+            quiz_pass_rate: number;
+            /**
+             * Milestone Count
+             * @default 0
+             */
+            milestone_count: number;
+            /**
+             * Pending Evaluation Count
+             * @default 0
+             */
+            pending_evaluation_count: number;
         };
         /** DashboardRecentChange */
         DashboardRecentChange: {
@@ -2737,6 +3016,20 @@ export interface components {
              */
             reason: string;
         };
+        /** NotificationReadStatusRequest */
+        NotificationReadStatusRequest: {
+            /**
+             * Read
+             * @description true=标记已读 false=标记未读
+             */
+            read: boolean;
+            /**
+             * Reason
+             * @description 运营介入原因（可选留痕）
+             * @default
+             */
+            reason: string;
+        };
         /** OrderConfirmRequest */
         OrderConfirmRequest: {
             /**
@@ -2831,77 +3124,6 @@ export interface components {
              * @description 数据列表
              */
             items?: components["schemas"]["AuditLogResponse"][];
-            /**
-             * Total
-             * @description 总数
-             * @default 0
-             */
-            total: number;
-            /**
-             * Page
-             * @description 当前页码
-             * @default 1
-             */
-            page: number;
-            /**
-             * Page Size
-             * @description 每页数量
-             * @default 20
-             */
-            page_size: number;
-            /**
-             * Has Next
-             * @description 是否有下一页
-             * @default false
-             */
-            has_next: boolean;
-        };
-        /** BookListResponse */
-        BookListResponse: {
-            /**
-             * Items
-             * @description 数据列表
-             */
-            items?: components["schemas"]["BookResponse"][];
-            /**
-             * Total
-             * @description 总数
-             * @default 0
-             */
-            total: number;
-            /**
-             * Page
-             * @description 当前页码
-             * @default 1
-             */
-            page: number;
-            /**
-             * Page Size
-             * @description 每页数量
-             * @default 20
-             */
-            page_size: number;
-            /**
-             * Has Next
-             * @description 是否有下一页
-             * @default false
-             */
-            has_next: boolean;
-            /**
-             * Counts
-             * @description Tab 计数（与列表筛选同口径）
-             */
-            counts?: {
-                [key: string]: number;
-            };
-        };
-        /** PaginatedResponse[BookResponse] */
-        PaginatedResponse_BookResponse_: {
-            /**
-             * Items
-             * @description 数据列表
-             */
-            items?: components["schemas"]["BookResponse"][];
             /**
              * Total
              * @description 总数
@@ -3113,6 +3335,19 @@ export interface components {
             child_id: number;
             /** Answers */
             answers: string[];
+        };
+        /** ReadNotificationsRequest */
+        ReadNotificationsRequest: {
+            /**
+             * Ids
+             * @default []
+             */
+            ids: number[];
+            /**
+             * All
+             * @default false
+             */
+            all: boolean;
         };
         /** RefundApplyRequest */
         RefundApplyRequest: {
@@ -3545,6 +3780,219 @@ export interface operations {
             };
         };
     };
+    list_notifications_api_admin_notifications_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                category?: string | null;
+                scene?: string | null;
+                parent_name?: string | null;
+                unread?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    toggle_notification_read_api_admin_notifications__notification_id__read_status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notification_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationReadStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_notifications_api_admin_notifications_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    task_specs_api_admin_tasks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    task_runs_api_admin_tasks_runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    task_run_api_admin_tasks__task_name__run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_audit_logs_api_admin_audit_logs_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    export_dashboard_api_admin_dashboard_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     staff_list_api_admin_staff_get: {
         parameters: {
             query?: never;
@@ -3802,6 +4250,8 @@ export interface operations {
                 no_cover?: boolean;
                 no_audio?: boolean;
                 quiz_incomplete?: boolean;
+                sort?: string | null;
+                order?: string | null;
             };
             header?: never;
             path?: never;
@@ -3969,6 +4419,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["BatchDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    batch_toggle_book_status_api_admin_books_batch_toggle_status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchToggleStatusRequest"];
             };
         };
         responses: {
@@ -6524,6 +7007,76 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_notifications_api_miniapp_notifications_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                category?: string | null;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_notifications_read_api_miniapp_notifications_read_post: {
+        parameters: {
+            query?: never;
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReadNotificationsRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

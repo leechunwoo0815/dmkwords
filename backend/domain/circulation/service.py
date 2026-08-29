@@ -10,7 +10,14 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.common.config_service import ConfigService
+from backend.common.events import BookBorrowedEvent, BookReturnedEvent, event_bus
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
+from backend.common.notification_models import Notification
+from backend.common.notifications import (
+    SCENE_BORROW_DUE_REMIND,
+    SCENE_BORROW_OVERDUE,
+    NotificationService,
+)
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.catalog.models import Book, BookCopy
 from backend.domain.circulation.models import BorrowRecord
@@ -278,6 +285,15 @@ class CirculationService:
             },
             reason=override_reason or "正常借书",
         )
+        event_bus.publish(
+            BookBorrowedEvent(
+                child_id=child_id,
+                book_id=copy.book_id,
+                book_copy_id=copy.id,
+                borrow_record_id=record.id,
+            ),
+            db=self.db,
+        )
         self.db.commit()
         return record, warnings
 
@@ -320,6 +336,16 @@ class CirculationService:
             detail={"condition": condition, "was_overdue": was_overdue},
             reason=f"还书（{condition}）",
         )
+        event_bus.publish(
+            BookReturnedEvent(
+                child_id=record.child_id,
+                book_id=record.book_id,
+                book_copy_id=copy_id,
+                borrow_record_id=record.id,
+                reason=condition,
+            ),
+            db=self.db,
+        )
         self.db.commit()
         return record
 
@@ -360,6 +386,95 @@ class CirculationService:
         )
         self.db.commit()
         return record
+
+    def book_due_remind(self) -> int:
+        """借阅即将到期提醒（due_remind_days 节点；每节点一次）。"""
+        from backend.common.config_service import ConfigService
+
+        remind_days = [
+            int(x)
+            for x in ConfigService(self.db).get_value("due_remind_days", "5,3,1,0").split(",")
+            if x.strip() != ""
+        ]
+        if not remind_days:
+            return 0
+        today = datetime.now().date()
+        sent = 0
+        for days in sorted(set(remind_days)):
+            target = today + timedelta(days=days)
+            records = (
+                self.db.query(BorrowRecord)
+                .filter(
+                    BorrowRecord.is_deleted == 0,
+                    BorrowRecord.status == BorrowRecord.STATUS_ACTIVE,
+                    BorrowRecord.due_at >= target,
+                    BorrowRecord.due_at < target + timedelta(days=1),
+                )
+                .all()
+            )
+            for rec in records:
+                child = self.db.query(Child).filter(Child.id == rec.child_id).first()
+                if not child:
+                    continue
+                book = self.db.query(Book).filter(Book.id == rec.book_id).first()
+                title = book.title if book else f"书目#{rec.book_id}"
+                parent = self.db.query(Parent).filter(Parent.id == child.parent_id).first()
+                label = "今天" if days == 0 else f"{days} 天后"
+                if NotificationService(self.db).send(
+                    parent_id=child.parent_id,
+                    scene=SCENE_BORROW_DUE_REMIND,
+                    title="借阅到期提醒",
+                    content=(
+                        f"《{title}》将于{label}（{rec.due_at:%Y-%m-%d}）到期，请及时归还或续借。"
+                    ),
+                    category=Notification.CATEGORY_BORROW,
+                    child_id=child.id,
+                    ref_type="borrow_record",
+                    ref_id=str(rec.id),
+                    dedup_key=str(days),
+                    openid=parent.wechat_openid if parent else None,
+                ):
+                    sent += 1
+        if sent:
+            self.db.commit()
+        return sent
+
+    def overdue_mark(self) -> int:
+        """逾期标记落库（接管原"访问列表时惰性标记"）+ 通知家长。幂等。"""
+        now = datetime.now()
+        overdue = (
+            self.db.query(BorrowRecord)
+            .filter(
+                BorrowRecord.is_deleted == 0,
+                BorrowRecord.status == BorrowRecord.STATUS_ACTIVE,
+                BorrowRecord.due_at < now,
+            )
+            .all()
+        )
+        marked = 0
+        for rec in overdue:
+            rec.status = BorrowRecord.STATUS_OVERDUE
+            marked += 1
+            child = self.db.query(Child).filter(Child.id == rec.child_id).first()
+            if not child:
+                continue
+            book = self.db.query(Book).filter(Book.id == rec.book_id).first()
+            title = book.title if book else f"书目#{rec.book_id}"
+            parent = self.db.query(Parent).filter(Parent.id == child.parent_id).first()
+            NotificationService(self.db).send(
+                parent_id=child.parent_id,
+                scene=SCENE_BORROW_OVERDUE,
+                title="图书已逾期",
+                content=f"《{title}》已逾期未还（到期日 {rec.due_at:%Y-%m-%d}），请尽快归还。",
+                category=Notification.CATEGORY_BORROW,
+                child_id=child.id,
+                ref_type="borrow_record",
+                ref_id=str(rec.id),
+                openid=parent.wechat_openid if parent else None,
+            )
+        if overdue:
+            self.db.commit()
+        return marked
 
     # ---------- 逾期列表 ----------
     def overdue_list(self) -> list[tuple[BorrowRecord, Child, Parent, Book]]:

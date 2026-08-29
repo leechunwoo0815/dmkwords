@@ -1,5 +1,7 @@
 <view class="page-bg" wx:if="{{book}}">
   <view class="book-hero">
+    <image wx:if="{{book.cover_url}}" class="hero-cover" src="{{book.cover_url}}" mode="aspectFill" />
+    <view wx:else class="hero-cover hero-cover-empty">📕</view>
     <view class="hero-info">
       <view class="hero-title">{{book.title}}</view>
       <view class="hero-author">{{book.author || '佚名'}}</view>

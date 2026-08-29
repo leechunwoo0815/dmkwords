@@ -3,13 +3,14 @@ import {
   BookOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
+  DownloadOutlined,
   ReloadOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Col, Row, Tag, Typography } from "antd";
+import { Button, Card, Col, message, Row, Tag, Typography } from "antd";
 
 import PaintLoading from "../components/PaintLoading";
-import { apiDashboardOverview } from "../api/admin";
+import { apiDashboardOverview, apiExportAuditLogs, apiExportDashboard } from "../api/admin";
 import type { components } from "../api/schema";
 
 type Overview = components["schemas"]["DashboardOverviewResponse"];
@@ -18,17 +19,24 @@ type Overview = components["schemas"]["DashboardOverviewResponse"];
 const BUSINESS_CELLS: { label: string; unit: string; valueKey: string }[] = [
   { label: "总藏书量", unit: "本", valueKey: "copy_total" },
   { label: "在馆 / 借出", unit: "本", valueKey: "copy_available_borrowed" },
+  { label: "维护 / 遗失", unit: "本", valueKey: "copy_maint_lost" },
   { label: "今日借出", unit: "本", valueKey: "today_borrowed" },
   { label: "今日归还", unit: "本", valueKey: "today_returned" },
   { label: "当前逾期", unit: "本", valueKey: "overdue_active" },
   { label: "会员总数", unit: "人", valueKey: "member_total" },
+  { label: "待评估", unit: "人", valueKey: "pending_evaluation_count" },
   { label: "本周新增会员", unit: "人", valueKey: "member_new_week" },
+  { label: "续费率", unit: "%", valueKey: "renew_rate" },
+  { label: "退会率", unit: "%", valueKey: "withdrawal_rate" },
+  { label: "测验通过率", unit: "%", valueKey: "quiz_pass_rate" },
+  { label: "里程碑达成", unit: "人", valueKey: "milestone_count" },
   { label: "近期活动报名", unit: "人次", valueKey: "activity_enroll_recent" },
 ];
 
 const cellValue = (o: Overview | null, key: string): number | string | null => {
   if (!o) return null;
   if (key === "copy_available_borrowed") return `${o.copy_available} / ${o.copy_borrowed}`;
+  if (key === "copy_maint_lost") return `${o.copy_maintenance} / ${o.copy_lost}`;
   const raw = (o as unknown as Record<string, number | null | undefined>)[key] ?? null;
   return raw;
 };
@@ -53,12 +61,28 @@ export default function Dashboard() {
         <Typography.Title level={4} style={{ fontFamily: "var(--font-display)", marginBottom: 0 }}>
           今日概览
         </Typography.Title>
-        <Button icon={<ReloadOutlined />} size="small" type="text" onClick={load}>
-          刷新
-        </Button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button
+            icon={<DownloadOutlined />}
+            size="small"
+            onClick={() => apiExportDashboard().catch((e) => message.error((e as Error).message))}
+          >
+            导出看板
+          </Button>
+          <Button
+            icon={<DownloadOutlined />}
+            size="small"
+            onClick={() => apiExportAuditLogs().catch((e) => message.error((e as Error).message))}
+          >
+            导出审计日志
+          </Button>
+          <Button icon={<ReloadOutlined />} size="small" type="text" onClick={load}>
+            刷新
+          </Button>
+        </div>
       </div>
       <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
-        门店运营实时数据；下方经营看板将随各业务模块上线逐步点亮。
+        门店运营实时数据；经营看板覆盖藏书/借阅/会员/测验/里程碑，支持 Excel 导出。
       </Typography.Paragraph>
 
       {loading ? (

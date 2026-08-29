@@ -221,7 +221,7 @@ def test_vocabulary_lookup_and_unique(client: TestClient):
     assert len(lst) == 1
     assert lst[0]["source_title"] == "B051"
     # 查不存在词
-    r3 = client.get(f"/api/miniapp/vocabulary/lookup?word=zzzzzz&child_id={c['id']}", headers=m)
+    r3 = client.get(f"/api/miniapp/vocabulary/lookup?word=zzqqxxpp&child_id={c['id']}", headers=m)
     assert r3.status_code == 404
     # 非法输入
     r4 = client.get(f"/api/miniapp/vocabulary/lookup?word=abc123&child_id={c['id']}", headers=m)
@@ -231,6 +231,15 @@ def test_vocabulary_lookup_and_unique(client: TestClient):
     assert r5.status_code == 200
     lst2 = client.get(f"/api/miniapp/vocabulary?child_id={c['id']}", headers=m).json()
     assert len(lst2) == 0
+    # C50：删除后再查同词 → 复活收录（修复前：INSERT 撞唯一索引 uq_vocab_child_word 500）
+    r6 = client.get(
+        f"/api/miniapp/vocabulary/lookup?word=adventure&child_id={c['id']}&book_id={book['id']}",
+        headers=m,
+    )
+    assert r6.status_code == 200, r6.text
+    assert r6.json()["recorded"] is True
+    lst3 = client.get(f"/api/miniapp/vocabulary?child_id={c['id']}", headers=m).json()
+    assert len(lst3) == 1
 
 
 def test_favorites_flow(client: TestClient):

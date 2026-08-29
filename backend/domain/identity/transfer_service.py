@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session
 
 from backend.common.config_service import ConfigService
 from backend.common.exceptions import NotFoundError, ValidationError
+from backend.common.notification_models import Notification
+from backend.common.notifications import SCENE_OTHER_TRANSFER_RESULT, NotificationService
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.circulation.models import BorrowRecord
 from backend.domain.identity.models import (
@@ -388,6 +390,20 @@ class TransferService:
         req.review_remark = remark or None
         req.reviewed_by = admin.id
         req.reviewed_at = datetime.now()
+        # WM11：权益转让审核结果通知家长（转出/受让同一家长）
+        NotificationService(self.db).send(
+            parent_id=source.parent_id,
+            scene=SCENE_OTHER_TRANSFER_RESULT,
+            title="权益转让审核结果",
+            content=(
+                f"权益转让审核通过：{source.name} 的剩余会期已转给 {target.name}。"
+                if approve
+                else f"权益转让申请未通过：{remark}"
+            ),
+            category=Notification.CATEGORY_OTHER,
+            ref_type="transfer",
+            ref_id=str(req.id),
+        )
         self.db.commit()
         return {"id": req.id, "status": req.status}
 

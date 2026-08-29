@@ -11,6 +11,8 @@
   <view class="book-list">
     <view wx:for="{{books}}" wx:key="id" class="book-item" data-book="{{item}}" bindtap="goDetail">
       <view class="book-card">
+        <image wx:if="{{item.cover_url}}" class="book-cover" src="{{item.cover_url}}" mode="aspectFill" />
+        <view wx:else class="book-cover book-cover-empty">📕</view>
         <view class="book-info">
           <view class="book-title">{{item.title}}</view>
           <view class="book-author">{{item.author || '佚名'}}</view>
