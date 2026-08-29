@@ -27,7 +27,7 @@
 | WM10 | 退款退会转让 | MANUAL_TEST | gate.sh full exit 0（提交 e6dadd3；104 pytest，覆盖率 69.6%）| 退款中心/退会/权益转让/评估报告；等手动验收 |
 | P0-fix | docs/09 P0 四项（D1/C13/C15/C16 + C17 随修） | DONE | gate.sh full exit 0（119 pytest，覆盖率 75.19%）；测试 tests/unit/test_d1_member_gates.py 10 用例 | 会员过期即时判定（读时不等定时任务）+ 涟漪修复（音频仅在手/周期榜/转让/二孩折扣）；观察期→待评估馆员按钮+评估通过转正链；未入会放行限 1 本+72h 借期；AR 超范围软提示（ar_warning_range 配置）。**已提交**（commit `af2eac2`） |
 | P0-fix2 | docs/10 P0 五项（R-313 守卫 / 退会 6 态 / 退款 7 态+refund_status / 会员费退款联动退会 / 转让 12 步）+ C20/WM10-07/WM3-03/WM4-01 | DONE | gate.sh full exit 0（2026-08-24，128 pytest / 覆盖率 76.50%）；test_wm10_state_machines 5/5、test_wm10_transfer_refund 7/7、test_r313_guards 4/4、test_d1_member_gates 10/10；架构关 PASS（transfer_service.py 拆分）；前端 RefundCenter.tsx 已适配（执行退款按钮+7/6 态中文标签，tsc 0 错） | MDL 挂起根因：①RefundService.review 未推进联动退会 applying→refunding（execute 失败分支失效）②_advance_withdrawal 补 pending_settle ③测试 _db() 改 with 防断言泄漏。**已提交**（commit `af2eac2` 代码 + `28f54eb` docs 回写） |
-| WM11 | 通知任务看板 | PENDING | — | 含 D1 第 3 层（过期落库定时任务）+ C13 自动转换 |
+| WM11 | 通知任务看板 | GATE_PASS | 2026-08-29 最终全量门禁 PASS（216 passed / 79.51%，gate-runs/2026-08-29/gate-wm11-ux.log；同日演进 gate-wm11.log→fix.log→ux.log 三份全 PASS）；WM11 专项测试 25（tests/unit/test_wm11_*.py，含审查 P0 并发隔离 + P1 转让超时） | 通知中心（站内必达+微信尽力+发送记录）+ 12 项定时任务（D1 第 3 层过期落库/C13 待评估转换/预约释放/订单超时/转让超时/借阅逾期/活动提醒等）+ 任务看板/手动触发/运行日志 + 死信落库（D6）+ 数据看板补全（D5）+ Excel 导出（C18 审计/看板/通知）+ miniapp 消息页。**手动验收主体已通过**（管理端七步 + miniapp 消息中心 + 自动调度取证闭环；验收期修复 F1-F5/C41-C52 见 docs/17 §八）；遗留：miniapp 查词 UI 复测、看板七字段抽查。详册 docs/17 |
 | WM12 | 微信支付与收尾 | PENDING | — | |
 
 ## 待办（非模块主线）
