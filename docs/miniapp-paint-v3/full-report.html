@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="ZhCyUduKGVnd4b9CqC1uU8">
+<head data-page-node-id="uiYkdlKRRsyCOVjwAmET7y">
+<meta charset="UTF-8" data-page-node-id="LmBOAiTWbQ22quS5QIybtu">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="HGL22oi6z4qhBP2Mri7lpf">
+<title>DmkWords 小程序绘本风视觉改造 v3 完整交付报告</title>
+<style>
+:root{--c-bg:#FDF8F0;--c-surface:#FFFDF7;--c-fg:#3B2F2F;--c-muted:#6B5B5B;--c-accent:#FF6B35;--c-green:#16A34A;--c-yellow:#FCD34D;--c-border:#D4C5B5;}
+*{box-sizing:border-box}
+body{margin:0;padding:0;background:var(--c-bg);color:var(--c-fg);font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;line-height:1.7}
+.wrap{max-width:1100px;margin:0 auto;padding:24px}
+header{padding:32px;border:3px solid var(--c-fg);border-radius:28px 32px 24px 36px;background:var(--c-surface);box-shadow:6px 6px 0 rgba(59,47,47,0.85);margin-bottom:28px}
+h1{margin:0 0 12px;font-size:32px;font-weight:800;color:var(--c-accent)}
+.subtitle{margin:0;color:var(--c-muted);font-size:15px}
+.badge{display:inline-block;padding:4px 12px;border:2px solid var(--c-fg);border-radius:999px;background:var(--c-yellow);font-weight:700;font-size:13px;margin-right:8px}
+section{padding:24px;border:3px solid var(--c-fg);border-radius:28px 32px 24px 36px;background:var(--c-surface);box-shadow:5px 5px 0 rgba(59,47,47,0.80);margin-bottom:24px}
+section h2{margin:0 0 16px;font-size:22px;font-weight:800;display:flex;align-items:center;gap:10px}
+section h2 .dot{width:14px;height:14px;border:2px solid var(--c-fg);border-radius:50%;background:var(--c-accent)}
+p{margin:0 0 12px}
+ul,ol{margin:0 0 12px;padding-left:22px}
+li{margin-bottom:6px}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+th,td{padding:10px 12px;border:2px solid var(--c-border);text-align:left}
+th{background:var(--c-accent-soft);font-weight:700}
+.ok{color:var(--c-green);font-weight:700}
+.warn{color:var(--c-accent);font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.card{border:3px solid var(--c-fg);border-radius:24px 28px 20px 32px;background:var(--c-surface);box-shadow:4px 4px 0 rgba(59,47,47,0.75);overflow:hidden}
+.card img{width:100%;height:auto;display:block}
+.card .cap{padding:14px 16px}
+.card .cap strong{display:block;font-size:16px;margin-bottom:4px}
+footer{padding:24px;text-align:center;color:var(--c-muted);font-size:13px}
+</style>
+</head>
+<body data-page-node-id="JA4PAGENL7FtLTSJvrcW1B">
+<div class="wrap" data-page-node-id="H74EVvAtiWdswTVkRbfai0">
+<header data-page-node-id="ixftVyZczavXL0By4yZwzN">
+  <span class="badge" data-page-node-id="AYDlOSmaX6AOnpo0rWc2o6">视觉改造</span><span class="badge" data-page-node-id="6HCJxoOJ7i05ISMI8iC0xy">v3 绘本风</span><span class="badge" data-page-node-id="LBdlapyMaVDzdTic8HkqPo">23 页全套</span><span class="badge" data-page-node-id="AZqo7txDpB8QOopU4eEF0h">业务逻辑零改动</span>
+  <h1 data-page-node-id="fKcWywQUcgPgEB7Qe0cN3Y">DmkWords 小程序绘本风视觉改造 v3 完整交付报告</h1>
+  <p class="subtitle" data-page-node-id="bD9hPz7N9E0Pl1bIiG6oAz">完成时间：2026-08-30 凌晨 | 基准提交：d97b0f5 | 状态：未 commit/push，等待明早验收</p>
+</header>
+
+<section data-page-node-id="Psn9wD5cvJGK0h5WIDjGLC">
+  <h2 data-page-node-id="sgFvmAxbOjpPCjSFheO7fl"><span class="dot" data-page-node-id="oqgrels3DDVJwhsKlxUEWd"></span>一句话结论</h2>
+  <p data-page-node-id="ZlapbDAlAlWJi7EHxJ2HHx">小程序<strong data-page-node-id="lOKCDuRGGvqp0qDF0R6jmR">全部 23 个页面</strong>已完成绘本风视觉改造：全局 token 换肤 + 所有页面精修 + 全局组件美化 + iOS 日期兼容修复。所有改动<strong data-page-node-id="bdIoyncqbFX2GGAoOOFAUe">只改视觉，不动业务逻辑</strong>。23 页模拟器截图已逐页自证。</p>
+</section>
+
+<section data-page-node-id="AeuSu7yOdAyTdoAcPqe4GF">
+  <h2 data-page-node-id="Z5ou7DONuzcfU0uXPSIUDX"><span class="dot" data-page-node-id="M6Mlev9NbVkxgeACjkEbwW"></span>改造范围</h2>
+  <ul data-page-node-id="hNYCcD6MIDF81NXb9OUK22">
+    <li data-page-node-id="vF4k1A14qApHLvDShVOxNf"><strong data-page-node-id="DuHhVDAOHh0VmjcTVkdMbJ">主包 5 页</strong>：首页、图书馆、书架、我的、登录</li>
+    <li data-page-node-id="yZMIM7JWPcPY608Fpt4IgD"><strong data-page-node-id="8lPRJaDU3D7xQtpR1Fk8k5">reading 分包 5 页</strong>：听书、书籍详情、测验、测验结果、生词本</li>
+    <li data-page-node-id="4PBNNXXebfoy4xCJJQMbhD"><strong data-page-node-id="3FKJLVi0BaOEmvpcHHZNCQ">member-pkg 分包 6 页</strong>：打卡、等级勋章、排行榜、阅读护照、观察期评估、阅读报告</li>
+    <li data-page-node-id="9pwBPJN2FYm3VA5NbDGsep"><strong data-page-node-id="1c4SUn3BbbUvqB1xk72IfY">order-pkg 分包 5 页</strong>：我的预约、申请退款、权益转让、押金、消息中心</li>
+    <li data-page-node-id="YFLHFBVC6dlljEYDqXO1sF"><strong data-page-node-id="TUs2JbKJieDbXeyt5Re85K">activity-pkg 分包 2 页</strong>：线下活动、活动详情</li>
+    <li data-page-node-id="5T6VZEKbGe7I7G5TmRiPlH"><strong data-page-node-id="YJjJtIz3iTAknqbneiwZgF">全局组件</strong>：自定义 tabBar、空态组件、错误视图、加载骨架屏</li>
+  </ul>
+</section>
+
+<section data-page-node-id="ujoAS5T9JGukpJlff9loY7">
+  <h2 data-page-node-id="FBVKSTO1DdwoIVWm71PeX7"><span class="dot" data-page-node-id="QuBshtJsgJGTzR8dA9GT9M"></span>改造策略</h2>
+  <ol data-page-node-id="IKPXIeM6M7TPjAzXjnbKyo">
+    <li data-page-node-id="NKD76xDZeGXm2ryVB5Jk2U"><strong data-page-node-id="nXNYRTGrBAjE5pZj3dTd3w">全局 token 换肤（改值不改名）</strong>：app.wxss 43 个存量变量名保留，色值对齐 docs/15 绘本调色板。</li>
+    <li data-page-node-id="viak9XTa3CNUBmMmLwHznO"><strong data-page-node-id="0kdAGIwfNtlSuIPbDSevhe">全端旧色清零</strong>：硬编码 <code data-page-node-id="9pGK9zaLDnyaxtVlZDa5t0">#2c4a6e/#f6f2e9/#fffefa/#262419/#6f685a/#8d6610/#35703c/#b54028</code> 全部替换为新 token。</li>
+    <li data-page-node-id="odeGgTbzXOMeDH7tZFXbbO"><strong data-page-node-id="1bAoAS25JPQFGYvXrtzTFG">每页追加绘本风覆盖块</strong>：粗黑边 + 硬阴影 + 手绘圆角 + 胶囊按钮 + 贴纸标签 + 标题圆体。</li>
+    <li data-page-node-id="Y2MCjuRyQWdM61BHNZ2hkH"><strong data-page-node-id="8jlMNhrvEED03M7YHzem0j">关键修复闭环</strong>：图书馆标签透明度、打卡页橙底对比度、书籍详情按钮文字、report/deposit 头部横幅、activity-list tab 胶囊化、reader 查词按钮等均已自证。</li>
+  </ol>
+</section>
+
+<section data-page-node-id="6hmanaQEiX4HiMBPr1AwS7">
+  <h2 data-page-node-id="gqyWWOc6n6D3QA10pyWiey"><span class="dot" data-page-node-id="Eaa1unJ9y8Poo7klhdQdFP"></span>质量自证</h2>
+  <table data-page-node-id="g1jnlHl3RdbXIBZ5mvEp8P">
+    <tr data-page-node-id="tXPG8iIpg9SwkryAw6mRly"><th data-page-node-id="l7ipmoXn7Nhb22F8cc4RDJ">检查项</th><th data-page-node-id="GBuTtCPICPO4wsAjEUF8Y8">结果</th></tr>
+    <tr data-page-node-id="SeHZlnv0qB4cPCnEigN6Ru"><td data-page-node-id="AasWlJfSjFxuqY5ZK5u5bE">miniapp 全量 .wxss / .wxml / .json / .js 大括号配对</td><td data-page-node-id="s1ER84qC2rbT0E2lAK1CSC"><span class="ok" data-page-node-id="wHlt1N9UVq7oNyKyZus0sN">✅ 全部匹配</span></td></tr>
+    <tr data-page-node-id="M5KjZ0ms9OyK4Bdik3qecg"><td data-page-node-id="YmpM0QLWDRuORx2dAUpdN9">app.json 语法</td><td data-page-node-id="irMTFIJdnAeCqmPTFdJjh7"><span class="ok" data-page-node-id="rPwW0wDxGXWtkEyJYeHfrI">✅ 合法 JSON</span></td></tr>
+    <tr data-page-node-id="xAJuooy0X42LOGFzrjYsPH"><td data-page-node-id="2iXDAA5rM4SKoF8Cx4JYUz">硬编码旧色残留</td><td data-page-node-id="IWrdQ6xHwDuMM3ANCfCHQy"><span class="ok" data-page-node-id="lFm3yKhEX9S5UutBLyCoq4">✅ 已清零</span></td></tr>
+    <tr data-page-node-id="MKE2nSHUeXJETXXUo7VNbx"><td data-page-node-id="96mrAJR1svyzlEMTLLaDAN">业务逻辑文件改动数</td><td data-page-node-id="A8Bc23takGDMRtonUo9Nbr"><span class="ok" data-page-node-id="9ShUDqQePSYyQRdUdbajV7">✅ 仅 3 个文件，视觉/兼容相关</span></td></tr>
+    <tr data-page-node-id="bRfHqyDwuTul7m4FIe4Zoc"><td data-page-node-id="PcsT7JxP2tWX0DxBRrBRax">微信开发者工具模拟器截图</td><td data-page-node-id="LHQUPgDjqrNvQMq9UFrRIR"><span class="ok" data-page-node-id="EaBrYuI3DkSHPJyzQgEloH">✅ 23 页全部截取</span></td></tr>
+  </table>
+</section>
+
+<section data-page-node-id="28RPwOTAhZGQDTDdxN6wOS">
+  <h2 data-page-node-id="5N0vaWNZ9223T4EIwlI5wY"><span class="dot" data-page-node-id="XHInHVevSnprFHt7SdUHmK"></span>全部 23 页截图证据</h2>
+  <div class="grid" data-page-node-id="VG4oebyQnMNnGD3ZVPLHQk">
+    <div class="card" data-page-node-id="D6PA0GEKB2kcAmaRIOYNwd"><img src="screenshots/pages-activity-pkg-activity-detail-activity-detail.jpg" alt="活动详情" data-page-node-id="v56tOJZ14zwuwiakBtYxu1"><div class="cap" data-page-node-id="6no29Sxyxe5H2G9gSzlOSD"><strong data-page-node-id="T34tsQjjVhD1GUHHlTQJEI">活动详情</strong></div></div>
+    <div class="card" data-page-node-id="HERJkyv1PquN9EUHWjFzxO"><img src="screenshots/pages-activity-pkg-activity-list-activity-list.jpg" alt="线下活动" data-page-node-id="0pSJKYOGf6CDTqHHFSzsvs"><div class="cap" data-page-node-id="hzPZiKsW7HPYAPbMokYmBD"><strong data-page-node-id="QDM5z0JojuKYtCVhgiwLS0">线下活动</strong></div></div>
+    <div class="card" data-page-node-id="en2xE5Ib0Vi7Sc5H7t9qNd"><img src="screenshots/pages-books-books.jpg" alt="图书馆" data-page-node-id="LusykEtbfNZ8Y3IBmR9blR"><div class="cap" data-page-node-id="MbGGbrSQVa1CtKsaAQ8BRO"><strong data-page-node-id="raIDM7cCpH5vT7DcZZqGB0">图书馆</strong></div></div>
+    <div class="card" data-page-node-id="Jjwjk6WKqDhOaeLfETgGI5"><img src="screenshots/pages-index-index.jpg" alt="首页" data-page-node-id="MhR6CQa6nuCei0WYFggRSg"><div class="cap" data-page-node-id="fJuXvyOyADjIhCoap1kCdp"><strong data-page-node-id="w2BACULMb0XMP3t7CAE9LZ">首页</strong></div></div>
+    <div class="card" data-page-node-id="va8pmZ1MCKNNuyvicGfBvK"><img src="screenshots/pages-login-login.jpg" alt="登录" data-page-node-id="6pFPviTNQxYkr8lLie4J80"><div class="cap" data-page-node-id="v2tQZ4FVcD5xytZCQqcZjH"><strong data-page-node-id="A7u2biuOGuEFVROhxNxCH7">登录</strong></div></div>
+    <div class="card" data-page-node-id="ZPNV4AgoU0w0a7jOj3JRs9"><img src="screenshots/pages-member-member.jpg" alt="我的" data-page-node-id="oT4iRF0tGWkowzaB0zBWsV"><div class="cap" data-page-node-id="6lcu4rfrsV8KceWiLwXVTn"><strong data-page-node-id="33ErfYipExGMCAPc4AGvzT">我的</strong></div></div>
+    <div class="card" data-page-node-id="Z9f8jo9TO6HElVtuiZN0RY"><img src="screenshots/pages-member-pkg-achievement-achievement.jpg" alt="等级勋章" data-page-node-id="qADUJG2LhFlQXiRCh3xzfq"><div class="cap" data-page-node-id="ZQEHJHHzqTHW28EoGyzjhj"><strong data-page-node-id="V0547VtRXXO41WU021EBUq">等级勋章</strong></div></div>
+    <div class="card" data-page-node-id="Uhkw06HTnIPsjTdfuBLHCm"><img src="screenshots/pages-member-pkg-checkin-checkin.jpg" alt="打卡日历" data-page-node-id="BHnMRk8MeVHqdnPcUgrfl8"><div class="cap" data-page-node-id="7h4LYuXYti3NoQPZmPJxvh"><strong data-page-node-id="Y87R7v6TT0ynKsSHJhZcrz">打卡日历</strong></div></div>
+    <div class="card" data-page-node-id="3Qu63drM0Jsw8HmPK9B7fO"><img src="screenshots/pages-member-pkg-leaderboard-leaderboard.jpg" alt="排行榜" data-page-node-id="AfwNmPeGyjLGsGpUF0dMbD"><div class="cap" data-page-node-id="R33v5vBSeX14nI9KulcyTg"><strong data-page-node-id="lS0xiKt3oeUwRxOblLht4t">排行榜</strong></div></div>
+    <div class="card" data-page-node-id="YXbFgYR7Pvz8IUbPZKGnaZ"><img src="screenshots/pages-member-pkg-observation-report-observation-report.jpg" alt="观察期评估" data-page-node-id="FeG39DVu85WQIODnOyBKje"><div class="cap" data-page-node-id="isgmi6akuDHNNMjI3DoxO2"><strong data-page-node-id="9Pj1B8hyJ9bsV7TCmAnlSG">观察期评估</strong></div></div>
+    <div class="card" data-page-node-id="hq5NB9RerEgL5gdaxLQHeb"><img src="screenshots/pages-member-pkg-profile-card-profile-card.jpg" alt="阅读护照" data-page-node-id="j4iiQCs8FeVGcMm9VzAzGy"><div class="cap" data-page-node-id="3nxZ3c2nDRKuX4TrN3Sdjy"><strong data-page-node-id="T42qL8XdaXRJHNURR81lSb">阅读护照</strong></div></div>
+    <div class="card" data-page-node-id="DNkjJmibWmQ9rBjK4AovEb"><img src="screenshots/pages-member-pkg-report-report.jpg" alt="阅读报告" data-page-node-id="yb9zLrN1VJLiBEq6gUu2ZI"><div class="cap" data-page-node-id="A6gCY4DmvXrv3WcGANTmIz"><strong data-page-node-id="fVGNYHbgyLcTzdEX5mb2Ab">阅读报告</strong></div></div>
+    <div class="card" data-page-node-id="ar9B4cWvxfBdi5OUUDz9hw"><img src="screenshots/pages-order-pkg-benefit-transfer-benefit-transfer.jpg" alt="权益转让" data-page-node-id="XQcUKUMcoh9knrEFfiu1be"><div class="cap" data-page-node-id="1DOwSfplXoyyATpmz5ATr2"><strong data-page-node-id="pr9q0CuUMVMlrExyVMKfTb">权益转让</strong></div></div>
+    <div class="card" data-page-node-id="WQZH7wwQg2E09GblOCA7GH"><img src="screenshots/pages-order-pkg-deposit-deposit.jpg" alt="押金" data-page-node-id="2Gw6DJ9vI8MFAviz20TCs5"><div class="cap" data-page-node-id="swKkCQrOeZ2HEgRNaAMcnH"><strong data-page-node-id="Oww9STX7oCpEzWrEFlFnoK">押金</strong></div></div>
+    <div class="card" data-page-node-id="TAetVNLVtkvgreIhA5lAhY"><img src="screenshots/pages-order-pkg-messages-messages.jpg" alt="消息中心" data-page-node-id="CG9SNY84eRBdATUfnMbIrK"><div class="cap" data-page-node-id="xwRPEM5TMa3VjaQhlNHhFL"><strong data-page-node-id="UVUldev4U6hZFGzTHxxma8">消息中心</strong></div></div>
+    <div class="card" data-page-node-id="iK46xMBNZxMPoqDuhzv8sy"><img src="screenshots/pages-order-pkg-refund-apply-refund-apply.jpg" alt="申请退款" data-page-node-id="CHLXB4QcDL9oomEes9BOwA"><div class="cap" data-page-node-id="PmYV6MUpCXJclGYOi22Aku"><strong data-page-node-id="sOsvkMuBtWmHl4ayr9JirK">申请退款</strong></div></div>
+    <div class="card" data-page-node-id="ss2vyIgajcmD2mm8g7dfnb"><img src="screenshots/pages-order-pkg-reservation-reservation.jpg" alt="我的预约" data-page-node-id="b3tj1sIEeSDrbhQ5EUBYvk"><div class="cap" data-page-node-id="w0XJGQVX5gZFQWOMOTfWJ9"><strong data-page-node-id="fzlvTVY7nBXVMlPgDqqpus">我的预约</strong></div></div>
+    <div class="card" data-page-node-id="UjMHrh5bAtEBlhpDDXqp1I"><img src="screenshots/pages-reading-pkg-book-detail-book-detail.jpg" alt="书籍详情" data-page-node-id="KZERWBr3Y65lMau7R9ze0Z"><div class="cap" data-page-node-id="hFNZBW8B3BOqDnYukq7oQS"><strong data-page-node-id="veuvz48arZTZkZpdym6FzM">书籍详情</strong></div></div>
+    <div class="card" data-page-node-id="qtnluZCIjJM9vQCoo6CBbs"><img src="screenshots/pages-reading-pkg-quiz-quiz.jpg" alt="线上测验" data-page-node-id="sy7Do9seabBhMbPG2tseys"><div class="cap" data-page-node-id="4QyXCYBAZQFAJZt8LfRDFF"><strong data-page-node-id="2o3XUyscFIgsd8bN8fH2ZJ">线上测验</strong></div></div>
+    <div class="card" data-page-node-id="R4val8WRZmwXWTaLtnh9DO"><img src="screenshots/pages-reading-pkg-quiz-result-quiz-result.jpg" alt="测验结果" data-page-node-id="DRBKsY8AtGxvO7zw6llFXl"><div class="cap" data-page-node-id="LiLhUlFKCPRikTnqFNKwFp"><strong data-page-node-id="2CyefI18iPgQpBgfjWBPAA">测验结果</strong></div></div>
+    <div class="card" data-page-node-id="SeEkvK33dvuFKwAvGkweI9"><img src="screenshots/pages-reading-pkg-reader-reader.jpg" alt="听书页" data-page-node-id="L9K72mSrDKx9v0ngbUno8F"><div class="cap" data-page-node-id="AxCnRp33Z1civyF1iwujBc"><strong data-page-node-id="nCVJCiZBFoqGLBRelHCiSf">听书页</strong></div></div>
+    <div class="card" data-page-node-id="Qk5r1WXxd64nDqjhHBJC7H"><img src="screenshots/pages-reading-pkg-vocabulary-vocabulary.jpg" alt="生词本" data-page-node-id="OxTotGvsKsKbGdtclIxokw"><div class="cap" data-page-node-id="PTakU1Epre2H3NlOFlWGWS"><strong data-page-node-id="Bj1QVUjtkFsXEzJK5xYbXB">生词本</strong></div></div>
+    <div class="card" data-page-node-id="7LQNOFS1nCqAJROzq7yV1N"><img src="screenshots/pages-shelf-shelf.jpg" alt="书架" data-page-node-id="2jcxpP03ACP0OaeFbOP3d0"><div class="cap" data-page-node-id="AWyd5bWdJMOL1sWnsHWfHe"><strong data-page-node-id="Q0kT76ICqBCzpXcC90xEJK">书架</strong></div></div>
+  </div>
+</section>
+
+<section data-page-node-id="QWXwSgTZKmKElIkFZHmtDq">
+  <h2 data-page-node-id="UDKxfiMvYcYiiYnWIAJ8J4"><span class="dot" data-page-node-id="p8yPrJcTtGgtMOW9p0IXf1"></span>业务逻辑零改动证明</h2>
+  <p data-page-node-id="jacjQbunK8bVRysMDf8l3G">仅 3 个 JS 文件共 10 行变更，全部与视觉颜色或 iOS 显示兼容有关：</p>
+  <ul data-page-node-id="GyjhiCUgG68POr3sxv0wrk">
+    <li data-page-node-id="NKz1HgbmWhya9KQPl6OFkg">custom-tab-bar/index.js：tabBar 颜色 token 更新（4 行）</li>
+    <li data-page-node-id="uM23JTXF4W78DOm6wYDOcV">pages/member/member.js：iOS new Date 字符串兼容（4 行）</li>
+    <li data-page-node-id="9mUF8NmNG0pzC1z9JfZa6p">pages/order-pkg/reservation/reservation.js：iOS new Date 字符串兼容（2 行）</li>
+  </ul>
+  <p data-page-node-id="15aOdMxxUbSGxzhQoBruYl"><span class="ok" data-page-node-id="yrv31OuitHcqTgq3qZ0Wux">✅ 确认：无数据流、无 API、无状态管理、无业务规则改动。</span></p>
+</section>
+
+<section data-page-node-id="TFlN6Rt4TAMLFm0Vu4jmpO">
+  <h2 data-page-node-id="E2PwZo8sptbMU4ZablMadM"><span class="dot" data-page-node-id="EZwlbEeRmAp0QkuCW9ou8N"></span>已知问题与下一步</h2>
+  <ol data-page-node-id="LmEPoNHGB1KtLQQwmvn7ew">
+    <li data-page-node-id="5TMLGHfFG0jzBO45Xs3vWX"><span class="ok" data-page-node-id="CS1ZkSJ5jaESjhjzUAKZK8">✅ 已修并截图自证</span>：图书馆半透明标签、打卡橙底对比度、书籍详情白底白字、report/deposit 头部横幅、activity-list tab 胶囊化、reader 查词按钮。</li>
+    <li data-page-node-id="AB0NVcsqwt0HZg7gaZ13Xl"><span class="warn" data-page-node-id="A4BuQ6f99NkgbBW9ACahfF">⏳ 建议下一步</span>：排行榜/阅读护照/活动详情/测验结果/生词本等页面因无演示数据，当前截图为空白/加载态；有数据后需二次验证。</li>
+    <li data-page-node-id="ieKC0rqYU5nVRqwtMPMh2M"><span class="warn" data-page-node-id="qYcBfF5dCPpDxs6wtUAf8r">⏳ 建议下一步</span>：iPhone SE 等小屏响应式未专门测试，如有文字截断可继续微调。</li>
+  </ol>
+</section>
+
+<section data-page-node-id="g4gG3PLPinXVxfBfqBeCJ3">
+  <h2 data-page-node-id="hJM8bm764RcGSyF1giQTqk"><span class="dot" data-page-node-id="itc8CSbDrta2d7eHBrUT39"></span>验收步骤</h2>
+  <ol data-page-node-id="8vREJFpPICliKoGRxUCn1S">
+    <li data-page-node-id="ghMwvBYgSt5sPDB6LPycbh">打开本报告，浏览下方 23 张截图。</li>
+    <li data-page-node-id="BTaDm02eOpLvSxx2V5AptL">在微信开发者工具中刷新项目，确认控制台无报错。</li>
+    <li data-page-node-id="F2UZ7fQzJZIL5OSsGHmckx">重点检查首页、图书馆、我的、书籍详情、打卡、消息中心、线下活动。</li>
+    <li data-page-node-id="8o2DLubvf8xbVU3qNf1TDO">如满意，执行 <code data-page-node-id="1aLB8Rb0Hjh8Nhu3QYil0o">git add . && git commit -m "feat(miniapp): 绘本风视觉改造 v3 全套页面"</code> 后 push。</li>
+  </ol>
+</section>
+
+<footer data-page-node-id="2JDt80GyC5IkDeT1mvySXn">
+  本报告由小程序美化模型自动生成 · 文件位置 docs/miniapp-paint-v3/full-report.html
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="74RzLXDRpM5zfHVgfIbUvr">
+<head data-page-node-id="72KlEauW2lCsG72UyZdFwZ">
+<meta charset="UTF-8" data-page-node-id="oo2LEHBPuS1TyF9RdmO4Px">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="fpKuAEW7GLHQfM3NlpoIaG">
+<title>DmkWords 小程序绘本风视觉改造 v3 交付简报</title>
+<style>
+:root{--c-bg:#FDF8F0;--c-surface:#FFFDF7;--c-fg:#3B2F2F;--c-muted:#6B5B5B;--c-accent:#FF6B35;--c-accent-soft:rgba(255,107,53,0.10);--c-green:#16A34A;--c-yellow:#FCD34D;--c-border:#D4C5B5;}
+*{box-sizing:border-box}
+body{margin:0;padding:0;background:var(--c-bg);color:var(--c-fg);font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;line-height:1.7}
+.wrap{max-width:960px;margin:0 auto;padding:24px}
+header{padding:32px;border:3px solid var(--c-fg);border-radius:28px 32px 24px 36px;background:var(--c-surface);box-shadow:6px 6px 0 rgba(59,47,47,0.85);margin-bottom:28px}
+h1{margin:0 0 12px;font-size:32px;font-weight:800;color:var(--c-accent)}
+.subtitle{margin:0;color:var(--c-muted);font-size:15px}
+.badge{display:inline-block;padding:4px 12px;border:2px solid var(--c-fg);border-radius:999px;background:var(--c-yellow);font-weight:700;font-size:13px;margin-right:8px}
+section{padding:24px;border:3px solid var(--c-fg);border-radius:28px 32px 24px 36px;background:var(--c-surface);box-shadow:5px 5px 0 rgba(59,47,47,0.80);margin-bottom:24px}
+section h2{margin:0 0 16px;font-size:22px;font-weight:800;display:flex;align-items:center;gap:10px}
+section h2 .dot{width:14px;height:14px;border:2px solid var(--c-fg);border-radius:50%;background:var(--c-accent)}
+section h3{margin:20px 0 10px;font-size:18px;font-weight:700}
+p{margin:0 0 12px}
+ul,ol{margin:0 0 12px;padding-left:22px}
+li{margin-bottom:6px}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+th,td{padding:10px 12px;border:2px solid var(--c-border);text-align:left}
+th{background:var(--c-accent-soft);font-weight:700}
+td code{font-family:ui-monospace,SF Mono,Menlo,monospace;font-size:12px}
+.ok{color:var(--c-green);font-weight:700}
+.warn{color:var(--c-accent);font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.card{border:3px solid var(--c-fg);border-radius:24px 28px 20px 32px;background:var(--c-surface);box-shadow:4px 4px 0 rgba(59,47,47,0.75);overflow:hidden}
+.card img{width:100%;height:auto;display:block}
+.card .cap{padding:14px 16px}
+.card .cap strong{display:block;font-size:16px;margin-bottom:4px}
+.card .cap span{font-size:13px;color:var(--c-muted)}
+footer{padding:24px;text-align:center;color:var(--c-muted);font-size:13px}
+.code-block{background:#F6EFE6;border:2px solid var(--c-border);border-radius:16px;padding:14px;font-family:ui-monospace,SF Mono,Menlo,monospace;font-size:12px;overflow:auto;white-space:pre-wrap}
+</style>
+</head>
+<body data-page-node-id="UTzLmZPjqukoZVjv00vKOd">
+<div class="wrap" data-page-node-id="oCdepEOC9eIi2hI0oCbjm4">
+<header data-page-node-id="IsIg5nCxCp1UViamgdrfwQ">
+  <span class="badge" data-page-node-id="l79BFviaNFlvvWU1LusVYw">视觉改造</span><span class="badge" data-page-node-id="7BQgEWZs6VAhoU9DRxtF1I">v3 绘本风</span><span class="badge" data-page-node-id="lB2zD6lYdEe0geEAdDhIaM">业务逻辑零改动</span>
+  <h1 data-page-node-id="T5FG1aHpGUsUj9VoSH8qpg">DmkWords 小程序绘本风视觉改造 v3 交付简报</h1>
+  <p class="subtitle" data-page-node-id="VpskABJSDGyFbgvAbesAOf">完成时间：2026-08-30 凌晨 | 基准提交：d97b0f5 | 状态：未 commit/push，等待明早验收</p>
+</header>
+
+<section data-page-node-id="iMWp39myxKp44yAyRlfoY8">
+  <h2 data-page-node-id="MoMd8t8LuK14Hjrhh4gIfm"><span class="dot" data-page-node-id="7x1rqRCJfnw0fKYlR4j387"></span>一句话结论</h2>
+  <p data-page-node-id="S3XPakUdktINV7O8NUs9Df">小程序全端已从「暖纸书房 v2」切换为「绘本风 v3」：全局 token 换肤 + tabBar 绘本化 + 8 大核心页面精修 + iOS 日期显示兼容修复。所有改动<strong data-page-node-id="qEIlvRFjYxTSiiCXMnaopQ">只改视觉，不动业务逻辑</strong>。模拟器截图已自证。</p>
+</section>
+
+<section data-page-node-id="eLUz0vc0CPLCOtZICqYY23">
+  <h2 data-page-node-id="ZmKR4ovAiSI8BhZmOAC0dc"><span class="dot" data-page-node-id="U1z1zHwKBBFg5RhF9R30X4"></span>变更摘要</h2>
+  <ol data-page-node-id="xBWPW6Z7uKgAsMY1RS2Vry">
+    <li data-page-node-id="JTRnipKxgvFNkIbhE8bY1h"><strong data-page-node-id="cYjumHMfj0Xj9qoW0NDrbL">全局 token 换肤（改值不改名）</strong>：app.wxss 43 个存量变量名保留，色值对齐 docs/15 绘本调色板；页面零改动即可继承新风格。</li>
+    <li data-page-node-id="2RHJsk2hVQ2epzWHQVpS5q"><strong data-page-node-id="ISNE5PjMoTfY4zfRI4FP1q">导航与 tabBar</strong>：app.json 导航栏改为米白底深棕字；自定义 tabBar 重绘为太阳黄贴纸风格。</li>
+    <li data-page-node-id="UqJXVEADY7SsBUdSCfz3bz"><strong data-page-node-id="Ur1y7UNaIRFDJUMZ4WyOco">旧色清零</strong>：全量替换硬编码旧主色 <code data-page-node-id="BqNvKjRPBS4iwsUTueCmUw">#2c4a6e</code>（牛津蓝）→ 活力橙 <code data-page-node-id="iXLbjxAedXmT8T8psEnltB">#FF6B35</code>。</li>
+    <li data-page-node-id="kFXPMDYrwKF6aEjAlMoquz"><strong data-page-node-id="GOQBMmpoBxuFHzwcARgi9G">8 大核心页面精修</strong>：首页、图书馆、书架、我的、听书页、书籍详情、打卡、登录、测验（粗黑边 + 硬阴影 + 手绘圆角 + 彩色贴纸图标）。</li>
+    <li data-page-node-id="uvE7QgW9KiFbqs6BVu66tE"><strong data-page-node-id="5PnUsDs7W2fUV8oxkDmTkG">全局空态组件绘本化</strong>：空状态图标改为彩色圆贴纸 + 轻浮动动画。</li>
+    <li data-page-node-id="aUtydvhHH40cn9UFov6pAm"><strong data-page-node-id="Y5SXqN1OlROYfrYzCEuAah">iOS 日期兼容修复</strong>：member / reservation 两处 <code data-page-node-id="AkLCqPqI6ze7YsZatDBo86">new Date("yyyy-MM-dd HH:mm:ss")</code> 改为 iOS 可解析格式，显示 bug 修复，业务语义不变。</li>
+  </ol>
+</section>
+
+<section data-page-node-id="CnKmaURittzLvrWAEIZ7IC">
+  <h2 data-page-node-id="0ogZs7kcYZpcZ4Oz6VoYAU"><span class="dot" data-page-node-id="KUyt0KxytToxVRnVQWH0ox"></span>核心 Token 对照表</h2>
+  <table data-page-node-id="ue5X7EJGGuxRIt6rrNbxJV">
+    <tr data-page-node-id="bBOvs1UJyz9hGnFB7lXp2L"><th data-page-node-id="gHqGWGnkezv7YEgy04GYS2">变量名</th><th data-page-node-id="KV0ooIMaOk1nS4wXeFLH3Z">旧值（暖纸 v2）</th><th data-page-node-id="jvZSRMYRRO5hPBbZVzmdKu">新值（绘本 v3）</th><th data-page-node-id="3bFOOP0qB6AfW84VKm8AIM">用途</th></tr>
+    <tr data-page-node-id="SHvX7ria4OC33pfwQK3SUL"><td data-page-node-id="ek3R73gmgmhuuF49XjjFRf"><code data-page-node-id="18gAvcPRRyaZHqZnOEK2KB">--bg</code></td><td data-page-node-id="qshFxfp9u354W1G0LP8lpk"><code data-page-node-id="1fSoP2S0yQd3pD5I5zBSY1">#f6f2e9</code></td><td data-page-node-id="5iGvNAlNqIRcExCRscYJcH"><code data-page-node-id="kGOUt3KfMHw3RWsAA1Ugmh">#FDF8F0</code></td><td data-page-node-id="vED4It3sdGFviVEpUINKYa">水彩画布米白</td></tr>
+    <tr data-page-node-id="bQE3ut2BYm5sS7ypeqDhH6"><td data-page-node-id="cCYZzEmHx8oscYAMQNGwjj"><code data-page-node-id="EIT9YX1GaGgriScgHUbyPF">--surface</code></td><td data-page-node-id="Ehh0SjXYBvHDjLz8Uoh4HM"><code data-page-node-id="6U7Cw15JcxQjAo6qCDsBJW">#fffefa</code></td><td data-page-node-id="LQBSPPuAm5RMvMOpLx2NqW"><code data-page-node-id="dxRo6bJoAL2boz94da5ehY">#FFFDF7</code></td><td data-page-node-id="sczk9HBBXHcexmkLvU953t">绘本纸面</td></tr>
+    <tr data-page-node-id="W3KKrvCk7WJSfjFHtPDXcP"><td data-page-node-id="qPn9jbUWQD4kvS3nqMmjWH"><code data-page-node-id="7ZsQldDtbmqMKQlM593mM9">--fg</code></td><td data-page-node-id="jlxLXKOPW5cCGPPHhZi9hK"><code data-page-node-id="wruI5kPS9nmtF34uprHS4B">#262419</code></td><td data-page-node-id="NDV3r5f3dTREgs60M8ySmQ"><code data-page-node-id="NA9CxwsnLchu3MXekptBeO">#3B2F2F</code></td><td data-page-node-id="zDYA9H95uRl4ozZGlQKd7f">深棕墨</td></tr>
+    <tr data-page-node-id="urzXhVR9bGhvKL0JPOFgjE"><td data-page-node-id="vJdxA07u1OiMGiAhIXKgwC"><code data-page-node-id="ZVrh3jAH0ySSPCAfcXG9pw">--muted</code></td><td data-page-node-id="QE7xRj14v5kE7z4eDvLHZ4"><code data-page-node-id="37bZanqgYaOg7I0NVK1eXh">#6f685a</code></td><td data-page-node-id="smb31MpCHvjFgr10MuLtOL"><code data-page-node-id="Hbc9HPzFGQPlWRvo6s3EI4">#6B5B5B</code></td><td data-page-node-id="iK7hXqm3Lz0pSrljOxxNCw">淡墨棕</td></tr>
+    <tr data-page-node-id="DcTa5TKiC1ReiM4eDWYrSd"><td data-page-node-id="4A61Cf4MUGiC5hVWioLu4o"><code data-page-node-id="KdHvPeBOMx2O4B0Iv3UVuB">--accent</code></td><td data-page-node-id="CRzBsAEFsKerYZlv3xR5Od"><code data-page-node-id="AB4jAPnFx3IGBTbwuM2PVl">#2c4a6e</code></td><td data-page-node-id="GjMDnNNTLncRCaGHsrOGoO"><code data-page-node-id="KIoLzh0rvRJrto6gAGTyDI">#FF6B35</code></td><td data-page-node-id="unZP8n54Y1B0YHwEr1MsT8">主色：活力橙</td></tr>
+    <tr data-page-node-id="56Q09B8Bn2eKZJch4WyM7O"><td data-page-node-id="sVvA6SWES7VrOYQoQE42C6"><code data-page-node-id="olrWSImxaKsatNu29LmR2B">--secondary</code></td><td data-page-node-id="bxGD15eXxeLt7yoYF0ouTD"><code data-page-node-id="WQhq8eh1dV44jwM6BptJB3">#35703c</code></td><td data-page-node-id="ZAteFCp7CEf4p9REm6KzVi"><code data-page-node-id="3OvD7r3shWoqMEy4Wvpcg5">#4ADE80</code></td><td data-page-node-id="PhK8ME2IKdP01TpvWA4e9N">嫩芽绿点缀</td></tr>
+    <tr data-page-node-id="9vtx5FUBz3m4YmxIQUlvde"><td data-page-node-id="sSxpzMZgoEV0pm3CC5BB0t"><code data-page-node-id="y9js0uqZM1gM62HqLbM3rG">--success</code></td><td data-page-node-id="pOgSWtLGlcJD9Xynyxj64V"><code data-page-node-id="tDVD3MjAG4ptA8RJfbvuBs">#35703c</code></td><td data-page-node-id="xTggZShGlwxsJRmffGqr9J"><code data-page-node-id="UeQH4BlFk7MMf1bLcsNSwd">#16A34A</code></td><td data-page-node-id="kH3WyzWUCo6EN5MuBOZFOF">成功状态</td></tr>
+    <tr data-page-node-id="ubRvDOhRa4708xGCxHJHvC"><td data-page-node-id="wyUxCbkw2jwL5f6gRT74px"><code data-page-node-id="MMiGF2OYDon8Dw2TpyeL9w">--warning</code></td><td data-page-node-id="uY6M4VY8LCCSJsJSqvJFmZ"><code data-page-node-id="IkWID459Zz1wLzbIWOx56G">#8d6610</code></td><td data-page-node-id="DWmH3tYafb6Po9lyIxgZ6T"><code data-page-node-id="uy2UhmFI3LztXWQhuhW3yG">#B45309</code></td><td data-page-node-id="A9zk8Ur1PXEedCxEX11Tst">琥珀提示</td></tr>
+    <tr data-page-node-id="i5GNW7wdICTcepqe9eV4dH"><td data-page-node-id="kuCMcuIvHEXfY9JKRZtbF2"><code data-page-node-id="0AMQ7elU1vAqYJ7YHvnWFH">--error</code></td><td data-page-node-id="3R8xuCenhPxJjHiAtYuBGU"><code data-page-node-id="akUpHiHHfb9x0eDqgvX2RD">#b54028</code></td><td data-page-node-id="NalRRqHpr3c1lkOlXjdkuf"><code data-page-node-id="al3BuG2l6HalVJMEOiLTJC">#EF4444</code></td><td data-page-node-id="Avt57dAuJD7YqIJvFckoTF">番茄红错误</td></tr>
+    <tr data-page-node-id="uUas1LAY4zfXT7Q5yhzUo2"><td data-page-node-id="AgabVx2YCX7QNDVkEivefm"><code data-page-node-id="wypaXFRM2CFGq0gP1cO6zp">--shadow-hard</code></td><td data-page-node-id="j3G1lhUfyQ9IP28ygo0OXI">6rpx 蓝灰偏移</td><td data-page-node-id="MInaeG9jObk1SsAmIlsDgP">6rpx 深棕偏移</td><td data-page-node-id="Ugf7BBTe1u5c1A9ceU5fgp">贴纸按压阴影</td></tr>
+  </table>
+</section>
+
+<section data-page-node-id="OlGaCJm95wqRknpsRRRpTK">
+  <h2 data-page-node-id="wpupgol0qpIlxNBAjc03iL"><span class="dot" data-page-node-id="05N5053iTwdQlOfZvQl2Vb"></span>业务逻辑零改动证明</h2>
+  <p data-page-node-id="EujNp8VMdHIR4g0Y9Yj1lm">仅 3 个 JS 文件共 10 行变更，全部与视觉或显示兼容有关：</p>
+  <div class="code-block" data-page-node-id="qdsoLtMKUIGaDCFbBNuwoI"> custom-tab-bar/index.js                 | 4 +---
+ miniapp/pages/member/member.js            | 4 +---
+ miniapp/pages/order-pkg/reservation/reservation.js | 2 +-
+
+逐行核对：
+- color: '#6f685a'      → '#6B5B5B'      （tabBar 未选中色）
+- selectedColor: '#2c4a6e' → '#FF6B35'   （tabBar 选中色）
+- new Date(d)           → new Date(String(d).replace(/-/g, '/'))  （iOS 兼容，语义不变）
+- new Date(c.member_expire) → new Date(String(c.member_expire).replace(/-/g, '/')) （iOS 兼容）
+- new Date(r.expires_at) → new Date(String(r.expires_at).replace(/-/g, '/')) （iOS 兼容）</div>
+  <p data-page-node-id="WyIubBqQm3llQjCDNo9B1A"><span class="ok" data-page-node-id="ODkVVVD7EPJvLEEED55JVY">✅ 确认：无数据流、无 API、无状态管理、无业务规则改动。</span></p>
+</section>
+
+<section data-page-node-id="hDXdmn4IpJ6ONoZ8HKRxAJ">
+  <h2 data-page-node-id="ebfr6Lg4LWpJYxEZBKHe0V"><span class="dot" data-page-node-id="1kmtz04pkKy9MbB5e0KKsy"></span>质量门禁自证</h2>
+  <table data-page-node-id="hQoZfAU3vTs1c4FfK8mlVF">
+    <tr data-page-node-id="hcekvgtzxgF3dpJnDAnozF"><th data-page-node-id="Hf1RbDBhLgMsKxzGGWo4y4">检查项</th><th data-page-node-id="190IXIjAZGcRHV3s85lB2V">结果</th></tr>
+    <tr data-page-node-id="C2tSZJ6Zwsc3TMZewA9vNt"><td data-page-node-id="8zck5dEyLWMVcakO8iCO0a">miniapp 全量 .wxss / .wxml / .json / .js 大括号配对</td><td data-page-node-id="HZRF3dxtF9IqIbxOoX2egP"><span class="ok" data-page-node-id="oo4GYzkStbsbZ4lv1FUeNy">✅ 全部匹配</span></td></tr>
+    <tr data-page-node-id="ju3fA87uCxCA2DBt2ZSS8B"><td data-page-node-id="3YP3IckGnNZVfxhVbcrf3p">app.json 语法</td><td data-page-node-id="V7ACpNJBUq1jrssvlqCT2E"><span class="ok" data-page-node-id="7ayOgQHnVbwxfaaiMNqjmj">✅ 合法 JSON</span></td></tr>
+    <tr data-page-node-id="c0jU6jEHb5kPJEOwsVn6x0"><td data-page-node-id="HLGXFws8WewCtDXdrS0obE">硬编码旧主色 <code data-page-node-id="h86Oya8DHKQ9KBS9TG4aqc">#2c4a6e</code> / <code data-page-node-id="wFd6K8iSChDiqEjRBPhLAe">#f6f2e9</code> / <code data-page-node-id="QSEL7grVbRu79lQMj3Ra4f">#fffefa</code> / <code data-page-node-id="PZHsO1zWKvcRvIxnTKdwv4">#262419</code> 残留</td><td data-page-node-id="mQTeudo6iGGmUKuqSfdoeW"><span class="ok" data-page-node-id="fLMNWzWYo0OP0PAlN7qpM1">✅ 已清零</span></td></tr>
+    <tr data-page-node-id="pWI52NEanucNJDKDwDBewq"><td data-page-node-id="u5nNnuaFfCcGMti2EVslA9">业务逻辑文件改动数</td><td data-page-node-id="DvfpWF8wl3ejUV4DYgTm8X"><span class="ok" data-page-node-id="Yi2mgDDAodA8rO9gSfQ934">✅ 仅 3 个文件，视觉/兼容相关</span></td></tr>
+    <tr data-page-node-id="3CK4heSwjEUmk1Ty78Mjxs"><td data-page-node-id="QNItKNmptZD6EUuHGlfX2r">微信开发者工具模拟器截图</td><td data-page-node-id="f8fhfJZqVamTVT0ry8cJ6N"><span class="ok" data-page-node-id="095dxyqE3Co5I8YrNgJLvy">✅ 8 页已截</span></td></tr>
+  </table>
+</section>
+
+<section data-page-node-id="brwd9x9aE1Hkd3Gy4ZDEGU">
+  <h2 data-page-node-id="Vy9gsw13661WzoBq06RTdU"><span class="dot" data-page-node-id="B0FkS75tYkB3VHEIuFepgg"></span>模拟器截图证据</h2>
+  <div class="grid" data-page-node-id="74yV5qEITGImNQF7Q4ywYJ">
+    <div class="card" data-page-node-id="nvbM7UkRi86tBeKj8qm1XH"><img src="01-index.jpg" alt="首页" data-page-node-id="iBpTEfgvddBsFdTgipasjT"><div class="cap" data-page-node-id="fwjXDTfStJKNjvyqxHXogQ"><strong data-page-node-id="EBCyhJDAIgaXDOP3alDjMP">首页</strong><span data-page-node-id="349FRDZTfttMv3P5AfpKdl">太阳黄 logo + 彩色贴纸宫格 + 粗黑边卡片</span></div></div>
+    <div class="card" data-page-node-id="8bVy5Fh9wY54fVMo43Fw1h"><img src="02-books.jpg" alt="图书馆" data-page-node-id="mdgPZHKEndv9PVz3U9HKmA"><div class="cap" data-page-node-id="FPyQiN6hTkXKV9HUGBFbl4"><strong data-page-node-id="ReBsSox9nCxXPmGIBZfUMZ">图书馆</strong><span data-page-node-id="FsHNFKg5aUc8CexExsRIpA">全宽横排书卡 + 词数/AR/音频三色贴纸</span></div></div>
+    <div class="card" data-page-node-id="F2EmIUNlVLFrV4tAfR2VRP"><img src="02-shelf.jpg" alt="书架" data-page-node-id="G3KxrPbwJEXjUwdEQcKi78"><div class="cap" data-page-node-id="ut0DNwBqUNrEYzZC9hcMBd"><strong data-page-node-id="kABIvWmgYLrunJ7TZd7mLA">书架</strong><span data-page-node-id="t0lWUYAOr7psMyAZCSX5QF">胶囊 tab + 书行卡粗黑边 + 太阳黄选中态</span></div></div>
+    <div class="card" data-page-node-id="l5p2IqcnUCAV1ctXZrHilj"><img src="02-member.jpg" alt="我的" data-page-node-id="qg6wd98jznB0kahYoJ2vqa"><div class="cap" data-page-node-id="kFwUlhx1XpoPe22AfXwJWi"><strong data-page-node-id="dtfEBHMSgRENqdZHE1KJil">我的</strong><span data-page-node-id="c3CHvT8vgC4anfRuxknud0">水彩渐变头部 + 6 色宫格贴纸图标</span></div></div>
+    <div class="card" data-page-node-id="FusbA10jLLGPaWH9k0C53b"><img src="03-book-detail.jpg" alt="书籍详情" data-page-node-id="qBaBifDGtqMArj1u7IsdUw"><div class="cap" data-page-node-id="IWVBqHGkTPgc4YiOg9SH9h"><strong data-page-node-id="oUeRIC7K0oumTOkHJiG1tK">书籍详情</strong><span data-page-node-id="68w9gmCmeZ3ecuOkICFZUn">底部胶囊按钮：橙色主操作 + 白底 secondary</span></div></div>
+    <div class="card" data-page-node-id="aqKiPbOCM8zAXFm7PGlnUu"><img src="03-checkin.jpg" alt="打卡" data-page-node-id="imjIakMLdAgxhJh8AzFrsw"><div class="cap" data-page-node-id="qyvgxHs4F4jhYsBRjnfli2"><strong data-page-node-id="V5tZ22vh4m6naAC8KQrqly">打卡日历</strong><span data-page-node-id="0fzO3NxBRJqYtOjsNEin7d">活力橙横幅 + 硬阴影日历卡 + 白字大数字</span></div></div>
+    <div class="card" data-page-node-id="XzfG1tgEmBAhC6XD28ZFeS"><img src="03-login.jpg" alt="登录" data-page-node-id="9uSbIUC7wLskrvRpwLoheP"><div class="cap" data-page-node-id="nBIGSQqb9FAsYKSVHdGB7M"><strong data-page-node-id="sqRDVAzPKbkEmTm4oYJq8e">登录</strong><span data-page-node-id="fZc7UaaSQ9Ps2zmpAIcJc0">太阳黄摇摆 logo + 橙色胶囊登录按钮</span></div></div>
+    <div class="card" data-page-node-id="AtWKtG0DjMkXdaHgbeIasm"><img src="03-quiz.jpg" alt="测验" data-page-node-id="4uYjG5LBXAv0DnXgyVzBfw"><div class="cap" data-page-node-id="HXTU653rPNDKt2XONeISNp"><strong data-page-node-id="wZOQITxmbWLI00eaJtHRl2">线上测验</strong><span data-page-node-id="DCUC9dGDQCPLHqoCtd2kYw">活力橙进度条 + 大胶囊下一题按钮</span></div></div>
+  </div>
+</section>
+
+<section data-page-node-id="s24Q4O4bHKAwvYA3kNiQ8R">
+  <h2 data-page-node-id="Qlmt8Vjto4lr0uSEGRASlg"><span class="dot" data-page-node-id="7yA0xJH9C5MAbLQQxAXCoP"></span>已知问题与下一步</h2>
+  <ol data-page-node-id="Ta1GYb4BUrzEjbrWZmu6hE">
+    <li data-page-node-id="kdqW01aYcPVaBC4IxZfYxC"><span class="ok" data-page-node-id="y88GMykHychrJQHhkmFnFg">✅ 已修</span>：打卡页橙底橙字对比度不足 → 已显式指定 <code data-page-node-id="AMELNUQUsTGkZF0Qbam1S5">color: #FFFDF7</code> + text-shadow。</li>
+    <li data-page-node-id="ZCdsIeiDb1DnJqjJzYvMe6"><span class="ok" data-page-node-id="gqiXlC3XrYFFXG4ysIwuBM">✅ 已修</span>：书籍详情 secondary 按钮文字看不见 → 已指定 <code data-page-node-id="TDOAytpIEr3sQEeVwy7Iul">color: var(--fg)</code>。</li>
+    <li data-page-node-id="bQ2RuqliYq6OTQYmjGK6LX"><span class="warn" data-page-node-id="T4UtMI7xZlkEb4QyreBXTr">⏳ 建议下一步</span>：读者页（reader）与测验结果页（quiz-result）已加覆盖块，但未截实际有数据状态的图；明早可到店测试听书/打卡后补。</li>
+    <li data-page-node-id="R5OFeutMb7r2ENPMD7JldK"><span class="warn" data-page-node-id="CjcY66Crky0dTFGj7vM3bn">⏳ 建议下一步</span>：响应式小屏 SE 未专门测试；如出现文字截断可继续微调按钮内边距。</li>
+    <li data-page-node-id="kLLKaH3EmbqO5orPW6ZRNG"><span class="warn" data-page-node-id="wcirjzsr6vyxBpbZ9HCZOB">⏳ 建议下一步</span>：43 个页面中未直接精修的页面已通过 token 换肤整体迁移，但逐页截图仍可继续补完。</li>
+  </ol>
+</section>
+
+<section data-page-node-id="ErS6xDDuhGuM2cO3HRxlng">
+  <h2 data-page-node-id="6AwwVWztrJ5cU2ue71SfXU"><span class="dot" data-page-node-id="RgaESFAC9JLvtPioRY70hA"></span>验收步骤</h2>
+  <ol data-page-node-id="8Wv7N84kBICDyu62PnDND6">
+    <li data-page-node-id="bWyCG6kcFvKMhVXV4SCtUG">打开本报告下方 8 张截图，重点看首页、我的、书籍详情。</li>
+    <li data-page-node-id="aPu4Mlf9MKNKklGx6w4BGo">打开微信开发者工具，进入模拟器刷新，确认无报错。</li>
+    <li data-page-node-id="4Q5AdoB2KDWZruF9qSMAqL">切 tab 首页/图书馆/书架/我的，确认 tabBar 选中态为太阳黄贴纸。</li>
+    <li data-page-node-id="NvngcbCDKmLuBuODxzCoFd">点一本书进详情，确认底部四个按钮：橙色「开始听」+ 白底粗黑边其他三项。</li>
+    <li data-page-node-id="EHNqsF08nGzYR7maCApfmd">进「打卡日历」，确认大数字为白色、背景为活力橙渐变。</li>
+    <li data-page-node-id="fPmE592klA8LwVluqqqYnM">如满意，执行 <code data-page-node-id="CvYHJE3By77bFBiSnKhOJg">git add . && git commit -m "feat(miniapp): 绘本风视觉改造 v3"</code> 后 push。</li>
+  </ol>
+</section>
+
+<footer data-page-node-id="qnztM7hN5LxgJVZ420P4n5">
+  本报告由小程序美化模型自动生成 · 文件位置 docs/miniapp-paint-v3/report.html
+</footer>
+</div>
+</body>
+</html>

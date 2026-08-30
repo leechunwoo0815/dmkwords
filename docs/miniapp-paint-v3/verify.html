@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="PStVUoRF1U8F7Ed6H7dRVN">
+<head data-page-node-id="obTDOT8RLnJEmxD9gtBYXi">
+<meta charset="UTF-8" data-page-node-id="Fh7aGzNmUcVFCClywznj8S">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="1zbNbdg7yFYVKPu71UJUi8">
+<title>小程序绘本风 v3 修复自证</title>
+<style>
+:root{--c-bg:#FDF8F0;--c-surface:#FFFDF7;--c-fg:#3B2F2F;--c-muted:#6B5B5B;--c-accent:#FF6B35;--c-green:#16A34A;--c-yellow:#FCD34D;--c-border:#D4C5B5;}
+*{box-sizing:border-box}
+body{margin:0;padding:0;background:var(--c-bg);color:var(--c-fg);font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;line-height:1.7}
+.wrap{max-width:720px;margin:0 auto;padding:24px}
+header{padding:28px;border:3px solid var(--c-fg);border-radius:28px 32px 24px 36px;background:var(--c-surface);box-shadow:6px 6px 0 rgba(59,47,47,0.85);margin-bottom:24px}
+h1{margin:0 0 10px;font-size:28px;font-weight:800;color:var(--c-accent)}
+.subtitle{margin:0;color:var(--c-muted);font-size:14px}
+section{padding:22px;border:3px solid var(--c-fg);border-radius:28px 32px 24px 36px;background:var(--c-surface);box-shadow:5px 5px 0 rgba(59,47,47,0.80);margin-bottom:22px}
+section h2{margin:0 0 14px;font-size:20px;font-weight:800}
+.item{margin-bottom:18px;padding-bottom:18px;border-bottom:2px dashed var(--c-border)}
+.item:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.item h3{margin:0 0 8px;font-size:17px;font-weight:700;color:var(--c-accent)}
+.item p{margin:0 0 10px;font-size:14px;color:var(--c-muted)}
+.item img{width:100%;border:3px solid var(--c-fg);border-radius:20px 24px 18px 26px;box-shadow:4px 4px 0 rgba(59,47,47,0.70)}
+.ok{color:var(--c-green);font-weight:700}
+footer{padding:20px;text-align:center;color:var(--c-muted);font-size:13px}
+</style>
+</head>
+<body data-page-node-id="bureAULVdtplYuC2O56SD3">
+<div class="wrap" data-page-node-id="OhND9EHb1VRicSfWQrHecN">
+<header data-page-node-id="YdtlDiFoY6RTljKqOqGnFH">
+  <h1 data-page-node-id="ZD5MHWhVFl9mgesaBwwMsE">小程序绘本风 v3 · 修复闭环自证</h1>
+  <p class="subtitle" data-page-node-id="FEONPQpVlEOxLdaerm9eWT">按用户要求，将三处修复重新截图验证一遍，全部通过。</p>
+</header>
+
+<section data-page-node-id="Ws8K8I1H9baPeCPc1Yj9sY">
+  <h2 data-page-node-id="mGbXX0Ad0rtiG6mRLut2RU">三处修复验证</h2>
+
+  <div class="item" data-page-node-id="gcLb9xHp7N1webNwuwZtKX">
+    <h3 data-page-node-id="0EnDIZmGMLWLeKScqPIBCm">1. 图书馆标签透明度 / 卡片布局</h3>
+    <p data-page-node-id="wrmCDM0FVkA7Bjq22INCrZ">问题：首次覆盖后书卡仍为半宽网格，且词数标签因旧样式残留 opacity:0.15 而半透明。<br data-page-node-id="tUIJ7pHXSqu8o2Sm0EQfjG">修复：改为全宽横排书卡 + 显式 opacity:1。</p>
+    <img src="verify-books.jpg" alt="图书馆修复后" data-page-node-id="UTCWfjCxtGzjdnc8LbRRPL">
+    <p data-page-node-id="IganlQa7jlBlfCOd1sH5FY"><span class="ok" data-page-node-id="QOoFSXyjp1ylhGwP7wrnAD">✅ 验证通过</span>：标签不透明、三色贴纸清晰、横排卡布局正常。</p>
+  </div>
+
+  <div class="item" data-page-node-id="QVlCFmMOFa6nDuUgVkbk7C">
+    <h3 data-page-node-id="T4HBuFwTwqkP12l5dQ3zv9">2. 打卡页橙底橙字对比度</h3>
+    <p data-page-node-id="C6hGGDMY6Avudy8h6or4Xo">问题：活力橙横幅上的大数字默认继承 --surface，在低对比度下曾被渲染成橙色，几乎看不见。<br data-page-node-id="0zPio61fhrLtcaCWRPERq6">修复：显式指定 color:#FFFDF7 + text-shadow。</p>
+    <img src="verify-checkin.jpg" alt="打卡修复后" data-page-node-id="dq6nPj5OYXsFTG5v75ufZT">
+    <p data-page-node-id="9o7Ro9hYJPN9D7CVZCeAxd"><span class="ok" data-page-node-id="yvcaXjPLNzSPowGw4bB7fj">✅ 验证通过</span>：白字在橙色横幅上清晰可读。</p>
+  </div>
+
+  <div class="item" data-page-node-id="kADrnBEmvTfvqIHeGGLVsV">
+    <h3 data-page-node-id="Z1bWnMYTXDXDatbJPx3BXh">3. 书籍详情 secondary 按钮文字</h3>
+    <p data-page-node-id="83AHc0e00oFvXK8EQzimWK">问题：将 secondary / fav 按钮背景改为 --surface 后，文字颜色仍为原样式 var(--surface)，导致白底白字看不见。<br data-page-node-id="oe4np24zcyyici8PzhAPH8">修复：显式指定 color:var(--fg)。</p>
+    <img src="verify-book-detail.jpg" alt="书籍详情修复后" data-page-node-id="uzSfQ0lRN7VZwuJuM2t3d2">
+    <p data-page-node-id="h8eF5zmpaXf4LujiSh0vE6"><span class="ok" data-page-node-id="BpRyR2nNIuWYlZcUdTBkOg">✅ 验证通过</span>：四个按钮文字全部可读，主操作「开始听」橙色突出。</p>
+  </div>
+</section>
+
+<footer data-page-node-id="BxemyExI3W5L41hIrbTjRs">
+  生成时间：2026-08-30 01:53 | 文件位置：docs/miniapp-paint-v3/verify.html
+</footer>
+</div>
+</body>
+</html>
