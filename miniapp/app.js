@@ -2,11 +2,14 @@
 // 生产环境通过 project.config.json 的编译环境注入 baseURL
 const PROD_BASE_URL = 'https://api.dmkwords.cn'
 // 开发版连本地后端。
-// 微信开发者工具模拟器与宿主机共享网络，127.0.0.1 通常可用；
-// 若模拟器/真机无法访问，请改成宿主机的局域网 IP，例如 http://192.168.x.x:8002
-//（并确保后端 uvicorn --host 0.0.0.0，以及 project.private.config.json 中 urlCheck 为 false）
-const DEV_BASE_URL = 'http://127.0.0.1:8002'
+// - 模拟器（platform=devtools）：http 127.0.0.1 即可（image 组件不信任自签 https）
+// - 真机（ios/android）：媒体栈拦 http，必须走本地 https :8443
+//   （证书 certs/server.crt，手机需安装并完全信任 ca.crt；本机 IP 变更需改 SAN 重新生成）
 const _envVersion = (wx.getAccountInfoSync().miniProgram.envVersion || 'develop')
+const DEV_BASE_URL =
+  wx.getSystemInfoSync().platform === 'devtools'
+    ? 'http://127.0.0.1:8002'
+    : 'https://192.168.18.162:8443'
 const BASE_URL = _envVersion === 'develop' ? DEV_BASE_URL : PROD_BASE_URL
 
 App({

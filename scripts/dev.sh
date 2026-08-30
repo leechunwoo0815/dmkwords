@@ -54,13 +54,25 @@ start() {
     echo "⚠ 后端已在运行（pid $(cat "$BACKEND_PID_FILE")）——运行的是启动时的代码，不会自动加载新提交"
     echo "  拉取/修改过代码后请执行: bash scripts/dev.sh restart"
   else
-    nohup .venv/bin/uvicorn backend.main:app --port 8002 > "$LOG_DIR/backend.log" 2>&1 < /dev/null &
+    nohup .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8002 > "$LOG_DIR/backend.log" 2>&1 < /dev/null &
     echo $! > "$BACKEND_PID_FILE"
     for _ in $(seq 1 20); do
       # --noproxy：本机探测绕过系统代理（http_proxy 会把 localhost 探测打到 7890 代理上，返回 502 假崩）
   curl -sf --noproxy '*' -m 3 "$BACKEND_URL" > /dev/null && break
       sleep 1
     done
+    # 真机 iOS 媒体（image/audio）拦 http——提供本地 https 端口（certs/ 存在时起 8443）
+    if [ -f certs/server.crt ] && [ -f certs/server.key ]; then
+      if lsof -ti :8443 >/dev/null 2>&1; then
+        echo "  https 后端已在 :8443"
+      else
+        nohup .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8443 \
+          --ssl-certfile certs/server.crt --ssl-keyfile certs/server.key \
+          > "$LOG_DIR/backend-https.log" 2>&1 < /dev/null &
+        echo $! > "${BACKEND_PID_FILE}.https"
+        echo "  https 后端已起 :8443（真机媒体用）"
+      fi
+    fi
   fi
   curl -sf --noproxy '*' -m 3 "$BACKEND_URL" > /dev/null && echo "后端 OK: $BACKEND_URL" || { echo "✗ 后端未就绪，查看 $LOG_DIR/backend.log"; exit 1; }
 
@@ -90,7 +102,7 @@ start() {
 }
 
 stop() {
-  for pid_file in "$BACKEND_PID_FILE" "$FRONTEND_PID_FILE"; do
+  for pid_file in "$BACKEND_PID_FILE" "$BACKEND_PID_FILE.https" "$FRONTEND_PID_FILE"; do
     if is_running "$pid_file"; then
       pid=$(cat "$pid_file")
       # 杀进程组（vite 会 spawn 子进程）

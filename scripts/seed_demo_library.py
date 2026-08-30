@@ -381,6 +381,16 @@ def main() -> int:
             b.audio_path = rel
             b.audio_duration_seconds = durations[rel]
             print(f"c audio 补齐: {b.title}", flush=True)
+        # 上架书缺题则补（seed_wm11_demo 建的 6 本原无题；测验页/上架强校验依赖）
+        for b in db.query(B).filter(B.is_deleted == 0).all():
+            if (
+                db.query(QuizQuestion)
+                .filter(QuizQuestion.book_id == b.id, QuizQuestion.is_active == 1)
+                .count()
+                == 0
+            ):
+                db.add_all(make_questions(b))
+                print(f"c quiz 补齐: {b.title}", flush=True)
         db.commit()
         print(
             f"\n完成：新增 {added} 本，跳过 {skipped} 本，旧书封面补齐见上。总计书目 "

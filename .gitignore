@@ -22,3 +22,7 @@ data/*.db
 /project.private.config.json
 # 小程序本地私人配置（官方规范不入库）
 miniapp/project.private.config.json
+
+# 本地 HTTPS 开发证书（自签 CA + 私钥，绝不入库）
+certs/
+*.key
