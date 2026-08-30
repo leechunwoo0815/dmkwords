@@ -317,3 +317,42 @@ def test_admin_reservation_checkout_and_profile(client: TestClient):
     assert prof["total_checkin_days"] == 1
     assert prof["current_streak"] == 1
     assert prof["finished_books"][0]["title"] == "Dog Man"
+
+
+def test_merge_intervals_dirty_data():
+    """E-20260830-12 防御：脏数据（int/str/None/负区间/start>end）清洗后正常合并，不 500。"""
+    from backend.domain.reading.service import merge_intervals
+
+    dirty = [0, 2, "ab", None, [5, 3], [3, 10], [-1, 2], [8, 6], [10, 12], 7]
+    assert merge_intervals(dirty, [0, 2]) == [[0, 2], [3, 12]]
+    # 非 list 输入安全
+    assert merge_intervals(None, [0, 2]) == [[0, 2]]
+    assert merge_intervals("not-json", [0, 2]) == [[0, 2]]
+
+
+def test_report_progress_polluted_intervals_no_500(client: TestClient):
+    """一维 intervals 污染后上报仍 200（脏区间被清洗，只计入本次新区间）。"""
+    h = _h(client)
+    c, book, mini = _setup(client, h, "13800000607")
+    r = _report(client, mini, c["id"], book["id"], 10, 0)
+    assert r.status_code == 200
+    from backend.database import get_session
+    from backend.domain.reading.models import ReadingProgress
+
+    with get_session() as db:
+        p = (
+            db.query(ReadingProgress)
+            .filter(
+                ReadingProgress.child_id == c["id"],
+                ReadingProgress.book_id == book["id"],
+                ReadingProgress.is_deleted == 0,
+            )
+            .first()
+        )
+        p.intervals = "[0,10]"  # 一维脏数据（曾触发 TypeError 500）
+        db.commit()
+    _backdate(client, c["id"], book["id"], 5)
+    r2 = _report(client, mini, c["id"], book["id"], 15, 10)
+    assert r2.status_code == 200, r2.text
+    body = r2.json()
+    assert body["coverage_seconds"] == 5  # 脏区间 [0,10] 被清洗，仅 [10,15] 入账

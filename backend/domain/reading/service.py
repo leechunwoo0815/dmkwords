@@ -38,9 +38,28 @@ SPEED_TOLERANCE = 1.2  # R-151：容差
 REPORT_GRACE_SECONDS = 60  # 首次上报/网络抖动宽限（心跳 10s 的理论上限为 10×2.0×1.2=24s）
 
 
-def merge_intervals(intervals: list[list[int]], new: list[int]) -> list[list[int]]:
-    """合并区间并集（排序 + 线性合并）。"""
-    all_intervals = sorted([list(i) for i in intervals if i[1] > i[0]] + [new], key=lambda x: x[0])
+def _clean_intervals(raw: object) -> list[list[int]]:
+    """清洗历史 intervals：丢弃非法区间（非 [a,b]、含非数字、a>=b、负起点），
+    保证 merge/coverage 对脏数据永不 500（E-20260830-12 防御）。"""
+    if not isinstance(raw, list):
+        return []
+    cleaned: list[list[int]] = []
+    for item in raw:
+        if (
+            isinstance(item, (list, tuple))
+            and len(item) >= 2
+            and isinstance(item[0], (int, float))
+            and isinstance(item[1], (int, float))
+        ):
+            start, end = int(item[0]), int(item[1])
+            if 0 <= start < end:
+                cleaned.append([start, end])
+    return cleaned
+
+
+def merge_intervals(intervals: object, new: list[int]) -> list[list[int]]:
+    """合并区间并集（排序 + 线性合并）。intervals 为脏数据时清洗后合并，不抛异常。"""
+    all_intervals = sorted(_clean_intervals(intervals) + [list(new)], key=lambda x: x[0])
     merged: list[list[int]] = []
     for start, end in all_intervals:
         if merged and start <= merged[-1][1]:
@@ -124,7 +143,10 @@ class ReadingService:
 
         # ---- 防刷：覆盖增速校验（R-151）----
         now = datetime.now()
-        intervals = json.loads(progress.intervals or "[]")
+        try:
+            intervals = json.loads(progress.intervals or "[]")
+        except (json.JSONDecodeError, TypeError):
+            intervals = []  # E-20260830-12：字段损坏时按空区间处理，不 500
         old_cov = progress.coverage_seconds
         merged = merge_intervals(intervals, [start, end])
         new_cov = coverage_of(merged)
@@ -450,6 +472,8 @@ class ReservationService:
                     "book_id": book.id,
                     "title": book.title,
                     "author": book.author,
+                    "cover_url": f"/api/miniapp/covers/{book.id}" if book.cover_path else None,
+                    "has_audio": bool(book.audio_path),
                     "status": res.status,
                     "expires_at": str(res.expires_at),
                 }
