@@ -321,7 +321,11 @@ DICT_SEEDS = [
 def seed() -> int:
     db = get_session()
     try:
-        existing = {r[0] for r in db.query(DictionaryWord.word).all()}
+        # 只查本次要补的词（表内已是 340 万全量，全表 .all() 会拖死调用方——conftest 每模块都跑）
+        names = [w for w, _p, _d, _t in DICT_SEEDS]
+        existing = {
+            r[0] for r in db.query(DictionaryWord.word).filter(DictionaryWord.word.in_(names)).all()
+        }
         added = 0
         for word, phonetic, definition, translation in DICT_SEEDS:
             if word in existing:

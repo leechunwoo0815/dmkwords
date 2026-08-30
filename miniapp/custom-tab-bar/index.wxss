@@ -1,3 +1,4 @@
+/* 绘本风 TabBar — 纸面浮岛 + 粗黑顶边 + 活力橙选中 */
 .tab-bar {
   position: fixed;
   bottom: 0;
@@ -5,8 +6,8 @@
   right: 0;
   height: 100rpx;
   padding-bottom: env(safe-area-inset-bottom);
-  background: #ffffff;
-  border-top: 2rpx solid #e5e5e5;
+  background: #FFFDF7;
+  border-top: 3rpx solid #3B2F2F;
   display: flex;
   z-index: 100;
 }
@@ -18,20 +19,44 @@
   align-items: center;
   justify-content: center;
   gap: 4rpx;
+  position: relative;
+  transition: transform 0.12s ease;
+}
+
+.tab-bar-item:active {
+  transform: scale(0.92);
+}
+
+/* 选中态：图标底衬太阳黄圆贴纸 */
+.tab-bar-item.active::before {
+  content: "";
+  position: absolute;
+  top: 6rpx;
+  width: 88rpx;
+  height: 56rpx;
+  border-radius: 999rpx;
+  background: rgba(252, 211, 77, 0.45);
+  border: 3rpx solid #3B2F2F;
+  z-index: 0;
 }
 
 .tab-bar-icon {
   width: 48rpx;
   height: 48rpx;
+  position: relative;
+  z-index: 1;
 }
 
 .tab-bar-text {
   font-size: 24rpx;
-  color: #9a9a9a;
+  color: #6B5B5B;
   line-height: 1;
+  position: relative;
+  z-index: 1;
+  font-weight: 600;
 }
 
 .tab-bar-item.active .tab-bar-text {
-  color: #2c4a6e;
-  font-weight: 600;
+  color: #FF6B35;
+  font-weight: 800;
 }

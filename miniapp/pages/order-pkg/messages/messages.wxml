@@ -1,4 +1,5 @@
 <view class="page-bg">
+  <!-- 分类 chips -->
   <view class="cat-tabs">
     <view wx:for="{{categories}}" wx:key="key"
       class="cat-tab {{activeCat === item.key ? 'active' : ''}}"
@@ -7,28 +8,33 @@
     </view>
   </view>
 
+  <!-- 未读操作条 -->
   <view class="unread-bar" wx:if="{{unread > 0}}" bindtap="markAllRead">
-    <text>{{unread}} 条未读，点击全部已读</text>
+    <view class="unread-left">
+      <text class="unread-num">{{unread}}</text>
+      <text>条未读消息</text>
+    </view>
+    <text class="unread-all">全部已读 ›</text>
   </view>
 
   <view wx:if="{{loading && list.length === 0}}" class="loading">加载中…</view>
-  <view wx:elif="{{error && list.length === 0}}" class="empty-state">加载失败，下拉重试</view>
-  <view wx:elif="{{list.length === 0}}" class="empty-state">暂无消息</view>
+  <view wx:elif="{{error && list.length === 0}}" class="empty-state" bindtap="onPullDownRefresh">加载失败，点此重试</view>
+  <empty-state wx:elif="{{list.length === 0}}" icon="🔔" title="暂无消息" desc="有新消息时会第一时间通知你" />
 
   <view class="msg-list" wx:else>
     <view wx:for="{{list}}" wx:key="id"
-      class="msg-item {{item.read ? 'read' : 'unread'}}"
+      class="msg-card {{item.read ? 'is-read' : 'is-unread'}}"
       data-id="{{item.id}}" bindtap="toggleExpand">
-      <view class="msg-top">
-        <text class="msg-cat">{{item.category}}</text>
+      <view class="msg-head">
+        <view wx:if="{{!item.read}}" class="unread-dot"></view>
+        <text class="msg-cat-tag cat-{{item.catKey}}">{{item.categoryLabel}}</text>
         <text class="msg-title">{{item.title}}</text>
-        <text wx:if="{{!item.read}}" class="msg-dot">●</text>
+        <text class="msg-time">{{item.timeText}}</text>
       </view>
       <view wx:if="{{expandedId === item.id}}" class="msg-content expanded">{{item.content}}</view>
       <view wx:else class="msg-content one-line">{{item.content}}</view>
-      <view class="msg-time">{{item.created_at}}</view>
     </view>
   </view>
 
-  <view wx:if="{{list.length > 0 && list.length >= total}}" class="load-end">没有更多了</view>
+  <view wx:if="{{list.length > 0 && list.length >= total}}" class="load-end">— 没有更多了 —</view>
 </view>

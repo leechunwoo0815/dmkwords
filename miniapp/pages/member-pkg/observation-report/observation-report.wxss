@@ -345,3 +345,39 @@
 /* Bottom Space */
 .bottom-space { height: 40rpx; }
 
+
+/* ============================================
+   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
+   ============================================ */
+/* 卡片：粗黑边 + 硬阴影 + 手绘圆角 */
+.card, .section-card, .card-wrapper, .section, .panel, .info-card, .form-card {
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+/* 标题圆体 */
+.page-title, .section-title, .card-title, .header-title, .title, .name {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+
+/* 绘本风精修补充：顶部报告头 */
+.report-header {
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+}
+.report-header .rh-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.35);
+}
+.stat-card {
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+}

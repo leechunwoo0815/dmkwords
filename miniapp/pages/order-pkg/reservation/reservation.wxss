@@ -280,3 +280,64 @@
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
+
+/* ============================================
+   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
+   ============================================ */
+/* 卡片：粗黑边 + 硬阴影 + 手绘圆角 */
+.card, .section-card, .card-wrapper, .section, .panel, .info-card, .form-card {
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+/* 按钮：胶囊贴纸 */
+.btn, button, .primary-btn, .secondary-btn, .submit-btn, .action-btn {
+  border: 3rpx solid var(--fg) !important;
+  border-radius: 999rpx !important;
+  box-shadow: var(--shadow-hard-sm) !important;
+  font-weight: 700;
+}
+.btn-primary, .primary, button[type="primary"], .primary-btn {
+  background: var(--accent) !important;
+  color: #FFFDF7 !important;
+}
+.btn-secondary, .secondary, .secondary-btn {
+  background: var(--surface) !important;
+  color: var(--fg) !important;
+}
+.btn:active, button:active, .primary-btn:active, .secondary-btn:active {
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none !important;
+}
+
+/* 标签/徽章：圆角贴纸 */
+.tag, .badge, .pill, .tag-primary, .tag-secondary, .tag-success, .tag-warning {
+  border: 2rpx solid rgba(59, 47, 47, 0.6);
+  border-radius: 999rpx;
+  font-weight: 700;
+}
+.tag-primary, .badge-primary { background: var(--accent-soft); color: var(--accent-dark); }
+.tag-secondary, .badge-secondary { background: var(--secondary-soft); color: var(--secondary-ink); }
+.tag-success, .badge-success { background: var(--success-soft); color: var(--success); }
+.tag-warning, .badge-warning { background: var(--warning-soft); color: var(--warning-dark); }
+
+/* 标题圆体 */
+.page-title, .section-title, .card-title, .header-title, .title, .name {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+/* 列表项：卡片化 */
+.list-item, .item, .row, .cell, .info-row {
+  background: var(--surface);
+  border: 2rpx solid var(--fg);
+  border-radius: 24rpx 28rpx 20rpx 30rpx;
+  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
+}
+
+/* 列表容器：加间距 */
+.list, .grid, .list-container {
+  gap: 16rpx;
+}

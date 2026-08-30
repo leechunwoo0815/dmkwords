@@ -1,74 +1,131 @@
-<view class="page-root">
-  <view class="top-bar">
-    <view class="logo">
-      <view class="logo-icon">📚</view>
-      <text class="logo-text">DmkWords</text>
-    </view>
-  </view>
-
-  <view wx:if="{{!currentChild}}" class="login-prompt">
-    <text>还没有孩子档案，请到店建档</text>
-  </view>
-
-  <view wx:if="{{children.length > 1}}" class="child-switcher">
-    <view wx:for="{{children}}" wx:key="id" class="child-chip {{currentChild.id === item.id ? 'child-chip-active' : ''}}"
-      data-id="{{item.id}}" bindtap="onSwitchChild">
-      <text>{{item.name}}</text>
-    </view>
-  </view>
-
-  <view wx:if="{{currentChild}}" class="section-block">
-    <view class="section-title">正在陪伴：{{currentChild.name}}（{{statusText}}）</view>
-    <view class="stat-cards">
-      <view class="stat-item">
-        <view class="stat-num">{{currentStreak}}</view>
-        <view class="stat-label">连续打卡（天）</view>
-      </view>
-      <view class="stat-item">
-        <view class="stat-num">{{todayChecked ? '✓' : '—'}}</view>
-        <view class="stat-label">今日打卡</view>
+<scroll-view class="page-root" scroll-y enhanced show-scrollbar="{{false}}">
+  <!-- 问候卡：孩子 + 会员态 + 打卡 -->
+  <view class="hero-card" wx:if="{{currentChild}}">
+    <view class="hero-left">
+      <view class="hero-greeting">你好，{{currentChild.name}}！</view>
+      <view class="hero-badges">
+        <text class="badge badge-member">{{statusText}}</text>
+        <text class="badge {{todayChecked ? 'badge-done' : 'badge-todo'}}"
+          bindtap="goCheckin">{{todayChecked ? '今日已打卡 ✓' : '去打卡'}}</text>
       </view>
     </view>
+    <view class="streak-sticker" bindtap="goCheckin">
+      <text class="streak-num">{{currentStreak}}</text>
+      <text class="streak-label">连续打卡</text>
+    </view>
+  </view>
+  <view wx:if="{{!currentChild}}" class="empty-child">
+    <text>🏠 还没有孩子档案，请到店建档</text>
   </view>
 
-  <view class="section-block">
-    <view class="section-title">快捷入口</view>
+  <!-- 多孩切换 -->
+  <view wx:if="{{children.length > 1}}" class="child-chips">
+    <view wx:for="{{children}}" wx:key="id"
+      class="chip {{currentChild.id === item.id ? 'chip-on' : ''}}"
+      data-id="{{item.id}}" bindtap="onSwitchChild">{{item.name}}</view>
+  </view>
+
+  <!-- 提醒条：未读消息 / 在借 / 预约（有才显示） -->
+  <view class="notice-row" wx:if="{{currentChild && (unreadCount > 0 || borrowCount > 0 || reservationCount > 0)}}">
+    <view class="notice-item" wx:if="{{unreadCount > 0}}" bindtap="goMessage">
+      <text class="notice-emoji">🔔</text><text>{{unreadCount}} 条新消息</text>
+    </view>
+    <view class="notice-item" wx:if="{{borrowCount > 0}}" bindtap="goShelf">
+      <text class="notice-emoji">📚</text><text>在借 {{borrowCount}} 本</text>
+    </view>
+    <view class="notice-item" wx:if="{{reservationCount > 0}}" bindtap="goReservation">
+      <text class="notice-emoji">🔖</text><text>预约中 {{reservationCount}}</text>
+    </view>
+  </view>
+
+  <!-- 续听卡：在借第一本 + 真实进度 -->
+  <view class="section" wx:if="{{currentChild && continueBook}}">
+    <view class="section-title">🎧 继续听</view>
+    <view class="continue-card" bindtap="goContinue">
+      <image class="continue-cover" src="{{continueBook.cover_url}}" mode="aspectFill" />
+      <view class="continue-info">
+        <view class="continue-title">{{continueBook.title}}</view>
+        <view class="continue-meta">{{continueBook.author}} · {{continueBook.dueText}}</view>
+        <view class="progress-track">
+          <view class="progress-fill" style="width: {{continueBook.percent}}%"></view>
+        </view>
+        <view class="continue-pct">已听 {{continueBook.percent}}%</view>
+      </view>
+      <view class="continue-btn">▶</view>
+    </view>
+  </view>
+
+  <!-- 今日数据 -->
+  <view class="stat-row" wx:if="{{currentChild}}">
+    <view class="stat-cell" bindtap="goCheckin">
+      <text class="stat-num">{{currentStreak}}</text>
+      <text class="stat-label">连续打卡(天)</text>
+    </view>
+    <view class="stat-cell" bindtap="goVocabulary">
+      <text class="stat-num">{{totalWords}}</text>
+      <text class="stat-label">累计词数</text>
+    </view>
+    <view class="stat-cell" bindtap="goAchievement">
+      <text class="stat-num">{{points}}</text>
+      <text class="stat-label">积分</text>
+    </view>
+  </view>
+
+  <!-- 今日推荐：真实书目横滑 -->
+  <view class="section" wx:if="{{recommend.length}}">
+    <view class="section-head">
+      <text class="section-title">📖 今日推荐</text>
+      <text class="section-more" bindtap="goMoreBooks">全部 ›</text>
+    </view>
+    <scroll-view class="rec-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="rec-row">
+        <view wx:for="{{recommend}}" wx:key="id" class="rec-card"
+          data-book="{{item}}" bindtap="goRecommend">
+          <view class="rec-cover-wrap">
+            <image wx:if="{{item.cover_url}}" class="rec-cover" src="{{item.cover_url}}" mode="aspectFill" />
+            <view wx:else class="rec-cover rec-cover-fallback">📕</view>
+            <text wx:if="{{item.has_audio}}" class="rec-audio">🎧</text>
+          </view>
+          <view class="rec-title">{{item.title}}</view>
+          <view class="rec-tags">
+            <text class="rec-tag">{{item.ar_level || 'AR—'}}</text>
+            <text class="rec-tag rec-tag-words">{{item.word_count}} 词</text>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 快捷入口 2x4 -->
+  <view class="section" wx:if="{{currentChild}}">
+    <view class="section-title">🚀 快捷入口</view>
     <view class="entry-grid">
-      <view class="entry-item" bindtap="goBooks">
-        <view class="entry-icon-wrap"><text class="entry-icon">📖</text></view>
-        <view class="entry-title">图书馆</view>
-        <view class="entry-desc">听音频 · 完播打卡</view>
+      <view class="entry" bindtap="goMoreBooks">
+        <view class="entry-icon e-orange">📖</view><text class="entry-name">图书馆</text>
       </view>
-      <view class="entry-item" bindtap="goCheckin">
-        <view class="entry-icon-wrap"><text class="entry-icon">📅</text></view>
-        <view class="entry-title">打卡日历</view>
-        <view class="entry-desc">坚持的力量</view>
+      <view class="entry" bindtap="goCheckin">
+        <view class="entry-icon e-green">📅</view><text class="entry-name">打卡日历</text>
       </view>
-      <view class="entry-item" bindtap="goReservation">
-        <view class="entry-icon-wrap"><text class="entry-icon">🔖</text></view>
-        <view class="entry-title">我的预约</view>
-        <view class="entry-desc">到店取书</view>
+      <view class="entry" bindtap="goShelf">
+        <view class="entry-icon e-blue">📚</view><text class="entry-name">我的书架</text>
       </view>
-      <view class="entry-item" bindtap="goAchievement">
-        <view class="entry-icon-wrap"><text class="entry-icon">🏆</text></view>
-        <view class="entry-title">等级勋章</view>
-        <view class="entry-desc">词数 · 积分</view>
+      <view class="entry" bindtap="goReservation">
+        <view class="entry-icon e-gold">🔖</view><text class="entry-name">我的预约</text>
       </view>
-      <view class="entry-item" bindtap="goLeaderboard">
-        <view class="entry-icon-wrap"><text class="entry-icon">🏅</text></view>
-        <view class="entry-title">排行榜</view>
-        <view class="entry-desc">五榜 · 进步可见</view>
+      <view class="entry" bindtap="goAchievement">
+        <view class="entry-icon e-gold">🏆</view><text class="entry-name">等级勋章</text>
       </view>
-      <view class="entry-item" bindtap="goPassport">
-        <view class="entry-icon-wrap"><text class="entry-icon">🪪</text></view>
-        <view class="entry-title">阅读护照</view>
-        <view class="entry-desc">成长档案</view>
+      <view class="entry" bindtap="goLeaderboard">
+        <view class="entry-icon e-pink">🏅</view><text class="entry-name">排行榜</text>
       </view>
-      <view class="entry-item" bindtap="goActivities">
-        <view class="entry-icon-wrap"><text class="entry-icon">🎪</text></view>
-        <view class="entry-title">线下活动</view>
-        <view class="entry-desc">读书会 · 亲子</view>
+      <view class="entry" bindtap="goPassport">
+        <view class="entry-icon e-purple">🛂</view><text class="entry-name">阅读护照</text>
+      </view>
+      <view class="entry" bindtap="goActivities">
+        <view class="entry-icon e-cyan">🎪</view><text class="entry-name">线下活动</text>
       </view>
     </view>
   </view>
-</view>
+
+  <view class="page-footer">DmkWords · 让孩子爱上英文阅读</view>
+</scroll-view>

@@ -580,3 +580,40 @@
   color: var(--fg);
 }
 
+
+/* ============================================
+   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
+   ============================================ */
+
+/* 结果卡：粗黑边 + 硬阴影 + 弹跳入场 */
+.result-card {
+  border: 3rpx solid var(--fg);
+  border-radius: 36rpx 40rpx 32rpx 44rpx;
+  box-shadow: var(--shadow-hard);
+  background: var(--surface);
+  animation: paint-pop 0.4s ease-out both;
+}
+
+/* 分数圈描边加粗 */
+.score-circle {
+  border: 4rpx solid var(--fg);
+  box-shadow: var(--shadow-hard-sm);
+}
+
+/* 分数圆体 */
+.score-value {
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+
+/* 结果标题圆体 */
+.result-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+
+/* 通过徽章：嫩芽绿贴纸 */
+.badge-pass {
+  border: 3rpx solid var(--fg);
+  box-shadow: var(--shadow-hard-sm);
+}

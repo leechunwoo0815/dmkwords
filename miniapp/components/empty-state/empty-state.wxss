@@ -10,3 +10,54 @@
 .empty-title { font-size: 30rpx; color: var(--muted); margin-bottom: 12rpx; text-align: center; }
 .empty-desc { font-size: 24rpx; color: var(--muted); text-align: center; margin-bottom: 24rpx; }
 .empty-btn { background: var(--accent); color: var(--surface); border: none; border-radius: 16rpx; padding: 16rpx 40rpx; font-size: 28rpx; }
+
+/* ============================================
+   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
+   ============================================ */
+
+/* 空态图标：彩色圆贴纸 + 轻浮动 */
+.empty-state .empty-icon {
+  width: 140rpx;
+  height: 140rpx;
+  line-height: 140rpx;
+  text-align: center;
+  font-size: 72rpx;
+  background: var(--sun-soft);
+  border: 3rpx solid var(--fg);
+  border-radius: 50%;
+  box-shadow: var(--shadow-hard-sm);
+  margin-bottom: 28rpx;
+  animation: paint-float 2.5s ease-in-out infinite;
+}
+
+/* 文案圆体，像绘本对话 */
+.empty-state .empty-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 32rpx;
+  color: var(--fg);
+}
+.empty-state .empty-desc {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* 按钮走全局胶囊 */
+.empty-state .empty-btn {
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  box-shadow: var(--shadow-hard-sm);
+  font-weight: 700;
+  background: var(--accent);
+  color: #FFFDF7;
+}
+.empty-state .empty-btn:active {
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none;
+}
+
+/* 组件样式隔离保险：本地补 keyframes（与 app.wxss 同名，仅组件内生效） */
+@keyframes paint-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8rpx); }
+}

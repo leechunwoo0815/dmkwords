@@ -67,16 +67,16 @@
   },
   "window": {
     "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#2c4a6e",
+    "navigationBarBackgroundColor": "#FDF8F0",
     "navigationBarTitleText": "DmkWords",
-    "navigationBarTextStyle": "white",
-    "backgroundColor": "#f6f2e9"
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#FDF8F0"
   },
   "tabBar": {
     "custom": true,
-    "color": "#6f685a",
-    "selectedColor": "#2c4a6e",
-    "backgroundColor": "#fffefa",
+    "color": "#6B5B5B",
+    "selectedColor": "#FF6B35",
+    "backgroundColor": "#FFFDF7",
     "borderStyle": "black",
     "list": [
       {

@@ -1,71 +1,83 @@
 /* ============================================
    全局样式 — 设计系统基座
-   「暖纸书房」v2 (2026-08-18) — 与管理端 base.css 同源
-   概念：布面精装书的牛津蓝 × 书页暖纸 × 书脊烫金 × 绘本印刷色
-   令牌名与 v1 完全兼容：43 个页面 WXSS 无需改动即可继承新风格
+   「绘本风」v3 (2026-08-30) — 对齐 docs/15 绘本视觉系统规范
+   概念：活力橙 × 嫩芽绿 × 太阳黄 × 暖纸画布，像翻开一本少儿绘本
+   令牌名与 v1/v2 完全兼容：43 个页面 WXSS 无需改动即可继承新风格
+   本版策略：改值不改名（v1→v2 同款零改动换肤经验）+ 新增绘本工具类叠加
    ============================================ */
 
 page {
-  /* ===== 设计 Token — 与 pcweb/base.css 同源 ===== */
-  /* 纸面 */
-  --bg: #f6f2e9;              /* 暖纸米白 */
-  --surface: #fffefa;         /* 暖白纸面 */
-  --fg: #262419;              /* 暖炭墨 */
-  --muted: #6f685a;           /* 暖灰 */
-  --border: #e4dcc8;          /* 暖沙 */
+  /* ===== 设计 Token — 对齐 docs/15 §三 绘本调色板 ===== */
+  /* 纸面（更暖更亮的画布） */
+  --bg: #FDF8F0;              /* 水彩画布米白 */
+  --surface: #FFFDF7;         /* 绘本纸面 */
+  --fg: #3B2F2F;              /* 深棕墨（不是纯黑） */
+  --muted: #6B5B5B;           /* 淡墨棕 */
+  --border: #D4C5B5;          /* 暖沙描边（细线/分隔用） */
 
-  /* 主色：牛津布面蓝 */
-  --accent: #2c4a6e;
-  --accent-soft: rgba(44, 74, 110, 0.10);   /* 蓝染纸痕 */
-  --accent-hover: #1f3a59;
-  --accent-light: #5d7ba1;    /* 亮档（原紫 #5d7ba1 → 蓝灰亮档） */
-  --accent-dark: #23405f;
-  --accent-darker: #1a324b;
+  /* 主色：活力橙（主按钮、重点、选中） */
+  --accent: #FF6B35;
+  --accent-soft: rgba(255, 107, 53, 0.10);   /* 橙染纸痕 */
+  --accent-hover: #E85A28;
+  --accent-light: #FF9A66;    /* 亮档 */
+  --accent-dark: #D14E1F;
+  --accent-darker: #B84318;
 
-  /* 点缀：蜜杏橙（绘本活力） */
-  --secondary: #e8945a;
-  --secondary-soft: rgba(232, 148, 90, 0.12);
+  /* 点缀：嫩芽绿（成功、正向、生命感） */
+  --secondary: #4ADE80;
+  --secondary-soft: rgba(74, 222, 128, 0.16);
 
   /* 印刷状态色 */
-  --success: #35703c;
-  --success-soft: rgba(53, 112, 60, 0.10);
-  --warning: #8d6610;
-  --warning-soft: rgba(141, 102, 16, 0.10);
-  --warning-dark: #7a570c;
-  --error: #b54028;
-  --error-soft: rgba(181, 64, 40, 0.10);
+  --success: #16A34A;          /* 深一档绿：白字按钮对比度达标 */
+  --success-soft: rgba(74, 222, 128, 0.16);
+  --warning: #B45309;          /* 琥珀档：黄系文字/实色用 */
+  --warning-soft: rgba(252, 211, 77, 0.22);  /* 太阳黄纸痕 */
+  --warning-dark: #92400E;
+  --error: #EF4444;            /* 番茄红 */
+  --error-soft: rgba(239, 68, 68, 0.10);
 
   /* RGB 通道（页面里做渐变/遮罩用） */
-  --error-rgb: 192, 71, 47;
-  --success-rgb: 62, 124, 69;
-  --warning-rgb: 169, 123, 20;
-  --accent-rgb: 44, 74, 110;
+  --error-rgb: 239, 68, 68;
+  --success-rgb: 74, 222, 128;
+  --warning-rgb: 252, 211, 77;
+  --accent-rgb: 255, 107, 53;
 
-  /* 书脊金（成就/等级/星标专用） */
-  --gold: #c9a227;
-  --gold-light: #f6edd3;
-  --gold-dark: #736013;
+  /* 绘本金（成就/等级/星标专用） */
+  --gold: #F59E0B;
+  --gold-light: #FEF3C7;
+  --gold-dark: #92400E;
 
-  /* 硬边偏移阴影 — 品牌记忆点（实体按压感） */
-  --shadow-hard: 6rpx 6rpx 0 rgba(38, 36, 25, 0.12);
-  --shadow-hard-sm: 4rpx 4rpx 0 rgba(38, 36, 25, 0.10);
-  --shadow-soft: 0 4rpx 16rpx rgba(38, 36, 25, 0.06);
+  /* 硬边偏移阴影 — 品牌记忆点（贴纸贴在纸上的实体按压感） */
+  --shadow-hard: 6rpx 6rpx 0 rgba(59, 47, 47, 0.90);
+  --shadow-hard-sm: 4rpx 4rpx 0 rgba(59, 47, 47, 0.85);
+  --shadow-soft: 0 8rpx 24rpx rgba(59, 47, 47, 0.08);
 
-  /* 圆角 */
+  /* 绘本专用强调色（新增，存量页面零影响） */
+  --sun: #FCD34D;              /* 太阳黄 */
+  --sky: #60A5FA;              /* 天空蓝 */
+  --sakura: #F472B6;           /* 樱花粉 */
+  --lavender: #A78BFA;         /* 薰衣草紫 */
+  --sun-soft: rgba(252, 211, 77, 0.28);
+  --sky-soft: rgba(96, 165, 250, 0.16);
+  --sakura-soft: rgba(244, 114, 182, 0.14);
+  --lavender-soft: rgba(167, 139, 250, 0.16);
+
+  /* 圆角 — 大圆角像气球 */
   --radius: 32rpx;
-  --radius-sm: 20rpx;
+  --radius-sm: 24rpx;
   --radius-lg: 40rpx;
+  --radius-xl: 48rpx;
 
   /* v1 兼容别名（存量页面引用，旧版即未定义，2026-08-18 补钉）
      注：--pct 是页面 JS 动态注入的进度值，非设计 token，不在此定义 */
   --primary: var(--accent);
-  --text-secondary: #5d5748;
-  --text-tertiary: #6f685a;
-  --secondary-ink: #9d5c22;  /* 蜜杏橙文字档（--secondary 仅装饰） */
+  --text-secondary: #5C4F4F;
+  --text-tertiary: #6B5B5B;
+  --secondary-ink: #166534;  /* 嫩芽绿文字档（--secondary 仅装饰） */
 
-  /* 字体：标题衬线 = 书卷气 */
-  --font-display: 'Georgia', 'PingFang SC', 'Songti SC', 'STSong', serif;
-  --font-body: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  /* 字体：标题圆润 = 绘本手写感（系统圆体栈，零网络依赖） */
+  --font-display: 'ZCOOL KuaiLe', 'Yuanti SC', 'YouYuan', 'PingFang SC', sans-serif;
+  --font-body: 'Nunito', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
 
   font-family: var(--font-body);
@@ -73,6 +85,73 @@ page {
   color: var(--fg);
   background: var(--bg);
 }
+
+/* ============================================
+   绘本工具类（v3 新增 — 存量页面零影响，按需叠加）
+   ============================================ */
+
+/* 彩色圆形贴纸图标底 — 粗黑边 + 圆，像贴纸 */
+.paint-sticker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 3rpx solid var(--fg);
+  box-shadow: var(--shadow-hard-sm);
+}
+
+/* 手绘不一致圆角 — 四角轻微不同，像手剪的纸片 */
+.paint-hand {
+  border-radius: 32rpx 36rpx 28rpx 40rpx;
+}
+
+/* 水彩噪点纹理 — 叠加在任何底色上 */
+.watercolor {
+  position: relative;
+}
+.watercolor::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.08;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* 贴纸 pill 标签 — 粗黑边 */
+.paint-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6rpx 20rpx;
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+/* 轻动效（克制，≤800ms，可被打断） */
+@keyframes paint-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg); }
+  75% { transform: rotate(3deg); }
+}
+@keyframes paint-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8rpx); }
+}
+@keyframes paint-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  70% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.anim-wiggle { animation: paint-wiggle 3s ease-in-out infinite; }
+.anim-float { animation: paint-float 2.5s ease-in-out infinite; }
+.anim-pop { animation: paint-pop 0.35s ease-out both; }
+
+/* ============================================
+   全局组件（v3 绘本形态）
+   ============================================ */
 
 /* 全局按钮最小触控区 88rpx (44pt) — MP-018 红线，不可删 */
 button {
@@ -106,31 +185,34 @@ button {
 .text-sm { font-size: 24rpx; }
 .text-display { font-family: var(--font-display); }
 
-/* 全局按钮样式 — 牛津蓝实色 + 硬边偏移阴影（实体按压感） */
+/* 全局按钮样式 — 活力橙胶囊 + 粗黑边 + 硬边阴影（贴纸按压感） */
 .btn-primary {
   background: var(--accent);
-  color: #fffefa;
-  border: 1rpx solid var(--accent-hover);
-  border-radius: var(--radius);
-  font-size: 28rpx;
-  font-weight: 600;
+  color: #FFFDF7;
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  font-size: 30rpx;
+  font-weight: 700;
   box-shadow: var(--shadow-hard);
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 .btn-primary:active {
   transform: translate(3rpx, 3rpx);
-  box-shadow: 2rpx 2rpx 0 rgba(38, 36, 25, 0.10);
+  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
 }
 .btn-outline {
-  background: transparent;
-  color: var(--accent);
-  border: 2rpx solid var(--accent);
-  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--accent-dark);
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
   font-size: 28rpx;
-  font-weight: 600;
+  font-weight: 700;
+  box-shadow: var(--shadow-hard-sm);
 }
 .btn-outline:active {
   background: var(--accent-soft);
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none;
 }
 .btn-disabled {
   opacity: 0.4;
@@ -139,11 +221,11 @@ button {
 }
 .btn-success {
   background: var(--success);
-  color: #fffefa;
-  border: 1rpx solid var(--success);
-  border-radius: var(--radius);
+  color: #FFFDF7;
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
   font-size: 28rpx;
-  font-weight: 600;
+  font-weight: 700;
   box-shadow: var(--shadow-hard-sm);
 }
 .btn-success:active {
@@ -152,11 +234,11 @@ button {
 }
 .btn-danger {
   background: var(--error);
-  color: #fffefa;
-  border: 1rpx solid var(--error);
-  border-radius: var(--radius);
+  color: #FFFDF7;
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
   font-size: 28rpx;
-  font-weight: 600;
+  font-weight: 700;
   box-shadow: var(--shadow-hard-sm);
 }
 .btn-danger:active {
@@ -164,7 +246,7 @@ button {
   box-shadow: none;
 }
 
-/* 全局固定底部栏 — 暖白纸面 */
+/* 全局固定底部栏 — 绘本纸面 + 粗顶边 */
 .fixed-bottom-bar {
   position: fixed;
   box-sizing: border-box;
@@ -174,7 +256,7 @@ button {
   padding: 16rpx 32rpx;
   padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
   background: var(--surface);
-  border-top: 1rpx solid var(--border);
+  border-top: 3rpx solid var(--fg);
   box-sizing: border-box;
   z-index: 100;
 }
@@ -184,28 +266,29 @@ button {
   margin: 0 auto;
 }
 
-/* 全局卡片样式 — 暖白纸面 + 暖沙边 */
+/* 全局卡片样式 — 绘本纸面 + 粗黑边 + 硬边阴影 + 手绘圆角 */
 .card {
   background: var(--surface);
-  border: 2rpx solid var(--border);
-  border-radius: var(--radius-lg);
+  border: 3rpx solid var(--fg);
+  border-radius: 32rpx 36rpx 28rpx 40rpx;
   padding: 32rpx;
+  box-shadow: var(--shadow-hard-sm);
 }
 
-/* 全局徽章样式 — 印刷贴纸感 */
+/* 全局徽章样式 — 印刷贴纸感（粗边 pill） */
 .badge {
   display: inline-block;
   padding: 4rpx 16rpx;
   border-radius: 999rpx;
   font-size: 22rpx;
-  font-weight: 600;
-  border: 1rpx solid transparent;
+  font-weight: 700;
+  border: 2rpx solid var(--fg);
 }
-.badge-success { background: var(--success-soft); color: var(--success); border-color: rgba(53, 112, 60, 0.25); }
-.badge-warning { background: var(--warning-soft); color: var(--warning); border-color: rgba(141, 102, 16, 0.25); }
-.badge-error { background: var(--error-soft); color: var(--error); border-color: rgba(181, 64, 40, 0.25); }
-.badge-info { background: var(--accent-soft); color: var(--accent); border-color: rgba(44, 74, 110, 0.25); }
-.badge-gold { background: var(--gold-light); color: var(--gold-dark); border-color: rgba(201, 162, 39, 0.35); }
+.badge-success { background: var(--success-soft); color: var(--secondary-ink); border-color: rgba(59, 47, 47, 0.7); }
+.badge-warning { background: var(--warning-soft); color: var(--warning-dark); border-color: rgba(59, 47, 47, 0.7); }
+.badge-error { background: var(--error-soft); color: var(--accent-darker); border-color: rgba(59, 47, 47, 0.7); }
+.badge-info { background: var(--sky-soft); color: #1E40AF; border-color: rgba(59, 47, 47, 0.7); }
+.badge-gold { background: var(--gold-light); color: var(--gold-dark); border-color: rgba(59, 47, 47, 0.7); }
 
 
 /* ============================================

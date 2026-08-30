@@ -43,7 +43,7 @@ Page({
   _expireLine(c) {
     if (!c) return ''
     const fmt = (d) => {
-      const dt = new Date(d)
+      const dt = new Date(String(d).replace(/-/g, '/'))
       const m = String(dt.getMonth() + 1).padStart(2, '0')
       const day = String(dt.getDate()).padStart(2, '0')
       return `${dt.getFullYear()}-${m}-${day}`
@@ -56,7 +56,7 @@ Page({
       return `会员到期(观察期 30 天) ${fmt(d)}`
     }
     if (!c.member_expire) return ''
-    const diff = Math.ceil((new Date(c.member_expire).getTime() - today.getTime()) / 86400000)
+    const diff = Math.ceil((new Date(String(c.member_expire).replace(/-/g, '/')).getTime() - today.getTime()) / 86400000)
     if (c.member_status === 'formal' && diff >= 0 && diff <= 7) {
       return `会员到期 ${fmt(c.member_expire)} · 即将到期，请联系馆员续费`
     }

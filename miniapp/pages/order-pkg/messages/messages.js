@@ -14,6 +14,39 @@ const CATEGORIES = [
 
 const PAGE_SIZE = 20
 
+const CAT_LABEL = {
+  资金: '资金', 借阅: '借阅', 阅读: '阅读', 会员: '会员',
+  活动: '活动', 预约: '预约', 报告: '报告', 其他: '其他',
+}
+
+function timeText(raw) {
+  if (!raw) return ''
+  const d = new Date(String(raw).replace(/-/g, '/'))
+  if (isNaN(d.getTime())) return String(raw).slice(5, 16)
+  const now = new Date()
+  const pad = (n) => (n < 10 ? '0' + n : '' + n)
+  const hm = pad(d.getHours()) + ':' + pad(d.getMinutes())
+  const sameDay = d.toDateString() === now.toDateString()
+  if (sameDay) return hm
+  const yesterday = new Date(now.getTime() - 86400000)
+  if (d.toDateString() === yesterday.toDateString()) return '昨天 ' + hm
+  return pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + hm
+}
+
+const CAT_KEY = {
+  资金: 'money', 借阅: 'borrow', 阅读: 'reading', 会员: 'member',
+  活动: 'activity', 预约: 'reserve', 报告: 'report', 其他: 'other',
+}
+
+function decorate(items) {
+  return (items || []).map((i) => ({
+    ...i,
+    categoryLabel: CAT_LABEL[i.category] || i.category || '通知',
+    catKey: CAT_KEY[i.category] || 'other',
+    timeText: timeText(i.created_at),
+  }))
+}
+
 Page({
   data: {
     categories: CATEGORIES,
@@ -73,7 +106,7 @@ Page({
     this.setData({ loading: true, error: false })
     try {
       const r = await api.notifications(this._page, PAGE_SIZE, this.data.activeCat)
-      const items = reset ? r.items : this.data.list.concat(r.items)
+      const items = decorate(reset ? r.items : this.data.list.concat(r.items))
       this.setData({
         list: items,
         total: r.total,

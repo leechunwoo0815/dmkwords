@@ -15,7 +15,7 @@
         <text class="dp-label">已扣除</text>
       </view>
       <view class="dp-amt">
-        <text class="dp-num" style="color:#2c4a6e;">￥{{dep.standard_amount}}</text>
+        <text class="dp-num" style="color:#FF6B35;">￥{{dep.standard_amount}}</text>
         <text class="dp-label">标准押金</text>
       </view>
     </view>

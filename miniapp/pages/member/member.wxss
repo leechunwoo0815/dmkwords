@@ -372,13 +372,400 @@
 .expire-line {
   margin: 12rpx 0 4rpx;
   padding: 12rpx 20rpx;
-  background: #f6f2e9;
+  background: #FDF8F0;
   border-radius: 10rpx;
   font-size: 24rpx;
-  color: #6f685a;
+  color: #6B5B5B;
 }
 .expire-line.warn {
   background: #fff3e0;
   color: #b45309;
   font-weight: 600;
+}
+
+/* ============================================
+   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
+   ============================================ */
+
+/* 头部：水彩渐变 + 头像贴纸 */
+.profile-header {
+  background: linear-gradient(135deg, var(--accent-soft), var(--sun-soft) 55%, var(--sakura-soft));
+  border-bottom: 3rpx solid var(--fg);
+  padding-bottom: 44rpx;
+}
+.profile-header .profile-avatar {
+  width: 128rpx;
+  height: 128rpx;
+  border: 4rpx solid var(--fg);
+  border-radius: 50%;
+  box-shadow: var(--shadow-hard);
+  background: var(--sun-soft);
+  font-size: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.profile-header .profile-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 36rpx;
+  color: var(--fg);
+}
+
+/* 卡片：粗黑边 + 手绘圆角 + 硬阴影 */
+.section-card {
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 32rpx 36rpx 28rpx 40rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+/* 标题圆体 + 橙块装饰 */
+.section-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--fg);
+}
+.section-title::before {
+  content: "";
+  display: inline-block;
+  width: 14rpx;
+  height: 30rpx;
+  border-radius: 8rpx;
+  background: var(--accent);
+  border: 2rpx solid var(--fg);
+  margin-right: 12rpx;
+  vertical-align: -2rpx;
+}
+
+/* 功能宫格：彩色圆贴纸图标（覆盖旧 nth-child 灰绿系） */
+.func-item .fi-icon {
+  width: 88rpx;
+  height: 88rpx;
+  border: 3rpx solid var(--fg);
+  border-radius: 50%;
+  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  transition: transform 0.12s ease;
+}
+.func-item:active .fi-icon {
+  transform: scale(0.9);
+}
+/* 绘本多色轮换（色彩超过 5 个自动循环感：橙绿蓝金粉紫） */
+.func-item:nth-child(6n+1) .fi-icon { background: var(--accent-soft); }
+.func-item:nth-child(6n+2) .fi-icon { background: var(--secondary-soft); }
+.func-item:nth-child(6n+3) .fi-icon { background: var(--sky-soft); }
+.func-item:nth-child(6n+4) .fi-icon { background: var(--sun-soft); }
+.func-item:nth-child(6n+5) .fi-icon { background: var(--sakura-soft); }
+.func-item:nth-child(6n+6) .fi-icon { background: var(--lavender-soft); }
+
+/* 功能名圆体 */
+.func-item .fi-label {
+  font-weight: 700;
+}
+
+/* 孩子切换 chip 贴纸化 */
+.child-switcher-chip {
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  background: var(--surface);
+  box-shadow: var(--shadow-hard-sm);
+  font-weight: 700;
+}
+.child-switcher-chip.active {
+  background: var(--sun);
+  color: var(--fg);
+  transform: translate(2rpx, 2rpx);
+  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+}
+
+/* 退出登录行：纸面粗边 */
+.bottom-links .link-item {
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+/* ============================================
+   我的页 v4 改造（2026-08-30）：紧凑布局 + 减少留白
+   ============================================ */
+
+.page-bg {
+  height: 100vh;
+  background: var(--bg);
+}
+
+.profile-header {
+  margin: 0 24rpx 20rpx;
+  padding: 28rpx;
+  background: linear-gradient(135deg, var(--accent-soft), var(--sun-soft) 55%, var(--sakura-soft));
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.profile-main {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-bottom: 16rpx;
+}
+
+.profile-avatar {
+  width: 100rpx;
+  height: 100rpx;
+  border: 3rpx solid var(--fg);
+  border-radius: 50%;
+  background: var(--sun-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 50rpx;
+  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
+}
+
+.profile-name {
+  font-family: var(--font-display);
+  font-size: 34rpx;
+  font-weight: 800;
+}
+
+.profile-phone {
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+.profile-child {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding-top: 16rpx;
+  border-top: 2rpx dashed var(--border);
+}
+
+.pc-name {
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.pc-status {
+  padding: 4rpx 12rpx;
+  border: 2rpx solid var(--fg);
+  border-radius: 999rpx;
+  background: var(--surface);
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.pc-status.warn {
+  background: var(--error-soft);
+  color: var(--error);
+}
+
+.section-card {
+  margin: 0 24rpx 20rpx;
+  padding: 24rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.section-card.no-padding {
+  padding: 24rpx 0;
+}
+
+.section-card.no-padding .section-title {
+  padding: 0 24rpx;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 30rpx;
+  font-weight: 800;
+  margin-bottom: 20rpx;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.section-title::before {
+  content: "";
+  width: 10rpx;
+  height: 28rpx;
+  border-radius: 6rpx;
+  background: var(--accent);
+  border: 2rpx solid var(--fg);
+}
+
+.child-switcher-scroll {
+  display: flex;
+  gap: 16rpx;
+  padding: 0 24rpx;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.child-switcher-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.child-switcher-chip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  padding: 14rpx 22rpx;
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  background: var(--surface);
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.child-switcher-chip.active {
+  background: var(--sun);
+  transform: translate(2rpx, 2rpx);
+  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+}
+
+.chip-avatar {
+  width: 44rpx;
+  height: 44rpx;
+  line-height: 44rpx;
+  text-align: center;
+  border: 2rpx solid var(--fg);
+  border-radius: 50%;
+  background: var(--accent-soft);
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.chip-text {
+  font-weight: 700;
+  font-size: 26rpx;
+}
+
+.chip-status {
+  font-size: 20rpx;
+  color: var(--muted);
+}
+
+.member-info-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.mi-item {
+  flex: 1;
+  min-width: calc(50% - 16rpx);
+  padding: 16rpx;
+  background: var(--bg);
+  border: 2rpx solid var(--border);
+  border-radius: 16rpx;
+}
+
+.mi-label {
+  display: block;
+  font-size: 22rpx;
+  color: var(--muted);
+  margin-bottom: 6rpx;
+}
+
+.mi-value {
+  font-size: 26rpx;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.mi-value.warn {
+  color: var(--error);
+}
+
+.func-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.func-item {
+  width: calc(25% - 12rpx);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10rpx;
+  padding: 16rpx 6rpx;
+}
+
+.fi-icon {
+  width: 76rpx;
+  height: 76rpx;
+  line-height: 76rpx;
+  text-align: center;
+  font-size: 38rpx;
+  border: 3rpx solid var(--fg);
+  border-radius: 22rpx;
+  background: var(--surface);
+  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
+}
+
+.func-item:nth-child(6n+1) .fi-icon { background: var(--accent-soft); }
+.func-item:nth-child(6n+2) .fi-icon { background: var(--secondary-soft); }
+.func-item:nth-child(6n+3) .fi-icon { background: var(--sky-soft); }
+.func-item:nth-child(6n+4) .fi-icon { background: var(--sun-soft); }
+.func-item:nth-child(6n+5) .fi-icon { background: var(--sakura-soft); }
+.func-item:nth-child(6n+6) .fi-icon { background: var(--lavender-soft); }
+
+.fi-label {
+  font-size: 22rpx;
+  font-weight: 700;
+  text-align: center;
+}
+
+.bottom-links {
+  margin: 0 24rpx 24rpx;
+}
+
+.link-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.link-item.logout {
+  background: var(--error-soft);
+}
+
+.lk-left {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.lk-icon {
+  font-size: 36rpx;
+}
+
+.lk-text {
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.lk-arrow {
+  font-size: 34rpx;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.bottom-spacer {
+  height: 160rpx;
 }

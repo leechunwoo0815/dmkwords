@@ -42,6 +42,8 @@ Page({
     } catch (e) { /* request.js 已 toast */ }
   },
 
+  goBack() { wx.navigateBack({ delta: 1 }) },
+
   onPick(e) {
     const idx = e.currentTarget.dataset.index
     this.setData({ selected: idx })

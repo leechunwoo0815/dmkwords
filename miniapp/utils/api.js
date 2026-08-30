@@ -11,10 +11,19 @@ module.exports = {
   getBookDetail(bookId) {
     return req.get(`/api/miniapp/books/${bookId}`)
   },
-  listBooks(keyword, page, pageSize) {
-    return req.get('/api/miniapp/books', null, {
-      params: { keyword: keyword || '', page: page || 1, page_size: pageSize || 20 },
-    })
+  listBooks(params = {}) {
+    const q = {
+      keyword: params.keyword || '',
+      page: params.page || 1,
+      page_size: params.page_size || 20,
+    }
+    if (params.grade) q.grade = params.grade
+    if (params.topic) q.topic = params.topic
+    if (params.ar_min !== undefined && params.ar_min !== null && params.ar_min !== '') q.ar_min = params.ar_min
+    if (params.ar_max !== undefined && params.ar_max !== null && params.ar_max !== '') q.ar_max = params.ar_max
+    if (params.has_audio) q.has_audio = true
+    if (params.sort && params.sort !== 'newest') q.sort = params.sort
+    return req.get('/api/miniapp/books', null, { params: q })
   },
 
   // 阅读进度

@@ -9,7 +9,9 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header
 from pydantic import Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
+from sqlalchemy.types import Numeric
 
 from backend.common.base_schema import BaseSchema
 from backend.common.exceptions import NotFoundError, UnauthorizedError, ValidationError
@@ -115,15 +117,40 @@ def list_books(
     keyword: str | None = None,
     page: int = 1,
     page_size: int = 20,
+    grade: str | None = None,
+    topic: str | None = None,
+    ar_min: float | None = None,
+    ar_max: float | None = None,
+    has_audio: bool = False,
+    sort: str = "newest",
     auth: Any = Depends(get_current_parent),
 ):
+    """书城列表（2000 本规模检索）：筛选（年级/主题/AR 区间/有音频）+ 排序 + 分页。
+    ar_level 是字符串列，范围过滤/排序一律 CAST DECIMAL（非法值按 0 处理）。"""
     _, db = auth
     q = db.query(Book).filter(Book.is_deleted == 0, Book.status == Book.STATUS_ON)
     if keyword:
         like = f"%{keyword}%"
         q = q.filter(Book.title.like(like) | Book.author.like(like))
+    if grade:
+        q = q.filter(Book.grade == grade)
+    if topic:
+        q = q.filter(Book.topic == topic)
+    ar_expr = func.cast(Book.ar_level, Numeric(4, 1))
+    if ar_min is not None:
+        q = q.filter(ar_expr >= ar_min)
+    if ar_max is not None:
+        q = q.filter(ar_expr <= ar_max)
+    if has_audio:
+        q = q.filter(Book.audio_path.isnot(None))
+    order = {
+        "ar_asc": ar_expr.asc(),
+        "ar_desc": ar_expr.desc(),
+        "words_asc": Book.word_count.asc(),
+        "words_desc": Book.word_count.desc(),
+    }.get(sort, Book.id.desc())
     total = q.count()
-    books = q.order_by(Book.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    books = q.order_by(order).offset((page - 1) * page_size).limit(page_size).all()
     return {"total": total, "items": [_book_view(b) for b in books]}
 
 
@@ -261,15 +288,23 @@ def observation_image(path: str, token: str = "", db: Session = Depends(get_db))
 
 
 @router.get("/covers/{book_id}")
-def book_cover(book_id: int, auth: Any = Depends(get_current_parent)):
-    _, db = auth
+def book_cover(
+    book_id: int,
+    token: str = "",
+    authorization: str | None = Header(None, alias="Authorization"),
+    db: Session = Depends(get_db),
+):
+    """封面图（query token：image 组件无法携带 Authorization 头；同时兼容 Header 鉴权）。"""
     import os
 
     from fastapi.responses import FileResponse
 
     from backend.config import get_settings
 
-    book = db.query(Book).filter(Book.id == book_id).first()
+    # 优先 query token，其次 Authorization 头，保持旧客户端兼容
+    effective_token = token or (authorization or "").replace("Bearer ", "").strip()
+    _parent_from_token(effective_token, db)
+    book = db.query(Book).filter(Book.id == book_id, Book.is_deleted == 0).first()
     if not book or not book.cover_path:
         from backend.common.exceptions import NotFoundError
 

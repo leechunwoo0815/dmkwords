@@ -1,272 +1,131 @@
-/* messages.wxss — aligned with design/user-end/messages.html */
-
+/* messages.wxss — 消息中心 v5：卡片化列表 */
 .page-bg {
   background: var(--bg);
   min-height: 100vh;
-  padding-bottom: env(safe-area-inset-bottom);
+  box-sizing: border-box;
+  padding: 20rpx 24rpx calc(60rpx + env(safe-area-inset-bottom));
 }
+
+/* ---------- 分类 chips ---------- */
+.cat-tabs {
+  display: flex;
+  gap: 14rpx;
+  overflow-x: auto;
+  padding: 4rpx 2rpx 20rpx;
+  white-space: nowrap;
+}
+.cat-tab {
+  flex-shrink: 0;
+  padding: 12rpx 32rpx;
+  border-radius: 999rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--border);
+  font-size: 26rpx;
+  color: var(--muted);
+  font-weight: 600;
+}
+.cat-tab.active {
+  background: var(--accent);
+  border-color: var(--fg);
+  color: #fff;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+/* ---------- 未读操作条 ---------- */
+.unread-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--accent-soft);
+  border: 3rpx solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 20rpx 28rpx;
+  margin-bottom: 20rpx;
+}
+.unread-left {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  color: var(--fg);
+  font-size: 26rpx;
+}
+.unread-num {
+  background: var(--accent);
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 800;
+  min-width: 40rpx;
+  height: 40rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10rpx;
+}
+.unread-all { color: var(--accent); font-size: 26rpx; font-weight: 700; }
+
+/* ---------- 消息卡片 ---------- */
+.msg-list { display: flex; flex-direction: column; gap: 16rpx; }
+.msg-card {
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-hard-sm);
+  padding: 22rpx 24rpx;
+}
+.msg-card.is-read { opacity: 0.72; box-shadow: none; border-color: var(--border); }
+.msg-head { display: flex; align-items: center; gap: 12rpx; }
+.unread-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+.msg-cat-tag {
+  flex-shrink: 0;
+  font-size: 18rpx;
+  font-weight: 800;
+  padding: 2rpx 14rpx;
+  border-radius: 999rpx;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.cat-money { background: rgba(74, 222, 128, 0.16); color: var(--success); }
+.cat-borrow { background: rgba(96, 165, 250, 0.16); color: var(--sky); }
+.cat-member { background: rgba(167, 139, 250, 0.16); color: var(--lavender); }
+.cat-activity { background: rgba(244, 114, 182, 0.16); color: var(--sakura); }
+.msg-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.is-read .msg-title { font-weight: 600; }
+.msg-time { flex-shrink: 0; font-size: 20rpx; color: var(--muted); }
+.msg-content {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.msg-content.one-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.msg-content.expanded { color: var(--fg); }
 
 .loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 400rpx;
+  height: 300rpx;
   color: var(--muted);
   font-size: 28rpx;
 }
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 120rpx 0;
-}
-
-.empty-state .emoji {
-  font-size: 80rpx;
-  margin-bottom: 24rpx;
-}
-
-.empty-state .text {
-  font-size: 28rpx;
-  color: var(--muted);
-}
-
-/* Nav Bar */
-.nav-bar {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  padding: 24rpx 32rpx;
-  background: var(--surface);
-  border-bottom: 2rpx solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.nav-bar .back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 20rpx;
-}
-
-.nav-bar .back svg,
-.nav-bar .back image {
-  width: 40rpx;
-  height: 40rpx;
-}
-
-.nav-bar .title {
-  font-family: var(--font-display);
-  font-size: 34rpx;
-  font-weight: 600;
-}
-
-.nav-bar .read-all {
-  margin-left: auto;
-  font-size: 26rpx;
-  color: var(--accent);
-  font-weight: 500;
-}
-
-/* Category Tabs */
-.cat-tabs {
-  display: flex;
-  gap: 16rpx;
-  padding: 24rpx 32rpx;
-  overflow-x: auto;
-  white-space: nowrap;
-  background: var(--surface);
-  border-bottom: 2rpx solid var(--border);
-}
-
-.cat-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.cat-tab {
-  display: inline-flex;
-  align-items: center;
-  padding: 14rpx 28rpx;
-  border-radius: 999rpx;
-  font-size: 26rpx;
-  border: 2rpx solid var(--border);
-  background: var(--surface);
-  white-space: nowrap;
-  color: var(--muted);
-  position: relative;
-}
-
-.cat-tab.active {
-  background: var(--accent);
-  color: var(--surface);
-  border-color: var(--accent);
-}
-
-.cat-tab .dot {
-  position: absolute;
-  top: 8rpx;
-  right: 8rpx;
-  width: 12rpx;
-  height: 12rpx;
-  border-radius: 50%;
-  background: var(--error);
-}
-
-.cat-tab.active .dot {
-  background: var(--surface);
-}
-
-/* Message List */
-.msg-list {
-  padding: 0 32rpx;
-}
-
-.msg-date {
-  font-size: 24rpx;
-  color: var(--muted);
-  text-align: center;
-  padding: 28rpx 0 16rpx;
-}
-
-.msg-item {
-  display: flex;
-  gap: 24rpx;
-  padding: 28rpx 0;
-  border-bottom: 2rpx solid var(--border);
-}
-
-.msg-item:last-child {
-  border-bottom: none;
-}
-
-.msg-icon {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 24rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  font-size: 40rpx;
-}
-
-.msg-icon svg,
-.msg-icon text {
-  width: 40rpx;
-  height: 40rpx;
-}
-
-.msg-icon.system {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.msg-icon.system svg,
-.msg-icon.system text {
-  color: var(--accent);
-}
-
-.msg-icon.borrow {
-  background: var(--success-soft);
-  color: var(--success);
-}
-
-.msg-icon.borrow svg,
-.msg-icon.borrow text {
-  color: var(--success);
-}
-
-.msg-icon.reading {
-  background: var(--success-soft);
-  color: var(--success);
-}
-
-.msg-icon.event {
-  background: var(--warning-soft);
-  color: var(--warning);
-}
-
-.msg-icon.event svg,
-.msg-icon.event text {
-  color: var(--warning);
-}
-
-.msg-icon.activity {
-  background: var(--warning-soft);
-  color: var(--warning);
-}
-
-.msg-icon.teacher {
-  background: var(--secondary-soft);
-  color: var(--success);
-}
-
-.msg-icon.teacher svg,
-.msg-icon.teacher text {
-  color: var(--success);
-}
-
-.msg-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.msg-title-row {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  margin-bottom: 6rpx;
-}
-
-.msg-title {
-  font-size: 28rpx;
-  font-weight: 600;
-}
-
-.msg-unread {
-  width: 12rpx;
-  height: 12rpx;
-  border-radius: 50%;
-  background: var(--error);
-  flex-shrink: 0;
-}
-
-.msg-body {
-  font-size: 26rpx;
-  color: var(--muted);
-  line-height: 1.4;
-}
-
-.msg-time {
-  font-size: 22rpx;
-  color: var(--text-tertiary);
-  margin-top: 8rpx;
-}
-
-.msg-item.read {
-  opacity: 0.6;
-}
-
-.msg-content.one-line {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.msg-content.expanded {
-  white-space: normal;
-}
-
-.load-end {
-  text-align: center;
-  color: var(--text-tertiary);
-  font-size: 24rpx;
-  padding: 24rpx 0 40rpx;
-}
-
+.load-end { text-align: center; color: var(--muted); font-size: 22rpx; padding: 32rpx 0; }

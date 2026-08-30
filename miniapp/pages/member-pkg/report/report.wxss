@@ -1,9 +1,9 @@
 /* pages/member-pkg/report/report.wxss — 周报/月报页 */
 .report-head {
-  background: #2c4a6e;
+  background: #FF6B35;
   border-radius: 16rpx;
   padding: 24rpx;
-  color: #fffefa;
+  color: #FFFDF7;
 }
 .report-header-line {
   display: flex;
@@ -27,12 +27,12 @@
   padding: 8rpx 32rpx;
   border-radius: 999rpx;
   background: rgba(255, 255, 255, 0.14);
-  color: #fffefa;
+  color: #FFFDF7;
   font-size: 26rpx;
 }
 .rk-chip.active {
-  background: #f6f2e9;
-  color: #2c4a6e;
+  background: #FDF8F0;
+  color: #FF6B35;
   font-weight: 600;
 }
 .rp-stats {
@@ -42,7 +42,7 @@
 }
 .rp-stat {
   flex: 1 0 28%;
-  background: #f6f2e9;
+  background: #FDF8F0;
   border-radius: 12rpx;
   padding: 16rpx 8rpx;
   text-align: center;
@@ -51,18 +51,18 @@
   display: block;
   font-size: 36rpx;
   font-weight: 700;
-  color: #2c4a6e;
+  color: #FF6B35;
 }
 .rp-label {
   display: block;
   font-size: 20rpx;
-  color: #6f685a;
+  color: #6B5B5B;
   margin-top: 6rpx;
 }
 .rp-note {
   margin-top: 20rpx;
   font-size: 24rpx;
-  color: #6f685a;
+  color: #6B5B5B;
 }
 .rp-image {
   width: 100%;
@@ -74,4 +74,61 @@
   font-size: 26rpx;
   padding: 40rpx 0;
   text-align: center;
+}
+
+/* ============================================
+   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
+   ============================================ */
+/* 卡片：粗黑边 + 硬阴影 + 手绘圆角 */
+.card, .section-card, .card-wrapper, .section, .panel, .info-card, .form-card {
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+/* 标签/徽章：圆角贴纸 */
+.tag, .badge, .pill, .tag-primary, .tag-secondary, .tag-success, .tag-warning {
+  border: 2rpx solid rgba(59, 47, 47, 0.6);
+  border-radius: 999rpx;
+  font-weight: 700;
+}
+.tag-primary, .badge-primary { background: var(--accent-soft); color: var(--accent-dark); }
+.tag-secondary, .badge-secondary { background: var(--secondary-soft); color: var(--secondary-ink); }
+.tag-success, .badge-success { background: var(--success-soft); color: var(--success); }
+.tag-warning, .badge-warning { background: var(--warning-soft); color: var(--warning-dark); }
+
+/* 标题圆体 */
+.page-title, .section-title, .card-title, .header-title, .title, .name {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+
+/* 绘本风精修补充：报告头部与 tab chip */
+.report-head {
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+}
+.report-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+.rk-chip {
+  border: 2rpx solid var(--surface);
+  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.35);
+  font-weight: 700;
+}
+.rk-chip.active {
+  background: var(--sun) !important;
+  color: var(--fg) !important;
+  border-color: var(--fg) !important;
+  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+}
+.report-image-card {
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
 }

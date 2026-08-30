@@ -1,51 +1,82 @@
-<view class="page-bg" style="min-height:100vh;padding:24rpx;">
-  <view class="tabs">
-    <view class="tab-btn {{tab === 'borrowed' ? 'active' : ''}}" data-tab="borrowed" bindtap="onTab">
-      在借（{{borrows.length}}）
+<view class="page-bg">
+  <!-- Tab 头 -->
+  <view class="tab-head">
+    <view class="tab-item {{tab === 'borrows' ? 'tab-on' : ''}}" data-tab="borrows" bindtap="onTab">
+      <text>在借中</text><text class="tab-badge">{{borrowCount}}</text>
     </view>
-    <view class="tab-btn {{tab === 'favorites' ? 'active' : ''}}" data-tab="favorites" bindtap="onTab">
-      收藏（{{favorites.length}}）
+    <view class="tab-item {{tab === 'favorites' ? 'tab-on' : ''}}" data-tab="favorites" bindtap="onTab">
+      <text>收藏</text><text class="tab-badge">{{favCount}}</text>
+    </view>
+    <view class="tab-item {{tab === 'reservations' ? 'tab-on' : ''}}" data-tab="reservations" bindtap="onTab">
+      <text>预约中</text><text class="tab-badge">{{resCount}}</text>
     </view>
   </view>
 
-  <view wx:if="{{loading}}" style="text-align:center;color:var(--muted);padding:60rpx;">加载中…</view>
-
-  <block wx:if="{{!loading && tab === 'borrowed'}}">
-    <view wx:if="{{!borrows.length}}" class="empty-state">
-      <view class="empty-emoji">📚</view>
-      <view class="empty-title">书架还是空的</view>
-      <view class="empty-desc">到店借书后会自动上架，到期时间一目了然</view>
-    </view>
-    <view wx:for="{{borrows}}" wx:key="record_id" class="book-row" data-book="{{item}}" bindtap="goDetail">
-      <image wx:if="{{item.cover_url}}" class="book-row-cover cover-img" src="{{item.cover_url}}" mode="aspectFill" />
-      <view wx:else class="book-row-cover">{{item.has_audio ? '🎧' : '📘'}}</view>
-      <view class="book-row-info">
-        <view class="br-title">{{item.title}}</view>
-        <view class="br-meta">
-          <text wx:if="{{item.overdue}}" style="color:var(--error);">已逾期 · {{item.due_at}}</text>
-          <text wx:else>应还 {{item.due_at}}</text>
-        </view>
+  <!-- 在借中 -->
+  <block wx:if="{{tab === 'borrows'}}">
+    <view wx:for="{{borrows}}" wx:key="record_id" class="asset-card">
+      <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
+      <view wx:else class="asset-cover asset-cover-fb">📕</view>
+      <view class="asset-info">
+        <view class="asset-title">{{item.title}}</view>
+        <view class="asset-meta">{{item.author}}</view>
+        <view class="due-pill {{item.overdue ? 'due-over' : ''}}">{{item.overdue ? '⚠ ' : ''}}{{item.dueText}}</view>
+      </view>
+      <view class="asset-actions">
+        <view class="btn-mini btn-main" data-book="{{item}}" catchtap="goListen">▶ 续听</view>
+        <view class="btn-mini" data-book="{{item}}" catchtap="goDetail">详情</view>
       </view>
     </view>
+    <empty-state wx:if="{{!loading && !borrows.length}}" icon="📚" title="还没有在借的书"
+      desc="去图书馆选一本，让馆员帮你借回家" >
+      <view class="empty-btn" bindtap="goBooks">去图书馆</view>
+    </empty-state>
   </block>
 
-  <block wx:if="{{!loading && tab === 'favorites'}}">
-    <view wx:if="{{!favorites.length}}" class="empty-state">
-      <view class="empty-emoji">⭐</view>
-      <view class="empty-title">收藏夹是空的</view>
-      <view class="empty-desc">在书籍详情页点「收藏」，标记想读的书（不占借阅额度）</view>
-    </view>
-    <view wx:for="{{favorites}}" wx:key="id" class="book-row">
-      <image wx:if="{{item.cover_url}}" class="book-row-cover cover-img" src="{{item.cover_url}}" mode="aspectFill" />
-      <view wx:else class="book-row-cover">{{item.off_shelf ? '📦' : '⭐'}}</view>
-      <view class="book-row-info" data-book="{{item}}" bindtap="goDetail">
-        <view class="br-title">{{item.title}}{{item.off_shelf ? '（已下架）' : ''}}</view>
-        <view class="br-meta">
-          <text>{{item.word_count}} 词</text>
-          <text wx:if="{{item.ar_level}}"> · AR {{item.ar_level}}</text>
+  <!-- 收藏 -->
+  <block wx:if="{{tab === 'favorites'}}">
+    <view wx:for="{{favorites}}" wx:key="id" class="asset-card">
+      <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
+      <view wx:else class="asset-cover asset-cover-fb">📕</view>
+      <view class="asset-info">
+        <view class="asset-title">{{item.title}}</view>
+        <view class="asset-meta">{{item.author}}</view>
+        <view class="asset-tags">
+          <text class="tag tag-ar" wx:if="{{item.ar_level}}">AR {{item.ar_level}}</text>
+          <text class="tag tag-words">{{item.word_count}} 词</text>
         </view>
       </view>
-      <view class="card-remove-btn" data-id="{{item.book_id}}" catchtap="onCancelFav">取消</view>
+      <view class="asset-actions">
+        <view class="btn-mini" data-id="{{item.book_id}}" catchtap="onCancelFav">取消收藏</view>
+        <view class="btn-mini btn-main" data-book="{{item}}" catchtap="goDetail">去详情</view>
+      </view>
     </view>
+    <empty-state wx:if="{{!loading && !favorites.length}}" icon="⭐" title="还没有收藏"
+      desc="在书籍详情页点 ♥ 收藏想读的书" >
+      <view class="empty-btn" bindtap="goBooks">去图书馆逛逛</view>
+    </empty-state>
   </block>
+
+  <!-- 预约中 -->
+  <block wx:if="{{tab === 'reservations'}}">
+    <view wx:for="{{reservations}}" wx:key="id" class="asset-card">
+      <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
+      <view wx:else class="asset-cover asset-cover-fb">📕</view>
+      <view class="asset-info">
+        <view class="asset-title">{{item.title}}</view>
+        <view class="asset-meta">{{item.author}}</view>
+        <view class="due-pill {{item.active ? 'due-ok' : ''}}">{{item.statusText}}</view>
+      </view>
+      <view class="asset-actions">
+        <view wx:if="{{item.active}}" class="btn-mini" data-id="{{item.id}}" catchtap="onCancelReservation">取消预约</view>
+        <view class="btn-mini" data-book="{{item}}" catchtap="goDetail">详情</view>
+      </view>
+    </view>
+    <empty-state wx:if="{{!loading && !reservations.length}}" icon="🔖" title="没有预约记录"
+      desc="馆藏被借完的书可以先预约，72 小时内保留" >
+      <view class="empty-btn" bindtap="goBooks">去图书馆看看</view>
+    </empty-state>
+  </block>
+
+  <view wx:if="{{loading}}" class="loading-tip">加载中…</view>
 </view>

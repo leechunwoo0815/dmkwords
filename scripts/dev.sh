@@ -57,11 +57,12 @@ start() {
     nohup .venv/bin/uvicorn backend.main:app --port 8002 > "$LOG_DIR/backend.log" 2>&1 < /dev/null &
     echo $! > "$BACKEND_PID_FILE"
     for _ in $(seq 1 20); do
-      curl -sf -m 3 "$BACKEND_URL" > /dev/null && break
+      # --noproxy：本机探测绕过系统代理（http_proxy 会把 localhost 探测打到 7890 代理上，返回 502 假崩）
+  curl -sf --noproxy '*' -m 3 "$BACKEND_URL" > /dev/null && break
       sleep 1
     done
   fi
-  curl -sf -m 3 "$BACKEND_URL" > /dev/null && echo "后端 OK: $BACKEND_URL" || { echo "✗ 后端未就绪，查看 $LOG_DIR/backend.log"; exit 1; }
+  curl -sf --noproxy '*' -m 3 "$BACKEND_URL" > /dev/null && echo "后端 OK: $BACKEND_URL" || { echo "✗ 后端未就绪，查看 $LOG_DIR/backend.log"; exit 1; }
 
   echo "===== [4/4] 管理端前端（:5173） ====="
   if is_running "$FRONTEND_PID_FILE"; then
@@ -71,11 +72,11 @@ start() {
     nohup pnpm --dir admin-web dev > "$LOG_DIR/frontend.log" 2>&1 < /dev/null &
     echo $! > "$FRONTEND_PID_FILE"
     for _ in $(seq 1 30); do
-      curl -sf -m 3 "$FRONTEND_URL" > /dev/null && break
+      curl -sf --noproxy '*' -m 3 "$FRONTEND_URL" > /dev/null && break
       sleep 1
     done
   fi
-  curl -sf -m 3 "$FRONTEND_URL" > /dev/null && echo "前端 OK: $FRONTEND_URL" || { echo "✗ 前端未就绪，查看 $LOG_DIR/frontend.log"; exit 1; }
+  curl -sf --noproxy '*' -m 3 "$FRONTEND_URL" > /dev/null && echo "前端 OK: $FRONTEND_URL" || { echo "✗ 前端未就绪，查看 $LOG_DIR/frontend.log"; exit 1; }
 
   echo ""
   echo "============================================"

@@ -1,4 +1,5 @@
 <view class="page-bg" wx:if="{{book}}">
+  <!-- 头部：封面 + 信息 -->
   <view class="book-hero">
     <image wx:if="{{book.cover_url}}" class="hero-cover" src="{{book.cover_url}}" mode="aspectFill" />
     <view wx:else class="hero-cover hero-cover-empty">📕</view>
@@ -8,13 +9,35 @@
       <view class="hero-tags">
         <text class="tag-words">{{book.word_count}} 词</text>
         <text wx:if="{{book.ar_level}}" class="tag-ar">AR {{book.ar_level}}</text>
-        <text wx:if="{{book.has_audio}}" class="tag-time">🎧 {{book.audio_duration}}s</text>
+        <text wx:if="{{book.has_audio && durationText}}" class="tag-time">🎧 {{durationText}}</text>
+      </view>
+      <view class="hero-meta">
+        <text wx:if="{{book.grade}}" class="meta-chip">{{book.grade}}</text>
+        <text wx:if="{{book.topic}}" class="meta-chip meta-chip2">{{book.topic}}</text>
       </view>
     </view>
   </view>
 
+  <!-- 真实借阅状态卡 -->
+  <view class="state-card state-borrowing" wx:if="{{borrowState === 'borrowing'}}" bindtap="goShelf">
+    <text class="state-emoji">📚</text>
+    <view class="state-texts">
+      <view class="state-title">{{borrowStateText}}{{childName}}的书架上</view>
+      <view class="state-sub">{{dueText}} · 去书架续听</view>
+    </view>
+    <text class="state-arrow">›</text>
+  </view>
+  <view class="state-card state-reserved" wx:elif="{{borrowState === 'reserved'}}">
+    <text class="state-emoji">🔖</text>
+    <view class="state-texts">
+      <view class="state-title">{{borrowStateText}}</view>
+      <view class="state-sub">{{dueText}}</view>
+    </view>
+  </view>
+
+  <!-- 阅读进度 -->
   <view wx:if="{{childName}}" class="section-card">
-    <view class="section-card-title">{{childName}} 的阅读进度</view>
+    <view class="section-card-title">{{childName}} 的听读进度</view>
     <view wx:if="{{progress && progress.coverage_seconds > 0}}" class="progress-section">
       <view class="reading-progress">
         <view class="rp-bar"><view class="rp-fill" style="width: {{progress.coverage_percent}}%"></view></view>
@@ -22,22 +45,37 @@
       </view>
       <view wx:if="{{progress.finished}}" class="quiz-tag">✅ 已读完 · 测验已解锁</view>
     </view>
-    <view wx:else style="color: var(--muted); font-size: 26rpx;">还没开始听，从第一秒开始吧</view>
+    <view wx:else class="muted-line">还没开始听，从第一秒开始吧</view>
   </view>
 
-  <view class="section-card" wx:if="{{childName}}">
+  <!-- 简介 -->
+  <view class="section-card" wx:if="{{book.description}}">
+    <view class="section-card-title">这本书讲什么</view>
+    <view class="desc-text">{{book.description}}</view>
+  </view>
+
+  <!-- 预约说明（可预约态才显示） -->
+  <view class="section-card" wx:if="{{borrowState === 'none'}}">
     <view class="section-card-title">借阅与预约</view>
-    <view style="color: var(--muted); font-size: 26rpx; margin-bottom: 20rpx;">
-      预约后副本为你保留 72 小时，到店取书核销转借阅。
-    </view>
+    <view class="muted-line">这套书在馆内借阅。如果已被借完，可以预约排队——预约成功后保留 72 小时，到店由馆员核销取书。</view>
   </view>
 
+  <!-- 底部操作 -->
   <view class="action-bar">
-    <button class="action-secondary" bindtap="onReserve" disabled="{{reserving}}">
-      {{reserving ? '预约中…' : '🔖 预约此书'}}
-    </button>
-    <button class="action-primary" bindtap="onPlay">▶ 开始听</button>
-    <button class="action-secondary" bindtap="onQuiz">📝 去测验</button>
-    <button class="action-secondary" bindtap="onFav">⭐ 收藏想读</button>
+    <button class="action-primary" bindtap="onPlay">▶ {{progress && progress.finished ? '再听一遍' : '开始听'}}</button>
+    <view class="action-row">
+      <button class="action-icon {{inFav ? 'active' : ''}}" bindtap="onFav">
+        <text class="action-icon-emoji">{{inFav ? '⭐' : '🤍'}}</text>
+        <text class="action-icon-label">{{inFav ? '已收藏' : '收藏'}}</text>
+      </button>
+      <button class="action-icon {{borrowState === 'reserved' ? 'active' : ''}}" bindtap="onReserve" disabled="{{reserving}}">
+        <text class="action-icon-emoji">📅</text>
+        <text class="action-icon-label">{{borrowState === 'borrowing' ? '在借中' : borrowState === 'reserved' ? '已预约' : (reserving ? '预约中' : '预约借书')}}</text>
+      </button>
+      <button class="action-icon" bindtap="onQuiz">
+        <text class="action-icon-emoji">📝</text>
+        <text class="action-icon-label">{{progress && progress.finished ? '去测验' : '测验未解锁'}}</text>
+      </button>
+    </view>
   </view>
 </view>

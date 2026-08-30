@@ -6,7 +6,7 @@
       <text class="cal-nav-btn" bindtap="onNextMonth">›</text>
     </view>
     <view class="streak-stats">
-      <view>连续打卡 <text style="font-weight:700;color:var(--accent)">{{currentStreak}}</text> 天</view>
+      <view>连续打卡 <text style="font-weight:800;color:#FFFFFF;font-size:40rpx">{{currentStreak}}</text> 天</view>
       <view>今日：{{todayChecked ? '已打卡 ✓' : '听完一本书即可打卡'}}</view>
     </view>
   </view>

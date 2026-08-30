@@ -1,611 +1,160 @@
-/* books.wxss — aligned with design/user-end/books.html */
-
-/* Page bg (tabBar 页预留底部空间) */
+/* pages/books/books.wxss — 图书馆 v5：搜索 + 筛选 + 2 列书卡 + 真分页 */
 .page-bg {
-  padding-bottom: 160rpx;
+  min-height: 100vh;
+  background: var(--bg);
+  box-sizing: border-box;
+  padding: 20rpx 24rpx 60rpx;
 }
 
-/* Nav Bar */
-.nav-bar {
-  display: flex;
-  align-items: center;
-  padding: 24rpx 32rpx;
-  background: var(--surface);
-  border-bottom: 2rpx solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-.nav-bar .back {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  min-height: 48rpx;
-}
-.nav-bar .back .title {
-  font-size: 34rpx;
-  font-weight: 600;
-  color: var(--fg);
-}
-
-/* Search Bar */
+/* ---------- 搜索 ---------- */
+.nav-bar { margin-bottom: 16rpx; }
 .search-wrap {
-  margin: 24rpx 32rpx;
-  position: relative;
-}
-
-.search-icon-wrap {
-  position: absolute;
-  left: 28rpx;
-  top: 0;
-  bottom: 0;
-  width: 36rpx;
   display: flex;
   align-items: center;
-  z-index: 2;
-}
-
-.search-icon-svg {
-  position: relative;
-  width: 36rpx;
-  height: 36rpx;
-}
-
-.si-circle {
-  position: absolute;
-  width: 26rpx;
-  height: 26rpx;
-  border: 4rpx solid var(--muted);
-  border-radius: 50%;
-  top: 2rpx;
-  left: 0;
-  box-sizing: border-box;
-}
-
-.si-line {
-  position: absolute;
-  width: 14rpx;
-  height: 4rpx;
-  background: var(--muted);
-  border-radius: 2rpx;
-  bottom: 2rpx;
-  right: 0;
-  transform: rotate(45deg);
-  transform-origin: center;
-}
-
-.search-input {
-  width: 100%;
-  height: 80rpx;
-  padding: 0 28rpx 0 80rpx;
-  border: 2rpx solid var(--border);
-  border-radius: 999rpx;
+  gap: 12rpx;
   background: var(--surface);
-  color: var(--fg);
-  font-size: 28rpx;
-  box-sizing: border-box;
-  line-height: 80rpx;
-  transition: border-color 0.15s ease;
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  box-shadow: var(--shadow-hard-sm);
+  padding: 16rpx 28rpx;
 }
-
-.search-input:focus {
-  border-color: var(--accent);
-}
-
-.search-placeholder {
-  color: var(--muted);
-}
-
+.search-icon { font-size: 30rpx; }
+.search-input { flex: 1; font-size: 28rpx; color: var(--fg); }
 .search-clear {
-  position: absolute;
-  right: 20rpx;
-  top: 0;
-  bottom: 0;
   width: 40rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-}
-
-.clear-icon {
-  font-size: 24rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2rpx solid var(--border);
   color: var(--muted);
-}
-
-/* Filter Scroll */
-.filter-scroll {
-  padding: 0 32rpx 24rpx;
-  white-space: nowrap;
-}
-
-.filter-chip {
-  display: inline-block;
-  padding: 14rpx 28rpx;
-  border-radius: 999rpx;
-  border: 2rpx solid var(--border);
-  background: var(--surface);
-  font-size: 26rpx;
-  white-space: nowrap;
-  color: var(--fg);
-  margin-right: 16rpx;
-  transition: all 0.15s ease;
-}
-
-.filter-chip.active {
-  background: var(--accent);
-  color: var(--surface);
-  border-color: var(--accent);
-}
-
-.filter-chip:active:not(.active) {
-  border-color: var(--accent);
-}
-
-/* Book Grid (2-column from design) */
-.book-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20rpx;
-  padding: 0 32rpx 32rpx;
-}
-
-.book-card {
-  width: calc(50% - 10rpx);
-  background: var(--surface);
-  border: 2rpx solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-.book-card:active {
-  transform: scale(0.97);
-}
-
-.card-cover {
-  width: 100%;
-  height: 0;
-  padding-bottom: 133.33%;
+  font-size: 22rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 96rpx;
-  background: linear-gradient(135deg, var(--bg), var(--border));
-  position: relative;
 }
 
-.card-cover .audio-badge {
-  position: absolute;
-  top: 16rpx;
-  right: 16rpx;
-  background: var(--accent-soft);
-  color: var(--accent);
-  padding: 4rpx 12rpx;
-  border-radius: 999rpx;
-  font-size: 20rpx;
-}
-
-.card-cover .series-badge {
-  position: absolute;
-  bottom: 16rpx;
-  left: 16rpx;
-  background: var(--warning-soft);
-  color: var(--warning);
-  padding: 4rpx 16rpx;
-  border-radius: 999rpx;
-  font-size: 20rpx;
-  font-weight: 500;
-}
-
-.card-body {
-  padding: 20rpx 20rpx 24rpx;
-  flex: 1;
+/* ---------- 筛选行 ---------- */
+.filter-bar {
   display: flex;
-  flex-direction: column;
+  gap: 14rpx;
+  flex-wrap: wrap;
+  margin-bottom: 16rpx;
 }
-
-.card-title {
-  font-family: var(--font-display);
-  font-size: 26rpx;
+.filter-bar picker { flex-shrink: 0; }
+.filter-pill {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--border);
+  border-radius: 999rpx;
+  padding: 10rpx 24rpx;
+  font-size: 24rpx;
+  color: var(--fg);
   font-weight: 600;
-  margin-bottom: 4rpx;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.4;
+}
+.filter-on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.caret { font-size: 20rpx; opacity: 0.6; }
+
+/* ---------- 已选 chips ---------- */
+.chips-row { display: flex; gap: 12rpx; flex-wrap: wrap; margin-bottom: 16rpx; }
+.chip-x {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  background: var(--accent);
+  color: #fff;
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  padding: 6rpx 20rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+.chip-x-btn { font-size: 20rpx; opacity: 0.85; }
+.chip-clear {
+  padding: 6rpx 20rpx;
+  border-radius: 999rpx;
+  border: 3rpx dashed var(--border);
+  color: var(--muted);
+  font-size: 22rpx;
 }
 
+.count-row { font-size: 24rpx; color: var(--muted); margin-bottom: 16rpx; }
+
+/* ---------- 2 列书卡 ---------- */
+.book-grid { display: flex; flex-wrap: wrap; gap: 20rpx; }
+.book-card {
+  width: calc((100% - 20rpx) / 2);
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-hard-sm);
+  overflow: hidden;
+}
+.card-cover { position: relative; }
+.card-cover-img {
+  width: 100%;
+  height: 340rpx;
+  display: block;
+  background: var(--accent-soft);
+}
+.card-cover-emoji {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 340rpx;
+  font-size: 80rpx;
+  background: var(--accent-soft);
+}
+.audio-badge {
+  position: absolute;
+  right: 12rpx;
+  bottom: 12rpx;
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2rpx solid var(--fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+}
+.card-body { padding: 16rpx 20rpx 20rpx; }
+.card-title {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .card-author {
   font-size: 22rpx;
   color: var(--muted);
-  margin-bottom: 12rpx;
-}
-
-.card-tags {
-  display: flex;
-  gap: 8rpx;
-  flex-wrap: wrap;
-  margin-bottom: 12rpx;
-}
-
-.card-tags .tag {
-  padding: 4rpx 12rpx;
-  border-radius: 999rpx;
-  font-size: 20rpx;
-  font-weight: 600;
-}
-
-.tag-ar {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.tag-words {
-  background: var(--muted);
-  color: var(--muted);
-  opacity: 0.15;
-}
-
-.tag-time {
-  background: var(--secondary-soft);
-  color: var(--success);
-}
-
-.card-meta {
-  font-size: 20rpx;
-  color: var(--muted);
-  margin-bottom: 8rpx;
-}
-
-.card-meta .audio-icon {
-  color: var(--accent);
-}
-
-/* Inventory Status */
-.inv-status {
-  margin-top: auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12rpx;
-}
-
-.inv-label {
-  font-size: 22rpx;
-  font-weight: 600;
-  padding: 6rpx 16rpx;
-  border-radius: 999rpx;
-}
-
-.inv-available {
-  background: var(--success-soft);
-  color: var(--success);
-}
-
-.inv-empty {
-  background: var(--muted);
-  color: var(--muted);
-  opacity: 0.15;
-}
-
-.reserve-btn {
-  padding: 10rpx 20rpx;
-  border-radius: 999rpx;
-  border: 3rpx solid var(--accent);
-  color: var(--accent);
-  font-size: 20rpx;
-  font-weight: 600;
-  white-space: nowrap;
-  background: transparent;
-  transition: all 0.15s ease;
-}
-
-.reserve-btn:active {
-  background: var(--accent-soft);
-}
-
-/* Book List (legacy single-column) */
-.book-list {
-  padding: 0 32rpx;
-}
-
-.book-item {
-  display: flex;
-  gap: 28rpx;
-  padding: 28rpx 0;
-  border-bottom: 2rpx solid var(--border);
-  align-items: center;
-}
-
-.book-item:last-child {
-  border-bottom: none;
-}
-
-/* Book Cover (single-column) */
-.book-cover {
-  width: 144rpx;
-  height: 192rpx;
-  border-radius: var(--radius);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2rpx solid var(--border);
-  position: relative;
+  margin-top: 4rpx;
   overflow: hidden;
-  background: linear-gradient(135deg, var(--bg), var(--border));
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-
-.book-cover-img {
-  width: 100%;
-  height: 100%;
-  border-radius: 30rpx;
-}
-
-.cover-letter {
-  position: absolute;
-  top: 66.6%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1;
-  font-family: var(--font-display);
+.card-tags { display: flex; gap: 8rpx; margin-top: 12rpx; flex-wrap: wrap; }
+.tag {
+  font-size: 18rpx;
+  padding: 2rpx 14rpx;
+  border-radius: 999rpx;
   font-weight: 700;
-  font-size: 72rpx;
-  color: var(--accent);
-  line-height: 1.2;
 }
+.tag-words { background: rgba(74, 222, 128, 0.14); color: var(--success); }
+.tag-ar { background: var(--accent-soft); color: var(--accent); }
 
-/* Book Info (single-column) */
-.book-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.book-title {
-  font-family: var(--font-display);
-  font-size: 30rpx;
-  font-weight: 600;
-  margin-bottom: 6rpx;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.4;
-}
-
-.book-author {
-  font-size: 24rpx;
-  color: var(--muted);
-  margin-bottom: 12rpx;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.book-meta {
-  display: flex;
-  gap: 12rpx;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.book-meta .ar-tag {
-  padding: 4rpx 16rpx;
-  border-radius: 999rpx;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: 22rpx;
-  font-weight: 600;
-}
-
-.book-meta .age-tag {
-  padding: 4rpx 16rpx;
-  border-radius: 999rpx;
-  background: var(--secondary-soft);
-  color: var(--success);
-  font-size: 22rpx;
-}
-
-.book-meta-row2 {
-  display: flex;
-  gap: 12rpx;
-  align-items: center;
-  margin-top: 10rpx;
-  font-size: 22rpx;
-  color: var(--muted);
-  flex-wrap: wrap;
-}
-
-.audio-tag {
-  padding: 4rpx 16rpx;
-  border-radius: 999rpx;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 20rpx;
-  font-weight: 500;
-}
-
-.inv-badge {
-  padding: 4rpx 16rpx;
-  border-radius: 999rpx;
-  font-size: 20rpx;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 6rpx;
-}
-
-.inv-avail {
-  background: var(--success-soft);
-  color: var(--success);
-}
-
-.inv-empty {
-  background: var(--muted);
-  color: var(--muted);
-  opacity: 0.15;
-}
-
-/* Add/Shelf Button */
-.add-btn {
-  margin-left: auto;
-  padding: 12rpx 28rpx;
-  border-radius: 999rpx;
-  border: 3rpx solid var(--accent);
-  background: transparent;
-  color: var(--accent);
-  font-size: 22rpx;
-  font-weight: 600;
-  white-space: nowrap;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 80rpx;
-  transition: all 0.15s ease;
-}
-
-.add-btn:active {
-  background: var(--accent-soft);
-}
-
-/* No More */
 .no-more {
   text-align: center;
+  color: var(--muted);
   font-size: 24rpx;
-  color: var(--muted);
-  padding: 30rpx 0 50rpx;
-}
-
-/* 卡片阴影 */
-.book-card {
-  box-shadow: 0 4rpx 16rpx rgba(38, 36, 25, 0.04);
-}
-
-/* 底部导航 */
-.bottom-nav {
-  position: fixed;
-    box-sizing: border-box;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(255, 255, 255, 0.92);
-  border-top: 2rpx solid var(--border);
-  display: flex;
-  padding: 12rpx 0 env(safe-area-inset-bottom, 16rpx);
-  z-index: 30;
-  box-sizing: border-box;
-}
-.nav-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 12rpx 0 4rpx;
-  color: var(--muted);
-  font-size: 20rpx;
-  gap: 4rpx;
-}
-.nav-item .nav-icon {
-  font-size: 44rpx;
-  margin-bottom: 4rpx;
-}
-.nav-item.active {
-  color: var(--accent);
-}
-
-/* 标签 - 词数 */
-.tag-words {
-  background: rgba(111, 104, 90, 0.1);
-  color: var(--muted);
-}
-
-/* 标签 - 时间 */
-.tag-time {
-  background: rgba(53, 112, 60, 0.1);
-  color: var(--success);
-}
-
-/* 库存-空 */
-.inv-empty {
-  background: rgba(111, 104, 90, 0.1);
-  color: var(--muted);
-}
-
-/* 卡片阴影 */
-.book-card {
-  box-shadow: 0 4rpx 16rpx rgba(38, 36, 25, 0.04);
-}
-
-/* 底部导航 */
-.bottom-nav {
-  position: fixed;
-    box-sizing: border-box;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(255, 255, 255, 0.92);
-  border-top: 2rpx solid var(--border);
-  display: flex;
-  padding: 12rpx 0 env(safe-area-inset-bottom, 16rpx);
-  z-index: 30;
-  box-sizing: border-box;
-}
-.nav-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 12rpx 0 4rpx;
-  color: var(--muted);
-  font-size: 20rpx;
-  gap: 4rpx;
-}
-.nav-item .nav-icon {
-  font-size: 44rpx;
-  margin-bottom: 4rpx;
-}
-.nav-item.active {
-  color: var(--accent);
-}
-
-/* 标签 - 词数 */
-.tag-words {
-  background: rgba(111, 104, 90, 0.1);
-  color: var(--muted);
-}
-
-/* 标签 - 时间 */
-.tag-time {
-  background: rgba(53, 112, 60, 0.1);
-  color: var(--success);
-}
-
-/* 库存-空 */
-.inv-empty {
-  background: rgba(111, 104, 90, 0.1);
-  color: var(--muted);
-}
-
-
-/* C49：列表封面（无封面显示绘本占位） */
-.book-cover {
-  width: 96rpx;
-  height: 128rpx;
-  border-radius: 12rpx;
-  border: 2rpx solid var(--border, #e8e0d4);
-  flex-shrink: 0;
-  margin-right: 20rpx;
-  background: var(--paper, #fffdf7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 44rpx;
+  padding: 32rpx 0;
 }

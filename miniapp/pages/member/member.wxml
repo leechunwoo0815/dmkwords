@@ -1,38 +1,59 @@
-<view class="page-bg">
+<scroll-view class="page-bg" scroll-y enhanced show-scrollbar="{{false}}">
   <view class="profile-header">
-    <view class="profile-avatar">👩</view>
-    <view class="profile-info">
-      <view class="profile-name">{{parent.name || '家长'}}</view>
-      <view class="profile-level">{{parent.phone}}</view>
+    <view class="profile-main">
+      <view class="profile-avatar">👩</view>
+      <view class="profile-info">
+        <view class="profile-name">{{parent.name || '家长'}}</view>
+        <view class="profile-phone">{{parent.phone || '已登录'}}</view>
+      </view>
+    </view>
+    <view wx:if="{{currentChild}}" class="profile-child">
+      <text class="pc-name">正在陪伴：{{currentChild.name}}</text>
+      <text class="pc-status {{expireWarn ? 'warn' : ''}}">{{statusText}}</text>
     </view>
   </view>
 
-  <view wx:if="{{children.length > 1}}" class="section-card" style="margin: 24rpx;">
-    <view class="child-switcher-label">切换孩子</view>
+  <view wx:if="{{children.length > 1}}" class="section-card no-padding">
+    <view class="section-title">切换孩子</view>
     <view class="child-switcher-scroll">
       <view wx:for="{{children}}" wx:key="id"
         class="child-switcher-chip {{currentChild && currentChild.id === item.id ? 'active' : ''}}"
         data-id="{{item.id}}" bindtap="onSwitchChild">
-        {{item.name}} · {{item.statusText}}
+        <text class="chip-avatar">{{item.name ? item.name[0] : '👶'}}</text>
+        <text class="chip-text">{{item.name}}</text>
+        <text class="chip-status">{{item.statusText}}</text>
       </view>
     </view>
   </view>
 
-  <view wx:if="{{currentChild}}" class="section-card" style="margin: 24rpx;">
-    <view class="section-title">{{currentChild.name}}（{{statusText}}）</view>
-    <view wx:if="{{expireLine}}" class="expire-line {{expireWarn ? 'warn' : ''}}">{{expireLine}}</view>
+  <view wx:if="{{currentChild}}" class="section-card">
+    <view class="section-title">会员信息</view>
+    <view class="member-info-row">
+      <view class="mi-item">
+        <text class="mi-label">会员状态</text>
+        <text class="mi-value {{expireWarn ? 'warn' : ''}}">{{statusText}}</text>
+      </view>
+      <view class="mi-item" wx:if="{{expireLine}}">
+        <text class="mi-label">到期时间</text>
+        <text class="mi-value {{expireWarn ? 'warn' : ''}}">{{expireLine}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-card">
+    <view class="section-title">成长中心</view>
     <view class="func-grid">
       <view class="func-item" bindtap="goCheckin">
         <text class="fi-icon">📅</text>
         <text class="fi-label">打卡日历</text>
       </view>
-      <view class="func-item" bindtap="goReservation">
-        <text class="fi-icon">🔖</text>
-        <text class="fi-label">我的预约</text>
-      </view>
       <view class="func-item" bindtap="goAchievement">
         <text class="fi-icon">🏆</text>
         <text class="fi-label">等级勋章</text>
+      </view>
+      <view class="func-item" bindtap="goPassport">
+        <text class="fi-icon">🪪</text>
+        <text class="fi-label">阅读护照</text>
       </view>
       <view class="func-item" bindtap="goReport">
         <text class="fi-icon">📊</text>
@@ -42,9 +63,27 @@
         <text class="fi-icon">🏅</text>
         <text class="fi-label">排行榜</text>
       </view>
-      <view class="func-item" bindtap="goPassport">
-        <text class="fi-icon">🪪</text>
-        <text class="fi-label">阅读护照</text>
+      <view class="func-item" bindtap="goObservation">
+        <text class="fi-icon">📋</text>
+        <text class="fi-label">评估报告</text>
+      </view>
+      <view class="func-item" bindtap="goVocabulary">
+        <text class="fi-icon">📖</text>
+        <text class="fi-label">生词本</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-card">
+    <view class="section-title">借阅服务</view>
+    <view class="func-grid">
+      <view class="func-item" bindtap="goReservation">
+        <text class="fi-icon">🔖</text>
+        <text class="fi-label">我的预约</text>
+      </view>
+      <view class="func-item" bindtap="goDeposit">
+        <text class="fi-icon">💳</text>
+        <text class="fi-label">押金</text>
       </view>
       <view class="func-item" bindtap="goRefund">
         <text class="fi-icon">💰</text>
@@ -54,24 +93,6 @@
         <text class="fi-icon">🔁</text>
         <text class="fi-label">权益转让</text>
       </view>
-      <view class="func-item" bindtap="goObservation">
-        <text class="fi-icon">📋</text>
-        <text class="fi-label">评估报告</text>
-      </view>
-      <view class="func-item" bindtap="goVocabulary">
-        <text class="fi-icon">📖</text>
-        <text class="fi-label">生词本</text>
-      </view>
-      <view class="func-item" bindtap="goDeposit">
-        <text class="fi-icon">💳</text>
-        <text class="fi-label">押金</text>
-      </view>
-    </view>
-  </view>
-
-  <view class="section-card" style="margin: 24rpx;">
-    <view class="section-title">家长服务</view>
-    <view class="func-grid">
       <view class="func-item" bindtap="goMessages">
         <text class="fi-icon">🔔</text>
         <text class="fi-label">消息中心</text>
@@ -80,9 +101,11 @@
   </view>
 
   <view class="bottom-links">
-    <view class="link-item" bindtap="onLogout">
+    <view class="link-item logout" bindtap="onLogout">
       <view class="lk-left"><text class="lk-icon">🚪</text><text class="lk-text">退出登录</text></view>
       <text class="lk-arrow">›</text>
     </view>
   </view>
-</view>
+
+  <view class="bottom-spacer"></view>
+</scroll-view>

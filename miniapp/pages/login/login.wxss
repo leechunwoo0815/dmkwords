@@ -332,3 +332,43 @@
   color: var(--border);
 }
 
+
+/* ============================================
+   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
+   ============================================ */
+
+/* Logo：太阳黄贴纸 + 轻摆动 */
+.logo-area .logo-icon {
+  border: 4rpx solid var(--fg);
+  border-radius: 24rpx 28rpx 22rpx 30rpx;
+  box-shadow: var(--shadow-hard);
+  background: var(--sun);
+  animation: paint-wiggle 3.5s ease-in-out infinite;
+}
+.app-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+.app-slogan {
+  color: var(--muted);
+}
+
+/* 微信登录按钮：微信绿 + 粗黑边 + 硬阴影 */
+.wx-login-btn {
+  border: 3rpx solid var(--fg) !important;
+  border-radius: 999rpx !important;
+  box-shadow: var(--shadow-hard) !important;
+  font-weight: 800;
+}
+.wx-login-btn:active {
+  transform: translate(3rpx, 3rpx);
+  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85) !important;
+}
+
+/* 隐私弹窗：贴纸卡 */
+.privacy-popup {
+  border: 3rpx solid var(--fg);
+  border-radius: 32rpx 36rpx 28rpx 40rpx;
+  box-shadow: var(--shadow-hard);
+  background: var(--surface);
+}

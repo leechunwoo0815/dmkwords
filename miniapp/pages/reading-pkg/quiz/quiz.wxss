@@ -314,7 +314,7 @@
 
 .feedback.selected {
   background: rgba(44, 74, 110, 0.1);
-  color: var(--accent, #2c4a6e);
+  color: var(--accent, #FF6B35);
 }
 
 /* Footer */
@@ -334,14 +334,11 @@
   bottom: 0;
   z-index: 50;
   background: rgba(0, 0, 0, 0.4);
-  display: none;
+  /* 显隐由 wx:if 控制（showConfirm），不能默认 display:none——否则节点出现也不可见 */
+  display: flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-}
-
-.confirm-overlay.show {
-  display: flex;
 }
 
 .confirm-dialog {
@@ -415,4 +412,73 @@
   color: var(--primary, #2f6b8a);
   background: rgba(47, 107, 138, 0.1);
   border-radius: 24rpx;
+}
+
+/* ============================================
+   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
+   ============================================ */
+
+/* 选项卡：粗黑边 + 手绘圆角 + 按压位移 */
+.options .option {
+  border: 3rpx solid var(--fg);
+  border-radius: 24rpx 28rpx 22rpx 30rpx;
+  background: var(--surface);
+  box-shadow: var(--shadow-hard-sm);
+  transition: all 0.15s ease;
+}
+.options .option:active {
+  transform: translate(3rpx, 3rpx);
+  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+}
+
+/* 选中：太阳黄 + 按下 */
+.option.selected {
+  background: var(--sun-soft) !important;
+  border-color: var(--fg) !important;
+  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+  transform: translate(3rpx, 3rpx);
+}
+/* 正确：嫩芽绿贴纸 */
+.option.correct {
+  background: var(--secondary-soft) !important;
+  border-color: var(--secondary-ink) !important;
+  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+}
+/* 错误：番茄红贴纸 */
+.option.wrong {
+  background: var(--error-soft) !important;
+  border-color: var(--error) !important;
+  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+}
+
+/* 选项字母：圆贴纸 */
+.option .option-letter {
+  border: 2rpx solid var(--fg);
+  border-radius: 50%;
+  font-weight: 800;
+}
+
+/* 顶部进度条：活力橙填充 */
+.quiz-progress-bar {
+  border: 2rpx solid var(--fg);
+  border-radius: 999rpx;
+  background: var(--surface);
+  overflow: hidden;
+}
+.quiz-progress-fill {
+  background: linear-gradient(90deg, var(--accent), var(--accent-light)) !important;
+}
+
+/* v5 增补：引导按钮 */
+.feedback { display: flex; flex-direction: column; align-items: center; }
+.feedback-btn {
+  margin-top: 28rpx;
+  background: var(--accent);
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  box-shadow: var(--shadow-hard-sm);
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 700;
+  padding: 16rpx 64rpx;
 }

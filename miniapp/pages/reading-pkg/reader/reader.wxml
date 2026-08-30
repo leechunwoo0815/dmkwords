@@ -12,7 +12,7 @@
     <view class="progress-area">
       <text class="progress-times">{{displayTime}}</text>
       <slider class="audio-slider" min="0" max="{{sliderMax}}" value="{{sliderValue}}"
-        activeColor="#2c4a6e" backgroundColor="#e4dcc8" block-size="20"
+        activeColor="#FF6B35" backgroundColor="#e4dcc8" block-size="20"
         bindchanging="onSliderChanging" bindchange="onSliderChange" />
       <text class="progress-times">{{displayDuration}}</text>
     </view>
@@ -42,14 +42,17 @@
         value="{{dictWord}}" bindinput="onDictInput" confirm-type="search" bindconfirm="onDictSearch" />
       <view class="lookup-btn" bindtap="onDictSearch">查</view>
     </view>
-    <view wx:if="{{showDict && dictResult}}" class="dict-result">
-      <view class="dr-word">{{dictResult.word}}</view>
-      <view class="dr-phonetic">{{dictResult.phonetic}}</view>
-      <view class="dr-def">{{dictResult.translation}}</view>
-      <view class="dr-def" style="color:var(--muted);font-size:22rpx;">{{dictResult.definition}}</view>
-    </view>
-    <view wx:if="{{showDict && dictError}}" class="dict-result">
-      <view class="dr-def" style="color:var(--error);">{{dictError}}</view>
+    <view wx:if="{{showDict}}" class="dict-result show">
+      <view wx:if="{{dictLoading}}" class="dict-loading">🔍 正在查词…</view>
+      <block wx:elif="{{dictResult}}">
+        <view class="dr-word">{{dictResult.word}}</view>
+        <view class="dr-phonetic">{{dictResult.phonetic}}</view>
+        <view class="dr-def">{{dictResult.translation}}</view>
+        <view wx:if="{{dictResult.definition}}" class="dr-def" style="color:var(--muted);font-size:24rpx;">{{dictResult.definition}}</view>
+      </block>
+      <block wx:elif="{{dictError}}">
+        <view class="dr-def" style="color:var(--error);">{{dictError}}</view>
+      </block>
     </view>
   </view>
 

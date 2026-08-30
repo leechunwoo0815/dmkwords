@@ -295,11 +295,23 @@
 }
 
 .cal-day.today {
-  border: 4rpx solid var(--accent);
+  border: 4rpx solid var(--fg);
 }
 
 .cal-day.today .cal-day-text {
   color: var(--accent);
+}
+
+/* 同天既 checked 又 today（今天打完卡）：橙底必须白字，优先级压过 .today 橙字 */
+.cal-day.today.checked,
+.cal-day.checked.today {
+  border: 4rpx solid var(--fg);
+}
+
+.cal-day.today.checked .cal-day-text,
+.cal-day.checked.today .cal-day-text {
+  color: var(--surface);
+  font-weight: 700;
 }
 
 .cal-day.empty {
@@ -470,3 +482,76 @@
   filter: grayscale(1);
 }
 
+
+/* ============================================
+   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
+   ============================================ */
+
+/* 打卡横幅：活力橙渐变 + 粗黑边贴纸 */
+.streak-banner {
+  border: 3rpx solid var(--fg);
+  border-radius: 32rpx 36rpx 28rpx 40rpx;
+  box-shadow: var(--shadow-hard);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  position: relative;
+  overflow: hidden;
+}
+.streak-banner .streak-num {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: #FFFDF7;
+  text-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.45);
+}
+
+/* 日历卡：粗黑边 + 手绘圆角 */
+.calendar-card {
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 32rpx 36rpx 28rpx 40rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+/* 统计小卡贴纸 */
+.streak-stats .ss-item {
+  border: 2rpx solid rgba(59, 47, 47, 0.6);
+  border-radius: 20rpx 24rpx 18rpx 26rpx;
+  background: var(--surface);
+  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.35);
+}
+
+/* ============================================
+   打卡页 v4 改造（2026-08-30）：数字与文案更清晰
+   ============================================ */
+
+.streak-banner .streak-num {
+  font-size: 120rpx;
+  line-height: 1;
+  color: #FFFDF7;
+  text-shadow: 4rpx 4rpx 0 rgba(59, 47, 47, 0.45);
+}
+
+.streak-banner .streak-label {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #FFFDF7;
+  opacity: 1;
+  margin-top: 12rpx;
+}
+
+.streak-banner .streak-sub {
+  font-size: 28rpx;
+  color: #FFFDF7;
+  opacity: 0.95;
+  margin-top: 12rpx;
+  font-weight: 600;
+}
+
+.streak-stats .ss-num {
+  color: var(--accent);
+}
+
+.streak-stats .ss-label {
+  color: var(--fg);
+  opacity: 1;
+  font-weight: 600;
+}

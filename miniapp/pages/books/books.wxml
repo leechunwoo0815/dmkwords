@@ -1,33 +1,74 @@
 <view class="page-bg">
+  <!-- 搜索行 -->
   <view class="nav-bar">
     <view class="search-wrap">
-      <view class="search-icon-wrap"><text class="search-icon-svg">🔍</text></view>
+      <text class="search-icon">🔍</text>
       <input class="search-input" placeholder="搜书名 / 作者" confirm-type="search"
         value="{{keyword}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" />
       <view wx:if="{{keyword}}" class="search-clear" bindtap="onClearSearch">✕</view>
     </view>
   </view>
 
-  <view class="book-list">
-    <view wx:for="{{books}}" wx:key="id" class="book-item" data-book="{{item}}" bindtap="goDetail">
-      <view class="book-card">
-        <image wx:if="{{item.cover_url}}" class="book-cover" src="{{item.cover_url}}" mode="aspectFill" />
-        <view wx:else class="book-cover book-cover-empty">📕</view>
-        <view class="book-info">
-          <view class="book-title">{{item.title}}</view>
-          <view class="book-author">{{item.author || '佚名'}}</view>
-          <view class="book-meta">
-            <text class="tag-words">{{item.word_count}} 词</text>
-            <text wx:if="{{item.ar_level}}" class="tag-ar">AR {{item.ar_level}}</text>
-            <text wx:if="{{item.has_audio}}" class="audio-tag">🎧 音频 {{item.audio_duration}}s</text>
-          </view>
+  <!-- 筛选行：年级 / 主题 / AR / 排序 + 音频开关 -->
+  <view class="filter-bar">
+    <picker mode="selector" range="{{gradeOptions}}" value="{{gradeIdx}}" bindchange="onGradeChange">
+      <view class="filter-pill {{gradeLabel ? 'filter-on' : ''}}">
+        <text>{{gradeLabel || '年级'}}</text><text class="caret">▾</text>
+      </view>
+    </picker>
+    <picker mode="selector" range="{{topicOptions}}" value="{{topicIdx}}" bindchange="onTopicChange">
+      <view class="filter-pill {{topicLabel ? 'filter-on' : ''}}">
+        <text>{{topicLabel || '主题'}}</text><text class="caret">▾</text>
+      </view>
+    </picker>
+    <picker mode="selector" range="{{arOptions}}" value="{{arIdx}}" bindchange="onArChange">
+      <view class="filter-pill {{arLabel ? 'filter-on' : ''}}">
+        <text>{{arLabel || 'AR'}}</text><text class="caret">▾</text>
+      </view>
+    </picker>
+    <picker mode="selector" range="{{sortOptions}}" value="{{sortIdx}}" bindchange="onSortChange">
+      <view class="filter-pill {{sortLabel ? 'filter-on' : ''}}">
+        <text>{{sortLabel || '排序'}}</text><text class="caret">▾</text>
+      </view>
+    </picker>
+    <view class="filter-pill {{hasAudio ? 'filter-on' : ''}}" bindtap="onToggleAudio">
+      <text>🎧 音频</text>
+    </view>
+  </view>
+
+  <!-- 已选条件 chips -->
+  <view class="chips-row" wx:if="{{activeChips.length}}">
+    <view wx:for="{{activeChips}}" wx:key="key" class="chip-x" data-key="{{item.key}}" bindtap="onRemoveChip">
+      <text>{{item.label}}</text><text class="chip-x-btn">✕</text>
+    </view>
+    <view class="chip-clear" bindtap="onClearAll">清空</view>
+  </view>
+
+  <!-- 计数 -->
+  <view class="count-row" wx:if="{{loaded && books.length}}">共 {{total}} 本书</view>
+
+  <!-- 2 列书卡 -->
+  <view class="book-grid">
+    <view wx:for="{{books}}" wx:key="id" class="book-card" data-book="{{item}}" bindtap="goDetail">
+      <view class="card-cover">
+        <image wx:if="{{item.cover_url}}" class="card-cover-img" src="{{item.cover_url}}" mode="aspectFill" lazy-load="{{true}}" />
+        <text wx:else class="card-cover-emoji">📕</text>
+        <text wx:if="{{item.has_audio}}" class="audio-badge">🎧</text>
+      </view>
+      <view class="card-body">
+        <view class="card-title">{{item.title}}</view>
+        <view class="card-author">{{item.author || '佚名'}}</view>
+        <view class="card-tags">
+          <text class="tag tag-words">{{item.word_count}} 词</text>
+          <text wx:if="{{item.ar_level}}" class="tag tag-ar">AR {{item.ar_level}}</text>
         </view>
       </view>
     </view>
   </view>
 
+  <!-- 加载态 / 空态 -->
   <view wx:if="{{loading}}" class="no-more">加载中…</view>
-  <empty-state wx:if="{{loaded && !books.length}}" icon="📭" title="没有找到书目"
-    desc="换个关键词试试，或到店请馆员录入" />
-  <view wx:if="{{books.length}}" class="no-more">共 {{total}} 本</view>
+  <view wx:elif="{{noMore && books.length}}" class="no-more">— 已经到底啦 —</view>
+  <empty-state wx:if="{{loaded && !books.length}}" icon="🔍" title="没有找到符合条件的书"
+    desc="换个关键词，或清除部分筛选再试试" />
 </view>

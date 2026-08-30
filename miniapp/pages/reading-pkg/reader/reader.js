@@ -2,6 +2,7 @@
 // 协议（PRD R-151）：每 10 秒心跳上报；暂停/seek/退出/切倍速/结束时立即上报。
 // 客户端如实上报连续段区间 [session_start, position]；seek 段由服务端区间并集排除。
 const api = require('../../../utils/api')
+const media = require('../../../utils/media')
 
 const HEARTBEAT_SEC = 10
 const SPEEDS = [0.75, 1.0, 1.25, 1.5, 2.0]
@@ -20,6 +21,7 @@ Page({
     dictResult: null,
     dictError: '',
     showDict: false,
+    dictLoading: false,
     childId: null,
     bookId: null,
     childName: '',
@@ -29,7 +31,7 @@ Page({
     displayTime: '0:00',
     displayDuration: '0:00',
     sliderValue: 0,
-    sliderMax: 100,
+    sliderMax: 0,
     speed: 1.0,
     speeds: SPEEDS,
     coveragePercent: 0,
@@ -46,13 +48,16 @@ Page({
     // C52 同款兜底：reLaunch/分享进入只有 URL 参数，补齐 id/title
     if (!book.id && options.book_id) book.id = Number(options.book_id)
     if (!book.title && options.book_title) book.title = decodeURIComponent(options.book_title)
+    book = media.formatBook(book)
+    const duration = book.audio_duration || 0
     this.setData({
       book,
       bookId: book.id || null,
       childId: options.child_id ? Number(options.child_id) : null,
       childName: options.child_name ? decodeURIComponent(options.child_name) : '',
-      duration: book.audio_duration || 0,
-      displayDuration: fmt(book.audio_duration || 0),
+      duration,
+      displayDuration: fmt(duration),
+      sliderMax: Math.max(1, Math.floor(duration)),
     })
     this._sessionStart = null
     this._pendingSec = 0
@@ -88,9 +93,9 @@ Page({
 
   _initAudio() {
     const { book } = this.data
-    const app = getApp()
     const token = wx.getStorageSync('token')
-    const url = `${app.globalData.baseURL}${book.audio_url}?token=${encodeURIComponent(token)}`
+    const base = book.audio_url.split('?')[0]
+    const url = `${base}?token=${encodeURIComponent(token)}`
     const audio = wx.createInnerAudioContext()
     audio.src = url
     audio.playbackRate = 1.0
@@ -114,7 +119,18 @@ Page({
       this.setData({ playing: false })
     })
     audio.onEnded(() => {
-      this._reportNow()
+      // 播放结束 currentTime 已归零，_reportNow 会因 position<=sessionStart 跳过，
+      // 最后一段永远丢失（4 秒音频只记到 3 秒，95% 完播判定失败）——用总时长兜底
+      const endPos = Math.floor(audio.duration || this.data.duration || 0)
+      if (this._sessionStart !== null && endPos > this._sessionStart) {
+        // E-20260830-11：上报成功后再刷新 UI，避免 loadProgress 竞态拿到旧值
+        api
+          .reportProgress(this.data.childId, this.data.bookId, endPos, this._sessionStart)
+          .then(() => this.loadProgress())
+          .catch(() => {})
+        this._sessionStart = endPos
+        this._pendingSec = 0
+      }
       this.setData({ playing: false })
     })
     audio.onError((err) => {
@@ -123,6 +139,11 @@ Page({
     })
     audio.onTimeUpdate(() => {
       const cur = audio.currentTime || 0
+      // 时长校准兜底：onCanplay 在部分基础库不触发，sliderMax 会停在初始值，滑块看似不动
+      const realDur = audio.duration || 0
+      if (realDur > 0 && Math.floor(realDur) !== this.data.sliderMax) {
+        this.setData({ duration: realDur, displayDuration: fmt(realDur), sliderMax: Math.floor(realDur) })
+      }
       this.setData({
         currentTime: cur,
         displayTime: fmt(cur),
@@ -242,17 +263,20 @@ Page({
       wx.showToast({ title: '先输入要查的单词', icon: 'none' })
       return
     }
+    this.setData({ dictLoading: true, showDict: true, dictResult: null, dictError: '' })
     try {
       const r = await api.lookupWord(w, this.data.childId, this.data.bookId)
       this.setData({
         dictResult: r,
         dictError: '',
+        dictLoading: false,
         showDict: true,
       })
     } catch (e) {
       this.setData({
         dictResult: null,
         dictError: (e && e.message) || '查询失败',
+        dictLoading: false,
         showDict: true,
       })
     }

@@ -1006,3 +1006,145 @@
   font-weight: 600;
   margin-top: 8rpx;
 }
+
+/* ============================================
+   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
+   ============================================ */
+
+/* 封面：粗黑边贴纸 + 太阳黄书脊 */
+.reader-page .book-cover {
+  border: 3rpx solid var(--fg);
+  border-radius: 16rpx 20rpx 14rpx 22rpx;
+  box-shadow: var(--shadow-hard-sm);
+  background: linear-gradient(160deg, var(--sun-soft), var(--surface));
+}
+
+/* 书名圆体 */
+.reader-page .book-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+
+/* 主播放键：活力橙 + 粗黑边 + 硬阴影 */
+.audio-btn-main {
+  border: 3rpx solid var(--fg) !important;
+  box-shadow: var(--shadow-hard) !important;
+  background: var(--accent) !important;
+}
+.audio-btn-main:active {
+  transform: translate(3rpx, 3rpx);
+  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85) !important;
+}
+.audio-btn-main.playing {
+  background: var(--success) !important;
+}
+
+/* 副按钮（快进快退）：纸面贴纸 */
+.audio-btn-secondary {
+  border: 3rpx solid var(--fg);
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow-hard-sm);
+}
+
+/* 速度条：贴纸 pill，选中太阳黄 */
+.speed-item {
+  border: 2rpx solid var(--fg);
+  border-radius: 999rpx;
+  background: var(--surface);
+  font-weight: 700;
+}
+.speed-item.active {
+  background: var(--sun);
+  color: var(--fg);
+  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+}
+
+/* 查词区：纸面卡片化 */
+.lookup-input-wrap {
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  background: var(--surface);
+  box-shadow: var(--shadow-hard-sm);
+}
+
+/* 逾期锁定卡：贴纸感 */
+.overdue-content {
+  border: 3rpx solid var(--fg);
+  border-radius: 32rpx 36rpx 28rpx 40rpx;
+  box-shadow: var(--shadow-hard);
+  background: var(--surface);
+}
+
+
+/* 绘本风精修补充：查词按钮 */
+.lookup-btn {
+  border: 3rpx solid var(--fg) !important;
+  border-radius: 999rpx !important;
+  box-shadow: var(--shadow-hard-sm) !important;
+  font-weight: 800;
+}
+.lookup-btn:active {
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none !important;
+}
+
+/* ============================================
+   听书页 v4 改造（2026-08-30）：进度条 + 查词可见性
+   ============================================ */
+
+.dict-result {
+  display: block;
+  margin: 24rpx 32rpx;
+  padding: 28rpx 32rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.dict-loading {
+  text-align: center;
+  color: var(--muted);
+  font-size: 28rpx;
+  padding: 20rpx 0;
+}
+
+.dr-word {
+  font-family: var(--font-display);
+  font-size: 40rpx;
+  font-weight: 800;
+  color: var(--fg);
+}
+
+.dr-phonetic {
+  font-size: 26rpx;
+  color: var(--muted);
+  margin: 8rpx 0 16rpx;
+}
+
+.dr-def {
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: var(--fg);
+  margin-bottom: 12rpx;
+}
+
+.audio-slider {
+  flex: 1;
+}
+
+.progress-area {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 0 32rpx;
+}
+
+.progress-times {
+  font-size: 24rpx;
+  color: var(--muted);
+  font-weight: 600;
+  min-width: 60rpx;
+  text-align: center;
+}

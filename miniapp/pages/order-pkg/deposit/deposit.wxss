@@ -1,9 +1,9 @@
 /* pages/order-pkg/deposit/deposit.wxss — 押金页（风格对齐 report 页） */
 .dp-head {
-  background: #2c4a6e;
+  background: #FF6B35;
   border-radius: 16rpx;
   padding: 24rpx;
-  color: #fffefa;
+  color: #FFFDF7;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -23,7 +23,7 @@
 }
 .dp-amt {
   flex: 1;
-  background: #f6f2e9;
+  background: #FDF8F0;
   border-radius: 12rpx;
   padding: 16rpx 8rpx;
   text-align: center;
@@ -32,12 +32,12 @@
   display: block;
   font-size: 30rpx;
   font-weight: 700;
-  color: #35703c;
+  color: #16A34A;
 }
 .dp-label {
   display: block;
   font-size: 20rpx;
-  color: #6f685a;
+  color: #6B5B5B;
   margin-top: 6rpx;
 }
 .dp-balance {
@@ -47,8 +47,8 @@
 }
 .dp-btn {
   margin-top: 20rpx;
-  background: #2c4a6e;
-  color: #fffefa;
+  background: #FF6B35;
+  color: #FFFDF7;
   border-radius: 999rpx;
   font-size: 28rpx;
 }
@@ -81,14 +81,14 @@
 .dp-row-type {
   font-size: 26rpx;
   font-weight: 600;
-  color: #2c4a6e;
+  color: #FF6B35;
 }
 .dp-row-type.red {
   color: #b45309;
 }
 .dp-row-reason {
   font-size: 22rpx;
-  color: #6f685a;
+  color: #6B5B5B;
   margin-top: 4rpx;
 }
 .dp-row-time {
@@ -103,7 +103,7 @@
   display: block;
   font-size: 26rpx;
   font-weight: 600;
-  color: #35703c;
+  color: #16A34A;
 }
 .dp-row-amount.red {
   color: #b45309;
@@ -113,4 +113,82 @@
   font-size: 20rpx;
   color: #a39a86;
   margin-top: 4rpx;
+}
+
+/* ============================================
+   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
+   ============================================ */
+/* 卡片：粗黑边 + 硬阴影 + 手绘圆角 */
+.card, .section-card, .card-wrapper, .section, .panel, .info-card, .form-card {
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+/* 按钮：胶囊贴纸 */
+.btn, button, .primary-btn, .secondary-btn, .submit-btn, .action-btn {
+  border: 3rpx solid var(--fg) !important;
+  border-radius: 999rpx !important;
+  box-shadow: var(--shadow-hard-sm) !important;
+  font-weight: 700;
+}
+.btn-primary, .primary, button[type="primary"], .primary-btn {
+  background: var(--accent) !important;
+  color: #FFFDF7 !important;
+}
+.btn-secondary, .secondary, .secondary-btn {
+  background: var(--surface) !important;
+  color: var(--fg) !important;
+}
+.btn:active, button:active, .primary-btn:active, .secondary-btn:active {
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none !important;
+}
+
+/* 标签/徽章：圆角贴纸 */
+.tag, .badge, .pill, .tag-primary, .tag-secondary, .tag-success, .tag-warning {
+  border: 2rpx solid rgba(59, 47, 47, 0.6);
+  border-radius: 999rpx;
+  font-weight: 700;
+}
+.tag-primary, .badge-primary { background: var(--accent-soft); color: var(--accent-dark); }
+.tag-secondary, .badge-secondary { background: var(--secondary-soft); color: var(--secondary-ink); }
+.tag-success, .badge-success { background: var(--success-soft); color: var(--success); }
+.tag-warning, .badge-warning { background: var(--warning-soft); color: var(--warning-dark); }
+
+/* 标题圆体 */
+.page-title, .section-title, .card-title, .header-title, .title, .name {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+/* 列表项：卡片化 */
+.list-item, .item, .row, .cell, .info-row {
+  background: var(--surface);
+  border: 2rpx solid var(--fg);
+  border-radius: 24rpx 28rpx 20rpx 30rpx;
+  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
+}
+
+
+/* 绘本风精修补充：押金头部与金额小卡 */
+.dp-head {
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+}
+.dp-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+.dp-amt {
+  border: 2rpx solid var(--fg);
+  border-radius: 20rpx 24rpx 18rpx 26rpx;
+  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
+}
+.dp-num {
+  font-family: var(--font-display);
+  font-weight: 800;
 }

@@ -582,18 +582,18 @@
 .action-fav {
   flex: 0.6;
   background: #fdecec;
-  color: #b54028;
+  color: #EF4444;
   border: 2rpx solid #f5c2c2;
 }
 
 .fav-active {
   background: #fdecec;
-  color: #b54028;
+  color: #EF4444;
   border-color: #f5c2c2;
 }
 
 .fav-text {
-  color: #b54028;
+  color: #EF4444;
 }
 
 /* ================================================================
@@ -717,7 +717,7 @@
   width: 160rpx;
   height: 216rpx;
   border-radius: 16rpx;
-  border: 3rpx solid var(--ink, #2c4a6e);
+  border: 3rpx solid var(--ink, #FF6B35);
   flex-shrink: 0;
   margin-right: 24rpx;
   background: var(--paper, #fffdf7);
@@ -726,3 +726,169 @@
   justify-content: center;
   font-size: 72rpx;
 }
+
+/* ============================================
+   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
+   ============================================ */
+
+/* 底部操作栏：粗黑顶边 + 按钮胶囊贴纸 */
+.action-bar {
+  border-top: 3rpx solid var(--fg) !important;
+}
+.action-bar .action-primary {
+  border: 3rpx solid var(--fg) !important;
+  border-radius: 999rpx !important;
+  box-shadow: var(--shadow-hard-sm) !important;
+  background: var(--accent) !important;
+  font-weight: 800;
+}
+.action-bar .action-primary:active {
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none !important;
+}
+.action-bar .action-secondary {
+  border: 3rpx solid var(--fg) !important;
+  border-radius: 999rpx !important;
+  background: var(--surface) !important;
+  color: var(--fg) !important;
+  font-weight: 700;
+}
+.action-bar .action-fav {
+  border: 3rpx solid var(--fg) !important;
+  border-radius: 999rpx !important;
+  background: var(--surface) !important;
+  color: var(--fg) !important;
+}
+
+/* ============================================
+   详情页 v4 改造（2026-08-30）：底部操作栏重构 + 书架标识
+   ============================================ */
+
+.shelf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  margin-top: 16rpx;
+  padding: 8rpx 18rpx;
+  border: 2rpx solid var(--fg);
+  border-radius: 999rpx;
+  background: var(--sun-soft);
+  color: var(--fg);
+  font-size: 22rpx;
+  font-weight: 700;
+  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.55);
+}
+
+.action-bar {
+  flex-direction: column;
+  gap: 16rpx;
+  padding: 20rpx 32rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 3rpx solid var(--fg);
+}
+
+.action-primary {
+  width: 100%;
+  height: 92rpx;
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  background: var(--accent);
+  color: #FFFDF7;
+  font-size: 32rpx;
+  font-weight: 800;
+  box-shadow: var(--shadow-hard-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-primary:active {
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none;
+}
+
+.action-primary::after {
+  border: none;
+}
+
+.action-row {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  width: 100%;
+}
+
+.action-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  background: transparent;
+  border: none;
+  padding: 8rpx 12rpx;
+  line-height: 1;
+}
+
+.action-icon::after {
+  border: none;
+}
+
+.action-icon-emoji {
+  width: 64rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  text-align: center;
+  font-size: 36rpx;
+  border: 2rpx solid var(--fg);
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.55);
+}
+
+.action-icon.active .action-icon-emoji {
+  background: var(--sun-soft);
+}
+
+.action-icon-label {
+  font-size: 22rpx;
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.action-icon[disabled] {
+  opacity: 0.6;
+}
+
+/* ---------- v5 增补：meta chips / 状态卡 / 简介 ---------- */
+.hero-meta { display: flex; gap: 10rpx; margin-top: 12rpx; flex-wrap: wrap; }
+.meta-chip {
+  font-size: 20rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba(96, 165, 250, 0.14);
+  color: var(--sky);
+  font-weight: 600;
+}
+.meta-chip2 { background: rgba(167, 139, 250, 0.16); color: var(--lavender); }
+
+.state-card {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  border-radius: var(--radius-sm);
+  border: 3rpx solid var(--fg);
+  padding: 24rpx 28rpx;
+  margin-top: 24rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+.state-borrowing { background: rgba(74, 222, 128, 0.14); }
+.state-reserved { background: rgba(252, 211, 77, 0.22); }
+.state-emoji { font-size: 44rpx; }
+.state-texts { flex: 1; }
+.state-title { font-size: 28rpx; font-weight: 700; color: var(--fg); }
+.state-sub { font-size: 22rpx; color: var(--muted); margin-top: 4rpx; }
+.state-arrow { font-size: 40rpx; color: var(--muted); }
+
+.muted-line { color: var(--muted); font-size: 26rpx; line-height: 1.6; }
+.desc-text { color: var(--fg); font-size: 26rpx; line-height: 1.7; }

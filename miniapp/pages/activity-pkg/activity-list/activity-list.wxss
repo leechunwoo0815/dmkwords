@@ -183,3 +183,59 @@
   font-size: 28rpx;
   color: var(--muted);
 }
+
+/* ============================================
+   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
+   ============================================ */
+/* 卡片：粗黑边 + 硬阴影 + 手绘圆角 */
+.card, .section-card, .card-wrapper, .section, .panel, .info-card, .form-card {
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+/* 标题圆体 */
+.page-title, .section-title, .card-title, .header-title, .title, .name {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+/* 列表项：卡片化 */
+.list-item, .item, .row, .cell, .info-row {
+  background: var(--surface);
+  border: 2rpx solid var(--fg);
+  border-radius: 24rpx 28rpx 20rpx 30rpx;
+  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
+}
+
+/* 列表容器：加间距 */
+.list, .grid, .list-container {
+  gap: 16rpx;
+}
+
+
+/* 绘本风精修补充：tab 胶囊化 + 活动卡 */
+.tabs {
+  border-bottom: none;
+  background: transparent;
+  gap: 16rpx;
+  padding: 0 24rpx;
+}
+.tab {
+  flex: 0 0 auto;
+  padding: 16rpx 32rpx;
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  background: var(--surface);
+  box-shadow: var(--shadow-hard-sm);
+  font-weight: 700;
+}
+.tab.active {
+  background: var(--sun);
+  color: var(--fg);
+  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+}
+.tab.active::after {
+  display: none;
+}

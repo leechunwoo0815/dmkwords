@@ -1,7 +1,7 @@
 <view class="quiz-page">
   <view class="quiz-header">
     <view class="quiz-book-name">{{bookTitle}}</view>
-    <view class="quiz-progress-row">
+    <view class="quiz-progress-row" wx:if="{{questions.length}}">
       <view class="quiz-progress-bar">
         <view class="quiz-progress-fill" style="width: {{(current + 1) * 100 / questions.length}}%"></view>
       </view>
@@ -11,7 +11,13 @@
 
   <view wx:if="{{status === 'locked'}}" class="feedback">
     <text class="feedback-icon">🔒</text>
-    <text class="feedback-text">需先听完音频（95%）才能开始测验</text>
+    <text class="feedback-text">先去把这本书听完（95%），测验就会解锁啦</text>
+    <view class="feedback-btn" bindtap="goBack">去听书</view>
+  </view>
+  <view wx:elif="{{status === 'passed'}}" class="feedback">
+    <text class="feedback-icon">🎉</text>
+    <text class="feedback-text">这本书你已经通过测验啦，词数已入账\n去挑战下一本书吧！</text>
+    <view class="feedback-btn" bindtap="goBack">选下一本</view>
   </view>
   <view wx:elif="{{status === 'failed'}}" class="feedback">
     <text class="feedback-icon">😅</text>

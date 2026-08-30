@@ -118,10 +118,25 @@ def _ensure_demo_books(db: Session) -> None:
     """6 本上架演示书目（C48 配套）：带音频（复用 uploads 现有文件）+ 各 2 副本，
     让图书馆/详情/预约/借阅/测验链路都有像样的测试数据。按 ISBN 幂等。"""
     from backend.common.file_storage import _mp3_duration
-    from backend.domain.catalog.models import Book, BookCopy
+    from backend.domain.catalog.models import Book, BookCopy, QuizQuestion
+    from scripts.seed_demo_library import make_questions
+
+    # 演示书缺题则补（测验链路可测；幂等：只给 0 题的书补）
+    demo_isbns = [row[0] for row in DEMO_BOOKS]
+    for b in db.query(Book).filter(Book.isbn.in_(demo_isbns), Book.is_deleted == 0).all():
+        if db.query(QuizQuestion).filter(QuizQuestion.book_id == b.id).count() == 0:
+            db.add_all(make_questions(b))
+            db.flush()
 
     for isbn, title, author, words, ar, grade, topic, audio_isbn in DEMO_BOOKS:
-        if db.query(Book).filter(Book.isbn == isbn, Book.is_deleted == 0).first():
+        # 查重含软删行（ISBN 唯一索引不含 is_deleted，软删行会挡 INSERT——C50 同族）：
+        # 命中软删行直接复活，不重复建书
+        existing = db.query(Book).filter(Book.isbn == isbn).first()
+        if existing is not None:
+            if existing.is_deleted:
+                existing.is_deleted = 0
+                existing.status = Book.STATUS_ON
+                db.flush()
             continue
         audio_rel = f"book_audio/{audio_isbn}/audio.mp3"
         try:
@@ -233,6 +248,181 @@ def _ensure_demo_borrow(db: Session, child) -> None:
     db.flush()
 
 
+def _ensure_demo_growth(db: Session, child) -> None:
+    """演示成长数据（小程序 v5 首页任务台配套）：打卡 3 天 + 3 本书的词数/积分流水 +
+    在借书 40% 听读进度。幂等：WordsLedger 靠唯一索引，其余先查后插。"""
+    from backend.domain.catalog.models import Book
+    from backend.domain.circulation.models import BorrowRecord
+    from backend.domain.growth.models import ChildGrowthState, PointLedger, WordsLedger
+    from backend.domain.reading.models import CheckIn, ReadingProgress
+
+    books = (
+        db.query(Book)
+        .filter(Book.is_deleted == 0, Book.status == Book.STATUS_ON, Book.word_count > 0)
+        .order_by(Book.id)
+        .limit(3)
+        .all()
+    )
+    if not books:
+        return
+
+    # 1) 词数流水（child×book 唯一，IGNORE 幂等）
+    for b in books:
+        stmt = mysql_insert(WordsLedger).values(
+            child_id=child.id,
+            book_id=b.id,
+            word_count=b.word_count,
+            source="quiz",
+            create_time=datetime.now() - timedelta(days=2),
+        )
+        db.execute(stmt.prefix_with("IGNORE"))
+
+    # 2) 积分流水（无唯一索引，先查后插）
+    if not db.query(PointLedger).filter(PointLedger.child_id == child.id).first():
+        db.add(
+            PointLedger(
+                child_id=child.id,
+                points=5,
+                reason_type="quiz_first_pass",
+                detail="演示：首次通过测验",
+            )
+        )
+        db.add(
+            PointLedger(
+                child_id=child.id, points=3, reason_type="quiz_full_marks", detail="演示：测验满分"
+            )
+        )
+        db.add(
+            PointLedger(
+                child_id=child.id, points=2, reason_type="words_convert", detail="演示：词数兑换"
+            )
+        )
+
+    # 3) 打卡近 3 天（先查后插）
+    have = {
+        c.checkin_date
+        for c in db.query(CheckIn)
+        .filter(CheckIn.child_id == child.id, CheckIn.is_deleted == 0)
+        .all()
+    }
+    for i in (0, 1, 2):
+        day = (datetime.now() - timedelta(days=i)).date()
+        if day in have:
+            continue
+        db.add(
+            CheckIn(
+                child_id=child.id,
+                checkin_date=day,
+                book_id=books[0].id,
+                streak=3 - i,
+                created_at=datetime.combine(day, datetime.min.time()) + timedelta(hours=19),
+            )
+        )
+
+    # 4) 在借书 40% 听读进度（先查后插）
+    borrow = (
+        db.query(BorrowRecord)
+        .filter(
+            BorrowRecord.child_id == child.id,
+            BorrowRecord.status == BorrowRecord.STATUS_ACTIVE,
+            BorrowRecord.is_deleted == 0,
+        )
+        .first()
+    )
+    if (
+        borrow
+        and not db.query(ReadingProgress)
+        .filter(ReadingProgress.child_id == child.id, ReadingProgress.book_id == borrow.book_id)
+        .first()
+    ):
+        pbook = db.query(Book).filter(Book.id == borrow.book_id).first()
+        total = int(pbook.audio_duration_seconds or 6) if pbook else 6
+        cov = max(1, int(total * 0.4))
+        intervals_json = f"[[0,{cov}]]"
+        db.add(
+            ReadingProgress(
+                child_id=child.id,
+                book_id=borrow.book_id,
+                # total 用书真实音频时长（20260830：硬编码 20s 与 4-6s 真音频不符，
+                # 完播判定 coverage/total 永远不可达 → "永远读不完"）
+                intervals=intervals_json,
+                coverage_seconds=cov,
+                total_seconds=total,
+                finished=0,
+                last_position=cov,
+                last_report_at=datetime.now(),
+            )
+        )
+
+    # 5) ChildGrowthState 同步（等级由词数决定，演示量级保持 A）
+    words_total = sum(b.word_count for b in books)
+    state = db.query(ChildGrowthState).filter(ChildGrowthState.child_id == child.id).first()
+    if not state:
+        state = ChildGrowthState(child_id=child.id, level="A")
+        db.add(state)
+    state.words_total = words_total
+    state.books_total = len(books)
+    state.points_total = 10
+    db.flush()
+
+
+def _ensure_demo_fav_reservation(db: Session, child) -> None:
+    """演示收藏 2 本 + 预约 1 条（书架页三 tab 有真实数据可验）。先查后插幂等。"""
+    from backend.domain.catalog.models import Book
+    from backend.domain.reading.models import Favorite, Reservation
+
+    if (
+        not db.query(Favorite)
+        .filter(Favorite.child_id == child.id, Favorite.is_deleted == 0)
+        .first()
+    ):
+        fav_books = (
+            db.query(Book)
+            .filter(Book.is_deleted == 0, Book.status == Book.STATUS_ON, Book.word_count > 500)
+            .order_by(Book.word_count.desc())
+            .limit(2)
+            .all()
+        )
+        for b in fav_books:
+            db.add(Favorite(child_id=child.id, book_id=b.id))
+        db.flush()
+    if (
+        not db.query(Reservation)
+        .filter(Reservation.child_id == child.id, Reservation.is_deleted == 0)
+        .first()
+    ):
+        from backend.domain.catalog.models import BookCopy
+
+        pick = (
+            db.query(Book)
+            .filter(Book.is_deleted == 0, Book.status == Book.STATUS_ON, Book.word_count > 1000)
+            .order_by(Book.word_count.desc())
+            .first()
+        )
+        if pick is not None:
+            copy = (
+                db.query(BookCopy)
+                .filter(
+                    BookCopy.book_id == pick.id,
+                    BookCopy.status == BookCopy.STATUS_AVAILABLE,
+                    BookCopy.is_deleted == 0,
+                )
+                .first()
+            )
+            if copy is not None:
+                copy.status = BookCopy.STATUS_RESERVED
+                db.add(
+                    Reservation(
+                        child_id=child.id,
+                        book_id=pick.id,
+                        copy_id=copy.id,
+                        status=Reservation.STATUS_ACTIVE,
+                        expires_at=datetime.now() + timedelta(hours=72),
+                    )
+                )
+            db.flush()
+
+
 def _upsert_notification(db: Session, parent: Parent, **kw) -> None:
     stmt = mysql_insert(Notification).values(
         parent_id=parent.id,
@@ -296,6 +486,8 @@ def seed() -> None:
         if demo_child is not None:
             _ensure_demo_deposit(db, demo_child)
             _ensure_demo_borrow(db, demo_child)
+            _ensure_demo_growth(db, demo_child)
+            _ensure_demo_fav_reservation(db, demo_child)
         now = datetime.now()
         _upsert_notification(
             db,

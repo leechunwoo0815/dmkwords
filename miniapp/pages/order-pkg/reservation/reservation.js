@@ -33,7 +33,7 @@ Page({
     try {
       const res = await api.listReservations(this._childId)
       const items = (res || []).map((r) => {
-        const remainMs = r.status === 'active' ? new Date(r.expires_at).getTime() - Date.now() : 0
+        const remainMs = r.status === 'active' ? new Date(String(r.expires_at).replace(/-/g, '/')).getTime() - Date.now() : 0
         let remainText = ''
         if (remainMs > 0) {
           const hours = Math.floor(remainMs / 3600000)

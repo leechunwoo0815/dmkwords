@@ -64,39 +64,50 @@ def save_cover_jpg(book, data: bytes, ext: str) -> str:
 
 
 def _mp3_duration(data: bytes) -> int:
-    """粗略解析 MP3 时长（秒）：优先 Xing/Info 头帧数，否则按首帧比特率估算。"""
+    """粗略解析 MP3 时长（秒）：优先 Xing/Info 头帧数，否则按首帧比特率估算。
+    支持 MPEG1/MPEG2/MPEG2.5 Layer III——lame 低采样率输出是 MPEG2（帧头 fff3），
+    只解析 MPEG1 时返回 0，会把真实几秒的音频兜底成 60s（完播判定永远不可达）。"""
 
     def _frames_to_seconds(frame_count: int, samples: int, sample_rate: int) -> int:
-        return int(frame_count * samples / sample_rate)
+        return int(frame_count * samples / sample_rate) if sample_rate else 0
 
-    # 查找第一帧同步字
-    idx = data.find(b"\xff\xfb") if data.find(b"\xff\xfb") != -1 else data.find(b"\xff\xf3")
+    # 逐字节找 11 位帧同步字（\xff 后高 3 位为 1），兼容 ID3 头在前
+    idx = -1
+    for i in range(len(data) - 4):
+        if data[i] == 0xFF and (data[i + 1] & 0xE0) == 0xE0:
+            idx = i
+            break
     if idx == -1:
-        # 可能是 ID3+VBR，扫 Xing
         return 0
-    header = data[idx : idx + 4]
-    if len(header) < 4:
+    b1, b2 = data[idx + 1], data[idx + 2]
+    version = (b1 >> 3) & 0x03  # 3=MPEG1, 2=MPEG2, 0=MPEG2.5
+    layer = (b1 >> 1) & 0x03  # 1=Layer III
+    bitrate_idx = (b2 >> 4) & 0x0F
+    sr_idx = (b2 >> 2) & 0x03
+    if layer != 1 or version == 1 or bitrate_idx == 0 or bitrate_idx == 15 or sr_idx == 3:
         return 0
-    bitrate_table = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0]
-    sample_rates = [44100, 48000, 32000]
-    version = (header[1] >> 3) & 0x03  # 3=MPEG1, 2=MPEG2
-    layer = (header[1] >> 1) & 0x03  # 1=Layer III
-    bitrate_idx = (header[2] >> 4) & 0x0F
-    sr_idx = (header[2] >> 2) & 0x03
-    if version == 3 and layer == 1 and 0 < bitrate_idx < 15 and sr_idx < 3:
-        sample_rate = sample_rates[sr_idx]
-        # Xing/Info 检测（VBR 头在帧数据开侧）
-        frame_size = 144 * bitrate_table[bitrate_idx] * 1000 // sample_rate
-        xing = data.find(b"Xing", idx + 4) if version == 3 else data.find(b"Info", idx + 4)
-        if xing != -1 and xing - idx < frame_size:
-            flags = struct.unpack(">I", data[xing + 4 : xing + 8])[0]
-            if flags & 0x01:  # frames flag
-                frames = struct.unpack(">I", data[xing + 8 : xing + 12])[0]
-                return _frames_to_seconds(frames, 1152, sample_rate)
-        # CBR 估算
-        bitrate = bitrate_table[bitrate_idx] * 1000
-        if bitrate > 0:
-            return int(len(data) * 8 / bitrate)
+    if version == 3:  # MPEG1
+        bitrate_table = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0]
+        sample_rates = [44100, 48000, 32000]
+        samples_per_frame = 1152
+    else:  # MPEG2 / MPEG2.5：低速率表、576 samples、采样率减半/再减半
+        bitrate_table = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0]
+        sample_rates = {2: [22050, 24000, 16000], 0: [11025, 12000, 8000]}[version]
+        samples_per_frame = 576
+    sample_rate = sample_rates[sr_idx]
+    # Xing/Info 检测（VBR 头在首帧内；帧最大 ~1440B，取 200 余量足够）
+    xing = data.find(b"Xing", idx + 4)
+    if xing == -1:
+        xing = data.find(b"Info", idx + 4)
+    if xing != -1 and xing - idx < 200:
+        flags = struct.unpack(">I", data[xing + 4 : xing + 8])[0]
+        if flags & 0x01:  # frames flag
+            frames = struct.unpack(">I", data[xing + 8 : xing + 12])[0]
+            return _frames_to_seconds(frames, samples_per_frame, sample_rate)
+    # CBR 估算：从同步字起算（剔除前面的 ID3 头）
+    bitrate = bitrate_table[bitrate_idx] * 1000
+    if bitrate > 0:
+        return int((len(data) - idx) * 8 / bitrate)
     return 0
 
 
