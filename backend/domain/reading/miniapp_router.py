@@ -398,3 +398,45 @@ def current_borrows(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child = _child_of_parent(db, parent.id, child_id)
     return ShelfService(db).current_borrows(child)
+
+
+@router.get("/continue-listening")
+def continue_listening(child_id: int, auth: Any = Depends(get_current_parent)):
+    """首页"继续听"卡：最近一次有进度但未读完（finished=0）的上一本。
+    读完的/无进度的不返回；无续听对象返回 null（前端隐藏卡片）。"""
+    from backend.domain.catalog.models import Book as BookModel
+    from backend.domain.circulation.models import BorrowRecord
+    from backend.domain.reading.models import ReadingProgress
+
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, child_id)
+    row = (
+        db.query(ReadingProgress, BookModel, BorrowRecord)
+        .join(BookModel, ReadingProgress.book_id == BookModel.id)
+        .join(
+            BorrowRecord,
+            (BorrowRecord.child_id == ReadingProgress.child_id)
+            & (BorrowRecord.book_id == ReadingProgress.book_id),
+            isouter=True,
+        )
+        .filter(
+            ReadingProgress.child_id == child.id,
+            ReadingProgress.finished == 0,
+            ReadingProgress.last_report_at.isnot(None),
+            ReadingProgress.is_deleted == 0,
+            BookModel.is_deleted == 0,
+            BookModel.status == BookModel.STATUS_ON,
+        )
+        .order_by(ReadingProgress.last_report_at.desc())
+        .first()
+    )
+    if not row:
+        return None
+    p, book, br = row
+    in_borrow = bool(br and br.status in (BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE))
+    return {
+        "book": _book_view(book),
+        "percent": round(p.coverage_seconds * 100 / p.total_seconds, 1) if p.total_seconds else 0,
+        "last_position": p.last_position,
+        "due_at": str(br.due_at) if in_borrow else None,
+    }

@@ -203,10 +203,11 @@ def test_reservation_flow(client: TestClient):
         "/api/miniapp/reservations", json={"child_id": c["id"], "book_id": book["id"]}, headers=mini
     )
     assert r4.status_code == 200
-    # 列表两条（cancelled + active）
+    # 书架"预约中"只返回 active：cancelled 的不再出现（bug 修复）
     mine = client.get(f"/api/miniapp/reservations?child_id={c['id']}", headers=mini).json()
-    assert len(mine) == 2
-    assert mine[0]["title"] == "Dog Man"
+    assert len(mine) == 1
+    assert mine[0]["status"] == "active"
+    assert mine[0]["book_id"] == book["id"]
 
 
 def test_miniapp_login_wrong_code(client: TestClient):
@@ -304,9 +305,9 @@ def test_admin_reservation_checkout_and_profile(client: TestClient):
     assert co.status_code == 200, co.text
     assert co.json()["reservation_id"] == rid
     assert co.json()["due_at"]
-    # 预约变 checked_out
+    # 核销后预约从书架"预约中"消失（bug 修复：checked_out 不再返回）
     mine = client.get(f"/api/miniapp/reservations?child_id={c['id']}", headers=mini).json()
-    assert mine[0]["status"] == "checked_out"
+    assert mine == [] or all(r["status"] == "active" for r in mine)
     # 重复核销被拒
     co2 = client.post(f"/api/admin/reservations/{rid}/checkout", headers=h)
     assert co2.status_code == 422
@@ -317,6 +318,26 @@ def test_admin_reservation_checkout_and_profile(client: TestClient):
     assert prof["total_checkin_days"] == 1
     assert prof["current_streak"] == 1
     assert prof["finished_books"][0]["title"] == "Dog Man"
+
+
+def test_continue_listening_returns_unfinished_only(client: TestClient):
+    """首页续听卡：只返回最近一本"有进度未读完"的书；读完/无进度不返回（null）。"""
+    h = _h(client)
+    c, book, mini = _setup(client, h, "13800000611", "9781313131313")
+    # 未读完：听 10 秒（coverage 10/600）
+    r = _report(client, mini, c["id"], book["id"], 10, 0)
+    assert r.status_code == 200
+    cont = client.get(f"/api/miniapp/continue-listening?child_id={c['id']}", headers=mini).json()
+    assert cont is not None
+    assert cont["book"]["id"] == book["id"]
+    assert cont["percent"] > 0
+    assert cont["last_position"] == 10
+    # 听完 → 不再出现在续听卡
+    _backdate(client, c["id"], book["id"], 590)
+    r2 = _report(client, mini, c["id"], book["id"], 600, 10)
+    assert r2.json()["finished"] is True
+    cont2 = client.get(f"/api/miniapp/continue-listening?child_id={c['id']}", headers=mini).json()
+    assert cont2 is None
 
 
 def test_merge_intervals_dirty_data():

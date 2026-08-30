@@ -116,8 +116,10 @@ Page({
   goDetail(e) {
     const book = e.currentTarget.dataset.book
     if (!book) return
+    // 预约/收藏 item 的 id 是记录 id 而非书 id（借阅无顶层 id）——跳详情必须用 book_id
+    const detailBook = { ...book, id: book.book_id || book.id }
     wx.navigateTo({
-      url: `/pages/reading-pkg/book-detail/book-detail?book=${encodeURIComponent(JSON.stringify(book))}`
+      url: `/pages/reading-pkg/book-detail/book-detail?book=${encodeURIComponent(JSON.stringify(detailBook))}`
         + `&child_id=${this.data.childId}&child_name=${encodeURIComponent(this.data.childName)}`,
     })
   },

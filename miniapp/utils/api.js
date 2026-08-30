@@ -162,6 +162,10 @@ module.exports = {
     return req.get('/api/miniapp/borrows', null, { params: { child_id: childId } })
   },
 
+  continueListening(childId) {
+    return req.get('/api/miniapp/continue-listening', null, { params: { child_id: childId } })
+  },
+
   // 打卡
   getCheckins(childId, days) {
     return req.get('/api/miniapp/checkins', null, { params: { child_id: childId, days: days || 60 } })

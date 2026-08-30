@@ -62,7 +62,7 @@
 
   <!-- 底部操作 -->
   <view class="action-bar">
-    <button class="action-primary" bindtap="onPlay">▶ {{progress && progress.finished ? '再听一遍' : '开始听'}}</button>
+    <button class="action-primary" bindtap="onPlay">▶ {{progress && progress.finished ? '再听一遍' : (progress && progress.coverage_seconds > 0 ? '继续听' : '开始听')}}</button>
     <view class="action-row">
       <button class="action-icon {{inFav ? 'active' : ''}}" bindtap="onFav">
         <text class="action-icon-emoji">{{inFav ? '⭐' : '🤍'}}</text>

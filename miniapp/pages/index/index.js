@@ -78,23 +78,27 @@ Page({
     } catch (e) { /* 静默 */ }
   },
 
-  // 续听卡：在借第一本 + 真实进度（borrows 为扁平结构：cover_url/has_audio/due_at）
+  // 续听卡：最近一本"有进度未读完"（finish=0 的最近一本；读完/无进度不显示）
   async loadContinue(childId) {
     try {
-      const borrows = await api.currentBorrows(childId)
+      const [borrows, cont] = await Promise.all([
+        api.currentBorrows(childId).catch(() => []),
+        api.continueListening(childId).catch(() => null),
+      ])
       this.setData({ borrowCount: (borrows || []).length })
-      if (!borrows || !borrows.length) {
+      if (!cont || !cont.book) {
         this.setData({ continueBook: null })
         return
       }
-      const b = borrows[0]
-      const book = media.formatBook(b)
-      let percent = 0
-      try {
-        const p = await api.getProgress(book.id || b.book_id, childId)
-        percent = Math.min(100, Math.round(p.coverage_percent || 0))
-      } catch (e) { /* 新书无进度 */ }
-      this.setData({ continueBook: { ...book, id: book.id || b.book_id, percent, dueText: this.dueText(b) } })
+      this.setData({
+        continueBook: {
+          ...media.formatBook(cont.book),
+          id: cont.book.id,
+          percent: cont.percent || 0,
+          lastPosition: cont.last_position || 0,
+          dueText: cont.due_at ? this.dueText(cont) : '可续听',
+        },
+      })
     } catch (e) {
       this.setData({ continueBook: null })
     }

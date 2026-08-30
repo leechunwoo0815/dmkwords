@@ -460,7 +460,13 @@ class ReservationService:
         rows = (
             self.db.query(Reservation, Book)
             .join(Book, Reservation.book_id == Book.id)
-            .filter(Reservation.child_id == child.id, Reservation.is_deleted == 0)
+            .filter(
+                Reservation.child_id == child.id,
+                # 书架"预约中"只显示有效锁定态：核销(checked_out)/取消(cancelled)/
+                # 超时(expired)/异常(exception) 均不应再出现
+                Reservation.status == Reservation.STATUS_ACTIVE,
+                Reservation.is_deleted == 0,
+            )
             .order_by(Reservation.id.desc())
             .all()
         )

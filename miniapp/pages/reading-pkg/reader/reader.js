@@ -62,6 +62,7 @@ Page({
     this._sessionStart = null
     this._pendingSec = 0
     this._audio = null
+    this._resumeApplied = false
     this._initAudio()
     this.loadProgress()
   },
@@ -88,7 +89,17 @@ Page({
         finished: !!p.finished,
         lastPosition: p.last_position || 0,
       })
+      this._applyResume()
     } catch (e) { /* 新书无进度 */ }
+  },
+
+  _applyResume() {
+    // 有历史进度则从 last_position 续播（onCanplay 与 loadProgress 双保险，防基础库不触发）
+    const { lastPosition } = this.data
+    if (lastPosition > 0 && this._audio && !this._resumeApplied) {
+      this._audio.seek(lastPosition)
+      this._resumeApplied = true
+    }
   },
 
   _initAudio() {
@@ -105,6 +116,7 @@ Page({
       if (this.data.duration <= 0 && audio.duration) {
         this.setData({ duration: audio.duration, displayDuration: fmt(audio.duration), sliderMax: Math.floor(audio.duration) })
       }
+      this._applyResume()
     })
     audio.onPlay(() => {
       if (this._sessionStart === null) this._sessionStart = Math.floor(audio.currentTime || 0)
