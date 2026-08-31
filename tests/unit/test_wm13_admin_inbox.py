@@ -97,9 +97,7 @@ def test_list_inbox_status_filter(client: TestClient):
     with _db() as db:
         _seed_mixed(db)
         db.commit()
-    r = client.get(
-        "/api/admin/admin-notifications", params={"status_filter": "pending"}, headers=h
-    )
+    r = client.get("/api/admin/admin-notifications", params={"status_filter": "pending"}, headers=h)
     data = r.json()
     assert data["total"] == 2
     assert data["pending_count"] == 2
@@ -123,9 +121,7 @@ def test_s2_staff_sees_empty_not_403(client: TestClient):
     data = r.json()
     assert data["items"] == []
     assert data["pending_count"] == 0
-    r2 = client.post(
-        "/api/admin/admin-notifications/1/handle", json={"reason": "x"}, headers=hs
-    )
+    r2 = client.post("/api/admin/admin-notifications/1/handle", json={"reason": "x"}, headers=hs)
     assert r2.status_code == 403
 
 
@@ -210,7 +206,5 @@ def test_inbox_scene_and_keyword_filter(client: TestClient):
         headers=h,
     )
     assert r.json()["total"] == 2
-    r2 = client.get(
-        "/api/admin/admin-notifications", params={"keyword": "测试家长"}, headers=h
-    )
+    r2 = client.get("/api/admin/admin-notifications", params={"keyword": "测试家长"}, headers=h)
     assert r2.json()["total"] == 4

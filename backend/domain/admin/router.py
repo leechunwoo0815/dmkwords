@@ -115,9 +115,9 @@ def list_admin_notifications(
     db: Session = Depends(get_db),
 ):
     """WM13 管理待办收件箱（显示态实时算；S2：非超管返回空数据不 403）。"""
-    from backend.common.admin_notifications import AdminNotifyService
+    from backend.domain.admin.todo_service import AdminTodoService
 
-    return AdminNotifyService(db).list_inbox(
+    return AdminTodoService(db).list_inbox(
         page,
         page_size,
         status_filter=status_filter,
@@ -135,9 +135,9 @@ def handle_admin_notification(
     db: Session = Depends(get_db),
 ):
     """WM13 手动兜底标记已处理（S4：reason 必填 + publish_audit 留痕；Q8 幂等）。"""
-    from backend.common.admin_notifications import AdminNotifyService
+    from backend.domain.admin.todo_service import AdminTodoService
 
-    return AdminNotifyService(db).handle(notification_id, admin, body.reason)
+    return AdminTodoService(db).handle(notification_id, admin, body.reason)
 
 
 @router.get("/todo-counts")
@@ -146,9 +146,9 @@ def todo_counts(
     db: Session = Depends(get_db),
 ):
     """WM13 感知层聚合（Q9 权限粒度：审计五类仅超管；order_pending_manual 跟 member.manage）。"""
-    from backend.common.admin_notifications import AdminNotifyService
+    from backend.domain.admin.todo_service import AdminTodoService
 
-    return AdminNotifyService(db).todo_counts(admin)
+    return AdminTodoService(db).todo_counts(admin)
 
 
 @router.get("/notifications")

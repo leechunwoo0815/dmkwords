@@ -178,9 +178,7 @@ def test_todo_counts_scene_split(client: TestClient):
             ("admin.transfer_expiring", "transfer", t_expired.id),
             ("admin.activity_batch_refund", "activity", a.id),
         ]:
-            svc.send(
-                scene=scene, title="t", content="c", ref_type=ref_type, ref_id=str(ref)
-            )
+            svc.send(scene=scene, title="t", content="c", ref_type=ref_type, ref_id=str(ref))
         db.commit()
     c = client.get("/api/admin/todo-counts", headers=h).json()
     assert c["withdrawal_pending"] == 1

@@ -20,11 +20,8 @@ from backend.domain.identity.schemas import (
     ParentResponse,
 )
 from backend.domain.identity.service import ChildService, OrderService, ParentService
-from backend.domain.identity.wm10_service import (
-    RefundService,
-    TransferService,
-    WithdrawalService,
-)
+from backend.domain.identity.transfer_service import TransferService
+from backend.domain.identity.wm10_service import RefundService, WithdrawalService
 from backend.middleware.admin_rbac import require_perm, require_super_admin
 
 router = APIRouter(tags=["identity"])

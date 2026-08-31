@@ -7,6 +7,8 @@ from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
+from backend.domain.admin.todo_service import AdminTodoService
+
 
 def _h(client, username="admin"):
     r = client.post("/api/admin/login", json={"username": username, "password": "dmkwords123"})
@@ -274,9 +276,9 @@ def _mk_notif_and_refund(db, status: str, ref_id="99010"):
 
 def test_status_resolver_refund_scenes(db):
     """refund_apply 分支：pending→待处理；cancelled→已失效·家长已撤销；approved/failed→已审结。"""
-    from backend.common.admin_notifications import AdminNotifyService
+    from backend.domain.admin.todo_service import AdminTodoService
 
-    svc = AdminNotifyService(db)
+    svc = AdminTodoService(db)
     n_pending = _mk_notif_and_refund(db, "pending")
     r = svc.resolve_many([n_pending])
     assert r[n_pending.id] == {"effective_status": "pending", "status_text": "待处理"}
@@ -298,10 +300,9 @@ def test_status_resolver_refund_scenes(db):
 def test_status_resolver_refund_execute_failed_scene(db):
     """refund_execute_failed 分支：failed→待处理（需重试）；refunded→已审结。"""
     from backend.common.admin_notification_models import AdminNotification
-    from backend.common.admin_notifications import AdminNotifyService
     from backend.domain.identity.models import RefundRequest
 
-    svc = AdminNotifyService(db)
+    svc = AdminTodoService(db)
     db.add(
         RefundRequest(
             kind=RefundRequest.KIND_ORDER,
@@ -335,10 +336,9 @@ def test_status_resolver_refund_execute_failed_scene(db):
 def test_status_resolver_withdrawal_transfer_scenes(db):
     """withdrawal/transfer/transfer_expiring 分支（Q5 映射表）。"""
     from backend.common.admin_notification_models import AdminNotification
-    from backend.common.admin_notifications import AdminNotifyService
     from backend.domain.identity.models import TransferRequest, WithdrawalRequest
 
-    svc = AdminNotifyService(db)
+    svc = AdminTodoService(db)
     # withdrawal：applying→待处理；cancelled→失效；rejected→已审结
     w = WithdrawalRequest(child_id=1, reason="x", status=WithdrawalRequest.STATUS_APPLYING)
     db.add(w)
@@ -412,10 +412,9 @@ def test_status_resolver_withdrawal_transfer_scenes(db):
 def test_status_resolver_activity_scene(db):
     """activity_batch_refund：有 REFUND_PENDING→待处理；全部终态→已审结（Q5/A3）。"""
     from backend.common.admin_notification_models import AdminNotification
-    from backend.common.admin_notifications import AdminNotifyService
     from backend.domain.activity.models import Activity, ActivityEnrollment
 
-    svc = AdminNotifyService(db)
+    svc = AdminTodoService(db)
     a = Activity(
         title="测试活动",
         activity_type="book_club",
@@ -469,12 +468,12 @@ def test_s1_orphan_refund_cancelled(client: TestClient):
         json={"child_id": c["id"], "order_id": o["id"], "reason": "临时"},
         headers=mini,
     ).json()
-    from backend.common.admin_notifications import AdminNotifyService
+    from backend.domain.admin.todo_service import AdminTodoService
 
     with _db() as db:
         rows = _notifs(db, "admin.refund_apply")
         assert len(rows) == 1
-        r = AdminNotifyService(db).resolve_many(rows)
+        r = AdminTodoService(db).resolve_many(rows)
         assert r[rows[0].id]["effective_status"] == "pending"
         # 家长撤销
         assert (
@@ -488,7 +487,7 @@ def test_s1_orphan_refund_cancelled(client: TestClient):
         db.commit()  # 结束快照事务（REPEATABLE READ），读取 app 已提交的撤销
         db.expire_all()
         rows = _notifs(db, "admin.refund_apply")
-        r = AdminNotifyService(db).resolve_many(rows)
+        r = AdminTodoService(db).resolve_many(rows)
         assert r[rows[0].id]["effective_status"] == "invalid"
         assert "撤销" in r[rows[0].id]["status_text"]
         pending_cnt = sum(1 for v in r.values() if v["effective_status"] == "pending")
@@ -508,15 +507,13 @@ def test_s1_orphan_transfer_expired(client: TestClient):
         json={"source_child_id": src["id"], "target_child_id": tgt["id"]},
         headers=mini,
     ).json()
-    from backend.common.admin_notifications import AdminNotifyService
+    from backend.domain.admin.todo_service import AdminTodoService
     from backend.domain.identity.transfer_service import TransferService
 
     with _db() as db:
         rows = _notifs(db, "admin.transfer_apply")
         assert len(rows) == 1
-        assert (
-            AdminNotifyService(db).resolve_many(rows)[rows[0].id]["effective_status"] == "pending"
-        )
+        assert AdminTodoService(db).resolve_many(rows)[rows[0].id]["effective_status"] == "pending"
     # 超时（expires_at 改到过去 → 跑 expire_overdue 真实任务方法）
     with _db() as db:
         from backend.domain.identity.models import TransferRequest
@@ -528,7 +525,7 @@ def test_s1_orphan_transfer_expired(client: TestClient):
         assert expired >= 1
         db.expire_all()
         rows = _notifs(db, "admin.transfer_apply")
-        r = AdminNotifyService(db).resolve_many(rows)
+        r = AdminTodoService(db).resolve_many(rows)
         assert r[rows[0].id]["effective_status"] == "invalid"
         assert "超时" in r[rows[0].id]["status_text"]
         assert sum(1 for v in r.values() if v["effective_status"] == "pending") == 0

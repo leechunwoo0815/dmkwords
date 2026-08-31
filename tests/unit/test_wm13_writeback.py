@@ -3,7 +3,6 @@
 回写只为审计展示完整（handled_at/handled_by/note）。家长撤销/超时路径 note 标注来源。"""
 
 from datetime import datetime, timedelta
-from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
@@ -57,9 +56,7 @@ def _refund_notifs(db):
 
     return (
         db.query(AdminNotification)
-        .filter(
-            AdminNotification.ref_type == "refund_request", AdminNotification.is_deleted == 0
-        )
+        .filter(AdminNotification.ref_type == "refund_request", AdminNotification.is_deleted == 0)
         .order_by(AdminNotification.id)
         .all()
     )
@@ -83,11 +80,9 @@ def test_refund_review_marks_handled(client: TestClient):
         assert rows[0].handled_at is not None
         assert rows[0].handled_by == 1
         # 显示态不受审计字段影响（双层设计）：approved → 已审结
-        from backend.common.admin_notifications import AdminNotifyService
+        from backend.domain.admin.todo_service import AdminTodoService
 
-        assert (
-            AdminNotifyService(db).resolve_many(rows)[rows[0].id]["effective_status"] == "done"
-        )
+        assert AdminTodoService(db).resolve_many(rows)[rows[0].id]["effective_status"] == "done"
 
 
 def test_refund_parent_cancel_marks_handled_with_note(client: TestClient):
@@ -141,9 +136,7 @@ def test_transfer_expire_marks_handled(client: TestClient):
 
         rows = (
             db.query(AdminNotification)
-            .filter(
-                AdminNotification.ref_type == "transfer", AdminNotification.is_deleted == 0
-            )
+            .filter(AdminNotification.ref_type == "transfer", AdminNotification.is_deleted == 0)
             .all()
         )
         # 预警通知 + 申请通知都回写
@@ -220,9 +213,7 @@ def test_activity_last_review_marks_batch_handled(client: TestClient):
 
         n = (
             db.query(AdminNotification)
-            .filter(
-                AdminNotification.ref_type == "activity", AdminNotification.is_deleted == 0
-            )
+            .filter(AdminNotification.ref_type == "activity", AdminNotification.is_deleted == 0)
             .first()
         )
         assert n is not None

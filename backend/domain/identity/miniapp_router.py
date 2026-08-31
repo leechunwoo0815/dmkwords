@@ -11,11 +11,8 @@ from backend.common.base_schema import BaseSchema
 from backend.common.exceptions import ValidationError
 from backend.domain.identity.models import Child
 from backend.domain.identity.observation_service import ObservationReportService
-from backend.domain.identity.wm10_service import (
-    RefundService,
-    TransferService,
-    WithdrawalService,
-)
+from backend.domain.identity.transfer_service import TransferService
+from backend.domain.identity.wm10_service import RefundService, WithdrawalService
 from backend.domain.reading.miniapp_router import get_current_parent
 
 router = APIRouter(tags=["identity-miniapp"])

@@ -106,13 +106,13 @@ def test_transfer_expiring_auto_invalidates_after_expired(client: TestClient):
     tid = _pending_transfer(client, h, "13800001704", 10)
     _run_warn()
     with _db() as db:
-        from backend.common.admin_notifications import AdminNotifyService
+        from backend.domain.admin.todo_service import AdminTodoService
         from backend.domain.identity.models import TransferRequest
         from backend.domain.identity.transfer_service import TransferService
 
         rows = _notifs(db, "admin.transfer_expiring")
         assert len(rows) == 1
-        r = AdminNotifyService(db).resolve_many(rows)
+        r = AdminTodoService(db).resolve_many(rows)
         assert r[rows[0].id]["effective_status"] == "pending"
         # 到期 → 跑真实超时任务
         t = db.query(TransferRequest).filter(TransferRequest.id == tid).first()
@@ -121,7 +121,7 @@ def test_transfer_expiring_auto_invalidates_after_expired(client: TestClient):
         assert TransferService(db).expire_overdue() >= 1
         db.expire_all()
         rows = _notifs(db, "admin.transfer_expiring")
-        r = AdminNotifyService(db).resolve_many(rows)
+        r = AdminTodoService(db).resolve_many(rows)
         assert r[rows[0].id]["effective_status"] == "invalid"
         assert "超时" in r[rows[0].id]["status_text"]
     c = client.get("/api/admin/todo-counts", headers=h).json()
