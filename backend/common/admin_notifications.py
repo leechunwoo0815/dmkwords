@@ -295,6 +295,74 @@ class AdminNotifyService:
         self.db.commit()
         return {"id": n.id, "handled": True, "already": False}
 
+    # ---------- 感知层聚合（批次三） ----------
+
+    def todo_counts(self, admin) -> dict:
+        """WM13 todo-counts（实时口径，与收件箱同一 StatusResolver）。
+
+        权限粒度（Q9 裁定）：
+        - 审计五类（refund/withdrawal/transfer/transfer_expiring/activity_batch）仅超管可见
+          （staff 为 0，S2：staff 审不了任何一类，不给假待办）
+        - order_pending_manual 跟 member.manage 权限走（staff 可确认收款，看到真实数）
+        - admin_total = 管理待办全部 pending（与 list_inbox.pending_count 严格一致——
+          徽标与管理待办 tab 数字永不分叉；含活动批量退款，一致性延伸见简报）
+        """
+        from backend.domain.admin.models import AdminUser
+        from backend.domain.admin.service import role_has_permission
+
+        counts = {
+            "refund_pending": 0,
+            "withdrawal_pending": 0,
+            "transfer_pending": 0,
+            "transfer_expiring": 0,
+            "activity_batch_refund": 0,
+            "order_pending_manual": 0,
+            "admin_total": 0,
+        }
+        if admin.role == AdminUser.ROLE_SUPER_ADMIN:
+            rows = self.db.query(AdminNotification).filter(
+                AdminNotification.is_deleted == 0
+            )
+            all_rows = rows.all()
+            resolved = self.resolve_many(all_rows)
+            scene_key = {
+                AdminNotification.SCENE_REFUND_APPLY: "refund_pending",
+                AdminNotification.SCENE_REFUND_EXECUTE_FAILED: "refund_pending",
+                AdminNotification.SCENE_WITHDRAWAL_APPLY: "withdrawal_pending",
+                AdminNotification.SCENE_TRANSFER_APPLY: "transfer_pending",
+                AdminNotification.SCENE_TRANSFER_EXPIRING: "transfer_expiring",
+                AdminNotification.SCENE_ACTIVITY_BATCH_REFUND: "activity_batch_refund",
+            }
+            for n in all_rows:
+                if resolved[n.id]["effective_status"] != ST_PENDING:
+                    continue
+                key = scene_key.get(n.scene)
+                if key:
+                    counts[key] += 1
+            counts["admin_total"] = sum(
+                counts[k]
+                for k in (
+                    "refund_pending",
+                    "withdrawal_pending",
+                    "transfer_pending",
+                    "transfer_expiring",
+                    "activity_batch_refund",
+                )
+            )
+        if role_has_permission(admin.role, "member.manage"):
+            from backend.domain.identity.models import Order
+
+            counts["order_pending_manual"] = (
+                self.db.query(func.count(Order.id))
+                .filter(
+                    Order.status == Order.STATUS_PENDING_MANUAL,
+                    Order.is_deleted == 0,
+                )
+                .scalar()
+                or 0
+            )
+        return counts
+
     # ---------- 判定分支（Q5 裁定映射表） ----------
 
     def _decide_refund(self, status: str | None) -> dict:

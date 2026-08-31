@@ -13,6 +13,7 @@ import {
   type ActivityItem, type EnrollmentItem,
 } from "../api/activities";
 import { usePaintPagination } from "../hooks/usePaintPagination";
+import { TODO_REFRESH_EVENT } from "../hooks/useTodoCounts";
 
 const TYPE_OPTIONS = [
   { value: "lecture", label: "宣讲会" },
@@ -121,6 +122,8 @@ export default function ActivityManage() {
         try {
           await apiReviewActivityRefund(r.enrollment_id ?? r.id ?? 0, approve, "");
           message.success("已处理");
+          // WM13 L3：审核完成主动刷新待办徽标/待办卡
+          window.dispatchEvent(new Event(TODO_REFRESH_EVENT));
           load();
           if (enrollActivity) openEnrollments(enrollActivity);
         } catch (e) {

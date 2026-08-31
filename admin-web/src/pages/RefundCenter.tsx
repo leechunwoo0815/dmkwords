@@ -12,6 +12,7 @@ import {
   type RefundRequestItem, type TransferItem, type WithdrawalItem,
 } from "../api/refunds";
 import { usePaintPagination } from "../hooks/usePaintPagination";
+import { TODO_REFRESH_EVENT } from "../hooks/useTodoCounts";
 
 const KIND_LABEL: Record<string, string> = { order: "订单退款", deposit: "押金退款" };
 const ORDER_TYPE_LABEL: Record<string, string> = {
@@ -94,6 +95,8 @@ export default function RefundCenter() {
       if (kind === "withdrawal") await apiReviewWithdrawal(id, approve, remark);
       if (kind === "transfer") await apiReviewTransfer(id, approve, remark);
       message.success("已处理");
+      // WM13 L3：审核完成主动刷新待办徽标/待办卡
+      window.dispatchEvent(new Event(TODO_REFRESH_EVENT));
       setRemarkTarget(null);
       load();
     } catch (e) {
@@ -126,6 +129,8 @@ export default function RefundCenter() {
     try {
       await apiExecuteRefund(execTarget.id, execSuccess, execRemark);
       message.success(execSuccess ? "已登记退款完成" : "已登记退款失败");
+      // WM13 L3：执行完成主动刷新待办徽标/待办卡
+      window.dispatchEvent(new Event(TODO_REFRESH_EVENT));
       setExecTarget(null);
       load();
     } catch (e) {

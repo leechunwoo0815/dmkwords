@@ -17,6 +17,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
 import { usePaintPagination } from "../hooks/usePaintPagination";
+import { TODO_REFRESH_EVENT } from "../hooks/useTodoCounts";
 import {
   AdminNotification,
   apiExportNotifications,
@@ -272,6 +273,8 @@ export default function Notifications() {
       message.success("已标记为已处理");
       setHandleTarget(null);
       setHandleReason("");
+      // L3：徽标计数即时刷新
+      window.dispatchEvent(new Event(TODO_REFRESH_EVENT));
       void loadInbox();
     } catch (e) {
       message.error((e as Error).message);

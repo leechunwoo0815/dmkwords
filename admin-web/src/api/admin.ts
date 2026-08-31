@@ -168,6 +168,20 @@ export function apiHandleAdminInbox(
   });
 }
 
+export interface TodoCounts {
+  refund_pending: number;
+  withdrawal_pending: number;
+  transfer_pending: number;
+  transfer_expiring: number;
+  activity_batch_refund: number;
+  order_pending_manual: number;
+  admin_total: number;
+}
+
+export function apiTodoCounts(): Promise<TodoCounts> {
+  return request("/api/admin/todo-counts");
+}
+
 export interface TaskSpecItem {
   name: string;
   display_name: string;

@@ -140,6 +140,17 @@ def handle_admin_notification(
     return AdminNotifyService(db).handle(notification_id, admin, body.reason)
 
 
+@router.get("/todo-counts")
+def todo_counts(
+    admin: AdminUser = Depends(require_perm("dashboard.view")),
+    db: Session = Depends(get_db),
+):
+    """WM13 感知层聚合（Q9 权限粒度：审计五类仅超管；order_pending_manual 跟 member.manage）。"""
+    from backend.common.admin_notifications import AdminNotifyService
+
+    return AdminNotifyService(db).todo_counts(admin)
+
+
 @router.get("/notifications")
 def list_notifications(
     page: int = Query(1, ge=1),

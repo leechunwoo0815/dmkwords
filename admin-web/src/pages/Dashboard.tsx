@@ -8,9 +8,17 @@ import {
   TeamOutlined,
 } from "@ant-design/icons";
 import { Button, Card, Col, message, Row, Tag, Typography } from "antd";
+import { useNavigate } from "react-router-dom";
 
 import PaintLoading from "../components/PaintLoading";
-import { apiDashboardOverview, apiExportAuditLogs, apiExportDashboard } from "../api/admin";
+import {
+  apiDashboardOverview,
+  apiExportAuditLogs,
+  apiExportDashboard,
+  TodoCounts,
+} from "../api/admin";
+import { hasPermission, useAuth } from "../auth";
+import { useTodoCounts } from "../hooks/useTodoCounts";
 import type { components } from "../api/schema";
 
 type Overview = components["schemas"]["DashboardOverviewResponse"];
@@ -41,9 +49,87 @@ const cellValue = (o: Overview | null, key: string): number | string | null => {
   return raw;
 };
 
+/** WM13 待办卡（提案 §6.3）：实时计数+跳转；失败禁假 0（U10）；零待办绿色态。 */
+const TODO_ROWS: { key: keyof TodoCounts; label: string; route: string }[] = [
+  { key: "refund_pending", label: "待审退款", route: "/refund-center" },
+  { key: "withdrawal_pending", label: "待审退会", route: "/refund-center" },
+  { key: "transfer_pending", label: "待审转让", route: "/refund-center" },
+  { key: "activity_batch_refund", label: "活动批量退款", route: "/activities" },
+  { key: "transfer_expiring", label: "转让临近超时", route: "/refund-center" },
+];
+
+function TodoCard({
+  counts,
+  failed,
+  reload,
+  isSuper,
+}: {
+  counts: TodoCounts | null;
+  failed: boolean;
+  reload: () => void;
+  isSuper: boolean;
+}) {
+  const navigate = useNavigate();
+  const { permissions } = useAuth();
+  // 行级权限粒度（Q9 裁定）：审计类仅超管可见；待确认收款跟 member.manage 走
+  const rows = [
+    ...(isSuper ? TODO_ROWS : []),
+    ...(hasPermission(permissions, "member.manage")
+      ? [{ key: "order_pending_manual" as const, label: "待确认收款", route: "/members?tab=orders" }]
+      : []),
+  ];
+  const total = counts ? rows.reduce((s, r) => s + (counts[r.key] || 0), 0) : 0;
+  return (
+    <Card
+      size="small"
+      title="待办事项"
+      style={{ marginBottom: 12, borderColor: "var(--paint-ink)" }}
+      styles={{ body: { padding: "10px 16px" } }}
+    >
+      {failed ? (
+        <Button size="small" danger onClick={reload}>
+          待办加载失败 · 点击重试
+        </Button>
+      ) : !counts ? (
+        <Typography.Text type="secondary">待办加载中…</Typography.Text>
+      ) : total === 0 ? (
+        <Tag color="green" style={{ fontSize: 13, padding: "2px 10px" }}>
+          全部处理完毕
+        </Tag>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {rows.map((r) => {
+            const n = counts[r.key] || 0;
+            return (
+              <Button
+                key={r.key}
+                type="link"
+                size="small"
+                style={{ justifyContent: "flex-start", paddingInline: 0, width: "fit-content" }}
+                onClick={() => navigate(r.route)}
+              >
+                {n > 0 ? (
+                  <span style={{ fontWeight: 700, color: "#cf1322" }}>
+                    {r.label} {n} 笔 →
+                  </span>
+                ) : (
+                  <span style={{ color: "rgba(0,0,0,0.4)" }}>{r.label} 0 笔</span>
+                )}
+              </Button>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function Dashboard() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
+  const { counts, failed, reload } = useTodoCounts();
+  const { permissions } = useAuth();
+  const isSuper = hasPermission(permissions, "audit.view");
 
   const load = () => {
     setLoading(true);
@@ -84,6 +170,8 @@ export default function Dashboard() {
       <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
         门店运营实时数据；经营看板覆盖藏书/借阅/会员/测验/里程碑，支持 Excel 导出。
       </Typography.Paragraph>
+
+      <TodoCard counts={counts} failed={failed} reload={reload} isSuper={isSuper} />
 
       {loading ? (
         <PaintLoading character="rainbow" />

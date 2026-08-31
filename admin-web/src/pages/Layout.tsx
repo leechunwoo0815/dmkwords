@@ -14,10 +14,12 @@ import {
   NotificationOutlined,
   ScheduleOutlined,
 } from "@ant-design/icons";
-import { Dropdown, Layout as AntLayout, Menu, Typography } from "antd";
+import { useEffect } from "react";
+import { Badge, Dropdown, Layout as AntLayout, Menu, Typography } from "antd";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { hasPermission, useAuth } from "../auth";
+import { useTodoCounts } from "../hooks/useTodoCounts";
 
 const { Sider, Header, Content } = AntLayout;
 
@@ -25,6 +27,14 @@ export default function Layout() {
   const { user, permissions, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { counts, failed } = useTodoCounts();
+  // L3 双保险（Q10 裁定）：路由变化也触发待办刷新（审核完成主动 dispatch 之外的兜底）
+  useEffect(() => {
+    window.dispatchEvent(new Event("wm13-todo-refresh"));
+  }, [location.pathname]);
+  // 徽标计数 = 管理待办全部待处理（与通知中心管理待办 tab 同口径）；
+  // 拉取失败或未拉到 → 不渲染徽标（U10 禁假 0），count=0 时 Badge 自动隐藏
+  const badgeCount = failed || !counts ? 0 : counts.admin_total;
 
   const iconBgMap: Record<string, string> = {
     "/": "#FCD34D",
@@ -70,7 +80,19 @@ export default function Layout() {
     { key: "/growth", icon: <TrophyOutlined />, label: "成长与测验", perm: "member.manage" },
     { key: "/activities", icon: <CalendarOutlined />, label: "线下活动", perm: "member.manage" },
     { key: "/refund-center", icon: <SafetyCertificateOutlined />, label: "退款中心", perm: "audit.view" },
-    { key: "/notifications", icon: <NotificationOutlined />, label: "通知中心", perm: "dashboard.view" },
+    {
+      key: "/notifications",
+      icon: <NotificationOutlined />,
+      label:
+        badgeCount > 0 ? (
+          <Badge count={badgeCount} size="small" offset={[10, 0]}>
+            通知中心
+          </Badge>
+        ) : (
+          "通知中心"
+        ),
+      perm: "dashboard.view",
+    },
     { key: "/tasks", icon: <ScheduleOutlined />, label: "任务看板", perm: "dashboard.view" },
     { key: "/staff", icon: <UserOutlined />, label: "员工管理", perm: "staff.manage" },
     { key: "/configs", icon: <SettingOutlined />, label: "系统配置", perm: "config.view" },
