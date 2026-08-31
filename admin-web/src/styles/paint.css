@@ -543,3 +543,9 @@ h1, h2, h3, h4, h5, h6,
 .paint-character-float {
   animation: paint-float 2.5s ease-in-out infinite;
 }
+
+/* WM13 跳转最后一公里：从通知跳转定位的行高亮（3 秒淡出） */
+.wm13-highlight-row > td {
+  background: #ffe58f !important;
+  transition: background 1.2s ease;
+}

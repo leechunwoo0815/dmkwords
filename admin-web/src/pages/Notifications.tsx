@@ -81,12 +81,12 @@ const REF_META: Record<string, { label: string; route?: (r: AdminNotification) =
   parent: { label: "家长" },
 };
 
-// WM13 管理待办跳转路由（refund/withdrawal/transfer → 退款中心；activity → 活动管理）
-const ADMIN_REF_ROUTE: Record<string, string> = {
-  refund_request: "/refund-center",
-  withdrawal_request: "/refund-center",
-  transfer: "/refund-center",
-  activity: "/activities",
+// WM13 管理待办跳转（最后一公里）：定位 tab + highlight 单据 id（RefundCenter 只读解析）
+const ADMIN_REF_ROUTE: Record<string, { path: string; tab: string }> = {
+  refund_request: { path: "/refund-center", tab: "refunds" },
+  withdrawal_request: { path: "/refund-center", tab: "withdrawals" },
+  transfer: { path: "/refund-center", tab: "transfers" },
+  activity: { path: "/activities", tab: "" },
 };
 
 function wechatTag(status: string): React.ReactNode {
@@ -350,7 +350,12 @@ export default function Notifications() {
       key: "action",
       width: 200,
       render: (_: unknown, r: AdminInboxItem) => {
-        const route = ADMIN_REF_ROUTE[r.ref_type];
+        const meta = ADMIN_REF_ROUTE[r.ref_type];
+        const route = meta
+          ? meta.tab
+            ? `${meta.path}?tab=${meta.tab}&highlight=${r.ref_id}`
+            : meta.path
+          : undefined;
         return (
           <span style={{ display: "inline-flex", gap: 8 }}>
             {route && (

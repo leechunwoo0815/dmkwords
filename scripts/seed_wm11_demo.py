@@ -527,6 +527,95 @@ def _ensure_demo_wm3_states(db: Session) -> None:
     print("c WM3 异常态演示：观察/待评估/过期孩 + 待确认订单", flush=True)
 
 
+def _ensure_demo_wm13_states(db: Session) -> None:
+    """WM13 演示数据（幂等）：1 待审退款 + 1 待审转让——走真实 service 链路（禁直改 DB）。
+
+    RefundService.apply / TransferService.apply 内部同事务触发 AdminNotifyService.send，
+    管理待办通知自然落库；幂等由业务 dup 检查 + dedup_key 唯一索引双保险。
+    """
+    import time
+    from decimal import Decimal
+
+    from backend.domain.identity.models import (
+        Child,
+        Order,
+        RefundRequest,
+        TransferRequest,
+    )
+    from backend.domain.identity.transfer_service import TransferService
+    from backend.domain.identity.wm10_service import RefundService
+
+    parent = db.query(Parent).filter(Parent.phone == "13800006666", Parent.is_deleted == 0).first()
+    if not parent:
+        parent = Parent(name="WM13演示家长", phone="13800006666")
+        db.add(parent)
+        db.flush()
+
+    def ensure_child(name: str, status: str, expire) -> Child:
+        c = (
+            db.query(Child)
+            .filter(Child.parent_id == parent.id, Child.name == name, Child.is_deleted == 0)
+            .first()
+        )
+        if not c:
+            c = Child(parent_id=parent.id, name=name, member_status=status, member_expire=expire)
+            db.add(c)
+            db.flush()
+        return c
+
+    today = datetime.now().date()
+    src = ensure_child("退款演示孩", Child.MEMBER_FORMAL, today + timedelta(days=180))
+    transfer_src = ensure_child("转让源孩", Child.MEMBER_FORMAL, today + timedelta(days=180))
+    transfer_tgt = ensure_child("转让受让孩", Child.MEMBER_NONE, None)
+    # 已支付订单（observation_fee 500，演示用小额）——供退款申请挂靠
+    paid = (
+        db.query(Order)
+        .filter(
+            Order.child_id == src.id,
+            Order.status == Order.STATUS_PAID,
+            Order.is_deleted == 0,
+        )
+        .first()
+    )
+    if not paid:
+        paid = Order(
+            order_no=f"WM13-DEMO-{int(time.time())}",
+            order_type=Order.TYPE_OBSERVATION,
+            parent_id=parent.id,
+            child_id=src.id,
+            amount=Decimal("500.00"),
+            status=Order.STATUS_PAID,
+        )
+        db.add(paid)
+        db.commit()
+    # 待审退款（真实链路：apply 同事务发 admin.refund_apply；重复申请会被 dup 检查拦截）
+    existing = (
+        db.query(RefundRequest)
+        .filter(RefundRequest.child_id == src.id, RefundRequest.is_deleted == 0)
+        .first()
+    )
+    if not existing:
+        try:
+            RefundService(db).apply(src, paid.id, "演示：孩子转学去外地")
+        except Exception as exc:  # 演示数据容错：不因状态冲突中断 seed
+            db.rollback()
+            print(f"c WM13 退款演示跳过（{exc}）", flush=True)
+    # 待审转让（真实链路：apply 同事务发 admin.transfer_apply）
+    existing_transfer = (
+        db.query(TransferRequest)
+        .filter(TransferRequest.source_child_id == transfer_src.id, TransferRequest.is_deleted == 0)
+        .first()
+    )
+    if not existing_transfer:
+        try:
+            TransferService(db).apply(parent, transfer_src.id, transfer_tgt.id)
+        except Exception as exc:
+            db.rollback()
+            print(f"c WM13 转让演示跳过（{exc}）", flush=True)
+    db.commit()
+    print("c WM13 演示：待审退款 + 待审转让（管理待办通知已落库）", flush=True)
+
+
 def seed() -> None:
     db = SessionLocal()
     try:
@@ -545,6 +634,7 @@ def seed() -> None:
             _ensure_demo_growth(db, demo_child)
             _ensure_demo_fav_reservation(db, demo_child)
         _ensure_demo_wm3_states(db)
+        _ensure_demo_wm13_states(db)
         now = datetime.now()
         _upsert_notification(
             db,

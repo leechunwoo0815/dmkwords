@@ -2,6 +2,7 @@ import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
 // 退款中心（WM10：订单/押金退款 + 退会 + 转让，超管逐单审核）
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   App as AntdApp, Button, Input, Modal, Radio, Space, Table, Tabs, Tag, Tooltip, Typography,
 } from "antd";
@@ -43,6 +44,21 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function RefundCenter() {
   const { message } = AntdApp.useApp();
+  // WM13 跳转最后一公里（只读解析）：?tab=refunds|withdrawals|transfers（pending 兼容映射 refunds）
+  // + ?highlight={id} 行高亮 3 秒——从通知跳过来直接看到那一单
+  const [searchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<string>(
+    urlTab === "withdrawals" ? "withdrawals" : urlTab === "transfers" ? "transfers" : "refunds"
+  );
+  const [highlightId, setHighlightId] = useState<number | null>(
+    searchParams.get("highlight") ? Number(searchParams.get("highlight")) : null
+  );
+  useEffect(() => {
+    if (highlightId === null) return;
+    const t = setTimeout(() => setHighlightId(null), 3000);
+    return () => clearTimeout(t);
+  }, [highlightId]);
   const [refunds, setRefunds] = useState<RefundRequestItem[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalItem[]>([]);
   const [transfers, setTransfers] = useState<TransferItem[]>([]);
@@ -145,13 +161,17 @@ export default function RefundCenter() {
       </Typography.Text>
 
       <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
         items={[
           {
             key: "refunds",
             label: `退款待审（${pendingRefunds.length}）`,
             children: (<>
               <Table<RefundRequestItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
-                rowKey="id" dataSource={refunds.slice((refundPg.page - 1) * refundPg.pageSize, refundPg.page * refundPg.pageSize)} size="middle"
+                rowKey="id"
+                rowClassName={(r) => (r.id === highlightId ? "wm13-highlight-row" : "")}
+                dataSource={refunds.slice((refundPg.page - 1) * refundPg.pageSize, refundPg.page * refundPg.pageSize)} size="middle"
                 pagination={false}
                 columns={[
                   { title: "类型", dataIndex: "kind", width: 100, render: (k) => KIND_LABEL[k] ?? k },
@@ -204,7 +224,9 @@ export default function RefundCenter() {
             label: `退会待审（${pendingWithdrawals.length}）`,
             children: (<>
               <Table<WithdrawalItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
-                rowKey="id" dataSource={withdrawals.slice((withdrawalPg.page - 1) * withdrawalPg.pageSize, withdrawalPg.page * withdrawalPg.pageSize)} size="middle"
+                rowKey="id"
+                rowClassName={(r) => (r.id === highlightId ? "wm13-highlight-row" : "")}
+                dataSource={withdrawals.slice((withdrawalPg.page - 1) * withdrawalPg.pageSize, withdrawalPg.page * withdrawalPg.pageSize)} size="middle"
                 pagination={false}
                 columns={[
                   { title: "孩子", dataIndex: "child_name", width: 100 },
@@ -242,7 +264,9 @@ export default function RefundCenter() {
             label: `转让待审（${pendingTransfers.length}）`,
             children: (<>
               <Table<TransferItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
-                rowKey="id" dataSource={transfers.slice((transferPg.page - 1) * transferPg.pageSize, transferPg.page * transferPg.pageSize)} size="middle"
+                rowKey="id"
+                rowClassName={(r) => (r.id === highlightId ? "wm13-highlight-row" : "")}
+                dataSource={transfers.slice((transferPg.page - 1) * transferPg.pageSize, transferPg.page * transferPg.pageSize)} size="middle"
                 pagination={false}
                 columns={[
                   { title: "转出方", dataIndex: "source_name", width: 100 },
