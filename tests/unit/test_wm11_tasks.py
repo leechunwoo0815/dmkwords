@@ -451,7 +451,8 @@ def test_task_board_and_run_log(client: TestClient):
     assert spec_resp.status_code == 200
     names = {s["name"] for s in spec_resp.json()["items"]}
     assert "member_expire_check" in names
-    assert len(names) == 12
+    # WM13-4 新增 transfer_expiring_warn（任务包批次四 B12 注册），12 → 13
+    assert len(names) == 13
 
     _run(client, h, "member_expire_check")
     runs = client.get("/api/admin/tasks/runs", headers=h).json()["items"]

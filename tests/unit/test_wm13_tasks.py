@@ -3,7 +3,6 @@
 B12（任务注册表 + 幂等重跑）/ dedup 每单一次（S3）。"""
 
 from datetime import datetime, timedelta
-from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
