@@ -96,8 +96,16 @@ class AdminNotifyService:
 
     # ---------- 审计回写（幂等，Q8：保留首次） ----------
 
-    def mark_handled(self, *, ref_type: str, ref_id: str | int, admin) -> int:
-        """审计回写：handled_at/handled_by。幂等：已处理跳过（保留首次审计）。返回更新条数。"""
+    def mark_handled(self, *, ref_type: str, ref_id: str | int, admin=None, note: str = "") -> int:
+        """审计回写：handled_at/handled_by。幂等：已处理跳过（保留首次审计）。返回更新条数。
+
+        admin=None 的路径（家长撤销/超时自动失效）不写 handled_by，note 记录来源。
+        """
+        values: dict = {"handled_at": datetime.now()}
+        if admin is not None:
+            values["handled_by"] = admin.id
+        if note:
+            values["extra"] = json.dumps({"method": note}, ensure_ascii=False)
         updated = (
             self.db.query(AdminNotification)
             .filter(
@@ -106,13 +114,7 @@ class AdminNotifyService:
                 AdminNotification.handled_at.is_(None),
                 AdminNotification.is_deleted == 0,
             )
-            .update(
-                {
-                    "handled_at": datetime.now(),
-                    "handled_by": admin.id,
-                },
-                synchronize_session=False,
-            )
+            .update(values, synchronize_session=False)
         )
         return updated
 

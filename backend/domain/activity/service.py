@@ -375,6 +375,25 @@ class ActivityService:
             reason=remark or ("退款通过" if approve else "退款拒绝"),
         )
         self.db.commit()
+        # WM13 L2 回写（批次五 #7）：该活动退款全部终态 → 汇总通知审计回写（A3 判定）
+        from backend.common.admin_notification_models import AdminNotification
+        from backend.common.admin_notifications import AdminNotifyService
+
+        remaining = (
+            self.db.query(func.count(ActivityEnrollment.id))
+            .filter(
+                ActivityEnrollment.activity_id == e.activity_id,
+                ActivityEnrollment.status == ActivityEnrollment.STATUS_REFUND_PENDING,
+                ActivityEnrollment.is_deleted == 0,
+            )
+            .scalar()
+            or 0
+        )
+        if remaining == 0:
+            AdminNotifyService(self.db).mark_handled(
+                ref_type=AdminNotification.REF_ACTIVITY, ref_id=str(e.activity_id), admin=admin
+            )
+            self.db.commit()
         return {"enrollment_id": e.id, "status": e.status}
 
     # ---------- 报名（小程序） ----------

@@ -219,6 +219,12 @@ class RefundService:
             if w and w.status == WithdrawalRequest.STATUS_APPLYING:
                 w.status = WithdrawalRequest.STATUS_CANCELLED
                 child.operation_locked = 0
+        # WM13 L2 回写：家长撤销 → 该单管理待办审计标注来源（幂等）
+        AdminNotifyService(self.db).mark_handled(
+            ref_type=AdminNotification.REF_REFUND_REQUEST,
+            ref_id=str(req.id),
+            note="家长已撤销",
+        )
         self.db.commit()
         return req
 
@@ -326,6 +332,10 @@ class RefundService:
         child = self.db.query(Child).filter(Child.id == req.child_id).first()
         if child:
             notify_refund_reviewed(self.db, child, req, approve, remark)
+        # WM13 L2 回写：审核终态 → 该单管理待办审计回写（幂等）
+        AdminNotifyService(self.db).mark_handled(
+            ref_type=AdminNotification.REF_REFUND_REQUEST, ref_id=str(req.id), admin=admin
+        )
         self.db.commit()
         return {"id": req.id, "status": req.status}
 
@@ -429,6 +439,11 @@ class RefundService:
                 ref_id=str(req.id),
                 applicant_name=f"{parent.name if parent else ''}·{child.name if child else ''}",
                 amount=req.amount,
+            )
+        # WM13 L2 回写（Q5 配套）：执行成功 = refund_execute_failed 预警闭环（幂等）
+        if success:
+            AdminNotifyService(self.db).mark_handled(
+                ref_type=AdminNotification.REF_REFUND_REQUEST, ref_id=str(req.id), admin=admin
             )
         self.db.commit()
         # 聚合推进关联退会流程（全部退款完成 → completed）
@@ -695,6 +710,12 @@ class WithdrawalService:
             raise ValidationError(f"申请状态 {req.status}，不可撤销")
         req.status = WithdrawalRequest.STATUS_CANCELLED
         child.operation_locked = 0
+        # WM13 L2 回写：家长撤销 → 该单管理待办审计标注来源（幂等）
+        AdminNotifyService(self.db).mark_handled(
+            ref_type=AdminNotification.REF_WITHDRAWAL_REQUEST,
+            ref_id=str(req.id),
+            note="家长已撤销",
+        )
         self.db.commit()
         return req
 
@@ -843,6 +864,10 @@ class WithdrawalService:
         req.reviewed_at = datetime.now()
         # WM11：退会审核结果通知家长
         notify_withdrawal_reviewed(self.db, child, request_id, approve, remark)
+        # WM13 L2 回写：审核终态 → 该单管理待办审计回写（幂等）
+        AdminNotifyService(self.db).mark_handled(
+            ref_type=AdminNotification.REF_WITHDRAWAL_REQUEST, ref_id=str(req.id), admin=admin
+        )
         self.db.commit()
         return {"id": req.id, "status": req.status}
 

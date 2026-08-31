@@ -230,6 +230,15 @@ class TransferService:
         req = self._pending_of(parent, transfer_id)
         req.status = TransferRequest.STATUS_CANCELLED
         self._unlock_both(req)
+        # WM13 L2 回写：家长撤销 → 该单管理待办审计标注来源（幂等）
+        from backend.common.admin_notification_models import AdminNotification
+        from backend.common.admin_notifications import AdminNotifyService
+
+        AdminNotifyService(self.db).mark_handled(
+            ref_type=AdminNotification.REF_TRANSFER,
+            ref_id=str(req.id),
+            note="家长已撤销",
+        )
         self.db.commit()
         return {"id": req.id, "status": req.status}
 
@@ -295,6 +304,15 @@ class TransferService:
         for r in rows:
             r.status = TransferRequest.STATUS_EXPIRED
             self._unlock_both(r)
+            # WM13 L2 回写：超时自动失效 → 该单管理待办审计标注来源（幂等）
+            from backend.common.admin_notification_models import AdminNotification
+            from backend.common.admin_notifications import AdminNotifyService
+
+            AdminNotifyService(self.db).mark_handled(
+                ref_type=AdminNotification.REF_TRANSFER,
+                ref_id=str(r.id),
+                note="已超时自动失效",
+            )
         if rows:
             self.db.commit()
         return len(rows)
@@ -467,6 +485,13 @@ class TransferService:
             category=Notification.CATEGORY_OTHER,
             ref_type="transfer",
             ref_id=str(req.id),
+        )
+        # WM13 L2 回写：审核终态 → 该单管理待办审计回写（幂等；含超时预警通知）
+        from backend.common.admin_notification_models import AdminNotification
+        from backend.common.admin_notifications import AdminNotifyService
+
+        AdminNotifyService(self.db).mark_handled(
+            ref_type=AdminNotification.REF_TRANSFER, ref_id=str(req.id), admin=admin
         )
         self.db.commit()
         return {"id": req.id, "status": req.status}
