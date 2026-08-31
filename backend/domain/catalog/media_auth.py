@@ -1,16 +1,24 @@
 # backend/domain/catalog/media_auth.py — 管理端媒体资源鉴权（C25）
 """Router 零异常处理纪律：try/except 与异常抛出集中在此层。
 支持 Authorization Bearer（后台 fetch）与 query token（<img>/<audio> 无法带头）。
-"""
+
+P0-F3（20260831 审查）：家长 token 与 admin token 同密钥同算法签发，只验签名可被
+type=parent 的 token 越权拉媒体——补 token type 校验 + token_generation 撤销校验
+（与 middleware/admin_auth.get_current_admin 同一标准）。"""
 
 from __future__ import annotations
+
+from sqlalchemy.orm import Session
 
 from backend.common.exceptions import UnauthorizedError
 from backend.common.security import decode_admin_token
 
 
-def authorize_media(request, token: str = "") -> None:
-    """校验 admin JWT（header 或 query）；失败抛 UnauthorizedError（→401）。"""
+def authorize_media(request, token: str = "", db: Session | None = None) -> None:
+    """校验 admin JWT（header 或 query）；失败抛 UnauthorizedError（→401）。
+
+    db 提供时执行完整校验（type + 账号状态 + token_generation 撤销）。
+    """
     header = request.headers.get("authorization", "")
     auth_token = header[len("Bearer ") :] if header.startswith("Bearer ") else token
     if not auth_token:
@@ -21,3 +29,27 @@ def authorize_media(request, token: str = "") -> None:
         payload = None
     if not payload:
         raise UnauthorizedError("登录已过期，请重新登录")
+    # P0-F3：只验签名不够——家长 token 同密钥可伪造通过，必须校验 type
+    if payload.get("type") != "admin":
+        raise UnauthorizedError("非管理端凭证")
+    if db is None:
+        return
+    from backend.domain.admin.models import AdminUser
+
+    sub = payload.get("sub")
+    if not sub:
+        raise UnauthorizedError("Token中缺少管理员信息")
+    admin = (
+        db.query(AdminUser)
+        .filter(
+            AdminUser.id == int(sub),
+            AdminUser.is_deleted == 0,
+            AdminUser.status == AdminUser.STATUS_ACTIVE,
+        )
+        .first()
+    )
+    if not admin:
+        raise UnauthorizedError("管理员不存在或已禁用")
+    # token_generation 不一致 = 改密/禁用后签发的旧 token，立即失效（对齐 get_current_admin）
+    if int(payload.get("gen", 0)) != admin.token_generation:
+        raise UnauthorizedError("登录状态已失效，请重新登录")

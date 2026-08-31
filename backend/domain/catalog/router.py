@@ -71,11 +71,11 @@ def _media_response(book, field: str, media_type: str):
     return FileResponse(full, media_type=media_type)
 
 
-def _media_auth(request: "Request", token: str = "") -> None:
+def _media_auth(request: "Request", token: str = "", db: Session | None = None) -> None:
     """管理端媒体鉴权（委托 media_auth 模块：Router 不落 try/except 与 HTTPException）。"""
     from backend.domain.catalog.media_auth import authorize_media
 
-    authorize_media(request, token)
+    authorize_media(request, token, db)
 
 
 def _book_or_404(db: Session, book_id: int):
@@ -93,7 +93,7 @@ def book_cover_media(
     db: Session = Depends(get_db),
 ):
     """封面（管理端 <img> 用；query token 或 Bearer 均可）。"""
-    _media_auth(request, token)
+    _media_auth(request, token, db)
     book = _book_or_404(db, book_id)
     return _media_response(book, "cover_path", "image/jpeg")
 
@@ -106,7 +106,7 @@ def book_audio_media(
     db: Session = Depends(get_db),
 ):
     """音频试听（C7 播放器；query token 或 Bearer 均可）。"""
-    _media_auth(request, token)
+    _media_auth(request, token, db)
     book = _book_or_404(db, book_id)
     return _media_response(book, "audio_path", "audio/mpeg")
 
