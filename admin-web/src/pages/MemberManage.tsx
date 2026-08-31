@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   App as AntdApp,
   Button,
@@ -41,9 +41,12 @@ import {
   apiListChildren,
   apiListOrders,
   apiMarkPendingEvaluation,
+  apiOrderCounts,
+  apiSearchParents,
   apiUpdateChild,
   type Child,
   type Order,
+  type Parent,
 } from "../api/members";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 
@@ -70,35 +73,83 @@ const PAY_METHOD_OPTIONS = [
   { value: "transfer", label: "对公转账" },
   { value: "card", label: "刷卡" },
   { value: "cash", label: "现金" },
-  { value: "wechat", label: "微信线上" },
 ];
 
 export default function MemberManage() {
   const { message } = AntdApp.useApp();
   const { user } = useAuth();
+  // W5 URL 状态镜像：tab/keyword/page 进 URL（replaceState 不堆栈），刷新还原
+  const readUrl = () => new URLSearchParams(window.location.search);
+  const updateUrl = useCallback((params: Record<string, string | undefined>) => {
+    const url = new URL(window.location.href);
+    Object.entries(params).forEach(([k, v]) => {
+      if (v === undefined || v === "") url.searchParams.delete(k);
+      else url.searchParams.set(k, v);
+    });
+    window.history.replaceState(null, "", url.toString());
+  }, []);
+  const urlInitialPage = Number(readUrl().get("page")) || 1;
   const [tab, setTab] = useState<string>(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("tab") === "orders" ? "orders" : "children";
+    return readUrl().get("tab") === "orders" ? "orders" : "children";
   });
+  const changeTab = useCallback((t: string) => {
+    setTab(t);
+    updateUrl({ tab: t, page: undefined });
+  }, [updateUrl]);
   // 孩子列表
   const [children, setChildren] = useState<Child[]>([]);
   const [childTotal, setChildTotal] = useState(0);
-  const [keyword, setKeyword] = useState("");
+  const [keyword, setKeyword] = useState<string>(() => readUrl().get("keyword") ?? "");
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
   // 订单列表
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderTotal, setOrderTotal] = useState(0);
   const [orderStatus, setOrderStatus] = useState<string | undefined>();
-  const childPg = usePaintPagination();
-  const orderPg = usePaintPagination();
+  const [orderLoading, setOrderLoading] = useState(false); // W6
+  const [orderBy, setOrderBy] = useState<string | undefined>(); // W7
+  const [orderCounts, setOrderCounts] = useState<{ pending_manual_confirm: number; total: number }>({ pending_manual_confirm: 0, total: 0 }); // W3
+  const childPg = usePaintPagination(undefined, urlInitialPage);
+  const orderPg = usePaintPagination(undefined, urlInitialPage);
   // 弹窗
   const [parentOpen, setParentOpen] = useState(false);
   const [childOpen, setChildOpen] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
   const [confirmOrder, setConfirmOrder] = useState<Order | null>(null);
+  const [selectedOrderChild, setSelectedOrderChild] = useState<Child | null>(null); // W12
   const [parentForm] = Form.useForm();
   const [childForm] = Form.useForm();
+  // W1 建档家长远程搜索
+  const [parentOptions, setParentOptions] = useState<Parent[]>([]);
+  const [parentSearching, setParentSearching] = useState(false);
+  const parentSearchTimer = useRef<number>();
+  const searchParents = useCallback((kw: string) => {
+    window.clearTimeout(parentSearchTimer.current);
+    if (!kw.trim()) { setParentOptions([]); return; }
+    parentSearchTimer.current = window.setTimeout(() => {
+      setParentSearching(true);
+      apiSearchParents(kw.trim())
+        .then(setParentOptions)
+        .catch(() => { setParentOptions([]); })
+        .finally(() => setParentSearching(false));
+    }, 300);
+  }, []);
+
+  // W4 Modal 脏数据保护（参照 WM2 P2-11）：表单 touched / 受控快照非空 → 挽留
+  const confirmDiscardIfDirty = useCallback((dirty: boolean, doDiscard: () => void) => {
+    if (dirty) {
+      Modal.confirm({
+        title: "有未保存的修改",
+        content: "已填写的内容将丢失，确定放弃？",
+        okText: "放弃修改",
+        okButtonProps: { danger: true },
+        cancelText: "继续编辑",
+        onOk: doDiscard,
+      });
+    } else {
+      doDiscard();
+    }
+  }, []);
   const [obsChild, setObsChild] = useState<Child | null>(null);
   const [obsFileList, setObsFileList] = useState<UploadFile[]>([]);
   const [obsRemark, setObsRemark] = useState("");
@@ -123,11 +174,13 @@ export default function MemberManage() {
 
   const loadOrders = useCallback(
     (page: number) => {
-      apiListOrders({ page, page_size: orderPg.pageSize, status: orderStatus })
+      setOrderLoading(true);
+      apiListOrders({ page, page_size: orderPg.pageSize, status: orderStatus, order_by: orderBy })
         .then((r) => { setOrders(r.items ?? []); setOrderTotal(r.total); })
-        .catch((e: Error) => message.error(e.message));
+        .catch((e: Error) => message.error(e.message))
+        .finally(() => setOrderLoading(false));
     },
-    [orderStatus, orderPg.pageSize, message]
+    [orderStatus, orderBy, orderPg.pageSize, message]
   );
 
   useEffect(() => { if (tab === "children") loadChildren(childPg.page); }, [loadChildren, childPg.page, tab]);
@@ -240,6 +293,14 @@ export default function MemberManage() {
   }, [message]);
   useEffect(() => { if (tab === "orders") loadOrders(orderPg.page); }, [loadOrders, orderPg.page, tab]);
 
+  // W3 订单 Tab 待确认计数（轻量单请求）
+  useEffect(() => {
+    if (tab !== "orders") return;
+    apiOrderCounts()
+      .then((c) => setOrderCounts({ pending_manual_confirm: c.pending_manual_confirm, total: c.total }))
+      .catch(() => { /* 静默：计数失败不阻塞列表 */ });
+  }, [tab, orderTotal]);
+
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -257,17 +318,17 @@ export default function MemberManage() {
         家长建档 → 添加孩子 → 创建订单 → 确认收款（人工收款路径；微信线上支付在后期模块接入）。
       </Typography.Paragraph>
 
-      <Tabs activeKey={tab} onChange={setTab} items={[
+      <Tabs activeKey={tab} onChange={changeTab} items={[
         { key: "children", label: `孩子档案（${childTotal}）` },
-        { key: "orders", label: `订单（${orderTotal}）` },
+        { key: "orders", label: `订单（${orderCounts.total || orderTotal} · 待确认 ${orderCounts.pending_manual_confirm}）` },
       ]} />
 
       {tab === "children" && (
         <>
           <Space style={{ marginBottom: 12 }}>
             <Input.Search
-              placeholder="孩子姓名 / 英文名 / 家长手机号" allowClear style={{ width: 260 }}
-              onSearch={(v) => { setKeyword(v); childPg.setPage(1); }}
+              placeholder="孩子姓名 / 英文名 / 家长手机号" allowClear style={{ width: 260 }} defaultValue={keyword}
+              onSearch={(v) => { setKeyword(v); childPg.setPage(1); updateUrl({ keyword: v || undefined, page: undefined }); }}
             />
             <Select
               placeholder="会员状态" allowClear style={{ width: 130 }} value={statusFilter}
@@ -294,7 +355,20 @@ export default function MemberManage() {
               { title: "会员状态", dataIndex: "member_status", width: 110, render: (s: string) => (
                 <Tag color={MEMBER_COLOR[s]}>{MEMBER_LABEL[s] ?? s}</Tag>
               ) },
-              { title: "会员到期", dataIndex: "member_expire", width: 120, render: (v) => v ?? "—" },
+              { title: "会员到期", dataIndex: "member_expire", width: 150, render: (v) => {
+                if (!v) return "—";
+                const expireMs = new Date(String(v).replace(/-/g, "/")).getTime();
+                const days = Math.ceil((expireMs - Date.now()) / 86400000);
+                if (days < 0) return (
+                  <span style={{ color: "#cf1322", fontWeight: 600 }}>{v} · 已过期 {-days} 天</span>
+                );
+                const soon = days <= 7;
+                return (
+                  <span style={soon ? { color: "#d46b08", fontWeight: 600 } : undefined}>
+                    {v} · 剩 {days} 天
+                  </span>
+                );
+              } },
               { title: "会员开始", dataIndex: "member_start", width: 120, render: (v) => v ?? "—" },
               {
                 title: "操作", key: "op", width: 280,
@@ -302,6 +376,7 @@ export default function MemberManage() {
                   <Space size={0} wrap>
                     <Button type="link" size="small" onClick={() => {
                       orderForm.setFieldsValue({ child_id: r.id, order_type: r.member_status === "none" ? "observation_fee" : "formal_fee" });
+                      setSelectedOrderChild(r);
                       setOrderOpen(true);
                     }}>创建订单</Button>
                     {r.member_status === "observation" && (
@@ -321,7 +396,8 @@ export default function MemberManage() {
               },
             ]}
           />
-          <PaintPagination current={childPg.page} pageSize={childPg.pageSize} total={childTotal} onChange={childPg.onChange} />
+          <PaintPagination current={childPg.page} pageSize={childPg.pageSize} total={childTotal}
+            onChange={(p, s) => { childPg.onChange(p, s); updateUrl({ page: String(p) }); }} />
         </>
       )}
 
@@ -335,21 +411,31 @@ export default function MemberManage() {
             />
           </Space>
           <Table<Order> locale={{ emptyText: <PaintEmpty character="star" /> }}
-            rowKey="id" dataSource={orders} size="middle"
+            rowKey="id" dataSource={orders} size="middle" loading={orderLoading}
             pagination={false}
+            onChange={(_p, _f, sorter) => {
+              const sort = Array.isArray(sorter) ? sorter[0] : sorter;
+              if (sort?.order) {
+                const next = `${String(sort.columnKey)}_${sort.order === "ascend" ? "asc" : "desc"}`;
+                setOrderBy(next);
+                orderPg.setPage(1);
+              } else {
+                setOrderBy(undefined);
+              }
+            }}
             columns={[
               { title: "订单号", dataIndex: "order_no", width: 200, render: (v) => <Typography.Text code style={{ fontSize: 12 }}>{v}</Typography.Text> },
               { title: "类型", dataIndex: "order_type", width: 120, render: (t: string) => ORDER_TYPE_LABEL[t] ?? t },
               { title: "孩子", dataIndex: "child_name", width: 90, render: (v) => v ?? "—" },
               { title: "家长", dataIndex: "parent_name", width: 90 },
-              { title: "金额", dataIndex: "amount", width: 100, render: (v: string) => <Typography.Text strong>￥{Number(v).toLocaleString()}</Typography.Text> },
+              { title: "金额", dataIndex: "amount", key: "amount", width: 100, sorter: true, render: (v: string) => <Typography.Text strong>￥{Number(v).toLocaleString()}</Typography.Text> },
               { title: "状态", dataIndex: "status", width: 110, render: (s: string) => (
                 <Tag color={s === "paid" ? "green" : s === "cancelled" ? "default" : "orange"}>
                   {ORDER_STATUS_LABEL[s] ?? s}
                 </Tag>
               ) },
               { title: "收款方式", dataIndex: "pay_method", width: 100, render: (v) => v ? PAY_METHOD_OPTIONS.find((o) => o.value === v)?.label ?? v : "—" },
-              { title: "创建时间", dataIndex: "created_at", width: 170 },
+              { title: "创建时间", dataIndex: "created_at", key: "created_at", width: 170, sorter: true },
               {
                 title: "操作", key: "op", width: 150,
                 render: (_, r) => (
@@ -359,7 +445,19 @@ export default function MemberManage() {
                         <Button type="link" size="small" onClick={() => { confirmForm.resetFields(); setConfirmOrder(r); }}>
                           确认收款
                         </Button>
-                        <Popconfirm title="确认取消该订单？" onConfirm={async () => { await apiCancelOrder(r.id); message.success("已取消"); loadOrders(orderPg.page); }}>
+                        <Popconfirm
+                          title={`确认取消订单 ${r.order_no}（￥${Number(r.amount).toLocaleString()}）？取消后需重新下单`}
+                          okText="取消订单" okButtonProps={{ danger: true }}
+                          onConfirm={async () => {
+                            try {
+                              await apiCancelOrder(r.id);
+                              message.success("订单已取消");
+                              loadOrders(orderPg.page);
+                            } catch (e) {
+                              message.error((e as Error).message);
+                            }
+                          }}
+                        >
                           <Button type="link" size="small" danger>取消</Button>
                         </Popconfirm>
                       </>
@@ -372,7 +470,8 @@ export default function MemberManage() {
               },
             ]}
           />
-          <PaintPagination current={orderPg.page} pageSize={orderPg.pageSize} total={orderTotal} onChange={orderPg.onChange} />
+          <PaintPagination current={orderPg.page} pageSize={orderPg.pageSize} total={orderTotal}
+            onChange={(p, s) => { orderPg.onChange(p, s); updateUrl({ page: String(p) }); }} />
         </>
       )}
 
@@ -382,15 +481,19 @@ export default function MemberManage() {
         onOk={async () => {
           const v = await parentForm.validateFields();
           try {
-            await apiCreateParent(v);
-            message.success(`家长 ${v.name} 创建成功，可继续为孩子建档`);
+            const created = await apiCreateParent(v);
+            message.success(`家长 ${created.name}（${created.phone}）创建成功，已预选为建档家长`);
             setParentOpen(false);
-            loadChildren(1);
+            setChildOpen(true);
+            setTimeout(() => {
+              childForm.resetFields();
+              childForm.setFieldsValue({ parent_id: created.id });
+            }, 0);
           } catch (e) {
             message.error(e instanceof Error ? e.message : "创建失败");
           }
         }}
-        onCancel={() => setParentOpen(false)}
+        onCancel={() => confirmDiscardIfDirty(parentForm.isFieldsTouched(), () => { setParentOpen(false); parentForm.resetFields(); })}
       >
         <Form form={parentForm} layout="vertical">
           <Form.Item name="name" label="家长姓名" rules={[{ required: true }]}>
@@ -422,11 +525,16 @@ export default function MemberManage() {
             message.error(e instanceof Error ? e.message : "创建失败");
           }
         }}
-        onCancel={() => setChildOpen(false)}
+        onCancel={() => confirmDiscardIfDirty(childForm.isFieldsTouched(), () => { setChildOpen(false); childForm.resetFields(); })}
       >
         <Form form={childForm} layout="vertical">
-          <Form.Item name="parent_id" label="所属家长ID" rules={[{ required: true }]} extra="在上方孩子列表中可查看家长的建档信息，也可先在「孩子档案」页搜索家长手机号">
-            <Input type="number" placeholder="家长账号 ID（数字）" />
+          <Form.Item name="parent_id" label="所属家长" rules={[{ required: true }]} extra="输入家长手机号或姓名搜索选择">
+            <Select
+              showSearch placeholder="搜索家长（姓名 / 手机号）" filterOption={false}
+              options={parentOptions.map((p) => ({ value: p.id, label: `${p.name}（${p.phone}）` }))}
+              onSearch={searchParents} loading={parentSearching}
+              notFoundContent={null}
+            />
           </Form.Item>
           <Form.Item name="name" label="孩子姓名" rules={[{ required: true }]}>
             <Input />
@@ -458,11 +566,14 @@ export default function MemberManage() {
             message.error(e instanceof Error ? e.message : "创建失败");
           }
         }}
-        onCancel={() => setOrderOpen(false)}
+        onCancel={() => confirmDiscardIfDirty(orderForm.isFieldsTouched(), () => { setOrderOpen(false); setSelectedOrderChild(null); orderForm.resetFields(); })}
       >
         <Form form={orderForm} layout="vertical">
-          <Form.Item name="child_id" label="孩子ID" rules={[{ required: true }]}>
-            <Input type="number" disabled />
+          <Form.Item name="child_id" hidden rules={[{ required: true, message: "请选择孩子" }]} />
+          <Form.Item label="孩子">
+            <Typography.Text strong>
+              {selectedOrderChild ? `${selectedOrderChild.name}（${selectedOrderChild.parent_phone}）` : "—"}
+            </Typography.Text>
           </Form.Item>
           <Form.Item name="order_type" label="订单类型" rules={[{ required: true }]} extra="年费金额自动判定二孩折扣；观察期/活动费不打折">
             <Select options={[
@@ -493,7 +604,7 @@ export default function MemberManage() {
             message.error(e instanceof Error ? e.message : "确认失败");
           }
         }}
-        onCancel={() => setConfirmOrder(null)}
+        onCancel={() => confirmDiscardIfDirty(confirmForm.isFieldsTouched(), () => { setConfirmOrder(null); confirmForm.resetFields(); })}
       >
         {confirmOrder && (
           <Typography.Paragraph>
@@ -516,7 +627,11 @@ export default function MemberManage() {
       <Modal
         title={obsChild ? `为 ${obsChild.name} 上传评估报告` : ""}
         open={!!obsChild} okText="上传" cancelText="取消" destroyOnClose
-        onOk={onUploadObservation} onCancel={() => setObsChild(null)}
+        onOk={onUploadObservation}
+        onCancel={() => confirmDiscardIfDirty(
+          obsFileList.length > 0 || obsRemark.trim() !== "",
+          () => { setObsChild(null); setObsFileList([]); setObsRemark(""); }
+        )}
       >
         <Upload
           listType="picture-card" fileList={obsFileList}
@@ -587,7 +702,7 @@ export default function MemberManage() {
             if ((e as Error).message) message.error((e as Error).message);
           }
         }}
-        onCancel={() => setEditChild(null)}
+        onCancel={() => confirmDiscardIfDirty(editForm.isFieldsTouched(), () => { setEditChild(null); editForm.resetFields(); })}
       >
         <Form form={editForm} layout="vertical">
           <Form.Item name="english_name" label="英文名（榜单展示用）">

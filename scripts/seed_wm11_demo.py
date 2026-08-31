@@ -471,6 +471,62 @@ def _upsert_run(
     db.execute(stmt.prefix_with("IGNORE"))
 
 
+def _ensure_demo_wm3_states(db: Session) -> None:
+    """W10：WM3 异常态演示覆盖（幂等）——observation/pending_evaluation/expired 孩 + 1 笔待人工确认订单。
+
+    expired 孩 = member_status formal + member_expire 昨天（D1 读时即时判定，不写 expired 状态）。
+    """
+    import time
+    from decimal import Decimal
+
+    from backend.domain.identity.models import Child, Order
+
+    parent = db.query(Parent).filter(Parent.phone == "13800007777", Parent.is_deleted == 0).first()
+    if not parent:
+        parent = Parent(name="WM3异常态演示", phone="13800007777")
+        db.add(parent)
+        db.flush()
+    today = datetime.now().date()
+
+    def ensure_child(name: str, status: str, expire) -> Child:
+        c = (
+            db.query(Child)
+            .filter(Child.parent_id == parent.id, Child.name == name, Child.is_deleted == 0)
+            .first()
+        )
+        if not c:
+            c = Child(parent_id=parent.id, name=name, member_status=status, member_expire=expire)
+            db.add(c)
+            db.flush()
+        return c
+
+    ensure_child("观察期孩", Child.MEMBER_OBSERVATION, today + timedelta(days=30))
+    ensure_child("待评估孩", Child.MEMBER_PENDING_EVALUATION, None)
+    expired = ensure_child("过期孩", Child.MEMBER_FORMAL, today - timedelta(days=1))
+    pending_order = (
+        db.query(Order)
+        .filter(
+            Order.child_id == expired.id,
+            Order.status == Order.STATUS_PENDING_MANUAL,
+            Order.is_deleted == 0,
+        )
+        .first()
+    )
+    if not pending_order:
+        db.add(
+            Order(
+                order_no=f"WM3-DEMO-{int(time.time())}",
+                order_type=Order.TYPE_FORMAL,
+                parent_id=parent.id,
+                child_id=expired.id,
+                amount=Decimal("6000.00"),
+                status=Order.STATUS_PENDING_MANUAL,
+            )
+        )
+    db.commit()
+    print("c WM3 异常态演示：观察/待评估/过期孩 + 待确认订单", flush=True)
+
+
 def seed() -> None:
     db = SessionLocal()
     try:
@@ -488,6 +544,7 @@ def seed() -> None:
             _ensure_demo_borrow(db, demo_child)
             _ensure_demo_growth(db, demo_child)
             _ensure_demo_fav_reservation(db, demo_child)
+        _ensure_demo_wm3_states(db)
         now = datetime.now()
         _upsert_notification(
             db,

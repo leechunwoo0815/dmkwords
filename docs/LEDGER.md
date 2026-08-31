@@ -17,7 +17,7 @@
 | F1-F4 | 图书管理运营增强（分页/批量/进度条/滚动条） | ACCEPTED | 用户在 WM2 验收过程中逐项确认；commits `e4da393`/`4a43752`/`0bfe411`/`7e4a38f`/`c369b4b` | 已随 WM2 验收闭环 |
 | admin-web-fix | 侧边栏固定 + 媒体重传缓存失效修复 | DONE | gate full PASS（148 passed / 77.94%）；tsc 0 错；commit `5980516` | 侧边栏不再随内容滚动；封面/音频重传后 URL 带 v 版本参数强制刷新；用户已验收 |
 | WM2 | 图书资产 | ACCEPTED | **2026-08-28 用户手动验收通过**；外部终审 R1-R9 + P2 十二项 + C1-C3 + D1-D3 全部修复；gate PASS 187 passed/78.72%（gate-runs/2026-08-28/ 下 gate-wm2-p1.log、gate-wm2-p2.log、gate-wm2-d1d3.log 三份日志）；tag `acceptance-baseline-wm3-wm10`（固定于 ed60377） | 书目/副本/导入/封面音频/题目 + 运营增强 + 上架强校验（新书下架入库 + 五项完整性拦截 + book_onboarding_check 开关）|
-| WM3 | 会员与订单（人工收款路径） | MANUAL_TEST | gate.sh full exit 0（提交 710d56d/543593a/448ede2）| 家长孩子/订单/收款/会员状态机/二孩折扣；等手动验收 |
+| WM3 | 会员与订单（人工收款路径） | MANUAL_TEST | gate.sh full exit 0（提交 710d56d/543593a/448ede2）| 家长孩子/订单/收款/会员状态机/二孩折扣；等手动验收。**20260831 UX 基线修复 DONE**：W1-W12（家长搜索建档/待确认计数/脏数据保护/URL 镜像/排序/到期天数/演示异常态等），门禁 229 passed / 80.02%（gate-runs/2026-08-31/gate-wm3-ux.log）；两刀 commit 未 push |
 | WM4 | 押金与赔偿 | MANUAL_TEST | gate.sh full exit 0（提交 74efe86）| 押金状态机/扣除/补缴/待结清；等手动验收 |
 | WM5 | 借阅操作台 | MANUAL_TEST | gate.sh full exit 0（提交 7b5a8ee）| 借/还/续/逾期扣减/人工放行/未入会开关；等手动验收 |
 | WM6 | 小程序与阅读链 + 预约 | MANUAL_TEST | gate.sh full exit 0（73 pytest + 架构关 + 覆盖率 60.73%）| 防刷按 R-151 墙上时钟重写；miniapp 9 页 + admin 预约管理/核销/阅读档案；等手动验收 |
@@ -29,6 +29,7 @@
 | P0-fix2 | docs/10 P0 五项（R-313 守卫 / 退会 6 态 / 退款 7 态+refund_status / 会员费退款联动退会 / 转让 12 步）+ C20/WM10-07/WM3-03/WM4-01 | DONE | gate.sh full exit 0（2026-08-24，128 pytest / 覆盖率 76.50%）；test_wm10_state_machines 5/5、test_wm10_transfer_refund 7/7、test_r313_guards 4/4、test_d1_member_gates 10/10；架构关 PASS（transfer_service.py 拆分）；前端 RefundCenter.tsx 已适配（执行退款按钮+7/6 态中文标签，tsc 0 错） | MDL 挂起根因：①RefundService.review 未推进联动退会 applying→refunding（execute 失败分支失效）②_advance_withdrawal 补 pending_settle ③测试 _db() 改 with 防断言泄漏。**已提交**（commit `af2eac2` 代码 + `28f54eb` docs 回写） |
 | WM11 | 通知任务看板 | GATE_PASS | 2026-08-29 最终全量门禁 PASS（216 passed / 79.51%，gate-runs/2026-08-29/gate-wm11-ux.log；同日演进 gate-wm11.log→fix.log→ux.log 三份全 PASS）；WM11 专项测试 25（tests/unit/test_wm11_*.py，含审查 P0 并发隔离 + P1 转让超时） | 通知中心（站内必达+微信尽力+发送记录）+ 12 项定时任务（D1 第 3 层过期落库/C13 待评估转换/预约释放/订单超时/转让超时/借阅逾期/活动提醒等）+ 任务看板/手动触发/运行日志 + 死信落库（D6）+ 数据看板补全（D5）+ Excel 导出（C18 审计/看板/通知）+ miniapp 消息页。**手动验收主体已通过**（管理端七步 + miniapp 消息中心 + 自动调度取证闭环；验收期修复 F1-F5/C41-C52 见 docs/17 §八）；遗留：miniapp 查词 UI 复测、看板七字段抽查。详册 docs/17 |
 | WM12 | 微信支付与收尾 | PENDING | — | |
+| WM13 | 运营审核工作台（管理端通知/待办聚合/双 tab 通知中心） | PENDING | 任务包已出：docs/任务包-20260831-WM13运营审核工作台.md（规划 docs/WM13-运营审核工作台规划提案-20260831.md，用户 2026-08-31 裁决：独立表+事项级+通知中心双 tab）| 排期在 WM3 修复验收后 |
 
 ## 待办（非模块主线）
 
