@@ -1,5 +1,7 @@
 # 后端改动说明与排查交接 — 2026-08-30
 
+> 【已归档 20260831】历史过程文档，现行方案见 docs/miniapp-redesign-20260830.md
+
 > 由 AI agent 在小程序视觉改造 v4 期间对 `backend/domain/reading/miniapp_router.py` 做出的改动。
 > 其余改动均为小程序前端（`miniapp/`）样式/交互，未触及后端其他文件。
 
