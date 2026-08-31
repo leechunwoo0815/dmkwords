@@ -1,5 +1,6 @@
 # backend/domain/billing/router.py — 押金 API
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
@@ -42,7 +43,13 @@ class DepositLedgerResponse(BaseSchema):
 
 
 class DeductRequest(BaseSchema):
-    amount: str = Field(..., description="赔偿金额（元）")
+    amount: Decimal = Field(
+        ...,
+        gt=0,
+        max_digits=10,
+        decimal_places=2,
+        description="赔偿金额（元，正数）",
+    )
     reason: str = Field(..., min_length=1, max_length=200, description="事由（关联图书等，留痕）")
     copy_id: int | None = Field(None, description="关联副本ID")
 
@@ -154,7 +161,7 @@ def deduct_deposit(
     from decimal import Decimal
 
     dep, child_name = DepositService(db).deduct(
-        admin, child_id, Decimal(body.amount), body.reason, body.copy_id
+        admin, child_id, body.amount, body.reason, body.copy_id
     )
     return DepositResponse(
         id=dep.id,

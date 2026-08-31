@@ -162,6 +162,8 @@ class DepositService:
     def deduct_for_compensation(
         self, admin, child_id: int, amount: Decimal, reason: str, copy_id: int | None = None
     ) -> Deposit:
+        if amount <= 0:  # P0-F4 防御层：负数会反向增加可用余额（多退真钱）
+            raise ValidationError("赔偿金额必须大于 0")
         dep = self._get_or_create(child_id)
         if dep.status not in (Deposit.STATUS_PAID, Deposit.STATUS_PARTIALLY_DEDUCTED):
             raise ValidationError("押金未缴纳或状态异常，无法扣除（请先线下协商处理）")

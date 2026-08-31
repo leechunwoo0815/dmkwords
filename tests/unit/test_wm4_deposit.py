@@ -164,3 +164,58 @@ def test_sibling_deposits_independent(client: TestClient):
     )
     dep2 = client.get(f"/api/admin/deposits/children/{c2['id']}", headers=h).json()
     assert dep2["available_amount"] == "1200.00"  # 二宝不受影响
+
+
+# ---------- P0-F4：赔偿金额 Decimal 校验防负数（20260831 审查） ----------
+
+
+def test_deduct_negative_amount_rejected(client: TestClient):
+    """负数金额原实现 min(-100,200)=-100 反向加钱（available 300）——修复后 422。"""
+    h = _h(client)
+    c = _paid_child(client, h, "13800000421", "负数孩")
+    _pay_deposit(client, h, c["id"])
+    r = client.post(
+        f"/api/admin/deposits/children/{c['id']}/deduct",
+        json={"amount": "-100", "reason": "负数攻击"},
+        headers=h,
+    )
+    assert r.status_code == 422, f"负数金额未拦: {r.status_code} {r.text[:120]}"
+    dep = client.get(
+        f"/api/admin/deposits", params={"keyword": "负数孩"}, headers=h
+    ).json()["items"][0]
+    assert float(dep["available_amount"]) == 1200  # 余额分毫未动
+
+
+def test_deduct_non_numeric_amount_422_not_500(client: TestClient):
+    """非法字符串原实现 decimal.InvalidOperation → 500——修复后 Pydantic 422。"""
+    h = _h(client)
+    c = _paid_child(client, h, "13800000422", "乱串孩")
+    _pay_deposit(client, h, c["id"])
+    r = client.post(
+        f"/api/admin/deposits/children/{c['id']}/deduct",
+        json={"amount": "abc", "reason": "非法输入"},
+        headers=h,
+    )
+    assert r.status_code == 422, f"非法金额应 422 而非 {r.status_code}"
+
+
+def test_deduct_zero_rejected_and_normal_decimal_ok(client: TestClient):
+    """边界 0 → 422（gt=0）；正常两位小数 "50.00" → 200 且流水正确。"""
+    h = _h(client)
+    c = _paid_child(client, h, "13800000423", "边界孩")
+    _pay_deposit(client, h, c["id"])
+    r0 = client.post(
+        f"/api/admin/deposits/children/{c['id']}/deduct",
+        json={"amount": "0", "reason": "零金额"},
+        headers=h,
+    )
+    assert r0.status_code == 422
+    r = client.post(
+        f"/api/admin/deposits/children/{c['id']}/deduct",
+        json={"amount": "50.00", "reason": "正常赔偿"},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    dep = r.json()
+    assert float(dep["available_amount"]) == 1150
+    assert float(dep["deducted_amount"]) == 50
