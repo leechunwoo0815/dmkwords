@@ -207,6 +207,27 @@ def test_orders_counts(client: TestClient):
     }
 
 
+def test_children_list_keyword_search(client: TestClient):
+    """F2 回归：孩子列表 keyword 搜索（func.or_ 在 MySQL 生成非法 SQL 的潜伏 bug，or_ 已修）。"""
+    h = _h(client)
+    p = _parent(client, h, "13800000012", "关键字家长")
+    _child(client, h, p["id"], "关键字孩")
+    # 按孩子姓名命中
+    r = client.get("/api/admin/members/children", params={"keyword": "关键字孩"}, headers=h)
+    assert r.status_code == 200, r.text
+    assert [i["name"] for i in r.json()["items"]] == ["关键字孩"]
+    # 按家长手机号命中
+    r2 = client.get("/api/admin/members/children", params={"keyword": "13800000012"}, headers=h)
+    assert r2.status_code == 200, r2.text
+    assert [i["name"] for i in r2.json()["items"]] == ["关键字孩"]
+    # 按家长姓名命中
+    r3 = client.get("/api/admin/members/children", params={"keyword": "关键字家长"}, headers=h)
+    assert len(r3.json()["items"]) == 1
+    # 无关 keyword 返回空
+    r4 = client.get("/api/admin/members/children", params={"keyword": "不存在的名字xyz"}, headers=h)
+    assert r4.json()["items"] == []
+
+
 def test_orders_order_by_whitelist(client: TestClient):
     """W7 受控后端排序：amount/created_at 白名单；非法值 422。"""
     h = _h(client)

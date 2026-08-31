@@ -483,6 +483,7 @@ export default function MemberManage() {
           try {
             const created = await apiCreateParent(v);
             message.success(`家长 ${created.name}（${created.phone}）创建成功，已预选为建档家长`);
+            setParentOptions([created]); // F1：预选值进 options，避免 antd 显示裸数字 ID
             setParentOpen(false);
             setChildOpen(true);
             setTimeout(() => {
