@@ -7,7 +7,7 @@ import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from backend.common.events import OrderPaidEvent, event_bus
@@ -58,6 +58,14 @@ class ParentService:
             .order_by(Child.id)
             .all()
         )
+
+    def search(self, keyword: str | None = None, limit: int = 20) -> list[Parent]:
+        """家长搜索（W1 建档选择器：姓名/手机号模糊匹配）。"""
+        q = self.db.query(Parent).filter(Parent.is_deleted == 0)
+        if keyword:
+            like = f"%{keyword}%"
+            q = q.filter(or_(Parent.name.like(like), Parent.phone.like(like)))
+        return q.order_by(Parent.id.desc()).limit(limit).all()
 
 
 class ChildService:
@@ -203,7 +211,7 @@ class ChildService:
         if keyword:
             like = f"%{keyword}%"
             q = q.join(Parent, Child.parent_id == Parent.id).filter(
-                func.or_(
+                or_(
                     Child.name.like(like),
                     Child.english_name.like(like),
                     Parent.phone.like(like),
@@ -548,15 +556,35 @@ class OrderService:
             )
         child.member_status = new_status
 
-    def list_orders(self, page: int, page_size: int, status: str | None, keyword: str | None):
+    def list_orders(
+        self,
+        page: int,
+        page_size: int,
+        status: str | None,
+        keyword: str | None,
+        order_by: str | None = None,
+    ):
         q = self.db.query(Order).filter(Order.is_deleted == 0)
         if status:
             q = q.filter(Order.status == status)
         if keyword:
             like = f"%{keyword}%"
-            q = q.filter(func.or_(Order.order_no.like(like), Order.remark.like(like)))
+            q = q.filter(or_(Order.order_no.like(like), Order.remark.like(like)))
+        # W7 受控后端排序：白名单映射写死，非法值 422 暴露前端 bug（禁静默回退）
+        order_map = {
+            "amount_asc": Order.amount.asc(),
+            "amount_desc": Order.amount.desc(),
+            "created_at_asc": Order.create_time.asc(),
+            "created_at_desc": Order.create_time.desc(),
+        }
+        order_clause = order_map.get(order_by) if order_by else None
+        if order_by and order_clause is None:
+            raise ValidationError(
+                f"order_by 取值非法：{order_by}（白名单：amount/created_at × asc/desc）"
+            )
         total = q.count()
-        orders = q.order_by(Order.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        q = q.order_by(order_clause if order_clause is not None else Order.id.desc())
+        orders = q.offset((page - 1) * page_size).limit(page_size).all()
         # 关联孩子/家长名
         out = []
         for o in orders:
@@ -566,6 +594,22 @@ class OrderService:
             parent = self.db.query(Parent).filter(Parent.id == o.parent_id).first()
             out.append((o, child.name if child else None, parent.name if parent else None))
         return out, total
+
+    def counts(self) -> dict:
+        """订单各状态计数（W3/UI 待确认待办；WM13 待办聚合复用，键名语义化不可改）。"""
+        q = self.db.query(Order).filter(Order.is_deleted == 0)
+        total = q.count()
+        by_status = dict(
+            q.with_entities(Order.status, func.count(Order.id)).group_by(Order.status).all()
+        )
+        return {
+            "total": total,
+            "pending_payment": by_status.get(Order.STATUS_PENDING_PAYMENT, 0),
+            "pending_manual_confirm": by_status.get(Order.STATUS_PENDING_MANUAL, 0),
+            "paid": by_status.get(Order.STATUS_PAID, 0),
+            "cancelled": by_status.get(Order.STATUS_CANCELLED, 0),
+            "refunded": by_status.get(Order.STATUS_REFUNDED, 0),
+        }
 
     def cancel(self, admin, order_id: int) -> Order:
         order = self.db.query(Order).filter(Order.id == order_id, Order.is_deleted == 0).first()

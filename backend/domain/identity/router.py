@@ -39,6 +39,16 @@ def create_parent(
     return ParentResponse.model_validate(ParentService(db).create(admin, body))
 
 
+@router.get("/members/parents", response_model=list[ParentResponse])
+def search_parents(
+    keyword: str | None = Query(None),
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """家长搜索（W1：建档家长选择器远程搜索，姓名/手机号模糊匹配）。"""
+    return [ParentResponse.model_validate(p) for p in ParentService(db).search(keyword)]
+
+
 @router.get("/members/parents/{parent_id}/children", response_model=list[ChildResponse])
 def list_children(
     parent_id: int,
@@ -141,10 +151,11 @@ def list_orders(
     page_size: int = Query(20, ge=1, le=100),
     status: str | None = Query(None),
     keyword: str | None = Query(None),
+    order_by: str | None = Query(None),
     admin: Any = Depends(require_perm("member.manage")),
     db: Session = Depends(get_db),
 ):
-    rows, total = OrderService(db).list_orders(page, page_size, status, keyword)
+    rows, total = OrderService(db).list_orders(page, page_size, status, keyword, order_by)
     items = []
     for order, child_name, parent_name in rows:
         item = OrderResponse.model_validate(order)
@@ -155,6 +166,15 @@ def list_orders(
     return PaginatedResponse[OrderResponse].create(
         items=items, total=total, page=page, page_size=page_size
     )
+
+
+@router.get("/orders/counts")
+def order_counts(
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """订单各状态计数（W3 待确认待办视角；语义化键名，WM13 待办聚合预留）。"""
+    return OrderService(db).counts()
 
 
 @router.post("/orders/{order_id}/confirm-payment", response_model=OrderResponse)

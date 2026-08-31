@@ -16,8 +16,22 @@ export function apiListChildren(params: {
   return request(`/api/admin/members/children?${q.toString()}`);
 }
 
-export function apiCreateParent(body: { name: string; phone: string; remark?: string }): Promise<{ id: number }> {
+export type Parent = components["schemas"]["ParentResponse"];
+export type OrderCounts = {
+  total: number; pending_payment: number; pending_manual_confirm: number;
+  paid: number; cancelled: number; refunded: number;
+};
+
+export function apiCreateParent(body: { name: string; phone: string; remark?: string }): Promise<Parent> {
   return request("/api/admin/members/parents", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function apiSearchParents(keyword: string): Promise<Parent[]> {
+  return request(`/api/admin/members/parents?keyword=${encodeURIComponent(keyword)}`);
+}
+
+export function apiOrderCounts(): Promise<OrderCounts> {
+  return request("/api/admin/orders/counts");
 }
 
 export function apiCreateChild(parentId: number, body: {
@@ -27,11 +41,12 @@ export function apiCreateChild(parentId: number, body: {
 }
 
 export function apiListOrders(params: {
-  page: number; page_size: number; status?: string; keyword?: string;
+  page: number; page_size: number; status?: string; keyword?: string; order_by?: string;
 }): Promise<PaginatedOrders> {
   const q = new URLSearchParams({ page: String(params.page), page_size: String(params.page_size) });
   if (params.status) q.set("status", params.status);
   if (params.keyword) q.set("keyword", params.keyword);
+  if (params.order_by) q.set("order_by", params.order_by);
   return request(`/api/admin/orders?${q.toString()}`);
 }
 

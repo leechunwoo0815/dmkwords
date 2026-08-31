@@ -162,3 +162,69 @@ def test_member_status_matrix(client: TestClient, db):
     # withdrawn → observation（重新入会）合法
     child.member_status = Child.MEMBER_WITHDRAWN
     assert child.can_transition(Child.MEMBER_OBSERVATION)
+
+
+def test_parent_search_keyword(client: TestClient):
+    """W1 家长远程搜索：keyword 按姓名/手机号模糊匹配。"""
+    h = _h(client)
+    _parent(client, h, "13800000008", "张女士")
+    _parent(client, h, "13800000009", "李四")
+    r = client.get("/api/admin/members/parents", params={"keyword": "张"}, headers=h)
+    assert r.status_code == 200, r.text
+    items = r.json()
+    assert len(items) == 1
+    assert items[0]["name"] == "张女士"
+    assert items[0]["phone"] == "13800000008"
+    r2 = client.get("/api/admin/members/parents", params={"keyword": "13800000009"}, headers=h)
+    assert [p["name"] for p in r2.json()] == ["李四"]
+    # 无 keyword 返回全量（分页）
+    r3 = client.get("/api/admin/members/parents", headers=h)
+    assert r3.status_code == 200
+    assert len(r3.json()) >= 2
+
+
+def test_orders_counts(client: TestClient):
+    """W3 订单 counts：一次返回各状态计数（语义化键名，WM13 预留）。"""
+    h = _h(client)
+    p = _parent(client, h, "13800000010")
+    c = _child(client, h, p["id"])
+    _order(client, h, c["id"], "observation_fee")  # pending_manual_confirm
+    o2 = _order(client, h, c["id"], "observation_fee")
+    _confirm(client, h, o2["id"])  # paid
+    r = client.get("/api/admin/orders/counts", headers=h)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["total"] == 2
+    assert body["pending_manual_confirm"] == 1
+    assert body["paid"] == 1
+    assert set(body.keys()) >= {
+        "total",
+        "pending_payment",
+        "pending_manual_confirm",
+        "paid",
+        "cancelled",
+        "refunded",
+    }
+
+
+def test_orders_order_by_whitelist(client: TestClient):
+    """W7 受控后端排序：amount/created_at 白名单；非法值 422。"""
+    h = _h(client)
+    p = _parent(client, h, "13800000011")
+    c = _child(client, h, p["id"])
+    o1 = _order(client, h, c["id"], "observation_fee")  # 500 → observation
+    _confirm(client, h, o1["id"])
+    o2 = _order(client, h, c["id"], "formal_fee")  # 6000 → formal（观察期在会，无二孩折扣）
+    _confirm(client, h, o2["id"])
+    r = client.get("/api/admin/orders", params={"order_by": "amount_desc"}, headers=h)
+    assert r.status_code == 200, r.text
+    items = r.json()["items"]
+    amounts = [float(o["amount"]) for o in items]
+    assert amounts == sorted(amounts, reverse=True)
+    r2 = client.get("/api/admin/orders", params={"order_by": "amount_asc"}, headers=h)
+    asc = [float(o["amount"]) for o in r2.json()["items"]]
+    assert asc == sorted(asc)
+    # 非法值 422（白名单外暴露前端 bug，非静默回退）
+    r3 = client.get("/api/admin/orders", params={"order_by": "evil"}, headers=h)
+    assert r3.status_code == 422
+    assert "order_by" in r3.json()["detail"].lower()

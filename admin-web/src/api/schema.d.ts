@@ -730,7 +730,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Search Parents
+         * @description 家长搜索（W1：建档家长选择器远程搜索，姓名/手机号模糊匹配）。
+         */
+        get: operations["search_parents_api_admin_members_parents_get"];
         put?: never;
         /** Create Parent */
         post: operations["create_parent_api_admin_members_parents_post"];
@@ -847,6 +851,26 @@ export interface paths {
         put?: never;
         /** Create Order */
         post: operations["create_order_api_admin_orders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/orders/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Order Counts
+         * @description 订单各状态计数（W3 待确认待办视角；语义化键名，WM13 待办聚合预留）。
+         */
+        get: operations["order_counts_api_admin_orders_counts_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1178,7 +1202,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Books */
+        /**
+         * List Books
+         * @description 书城列表（2000 本规模检索）：筛选（年级/主题/AR 区间/有音频）+ 排序 + 分页。
+         *     ar_level 是字符串列，范围过滤/排序一律 CAST DECIMAL（非法值按 0 处理）。
+         */
         get: operations["list_books_api_miniapp_books_get"];
         put?: never;
         post?: never;
@@ -1341,7 +1369,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Book Cover */
+        /**
+         * Book Cover
+         * @description 封面图（query token：image 组件无法携带 Authorization 头；同时兼容 Header 鉴权）。
+         */
         get: operations["book_cover_api_miniapp_covers__book_id__get"];
         put?: never;
         post?: never;
@@ -1449,6 +1480,27 @@ export interface paths {
         };
         /** Current Borrows */
         get: operations["current_borrows_api_miniapp_borrows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/continue-listening": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Continue Listening
+         * @description 首页"继续听"卡：最近一次有进度但未读完（finished=0）的上一本。
+         *     读完的/无进度的不返回；无续听对象返回 null（前端隐藏卡片）。
+         */
+        get: operations["continue_listening_api_miniapp_continue_listening_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3789,6 +3841,7 @@ export interface operations {
                 scene?: string | null;
                 parent_name?: string | null;
                 unread?: boolean | null;
+                read?: boolean | null;
             };
             header?: never;
             path?: never;
@@ -5052,6 +5105,37 @@ export interface operations {
             };
         };
     };
+    search_parents_api_admin_members_parents_get: {
+        parameters: {
+            query?: {
+                keyword?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_parent_api_admin_members_parents_post: {
         parameters: {
             query?: never;
@@ -5297,6 +5381,7 @@ export interface operations {
                 page_size?: number;
                 status?: string | null;
                 keyword?: string | null;
+                order_by?: string | null;
             };
             header?: never;
             path?: never;
@@ -5353,6 +5438,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    order_counts_api_admin_orders_counts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };
@@ -5958,6 +6063,12 @@ export interface operations {
                 keyword?: string | null;
                 page?: number;
                 page_size?: number;
+                grade?: string | null;
+                topic?: string | null;
+                ar_min?: number | null;
+                ar_max?: number | null;
+                has_audio?: boolean;
+                sort?: string;
             };
             header: {
                 authorization: string;
@@ -6297,9 +6408,11 @@ export interface operations {
     };
     book_cover_api_miniapp_covers__book_id__get: {
         parameters: {
-            query?: never;
-            header: {
-                authorization: string;
+            query?: {
+                token?: string;
+            };
+            header?: {
+                Authorization?: string | null;
             };
             path: {
                 book_id: number;
@@ -6537,6 +6650,39 @@ export interface operations {
         };
     };
     current_borrows_api_miniapp_borrows_get: {
+        parameters: {
+            query: {
+                child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    continue_listening_api_miniapp_continue_listening_get: {
         parameters: {
             query: {
                 child_id: number;
