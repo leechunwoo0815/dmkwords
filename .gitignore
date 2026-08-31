@@ -26,3 +26,7 @@ miniapp/project.private.config.json
 # 本地 HTTPS 开发证书（自签 CA + 私钥，绝不入库）
 certs/
 *.key
+
+# Trae 工作区记忆（工具产物不入库）
+.workbuddy/
+
