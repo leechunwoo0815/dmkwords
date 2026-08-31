@@ -20,6 +20,7 @@ from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.circulation.models import BorrowRecord
 from backend.domain.identity.models import (
     Child,
+    Parent,
     RefundRequest,
     TransferRequest,
     WithdrawalRequest,
@@ -168,8 +169,7 @@ class TransferService:
             scene=AdminNotification.SCENE_TRANSFER_APPLY,
             title="【权益转让】",
             content=(
-                f"【权益转让】{parent.name}申请将 {source.name} 的会员权益"
-                f"转让给 {target.name}"
+                f"【权益转让】{parent.name}申请将 {source.name} 的会员权益转让给 {target.name}"
             ),
             ref_type=AdminNotification.REF_TRANSFER,
             ref_id=str(req.id),
@@ -232,6 +232,54 @@ class TransferService:
         self._unlock_both(req)
         self.db.commit()
         return {"id": req.id, "status": req.status}
+
+    def transfer_expiring_warn(self, hours_ahead: int = 24) -> int:
+        """WM13 守护层：转让临近超时（剩 ≤ hours_ahead 小时且未过期）预警运营。
+
+        幂等：dedup 每单一次（B11 唯一索引）；预警显示态由 StatusResolver 实时判定，
+        转让 expired/reviewed 后自动失效——预警永远不会变成孤儿（S1）。
+        """
+        from backend.common.admin_notification_models import AdminNotification
+        from backend.common.admin_notifications import AdminNotifyService
+
+        now = datetime.now()
+        deadline = now + timedelta(hours=hours_ahead)
+        rows = (
+            self.db.query(TransferRequest)
+            .filter(
+                TransferRequest.status == TransferRequest.STATUS_PENDING,
+                TransferRequest.expires_at <= deadline,
+                TransferRequest.expires_at > now,
+                TransferRequest.is_deleted == 0,
+            )
+            .all()
+        )
+        svc = AdminNotifyService(self.db)
+        sent = 0
+        for r in rows:
+            src = self.db.query(Child).filter(Child.id == r.source_child_id).first()
+            tgt = self.db.query(Child).filter(Child.id == r.target_child_id).first()
+            parent = (
+                self.db.query(Parent).filter(Parent.id == src.parent_id).first() if src else None
+            )
+            hours_left = max(1, int((r.expires_at - now).total_seconds() // 3600))
+            ok = svc.send(
+                scene=AdminNotification.SCENE_TRANSFER_EXPIRING,
+                title="【转让超时预警】",
+                content=(
+                    f"【转让超时预警】{parent.name if parent else ''}申请的转让"
+                    f"（{src.name if src else ''} → {tgt.name if tgt else ''}）"
+                    f"将在约 {hours_left} 小时后超时自动失效，请尽快审核"
+                ),
+                ref_type=AdminNotification.REF_TRANSFER,
+                ref_id=str(r.id),
+                applicant_name=f"{parent.name if parent else ''}·{src.name if src else ''}",
+            )
+            if ok:
+                sent += 1
+        if rows:
+            self.db.commit()
+        return sent
 
     def expire_overdue(self) -> int:
         """超时未审 → expired + 双方解锁（列表访问时惰性触发；WM11 定时任务接管）。"""

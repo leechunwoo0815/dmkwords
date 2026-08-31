@@ -75,6 +75,12 @@ def _transfer_expire_check(db: Session) -> int:
     return TransferService(db).expire_overdue()
 
 
+def _transfer_expiring_warn(db: Session) -> int:
+    from backend.domain.identity.transfer_service import TransferService
+
+    return TransferService(db).transfer_expiring_warn()
+
+
 def _book_due_remind(db: Session) -> int:
     from backend.domain.circulation.service import CirculationService
 
@@ -129,6 +135,9 @@ TASKS: dict[str, TaskSpec] = {
     ),
     "transfer_expire_check": TaskSpec(
         "transfer_expire_check", "转让超时取消", "会员", 600, _transfer_expire_check
+    ),
+    "transfer_expiring_warn": TaskSpec(
+        "transfer_expiring_warn", "转让超时预警", "会员", 3600, _transfer_expiring_warn
     ),
     "activity_remind": TaskSpec("activity_remind", "活动开始提醒", "活动", 3600, _activity_remind),
     "activity_auto_finish": TaskSpec(
