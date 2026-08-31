@@ -1,16 +1,15 @@
+# Import all models so Alembic can detect them
+import os
+import sys
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
-# Import all models so Alembic can detect them
-import os
-import sys
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from backend.database import Base  # noqa: E402
+from backend.common.admin_notification_models import AdminNotification  # noqa: E402, F401
 
 # Import domain models to register them with Base.metadata
 # （新域模型落地时在此追加 import）
@@ -19,13 +18,12 @@ from backend.common.notification_models import (  # noqa: E402, F401
     Notification,
     TaskRunLog,
 )
-from backend.common.admin_notification_models import AdminNotification  # noqa: E402, F401
+from backend.database import Base  # noqa: E402
 from backend.domain.activity.models import Activity, ActivityEnrollment  # noqa: E402, F401
 from backend.domain.admin.models import AdminUser, AuditLog, SystemConfig  # noqa: E402, F401
+from backend.domain.billing.models import Deposit, DepositLedger  # noqa: E402, F401
 from backend.domain.catalog.models import Book, BookCopy, QuizQuestion  # noqa: E402, F401
 from backend.domain.circulation.models import BorrowRecord  # noqa: E402, F401
-from backend.domain.reading.models import CheckIn, ReadingProgress, Reservation  # noqa: E402, F401
-from backend.domain.billing.models import Deposit, DepositLedger  # noqa: E402, F401
 from backend.domain.growth.models import (  # noqa: E402, F401
     CheckinStreakRecord,
     ChildGrowthState,
@@ -43,6 +41,7 @@ from backend.domain.identity.models import (  # noqa: E402, F401
     TransferRequest,
     WithdrawalRequest,
 )
+from backend.domain.reading.models import CheckIn, ReadingProgress, Reservation  # noqa: E402, F401
 
 # this is the Alembic Config object
 config = context.config
