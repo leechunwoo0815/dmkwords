@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from sqlalchemy import update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
@@ -30,10 +31,34 @@ def _ensure_demo_parent(db: Session) -> Parent:
 
 def _ensure_demo_child(db: Session, parent: Parent) -> None:
     """演示孩（C45 配套）：无孩子时 member 页功能网格不渲染，补一个 formal 孩让演示完整。"""
-    from backend.domain.identity.models import Child
+    from backend.domain.identity.models import Child, Order
 
     exists = db.query(Child).filter(Child.parent_id == parent.id, Child.is_deleted == 0).first()
     if exists:
+        # WM13 验收第二链配套：确保演示孩有一笔 paid 订单可供"申请退款→撤销"反例
+        # （否则步骤 9 无单可退；幂等按 order_no 前缀查）
+        child = exists
+        has_paid = (
+            db.query(Order)
+            .filter(
+                Order.child_id == child.id,
+                Order.order_no.like("WM11-DEMO-%"),
+                Order.is_deleted == 0,
+            )
+            .first()
+        )
+        if not has_paid:
+            db.add(
+                Order(
+                    order_no=f"WM11-DEMO-{int(datetime.now().timestamp())}",
+                    order_type=Order.TYPE_OBSERVATION,
+                    parent_id=parent.id,
+                    child_id=child.id,
+                    amount=Decimal("500.00"),
+                    status=Order.STATUS_PAID,
+                )
+            )
+            db.commit()
         return
     today = datetime.now().date()
     db.add(
