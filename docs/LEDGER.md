@@ -29,7 +29,7 @@
 | P0-fix2 | docs/10 P0 五项（R-313 守卫 / 退会 6 态 / 退款 7 态+refund_status / 会员费退款联动退会 / 转让 12 步）+ C20/WM10-07/WM3-03/WM4-01 | DONE | gate.sh full exit 0（2026-08-24，128 pytest / 覆盖率 76.50%）；test_wm10_state_machines 5/5、test_wm10_transfer_refund 7/7、test_r313_guards 4/4、test_d1_member_gates 10/10；架构关 PASS（transfer_service.py 拆分）；前端 RefundCenter.tsx 已适配（执行退款按钮+7/6 态中文标签，tsc 0 错） | MDL 挂起根因：①RefundService.review 未推进联动退会 applying→refunding（execute 失败分支失效）②_advance_withdrawal 补 pending_settle ③测试 _db() 改 with 防断言泄漏。**已提交**（commit `af2eac2` 代码 + `28f54eb` docs 回写） |
 | WM11 | 通知任务看板 | GATE_PASS | 2026-08-29 最终全量门禁 PASS（216 passed / 79.51%，gate-runs/2026-08-29/gate-wm11-ux.log；同日演进 gate-wm11.log→fix.log→ux.log 三份全 PASS）；WM11 专项测试 25（tests/unit/test_wm11_*.py，含审查 P0 并发隔离 + P1 转让超时） | 通知中心（站内必达+微信尽力+发送记录）+ 12 项定时任务（D1 第 3 层过期落库/C13 待评估转换/预约释放/订单超时/转让超时/借阅逾期/活动提醒等）+ 任务看板/手动触发/运行日志 + 死信落库（D6）+ 数据看板补全（D5）+ Excel 导出（C18 审计/看板/通知）+ miniapp 消息页。**手动验收主体已通过**（管理端七步 + miniapp 消息中心 + 自动调度取证闭环；验收期修复 F1-F5/C41-C52 见 docs/17 §八）；遗留：miniapp 查词 UI 复测、看板七字段抽查。详册 docs/17 |
 | WM12 | 微信支付与收尾 | PENDING | — | |
-| WM13 | 运营审核工作台（管理端通知/待办聚合/双 tab 通知中心） | PENDING | 任务包已出：docs/任务包-20260831-WM13运营审核工作台.md（规划 docs/WM13-运营审核工作台规划提案-20260831.md，用户 2026-08-31 裁决：独立表+事项级+通知中心双 tab）| 排期在 WM3 修复验收后 |
+| WM13 | 运营审核工作台（管理端通知/待办聚合/双 tab 通知中心） | MANUAL_TEST | 任务包 docs/任务包-20260831-WM13运营审核工作台.md；五批次 DONE 2026-08-31：底座（admin_notifications+StatusResolver 实时算显示态+5 触发点）/收件箱双 tab/徽标+待办卡/转让超时预警任务/9 处 L2 审计回写+RefundCenter 定位高亮；专项测试 32 | 等手动验收（docs/04 WM13 验收表 10 步）；显示态实时算/审计态事件写（S1 结构性歼灭） |
 
 ## 待办（非模块主线）
 
