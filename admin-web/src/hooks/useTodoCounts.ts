@@ -9,6 +9,9 @@ export const TODO_REFRESH_EVENT = "wm13-todo-refresh";
 
 let cache: TodoCounts | null = null;
 let loadFailed = false;
+// E-20260831-04：useSyncExternalStore 的 getSnapshot 必须返回稳定引用——
+// 每次返回新对象字面量 → Object.is 永不相等 → 无限重渲染 → React 卸载全树（全站白屏）
+let snapshot: { counts: TodoCounts | null; failed: boolean } = { counts: null, failed: false };
 let timer: ReturnType<typeof setInterval> | null = null;
 const listeners = new Set<() => void>();
 
@@ -23,6 +26,7 @@ async function fetchOnce() {
   } catch {
     loadFailed = true; // 保持上次值（不覆盖为空/0）
   }
+  snapshot = { counts: cache, failed: loadFailed }; // 数据落地时才换引用（E-20260831-04）
   notify();
 }
 
@@ -55,7 +59,7 @@ function handleEvent() {
 }
 
 function getSnapshot(): { counts: TodoCounts | null; failed: boolean } {
-  return { counts: cache, failed: loadFailed };
+  return snapshot;
 }
 
 /** 徽标/待办卡共用：同一缓存、同一轮询（Q10 裁定：事件机制 + 路由变化由调用方配合触发）。 */
