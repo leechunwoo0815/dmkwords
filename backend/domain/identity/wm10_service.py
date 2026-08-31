@@ -16,12 +16,15 @@ from decimal import Decimal
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.common.admin_notification_models import AdminNotification
+from backend.common.admin_notifications import AdminNotifyService
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.circulation.models import BorrowRecord
 from backend.domain.identity.models import (
     Child,
     Order,
+    Parent,
     RefundRequest,
     TransferRequest,
     WithdrawalRequest,
@@ -167,7 +170,22 @@ class RefundService:
             reason=reason.strip(),
         )
         self.db.add(req)
+        self.db.flush()  # WM13：取自增 id 供通知 ref_id
         order.refund_status = Order.REFUND_STATUS_PENDING
+        # WM13 触发点1：退款申请 → 管理待办通知（同事务，幂等，content 含原因原文）
+        parent = self.db.query(Parent).filter(Parent.id == child.parent_id).first()
+        AdminNotifyService(self.db).send(
+            scene=AdminNotification.SCENE_REFUND_APPLY,
+            title="【退款申请】",
+            content=(
+                f"【退款申请】{parent.name if parent else ''}为{child.name}申请退款 "
+                f"￥{req.amount}（订单 {order.order_no}）。原因：{req.reason}"
+            ),
+            ref_type=AdminNotification.REF_REFUND_REQUEST,
+            ref_id=str(req.id),
+            applicant_name=f"{parent.name if parent else ''}·{child.name}",
+            amount=req.amount,
+        )
         self.db.commit()
         return req
 
@@ -393,6 +411,25 @@ class RefundService:
         child = self.db.query(Child).filter(Child.id == req.child_id).first()
         if child:
             notify_refund_executed(self.db, child, req, success, remark)
+        # WM13 触发点5（Q5 裁定）：退款执行失败 → 管理待办通知（运营重试入口）
+        if not success:
+            parent = (
+                self.db.query(Parent).filter(Parent.id == child.parent_id).first()
+                if child
+                else None
+            )
+            AdminNotifyService(self.db).send(
+                scene=AdminNotification.SCENE_REFUND_EXECUTE_FAILED,
+                title="【退款执行失败】",
+                content=(
+                    f"【退款执行失败】{child.name if child else ''}的退款 ￥{req.amount} "
+                    f"执行失败：{remark}。请处理后重试"
+                ),
+                ref_type=AdminNotification.REF_REFUND_REQUEST,
+                ref_id=str(req.id),
+                applicant_name=f"{parent.name if parent else ''}·{child.name if child else ''}",
+                amount=req.amount,
+            )
         self.db.commit()
         # 聚合推进关联退会流程（全部退款完成 → completed）
         if success:
@@ -623,7 +660,21 @@ class WithdrawalService:
             child_id=child.id, source=WithdrawalRequest.SOURCE_NORMAL, reason=reason.strip()
         )
         self.db.add(req)
+        self.db.flush()  # WM13：取自增 id 供通知 ref_id
         child.operation_locked = 1  # 冻结：借/约/续/新订单/新测验/退款/转让
+        # WM13 触发点2：家长主动退会 → 管理待办通知（同事务，幂等；联动退会不发）
+        parent = self.db.query(Parent).filter(Parent.id == child.parent_id).first()
+        AdminNotifyService(self.db).send(
+            scene=AdminNotification.SCENE_WITHDRAWAL_APPLY,
+            title="【退会申请】",
+            content=(
+                f"【退会申请】{parent.name if parent else ''}为{child.name}申请退会。"
+                f"原因：{req.reason}"
+            ),
+            ref_type=AdminNotification.REF_WITHDRAWAL_REQUEST,
+            ref_id=str(req.id),
+            applicant_name=f"{parent.name if parent else ''}·{child.name}",
+        )
         self.db.commit()
         return {"id": req.id, "status": req.status, "child_id": child.id}
 

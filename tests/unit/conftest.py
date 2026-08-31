@@ -14,6 +14,7 @@ from backend.domain.admin.service import invalidate_config_cache
 from backend.main import app
 
 ADMIN_TABLES = [
+    "admin_notifications",
     "notifications",
     "task_run_logs",
     "dead_letters",

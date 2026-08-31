@@ -19,6 +19,7 @@ from backend.common.notification_models import (  # noqa: E402, F401
     Notification,
     TaskRunLog,
 )
+from backend.common.admin_notification_models import AdminNotification  # noqa: E402, F401
 from backend.domain.activity.models import Activity, ActivityEnrollment  # noqa: E402, F401
 from backend.domain.admin.models import AdminUser, AuditLog, SystemConfig  # noqa: E402, F401
 from backend.domain.catalog.models import Book, BookCopy, QuizQuestion  # noqa: E402, F401

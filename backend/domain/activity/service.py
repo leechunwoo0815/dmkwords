@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -192,6 +193,7 @@ class ActivityService:
             .all()
         )
         refund_cnt = cancel_cnt = 0
+        refund_amounts: list[Decimal] = []
         for e in enrollments:
             if e.status == ActivityEnrollment.STATUS_PENDING_PAYMENT:
                 e.status = ActivityEnrollment.STATUS_CANCELLED
@@ -201,6 +203,13 @@ class ActivityService:
                 e.status = ActivityEnrollment.STATUS_REFUND_PENDING
                 e.cancel_reason = "活动取消，待退款审核"
                 refund_cnt += 1
+                # WM13 触发点4：累计待退金额（关联订单金额，Q6 裁定）
+                if e.order_id:
+                    o = self.db.query(Order).filter(Order.id == e.order_id).first()
+                    if o:
+                        refund_amounts.append(Decimal(str(o.amount)))
+                else:
+                    refund_amounts.append(Decimal(str(a.fee)))
             # checked_in / refund_pending / refunded / cancelled 不动
         # WM11：活动取消通知已报名家庭（每家庭一条，去重）
         from backend.domain.identity.models import Parent
@@ -221,6 +230,23 @@ class ActivityService:
                 ref_type="activity",
                 ref_id=str(activity_id),
                 openid=p.wechat_openid if p else None,
+            )
+        # WM13 触发点4：活动批量退款汇总 → 管理待办通知（同事务，幂等；Q6：applicant=活动名）
+        if refund_cnt > 0:
+            from backend.common.admin_notification_models import AdminNotification
+            from backend.common.admin_notifications import AdminNotifyService
+
+            AdminNotifyService(self.db).send(
+                scene=AdminNotification.SCENE_ACTIVITY_BATCH_REFUND,
+                title="【活动退款】",
+                content=(
+                    f"【活动退款】《{a.title}》已取消，{refund_cnt} 笔报名费待退款审核"
+                    + (f"（合计 ￥{sum(refund_amounts)}）" if refund_amounts else "")
+                ),
+                ref_type=AdminNotification.REF_ACTIVITY,
+                ref_id=str(activity_id),
+                applicant_name=a.title,
+                amount=sum(refund_amounts) if refund_amounts else None,
             )
         publish_audit(
             self.db,

@@ -157,8 +157,24 @@ class TransferService:
             expires_at=datetime.now() + timedelta(hours=hours),
         )
         self.db.add(req)
+        self.db.flush()  # WM13：取自增 id 供通知 ref_id
         source.operation_locked = 1
         target.operation_locked = 1
+        # WM13 触发点3：转让申请 → 管理待办通知（同事务，幂等）
+        from backend.common.admin_notification_models import AdminNotification
+        from backend.common.admin_notifications import AdminNotifyService
+
+        AdminNotifyService(self.db).send(
+            scene=AdminNotification.SCENE_TRANSFER_APPLY,
+            title="【权益转让】",
+            content=(
+                f"【权益转让】{parent.name}申请将 {source.name} 的会员权益"
+                f"转让给 {target.name}"
+            ),
+            ref_type=AdminNotification.REF_TRANSFER,
+            ref_id=str(req.id),
+            applicant_name=f"{parent.name}·{source.name}",
+        )
         self.db.commit()
         return {
             "id": req.id,
