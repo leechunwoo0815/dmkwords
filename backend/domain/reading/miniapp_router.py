@@ -156,19 +156,15 @@ def list_books(
 
 @router.get("/books/{book_id}/progress")
 def get_progress(book_id: int, child_id: int, auth: Any = Depends(get_current_parent)):
-    _, db = auth
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise ValidationError("孩子不存在")
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, child_id)  # P0-F1 归属校验
     return ReadingService(db).get_progress(child, book_id)
 
 
 @router.post("/reading/progress")
 def report_progress(body: ProgressReportRequest, auth: Any = Depends(get_current_parent)):
-    _, db = auth
-    child = db.query(Child).filter(Child.id == body.child_id).first()
-    if not child:
-        raise ValidationError("孩子不存在")
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, body.child_id)  # P0-F1 归属校验
     return ReadingService(db).report_progress(
         child, body.book_id, body.position, body.session_start
     )
@@ -176,17 +172,15 @@ def report_progress(body: ProgressReportRequest, auth: Any = Depends(get_current
 
 @router.get("/checkins")
 def checkin_calendar(child_id: int, days: int = 30, auth: Any = Depends(get_current_parent)):
-    _, db = auth
-    child = db.query(Child).filter(Child.id == child_id).first()
-    if not child:
-        raise ValidationError("孩子不存在")
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, child_id)  # P0-F1 归属校验
     return ReadingService(db).checkin_calendar(child, days)
 
 
 @router.get("/reservations")
 def list_reservations(child_id: int, auth: Any = Depends(get_current_parent)):
-    _, db = auth
-    child = db.query(Child).filter(Child.id == child_id).first()
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, child_id)  # P0-F1 归属校验（含 None 检查）
     return ReservationService(db).list_mine(child)
 
 
@@ -201,10 +195,8 @@ class ReservationCancelRequest(BaseSchema):
 
 @router.post("/reservations")
 def create_reservation(body: ReservationCreateRequest, auth: Any = Depends(get_current_parent)):
-    _, db = auth
-    child = db.query(Child).filter(Child.id == body.child_id).first()
-    if not child:
-        raise ValidationError("孩子不存在")
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, body.child_id)  # P0-F1 归属校验
     res = ReservationService(db).create(child, body.book_id)
     return {"id": res.id, "expires_at": str(res.expires_at), "status": res.status}
 
@@ -213,10 +205,8 @@ def create_reservation(body: ReservationCreateRequest, auth: Any = Depends(get_c
 def cancel_reservation(
     reservation_id: int, body: ReservationCancelRequest, auth: Any = Depends(get_current_parent)
 ):
-    _, db = auth
-    child = db.query(Child).filter(Child.id == body.child_id).first()
-    if not child:
-        raise ValidationError("孩子不存在")
+    parent, db = auth
+    child = _child_of_parent(db, parent.id, body.child_id)  # P0-F1 归属校验
     res = ReservationService(db).cancel(child, reservation_id)
     return {"id": res.id, "status": res.status}
 
