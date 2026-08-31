@@ -11,6 +11,12 @@ class NotificationReadStatusRequest(BaseSchema):
     reason: str = Field("", max_length=200, description="运营介入原因（可选留痕）")
 
 
+class AdminNotificationHandleRequest(BaseSchema):
+    """WM13 管理待办手动兜底（S4：reason 必填留痕）。"""
+
+    reason: str = Field(..., min_length=1, max_length=200, description="处理原因（必填，审计留痕）")
+
+
 class LoginRequest(BaseSchema):
     username: str = Field(..., min_length=1, max_length=191)
     password: str = Field(..., min_length=1, max_length=128)

@@ -126,6 +126,48 @@ export function apiToggleNotificationRead(
   });
 }
 
+// ---------- WM13 管理待办收件箱 ----------
+
+export interface AdminInboxItem {
+  id: number;
+  scene: string;
+  title: string;
+  content: string;
+  ref_type: string;
+  ref_id: string;
+  applicant_name: string;
+  amount: string | null;
+  created_at: string;
+  handled_at: string | null;
+  handled_by_name: string | null;
+  effective_status: "pending" | "done" | "invalid";
+  status_text: string;
+}
+
+export function apiListAdminInbox(params: {
+  page: number;
+  page_size: number;
+  status_filter?: string;
+  scene?: string;
+  keyword?: string;
+}): Promise<{ items: AdminInboxItem[]; total: number; pending_count: number; page: number; page_size: number }> {
+  const query = new URLSearchParams({ page: String(params.page), page_size: String(params.page_size) });
+  if (params.status_filter) query.set("status_filter", params.status_filter);
+  if (params.scene) query.set("scene", params.scene);
+  if (params.keyword) query.set("keyword", params.keyword);
+  return request(`/api/admin/admin-notifications?${query.toString()}`);
+}
+
+export function apiHandleAdminInbox(
+  id: number,
+  reason: string
+): Promise<{ id: number; handled: boolean; already: boolean }> {
+  return request(`/api/admin/admin-notifications/${id}/handle`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
 export interface TaskSpecItem {
   name: string;
   display_name: string;

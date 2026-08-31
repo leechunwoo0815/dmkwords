@@ -6,6 +6,7 @@ from backend.common.base_schema import PaginatedResponse
 from backend.database import get_db
 from backend.domain.admin.models import AdminUser
 from backend.domain.admin.schemas import (
+    AdminNotificationHandleRequest,
     AdminUserResponse,
     AuditLogResponse,
     DashboardOverviewResponse,
@@ -101,6 +102,42 @@ def dashboard_overview(
 
 
 # ---------- WM11 通知中心 / 定时任务看板 / 导出 ----------
+
+
+@router.get("/admin-notifications")
+def list_admin_notifications(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    status_filter: str | None = Query(None),
+    scene: str | None = Query(None),
+    keyword: str | None = Query(None),
+    admin: AdminUser = Depends(require_perm("dashboard.view")),
+    db: Session = Depends(get_db),
+):
+    """WM13 管理待办收件箱（显示态实时算；S2：非超管返回空数据不 403）。"""
+    from backend.common.admin_notifications import AdminNotifyService
+
+    return AdminNotifyService(db).list_inbox(
+        page,
+        page_size,
+        status_filter=status_filter,
+        scene=scene,
+        keyword=keyword,
+        viewer_is_super=(admin.role == AdminUser.ROLE_SUPER_ADMIN),
+    )
+
+
+@router.post("/admin-notifications/{notification_id}/handle")
+def handle_admin_notification(
+    notification_id: int,
+    body: AdminNotificationHandleRequest,
+    admin: AdminUser = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    """WM13 手动兜底标记已处理（S4：reason 必填 + publish_audit 留痕；Q8 幂等）。"""
+    from backend.common.admin_notifications import AdminNotifyService
+
+    return AdminNotifyService(db).handle(notification_id, admin, body.reason)
 
 
 @router.get("/notifications")

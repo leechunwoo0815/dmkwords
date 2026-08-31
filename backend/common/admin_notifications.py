@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from decimal import Decimal
 
@@ -25,6 +26,7 @@ from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.orm import Session
 
 from backend.common.admin_notification_models import AdminNotification
+from backend.common.exceptions import NotFoundError, ValidationError
 
 # 显示态常量（effective_status）
 ST_PENDING = "pending"
@@ -154,6 +156,144 @@ class AdminNotifyService:
     def resolve_one(self, notification: AdminNotification) -> dict:
         """单条显示态解析（与 resolve_many 同一判定逻辑）。"""
         return self.resolve_many([notification])[notification.id]
+
+    # ---------- 收件箱（批次二：列表与手动兜底） ----------
+
+    def list_inbox(
+        self,
+        page: int,
+        page_size: int,
+        *,
+        status_filter: str | None = None,
+        scene: str | None = None,
+        keyword: str | None = None,
+        viewer_is_super: bool,
+    ) -> dict:
+        """管理待办收件箱：显示态实时算（与计数同一口径，v2 反口径分叉）。
+
+        权限（S2/v2）：非超管返回空数据（不 403，空列表）——三类审核全为超管专属，
+        staff 看到空态文案而非撞权限墙；将来审核下放新角色只改本过滤。
+        status_filter: pending=待处理 / finished=已审结+已失效 / None=全部。
+        排序：待处理优先，组内按 created_at 升序（等待最久的排前——运营处理优先级）。
+        """
+        if not viewer_is_super:
+            return {
+                "items": [],
+                "total": 0,
+                "pending_count": 0,
+                "page": page,
+                "page_size": page_size,
+            }
+
+        q = self.db.query(AdminNotification).filter(AdminNotification.is_deleted == 0)
+        if scene:
+            q = q.filter(AdminNotification.scene == scene)
+        if keyword:
+            like = f"%{keyword}%"
+            q = q.filter(
+                (AdminNotification.applicant_name.like(like))
+                | (AdminNotification.content.like(like))
+            )
+        rows = q.order_by(AdminNotification.created_at.desc(), AdminNotification.id.desc()).all()
+
+        resolved = self.resolve_many(rows)
+        pending_count = sum(
+            1 for n in rows if resolved[n.id]["effective_status"] == ST_PENDING
+        )
+
+        enriched: list[tuple[AdminNotification, dict]] = []
+        for n in rows:
+            eff = resolved[n.id]
+            if status_filter == "pending" and eff["effective_status"] != ST_PENDING:
+                continue
+            if status_filter == "finished" and eff["effective_status"] == ST_PENDING:
+                continue
+            enriched.append((n, eff))
+        # 待处理优先，组内 created_at 升序（等待最久的在前）
+        enriched.sort(
+            key=lambda t: (
+                0 if t[1]["effective_status"] == ST_PENDING else 1,
+                t[0].created_at,
+                t[0].id,
+            )
+        )
+        total = len(enriched)
+        page_rows = enriched[(page - 1) * page_size : (page - 1) * page_size + page_size]
+
+        handled_by_ids = {
+            n.handled_by for n, _ in page_rows if n.handled_by is not None
+        }
+        names: dict[int, str] = {}
+        if handled_by_ids:
+            from backend.domain.admin.models import AdminUser
+
+            for uid, uname in (
+                self.db.query(AdminUser.id, AdminUser.display_name)
+                .filter(AdminUser.id.in_(handled_by_ids))
+                .all()
+            ):
+                names[uid] = uname or ""
+
+        items = [
+            {
+                "id": n.id,
+                "scene": n.scene,
+                "title": n.title,
+                "content": n.content,
+                "ref_type": n.ref_type,
+                "ref_id": n.ref_id,
+                "applicant_name": n.applicant_name,
+                "amount": str(n.amount) if n.amount is not None else None,
+                "created_at": n.created_at.isoformat() if n.created_at else None,
+                "handled_at": n.handled_at.isoformat() if n.handled_at else None,
+                "handled_by_name": names.get(n.handled_by) if n.handled_by else None,
+                "effective_status": eff["effective_status"],
+                "status_text": eff["status_text"],
+            }
+            for n, eff in page_rows
+        ]
+        return {
+            "items": items,
+            "total": total,
+            "pending_count": pending_count,
+            "page": page,
+            "page_size": page_size,
+        }
+
+    def handle(self, notification_id: int, admin, reason: str) -> dict:
+        """手动兜底标记已处理（S4：reason 必填 + 审计留痕；幂等保留首次）。"""
+        if not reason or not reason.strip():
+            raise ValidationError("必须填写处理原因（留痕）")
+        n = (
+            self.db.query(AdminNotification)
+            .filter(
+                AdminNotification.id == notification_id,
+                AdminNotification.is_deleted == 0,
+            )
+            .first()
+        )
+        if not n:
+            raise NotFoundError("通知不存在")
+        if n.handled_at is not None:
+            return {"id": n.id, "handled": True, "already": True}
+        n.handled_at = datetime.now()
+        n.handled_by = admin.id
+        n.extra = json.dumps(
+            {"reason": reason.strip(), "method": "manual"}, ensure_ascii=False
+        )
+        from backend.domain.catalog.audit_events import publish_audit
+
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="admin_notification.handle",
+            target_type="admin_notification",
+            target_id=str(n.id),
+            detail={"scene": n.scene, "ref_type": n.ref_type, "ref_id": n.ref_id},
+            reason=reason.strip(),
+        )
+        self.db.commit()
+        return {"id": n.id, "handled": True, "already": False}
 
     # ---------- 判定分支（Q5 裁定映射表） ----------
 

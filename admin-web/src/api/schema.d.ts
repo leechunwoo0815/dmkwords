@@ -123,6 +123,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/admin-notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Admin Notifications
+         * @description WM13 管理待办收件箱（显示态实时算；S2：非超管返回空数据不 403）。
+         */
+        get: operations["list_admin_notifications_api_admin_admin_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/admin-notifications/{notification_id}/handle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Handle Admin Notification
+         * @description WM13 手动兜底标记已处理（S4：reason 必填 + publish_audit 留痕；Q8 幂等）。
+         */
+        post: operations["handle_admin_notification_api_admin_admin_notifications__notification_id__handle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/notifications": {
         parameters: {
             query?: never;
@@ -2360,6 +2400,17 @@ export interface components {
              */
             reason: string;
         };
+        /**
+         * AdminNotificationHandleRequest
+         * @description WM13 管理待办手动兜底（S4：reason 必填留痕）。
+         */
+        AdminNotificationHandleRequest: {
+            /**
+             * Reason
+             * @description 处理原因（必填，审计留痕）
+             */
+            reason: string;
+        };
         /** AdminUserResponse */
         AdminUserResponse: {
             /** Id */
@@ -3828,6 +3879,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardOverviewResponse"];
+                };
+            };
+        };
+    };
+    list_admin_notifications_api_admin_admin_notifications_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                status_filter?: string | null;
+                scene?: string | null;
+                keyword?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_admin_notification_api_admin_admin_notifications__notification_id__handle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notification_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminNotificationHandleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
