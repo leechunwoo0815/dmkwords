@@ -302,6 +302,8 @@ class CirculationService:
         """condition: normal / maintenance / lost（遗失联动押金赔偿提示）。"""
         if condition not in ("normal", "maintenance", "lost"):
             raise ValidationError("归还状态仅支持 normal/maintenance/lost")
+        # P1-F5：锁定读（锁序 record → copy 全局统一）——并发双还时后到者
+        # 阻塞后读到已 returned → NotFoundError，天然防重
         record = (
             self.db.query(BorrowRecord)
             .filter(
@@ -309,6 +311,7 @@ class CirculationService:
                 BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
                 BorrowRecord.is_deleted == 0,
             )
+            .with_for_update()
             .first()
         )
         if not record:
@@ -452,7 +455,20 @@ class CirculationService:
             .all()
         )
         marked = 0
+        from sqlalchemy import update as sa_update
+
         for rec in overdue:
+            # P1-F5：状态守卫条件写（只 ACTIVE→OVERDUE），防与还书并发时覆盖已 returned
+            result = self.db.execute(
+                sa_update(BorrowRecord)
+                .where(
+                    BorrowRecord.id == rec.id,
+                    BorrowRecord.status == BorrowRecord.STATUS_ACTIVE,
+                )
+                .values(status=BorrowRecord.STATUS_OVERDUE)
+            )
+            if result.rowcount == 0:
+                continue  # 已被并发方还书/推进，跳过（不误发逾期通知）
             rec.status = BorrowRecord.STATUS_OVERDUE
             marked += 1
             child = self.db.query(Child).filter(Child.id == rec.child_id).first()

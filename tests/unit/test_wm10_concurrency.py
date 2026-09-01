@@ -11,7 +11,7 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.common.exceptions import ValidationError
+from backend.common.exceptions import NotFoundError, ValidationError
 
 
 def _h(client, username="admin"):
@@ -298,3 +298,134 @@ def test_deduct_concurrent_no_balance_drift(client: TestClient, session_pair):
         assert float(dep.available_amount) == 0, f"余额应 0，实 {dep.available_amount}（覆盖写）"
         assert float(dep.deducted_amount) == 1200, f"deducted 应 1200，实 {dep.deducted_amount}"
         assert float(dep.unpaid_balance) == 700, f"unpaid 应 700，实 {dep.unpaid_balance}"
+
+
+def test_return_book_concurrent_no_double_return(client: TestClient, session_pair):
+    """P1-F5：B 旧快照（active）；A 已还书提交（returned）；B 再还同 copy——
+    锁定读实现：record 查询（FOR UPDATE）读最新 → 无进行中借阅 → 404；
+    无锁实现：B 读旧快照 active → 覆盖写双还 + 双事件（RED）。"""
+    h = _h(client)
+    # 建孩子+会员+押金+借一本书
+    p, c, mini = _family(client, h, "13800002306", "并发还孩")
+    _pay(client, h, c["id"], "observation_fee")
+    _pay_deposit(client, h, c["id"])
+    book_id = client.post(
+        "/api/admin/books",
+        json={"isbn": None, "title": "并发还书", "word_count": 100, "copy_count": 3},
+        headers=h,
+    ).json()["id"]
+    from tests.unit.helpers import force_book_on
+
+    force_book_on(client, h, book_id)
+    from backend.domain.catalog.models import BookCopy
+
+    with _db() as db:
+        copy_id = (
+            db.query(BookCopy)
+            .filter(BookCopy.book_id == book_id, BookCopy.is_deleted == 0)
+            .first()
+            .id
+        )
+    br = client.post(
+        "/api/admin/circulation/borrow", json={"child_id": c["id"], "copy_id": copy_id}, headers=h
+    ).json()
+    assert br.get("id"), f"借书失败: {br}"
+    s1, s2 = session_pair
+    from backend.domain.circulation.models import BorrowRecord
+
+    stale = (
+        s2.query(BorrowRecord)
+        .filter(BorrowRecord.copy_id == copy_id, BorrowRecord.status == BorrowRecord.STATUS_ACTIVE)
+        .first()
+    )
+    assert stale is not None  # B 旧快照：进行中
+    # A 完整还书（HTTP）
+    r_a = client.post(
+        "/api/admin/circulation/return", json={"copy_id": copy_id, "condition": "normal"}, headers=h
+    )
+    assert r_a.status_code == 200, r_a.text
+    s2.expire_all()
+    # B（旧快照 active）再还：锁定读 → 404；无锁 → 覆盖写
+    from backend.domain.circulation.service import CirculationService
+
+    with pytest.raises((ValidationError, NotFoundError)):
+        CirculationService(s2).return_book(
+            type("A", (), {"id": 1, "display_name": "超管"})(), copy_id, "normal"
+        )
+    s2.rollback()
+    with _db() as db:
+        db.commit()
+        records = (
+            db.query(BorrowRecord)
+            .filter(BorrowRecord.copy_id == copy_id, BorrowRecord.is_deleted == 0)
+            .all()
+        )
+        returned = [r for r in records if r.status in ("returned", "lost")]
+        assert len(returned) == 1, f"还书记录应 1 条，实 {len(returned)}（双还）"
+
+
+def test_overdue_mark_does_not_overwrite_returned(client: TestClient, session_pair):
+    """P1-F5：overdue_mark 与还书并发——已 returned 的记录不被覆盖回 overdue。
+    结构：B（overdue_mark 用的 session）扫到 ACTIVE 旧快照 → A 还书提交 →
+    B 逐行 UPDATE 带状态守卫（只 ACTIVE→OVERDUE）→ returned 行不受影响。"""
+    h = _h(client)
+    p, c, mini = _family(client, h, "13800002307", "逾期并发孩")
+    _pay(client, h, c["id"], "observation_fee")
+    _pay_deposit(client, h, c["id"])
+    book_id = client.post(
+        "/api/admin/books",
+        json={"isbn": None, "title": "逾期并发书", "word_count": 100, "copy_count": 3},
+        headers=h,
+    ).json()["id"]
+    from tests.unit.helpers import force_book_on
+
+    force_book_on(client, h, book_id)
+    # 借书后把 due_at 拨到过去（制造逾期条件）
+    from backend.domain.catalog.models import BookCopy
+
+    with _db() as db:
+        copy_id = (
+            db.query(BookCopy)
+            .filter(BookCopy.book_id == book_id, BookCopy.is_deleted == 0)
+            .first()
+            .id
+        )
+    br = client.post(
+        "/api/admin/circulation/borrow", json={"child_id": c["id"], "copy_id": copy_id}, headers=h
+    ).json()
+    assert br.get("id"), f"借书失败: {br}"
+    from datetime import datetime, timedelta
+
+    from backend.domain.circulation.models import BorrowRecord
+
+    with _db() as db:
+        rec = (
+            db.query(BorrowRecord)
+            .filter(BorrowRecord.copy_id == copy_id, BorrowRecord.status == BorrowRecord.STATUS_ACTIVE)
+            .first()
+        )
+        rec.due_at = datetime.now() - timedelta(days=3)
+        db.commit()
+    s1, s2 = session_pair
+    stale = (
+        s2.query(BorrowRecord)
+        .filter(BorrowRecord.copy_id == copy_id, BorrowRecord.status == BorrowRecord.STATUS_ACTIVE)
+        .first()
+    )
+    assert stale is not None
+    # A 还书提交
+    r_a = client.post(
+        "/api/admin/circulation/return", json={"copy_id": copy_id, "condition": "normal"}, headers=h
+    )
+    assert r_a.status_code == 200, r_a.text
+    # B 跑 overdue_mark（旧扫描结果）：状态守卫保证只 ACTIVE→OVERDUE
+    from backend.domain.circulation.service import CirculationService
+
+    CirculationService(s2).overdue_mark()
+    s2.commit()
+    with _db() as db:
+        db.commit()
+        rec = db.query(BorrowRecord).filter(BorrowRecord.copy_id == copy_id).first()
+        assert rec.status == BorrowRecord.STATUS_RETURNED, (
+            f"已还记录被 overdue_mark 覆盖：{rec.status}"
+        )
