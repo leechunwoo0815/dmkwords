@@ -134,9 +134,7 @@ def test_execute_concurrent_no_double_write(client: TestClient, session_pair):
         db.commit()
         dep_rr = (
             db.query(RefundRequest)
-            .filter(
-                RefundRequest.kind == RefundRequest.KIND_DEPOSIT, RefundRequest.is_deleted == 0
-            )
+            .filter(RefundRequest.kind == RefundRequest.KIND_DEPOSIT, RefundRequest.is_deleted == 0)
             .all()
         )
         assert len(dep_rr) == 1, f"押金退款单应 1 笔，实 {len(dep_rr)}（双写）"
@@ -475,9 +473,7 @@ def test_expire_due_concurrent_no_phantom_available(client: TestClient, session_
         assert rec is not None, "活跃借阅记录丢失"
 
 
-def test_cancel_reservation_concurrent_no_phantom_available(
-    client: TestClient, session_pair
-):
+def test_cancel_reservation_concurrent_no_phantom_available(client: TestClient, session_pair):
     """cancel 同款：B 旧快照 active；A 已核销提交；B（家长 token）cancel——
     锁定读 → 422（状态不可取消）；无锁 → copy 被改回 available（RED）。"""
     h = _h(client)
@@ -612,6 +608,4 @@ def test_execute_advance_failure_rolls_back_all(client: TestClient, session_pair
 
         req = db.query(RR).filter(RR.id == rr["id"]).first()
         # 方案 A：同事务 → 推进失败整体回滚，退款单不落 refunded 终态
-        assert req.status != "refunded", (
-            f"推进崩溃后主流程半提交：{req.status}（事务分裂未修）"
-        )
+        assert req.status != "refunded", f"推进崩溃后主流程半提交：{req.status}（事务分裂未修）"
