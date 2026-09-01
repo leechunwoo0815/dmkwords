@@ -528,6 +528,8 @@ def _ensure_demo_wm3_states(db: Session) -> None:
     ensure_child("观察期孩", Child.MEMBER_OBSERVATION, today + timedelta(days=30))
     ensure_child("待评估孩", Child.MEMBER_PENDING_EVALUATION, None)
     expired = ensure_child("过期孩", Child.MEMBER_FORMAL, today - timedelta(days=1))
+    # WM3-D2：临期孩（formal + today+3，相对日期每次 seed 都新鲜）——验收第 19 步橙字「剩 3 天」
+    ensure_child("临期孩", Child.MEMBER_FORMAL, today + timedelta(days=3))
     pending_order = (
         db.query(Order)
         .filter(
