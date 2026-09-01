@@ -106,6 +106,7 @@ export default function MemberManage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderTotal, setOrderTotal] = useState(0);
   const [orderStatus, setOrderStatus] = useState<string | undefined>();
+  const [orderKeyword, setOrderKeyword] = useState<string>(() => readUrl().get("okeyword") ?? ""); // WM3-A5
   const [orderLoading, setOrderLoading] = useState(false); // W6
   const [orderBy, setOrderBy] = useState<string | undefined>(); // W7
   const [orderCounts, setOrderCounts] = useState<{ pending_manual_confirm: number; total: number }>({ pending_manual_confirm: 0, total: 0 }); // W3
@@ -175,12 +176,12 @@ export default function MemberManage() {
   const loadOrders = useCallback(
     (page: number) => {
       setOrderLoading(true);
-      apiListOrders({ page, page_size: orderPg.pageSize, status: orderStatus, order_by: orderBy })
+      apiListOrders({ page, page_size: orderPg.pageSize, status: orderStatus, order_by: orderBy, keyword: orderKeyword || undefined })
         .then((r) => { setOrders(r.items ?? []); setOrderTotal(r.total); })
         .catch((e: Error) => message.error(e.message))
         .finally(() => setOrderLoading(false));
     },
-    [orderStatus, orderBy, orderPg.pageSize, message]
+    [orderStatus, orderBy, orderKeyword, orderPg.pageSize, message]
   );
 
   useEffect(() => { if (tab === "children") loadChildren(childPg.page); }, [loadChildren, childPg.page, tab]);
@@ -405,6 +406,11 @@ export default function MemberManage() {
       {tab === "orders" && (
         <>
           <Space style={{ marginBottom: 12 }}>
+            {/* WM3-A5：订单号 / 备注关键字搜索（后端 service.py list_orders keyword 已就绪） */}
+            <Input.Search
+              placeholder="订单号 / 备注" allowClear style={{ width: 240 }} defaultValue={orderKeyword}
+              onSearch={(v) => { setOrderKeyword(v); orderPg.setPage(1); updateUrl({ okeyword: v || undefined, page: undefined }); }}
+            />
             <Select
               placeholder="订单状态" allowClear style={{ width: 140 }} value={orderStatus}
               onChange={(v) => { setOrderStatus(v); orderPg.setPage(1); }}
