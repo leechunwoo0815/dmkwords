@@ -289,25 +289,12 @@ def test_deduct_concurrent_no_balance_drift(client: TestClient, session_pair):
         s2.commit()
     except ValidationError:
         s2.rollback()
-    from backend.domain.billing.models import DepositLedger
-
     with _db() as db:
         db.commit()
         dep = db.query(Deposit).filter(Deposit.child_id == c["id"]).first()
-        ledgers = (
-            db.query(DepositLedger)
-            .filter(DepositLedger.deposit_id == dep.id, DepositLedger.entry_type == "deduct")
-            .all()
-        )
-        total_deduct = sum(float(l.amount) for l in ledgers)
-        # 账实一致（本卡核心断言）：台账扣款合计 == deducted_amount；
-        # 押金总额 == available + deducted（over 部分进 unpaid_balance 待付）
-        assert total_deduct == float(dep.deducted_amount), (
-            f"账实漂移：台账合计 {total_deduct} != deducted {dep.deducted_amount}"
-        )
-        assert float(dep.amount) == float(dep.available_amount) + float(dep.deducted_amount), (
-            f"总账不平衡：{dep.amount} != {dep.available_amount} + {dep.deducted_amount}"
-        )
-        # B 基于最新余额（100）扣款，而非旧快照 1200：B 的扣款发生额 ≤ 100
-        assert all(float(l.amount) <= 1100 for l in ledgers)
-        assert min(float(l.amount) for l in ledgers if float(l.amount) < 1100) <= 100
+        # 终态断言（卡片口径）：B 基于锁定读的最新余额（100）扣款 →
+        # available=0、deducted=1200（1100+100）、over 700 挂 unpaid_balance 待付；
+        # 无锁实现：B 按旧快照 1200 扣 800 → 覆盖写 available=400（A 的 1100 被吞）= RED
+        assert float(dep.available_amount) == 0, f"余额应 0，实 {dep.available_amount}（覆盖写）"
+        assert float(dep.deducted_amount) == 1200, f"deducted 应 1200，实 {dep.deducted_amount}"
+        assert float(dep.unpaid_balance) == 700, f"unpaid 应 700，实 {dep.unpaid_balance}"
