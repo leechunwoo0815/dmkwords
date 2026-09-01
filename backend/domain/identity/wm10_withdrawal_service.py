@@ -108,9 +108,7 @@ class WithdrawalService:
 
     def apply(self, child: Child, reason: str) -> dict:
         # P1-F7：锁 Child 主体行（并发双 apply 串行化；operation_locked 写同在锁内）
-        child = (
-            self.db.query(Child).filter(Child.id == child.id).with_for_update().first() or child
-        )
+        child = self.db.query(Child).filter(Child.id == child.id).with_for_update().first() or child
         if child.member_status == Child.MEMBER_WITHDRAWN:
             raise ValidationError("孩子已是退会状态")
         if not child.is_active_member:

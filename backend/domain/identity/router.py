@@ -18,6 +18,8 @@ from backend.domain.identity.schemas import (
     OrderResponse,
     ParentCreateRequest,
     ParentResponse,
+    ParentUpdateRequest,
+    ParentWithStatsResponse,
 )
 from backend.domain.identity.service import ChildService, OrderService, ParentService
 from backend.domain.identity.transfer_service import TransferService
@@ -44,6 +46,49 @@ def search_parents(
 ):
     """家长搜索（W1：建档家长选择器远程搜索，姓名/手机号模糊匹配）。"""
     return [ParentResponse.model_validate(p) for p in ParentService(db).search(keyword)]
+
+
+@router.get("/members/parents-page", response_model=PaginatedResponse[ParentWithStatsResponse])
+def parents_page(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    keyword: str | None = Query(None),
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """家长管理 tab 分页（WM3-B1：children_count / has_orders 守卫标志）。"""
+    rows, total = ParentService(db).list_page(page, page_size, keyword)
+    items = []
+    for p, ccount, has_orders in rows:
+        item = ParentWithStatsResponse.model_validate(p)
+        item.children_count = ccount
+        item.has_orders = has_orders
+        items.append(item)
+    return PaginatedResponse[ParentWithStatsResponse].create(
+        items=items, total=total, page=page, page_size=page_size
+    )
+
+
+@router.patch("/members/parents/{parent_id}", response_model=ParentResponse)
+def update_parent(
+    parent_id: int,
+    body: ParentUpdateRequest,
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """编辑家长（WM3-B1；订单守卫 409；手机号唯一 422——手机号即登录标识）。"""
+    return ParentResponse.model_validate(ParentService(db).update(admin, parent_id, body))
+
+
+@router.delete("/members/parents/{parent_id}")
+def delete_parent(
+    parent_id: int,
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """软删家长+名下孩子（WM3-B1；订单守卫 409）。"""
+    ParentService(db).delete(admin, parent_id)
+    return {"id": parent_id, "deleted": True}
 
 
 @router.get("/members/parents/{parent_id}/children", response_model=list[ChildResponse])
@@ -80,6 +125,7 @@ def list_children_page(
         item = ChildWithParentResponse.model_validate(child)
         item.parent_name = parent_name
         item.parent_phone = parent_phone
+        item.has_orders = ChildService.has_orders(db, child.id)
         items.append(item)
     return PaginatedResponse[ChildWithParentResponse].create(
         items=items, total=total, page=page, page_size=page_size
@@ -110,12 +156,30 @@ def update_child(
     admin: Any = Depends(require_perm("member.manage")),
     db: Session = Depends(get_db),
 ):
-    """维护孩子资料（C19）：英文名/年级/AR 值（AR 只升不降）。"""
+    """维护孩子资料（C19 + WM3-B1 扩展：姓名/性别/生日全开；AR 只升不降；订单守卫 409）。"""
     return ChildResponse.model_validate(
         ChildService(db).update_profile(
-            admin, child_id, body.english_name, body.grade, body.ar_level
+            admin,
+            child_id,
+            body.english_name,
+            body.grade,
+            body.ar_level,
+            name=body.name,
+            gender=body.gender,
+            birthday=body.birthday,
         )
     )
+
+
+@router.delete("/members/children/{child_id}")
+def delete_child(
+    child_id: int,
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """软删孩子档案（WM3-B1；订单守卫 409）。"""
+    ChildService(db).delete(admin, child_id)
+    return {"id": child_id, "deleted": True}
 
 
 @router.post("/members/children/{child_id}/evaluate-approve", response_model=OrderResponse)

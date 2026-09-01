@@ -67,6 +67,97 @@ class ParentService:
             q = q.filter(or_(Parent.name.like(like), Parent.phone.like(like)))
         return q.order_by(Parent.id.desc()).limit(limit).all()
 
+    # ---- WM3-B1 家长编辑/删除（订单守卫）----
+    @staticmethod
+    def has_orders(db: Session, parent_id: int) -> bool:
+        """名下任一孩子存在未删订单（任意状态含 cancelled）→ 守卫口径（用户拍板）。"""
+        return (
+            db.query(func.count(Order.id))
+            .filter(Order.parent_id == parent_id, Order.is_deleted == 0)
+            .scalar()
+        ) > 0
+
+    @staticmethod
+    def children_count(db: Session, parent_ids: list[int]) -> dict[int, int]:
+        if not parent_ids:
+            return {}
+        rows = (
+            db.query(Child.parent_id, func.count(Child.id))
+            .filter(Child.parent_id.in_(parent_ids), Child.is_deleted == 0)
+            .group_by(Child.parent_id)
+            .all()
+        )
+        return dict(rows)
+
+    def update(self, admin, parent_id: int, req) -> Parent:
+        parent = self.get(parent_id)
+        if self.has_orders(self.db, parent_id):
+            raise ConflictError("该家长名下已创建订单，禁止修改")
+        changed = []
+        if req.name is not None:
+            parent.name = req.name
+            changed.append("name")
+        if req.phone is not None and req.phone != parent.phone:
+            dup = (
+                self.db.query(func.count(Parent.id))
+                .filter(Parent.phone == req.phone, Parent.is_deleted == 0, Parent.id != parent_id)
+                .scalar()
+            )
+            if dup:
+                raise ValidationError(f"手机号 {req.phone} 已存在家长账号")
+            parent.phone = req.phone
+            changed.append("phone")
+        if req.remark is not None:
+            parent.remark = req.remark
+            changed.append("remark")
+        if not changed:
+            raise ValidationError("没有可更新的字段")
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="parent.update",
+            target_type="parent",
+            target_id=str(parent.id),
+            detail={"fields": changed, "phone": parent.phone},
+            reason="手机号即小程序登录标识，修改后家长需用新号登录",
+        )
+        self.db.commit()
+        return parent
+
+    def delete(self, admin, parent_id: int) -> None:
+        if self.has_orders(self.db, parent_id):
+            raise ConflictError("该家长名下已创建订单，禁止删除")
+        parent = self.get(parent_id)
+        parent.is_deleted = 1
+        # 名下未删孩子一并软删（孤儿档案必须清；守卫已确保这些孩子无订单）
+        self.db.query(Child).filter(Child.parent_id == parent_id, Child.is_deleted == 0).update(
+            {"is_deleted": 1}
+        )
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="parent.delete",
+            target_type="parent",
+            target_id=str(parent.id),
+            detail={"name": parent.name, "phone": parent.phone},
+        )
+        self.db.commit()
+
+    def list_page(
+        self, page: int, page_size: int, keyword: str | None = None
+    ) -> tuple[list[tuple[Parent, int, bool]], int]:
+        """家长管理 tab 分页（含 children_count / has_orders）。"""
+        q = self.db.query(Parent).filter(Parent.is_deleted == 0)
+        if keyword:
+            like = f"%{keyword}%"
+            q = q.filter(or_(Parent.name.like(like), Parent.phone.like(like)))
+        total = q.count()
+        q = q.order_by(Parent.id.desc())
+        parents = q.offset((page - 1) * page_size).limit(page_size).all()
+        counts = self.children_count(self.db, [p.id for p in parents])
+        out = [(p, counts.get(p.id, 0), self.has_orders(self.db, p.id)) for p in parents]
+        return out, total
+
 
 class ChildService:
     def __init__(self, db: Session):
@@ -109,6 +200,16 @@ class ChildService:
             raise NotFoundError("孩子不存在")
         return child
 
+    # ---- WM3-B1 孩子编辑/删除（订单守卫）----
+    @staticmethod
+    def has_orders(db: Session, child_id: int) -> bool:
+        """该孩子存在未删订单（任意状态含 cancelled）→ 守卫口径（用户拍板）。"""
+        return (
+            db.query(func.count(Order.id))
+            .filter(Order.child_id == child_id, Order.is_deleted == 0)
+            .scalar()
+        ) > 0
+
     def update_profile(
         self,
         admin,
@@ -116,10 +217,24 @@ class ChildService:
         english_name: str | None = None,
         grade: str | None = None,
         ar_level: str | None = None,
+        name: str | None = None,
+        gender: int | None = None,
+        birthday=None,
     ) -> Child:
-        """维护孩子资料（C19）：英文名/年级/AR 值；AR 只升不降（老师评估口径）+ 审计。"""
+        """维护孩子资料（C19 + WM3-B1 扩展：姓名/性别/生日全开）；AR 只升不降 + 订单守卫。"""
         child = self._get_child(child_id)
+        if self.has_orders(self.db, child_id):
+            raise ConflictError("该孩子已创建订单，禁止修改")
         changed = []
+        if name is not None:
+            child.name = name
+            changed.append("name")
+        if gender is not None:
+            child.gender = gender
+            changed.append("gender")
+        if birthday is not None:
+            child.birthday = birthday
+            changed.append("birthday")
         if english_name is not None:
             child.english_name = english_name or None
             changed.append("english_name")
@@ -156,6 +271,22 @@ class ChildService:
         )
         self.db.commit()
         return child
+
+    def delete(self, admin, child_id: int) -> None:
+        """软删孩子档案（WM3-B1；订单守卫 409）。"""
+        child = self._get_child(child_id)
+        if self.has_orders(self.db, child_id):
+            raise ConflictError("该孩子已创建订单，禁止删除")
+        child.is_deleted = 1
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="child.delete",
+            target_type="child",
+            target_id=str(child.id),
+            detail={"name": child.name, "parent_id": child.parent_id},
+        )
+        self.db.commit()
 
     def mark_pending_evaluation(self, admin, child_id: int, reason: str) -> Child:
         """观察期 → 待评估（C13/决策 8：馆员手动标记留痕；到期自动转换任务在 WM11）。"""

@@ -28,7 +28,11 @@ class ChildCreateRequest(BaseSchema):
 
 
 class ChildUpdateRequest(BaseSchema):
+    # WM3-B1 扩展：姓名/性别/生日全开（编辑弹窗统一端点；AR 只升不降保留）
+    name: str | None = Field(None, min_length=1, max_length=64)
     english_name: str | None = Field(None, max_length=64)
+    gender: int | None = Field(None, ge=1, le=2)
+    birthday: date | None = None
     grade: str | None = Field(None, max_length=50)
     ar_level: str | None = Field(None, max_length=10, description="AR 值（老师评估，只升不降）")
 
@@ -45,11 +49,29 @@ class ChildResponse(BaseSchema):
     member_start: date | None
     member_expire: date | None
     ar_level: str | None
+    has_orders: bool = Field(False, description="存在未删订单（WM3-B1 守卫）")
 
 
 class ChildWithParentResponse(ChildResponse):
     parent_name: str = ""
     parent_phone: str = ""
+
+
+class ParentUpdateRequest(BaseSchema):
+    name: str | None = Field(None, min_length=1, max_length=64)
+    phone: str | None = Field(None, pattern=r"^\d{11}$", description="手机号（登录标识）")
+    remark: str | None = Field(None, max_length=200)
+
+
+class ParentWithStatsResponse(BaseSchema):
+    """家长管理 tab 行（WM3-B1）：含孩子数与订单守卫标志。"""
+
+    id: int
+    name: str
+    phone: str
+    remark: str
+    children_count: int = 0
+    has_orders: bool = Field(False, description="名下任一孩子存在订单（禁改禁删守卫）")
 
 
 class OrderCreateRequest(BaseSchema):
