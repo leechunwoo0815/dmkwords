@@ -65,7 +65,7 @@ const ORDER_TYPE_LABEL: Record<string, string> = {
 };
 const ORDER_STATUS_LABEL: Record<string, string> = {
   pending_payment: "待支付", pending_manual_confirm: "待人工确认",
-  paid: "已支付", cancelled: "已取消",
+  paid: "已支付", cancelled: "已取消", refunded: "已退款",
 };
 const PAY_METHOD_OPTIONS = [
   { value: "scan", label: "微信扫码" },
@@ -430,7 +430,7 @@ export default function MemberManage() {
               { title: "家长", dataIndex: "parent_name", width: 90 },
               { title: "金额", dataIndex: "amount", key: "amount", width: 100, sorter: true, render: (v: string) => <Typography.Text strong>￥{Number(v).toLocaleString()}</Typography.Text> },
               { title: "状态", dataIndex: "status", width: 110, render: (s: string) => (
-                <Tag color={s === "paid" ? "green" : s === "cancelled" ? "default" : "orange"}>
+                <Tag color={s === "paid" ? "green" : s === "cancelled" ? "default" : s === "refunded" ? "volcano" : "orange"}>
                   {ORDER_STATUS_LABEL[s] ?? s}
                 </Tag>
               ) },
