@@ -85,6 +85,15 @@ class OrderConfirmRequest(BaseSchema):
         ..., pattern="^(scan|alipay|transfer|card|cash|wechat)$", description="收款方式"
     )
     remark: str = Field("", max_length=200, description="凭证说明（留痕）")
+    voucher_path: str | None = Field(
+        None, max_length=255, description="收款凭证路径（可选，WM3-B2 两步式兼容）"
+    )
+
+
+class VoucherUploadResponse(BaseSchema):
+    id: int
+    order_no: str
+    voucher_path: str
 
 
 class OrderResponse(BaseSchema):
@@ -98,6 +107,7 @@ class OrderResponse(BaseSchema):
     pay_method: str | None
     paid_at: datetime | None
     remark: str
+    voucher_path: str | None = None
     created_at: datetime = Field(alias="create_time")
     child_name: str | None = None
     parent_name: str | None = None

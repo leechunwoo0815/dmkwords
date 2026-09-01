@@ -1,7 +1,7 @@
 # backend/domain/identity/router.py — 会员与订单 API
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from pydantic import Field
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,7 @@ from backend.domain.identity.schemas import (
     ParentResponse,
     ParentUpdateRequest,
     ParentWithStatsResponse,
+    VoucherUploadResponse,
 )
 from backend.domain.identity.service import ChildService, OrderService, ParentService
 from backend.domain.identity.transfer_service import TransferService
@@ -265,6 +266,87 @@ def cancel_order(
 
 class OrderRefundRequest(BaseSchema):
     remark: str = Field("", max_length=200, description="退款说明（留痕）")
+
+
+@router.post("/orders/{order_id}/voucher", response_model=VoucherUploadResponse)
+async def upload_order_voucher(
+    order_id: int,
+    file: UploadFile = File(...),
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """收款凭证上传（WM3-B2 两步式第一步；仅待人工确认订单可传；统一转 JPG）。"""
+    import os
+
+    from backend.common.exceptions import ValidationError
+    from backend.common.file_storage import save_voucher_jpg
+
+    data = await file.read()
+    ext = os.path.splitext(file.filename or "")[1]
+    if not ext:
+        raise ValidationError("凭证文件缺少扩展名")
+    rel = save_voucher_jpg("pending", data, ext)
+    try:
+        order = OrderService(db).set_voucher(admin, order_id, rel)
+    except Exception:
+        # R-316 对齐口径：落库失败删除已写文件，防孤儿文件
+        from backend.common.file_storage import _uploads_root
+
+        full = os.path.join(_uploads_root(), rel)
+        if os.path.isfile(full):
+            os.remove(full)
+        raise
+    return VoucherUploadResponse(
+        id=order.id, order_no=order.order_no, voucher_path=order.voucher_path or rel
+    )
+
+
+@router.get("/members/orders/{order_id}/voucher-image")
+def order_voucher_image(
+    order_id: int,
+    request: Request,
+    token: str = "",
+    db: Session = Depends(get_db),
+):
+    """凭证查看（WM3-B2；<img> 无法带 Authorization → query token 双通道；
+    member.manage 权限语义经 validate_admin_payload + payload perms 校验
+    （catalog/media_auth 同款模式；独立端点不挂 book.manage 的 uploads）。"""
+    import os
+
+    from fastapi.responses import FileResponse
+
+    from backend.common.security import decode_admin_token
+    from backend.config import get_settings
+    from backend.domain.admin.service import role_has_permission
+    from backend.domain.catalog.media_auth import authorize_media
+
+    authorize_media(request, token, db)
+    # 权限点校验（member.manage）：media_auth 只验身份不验权限，凭证是会员域资源
+    # （payload 带 role，实时派生权限单一事实源 admin/service.py；staff 含 member.manage）
+    auth = request.headers.get("authorization", "")
+    raw = auth[len("Bearer ") :] if auth.startswith("Bearer ") else token
+    try:
+        payload = decode_admin_token(raw)
+    except Exception:  # noqa: BLE001 — authorize_media 已校验，此处兜底防越权放大
+        payload = None
+    if not payload or not role_has_permission(payload.get("role", ""), "member.manage"):
+        from backend.common.exceptions import ForbiddenError
+
+        raise ForbiddenError("需要会员管理权限")
+    from backend.domain.identity.models import Order
+
+    order = db.query(Order).filter(Order.id == order_id, Order.is_deleted == 0).first()
+    if not order or not order.voucher_path:
+        from backend.common.exceptions import NotFoundError
+
+        raise NotFoundError("凭证不存在")
+    root = os.path.abspath(get_settings().UPLOADS_DIR)
+    full = os.path.abspath(os.path.join(root, order.voucher_path))
+    if not full.startswith(root) or not os.path.isfile(full):
+        from backend.common.exceptions import NotFoundError
+
+        raise NotFoundError("凭证文件不存在")
+    return FileResponse(full, media_type="image/jpeg")
 
 
 @router.post("/orders/{order_id}/refund")

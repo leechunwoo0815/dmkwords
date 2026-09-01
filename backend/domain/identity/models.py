@@ -145,6 +145,9 @@ class Order(BaseModel):
     pay_method = Column(
         String(24), nullable=True, comment="收款方式（wechat/scan/alipay/transfer/card/cash）"
     )
+    voucher_path = Column(
+        String(255), nullable=True, comment="收款凭证图路径（WM3-B2，voucher/ 目录）"
+    )
     paid_at = Column(DateTime, nullable=True, comment="收款确认时间")
     paid_by = Column(Integer, nullable=True, comment="确认收款的管理员ID")
     remark = Column(String(200), nullable=False, default="", comment="备注/凭证说明")

@@ -63,6 +63,32 @@ def save_cover_jpg(book, data: bytes, ext: str) -> str:
     return rel.replace(os.sep, "/")
 
 
+def save_voucher_jpg(order_no: str, data: bytes, ext: str) -> str:
+    """收款凭证存储（WM3-B2）：统一转 JPG（Pillow 对齐封面口径）；
+    路径 voucher/{order_no}_{token}.jpg（订单号便于归档追溯）。"""
+    ext = ext.lower()
+    if ext and ext not in ALLOWED_COVER_EXTS:
+        from backend.common.exceptions import ValidationError
+
+        raise ValidationError(f"凭证格式仅支持 JPG/JPEG/PNG/WebP: {ext}")
+    from io import BytesIO
+
+    from PIL import Image
+
+    try:
+        img = Image.open(BytesIO(data))
+        img = img.convert("RGB")
+    except Exception as e:  # noqa: BLE001 — Pillow 异常类型多，统一转业务异常
+        from backend.common.exceptions import ValidationError
+
+        raise ValidationError("凭证文件无法解析为图片") from e
+    rel = os.path.join("voucher", f"{order_no}_{secrets.token_hex(6)}.jpg")
+    abs_path = os.path.join(_uploads_root(), rel)
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+    img.save(abs_path, "JPEG", quality=88)
+    return rel.replace(os.sep, "/")
+
+
 def _mp3_duration(data: bytes) -> int:
     """粗略解析 MP3 时长（秒）：优先 Xing/Info 头帧数，否则按首帧比特率估算。
     支持 MPEG1/MPEG2/MPEG2.5 Layer III——lame 低采样率输出是 MPEG2（帧头 fff3），
