@@ -155,7 +155,7 @@ def test_b1_parents_page_has_orders_flag(client: TestClient):
     """家长分页列表：children_count / has_orders 标志（前端禁用按钮数据源）。"""
     h = _h(client)
     p1 = _parent(client, h, "13800002010", "无单家长")
-    c1 = _child(client, h, p1["id"])
+    _child(client, h, p1["id"])
     p2 = _parent(client, h, "13800002011", "有单家长")
     c2 = _child(client, h, p2["id"])
     _order(client, h, c2["id"])
