@@ -199,3 +199,47 @@ def _db():
     from backend.database import get_session
 
     return get_session()
+
+
+def test_confirm_payment_concurrent_idempotent(client: TestClient, session_pair):
+    """P1-F2：B 旧快照 pending_manual；A 已 confirm（paid + 押金台账 1 笔）提交；
+    B 再 confirm —— 锁定读实现下读到 paid → 422；无锁 → 覆盖写双押金台账（RED）。"""
+    h = _h(client)
+    p, c, mini = _family(client, h, "13800002304", "确认并发孩")
+    o = client.post(
+        "/api/admin/orders", json={"child_id": c["id"], "order_type": "observation_fee"}, headers=h
+    ).json()
+    # 押金订单也在场（confirm observation 单会联动？不会——押金单单独 confirm 才记押金。
+    # 用 deposit 单测幂等最直接）
+    do = client.post(f"/api/admin/deposits/children/{c['id']}/orders", headers=h).json()
+    s1, s2 = session_pair
+    from backend.domain.identity.models import Order
+
+    stale = s2.query(Order).filter(Order.id == do["order_id"]).first()
+    assert stale.status == "pending_manual_confirm"  # B 旧快照
+    # A 完整确认成功（押金 paid + ENTRY_PAY 台账 1 笔）
+    r_a = client.post(
+        f"/api/admin/orders/{do['order_id']}/confirm-payment",
+        json={"pay_method": "scan", "remark": "先到者"},
+        headers=h,
+    )
+    assert r_a.status_code == 200, r_a.text
+    s2.expire_all()
+    # B（旧快照）再确认：锁定读 → 422；无锁 → 覆盖写双 ENTRY_PAY
+    from backend.domain.identity.service import OrderService
+
+    with pytest.raises(ValidationError):
+        OrderService(s2).confirm_payment(
+            type("A", (), {"id": 1, "display_name": "超管"})(),
+            do["order_id"],
+            type("R", (), {"pay_method": "scan", "remark": "并发确认"})(),
+        )
+    s2.rollback()
+    from backend.domain.billing.models import Deposit, DepositLedger
+
+    with _db() as db:
+        db.commit()
+        ledgers = db.query(DepositLedger).filter(DepositLedger.entry_type == "pay").all()
+        assert len(ledgers) == 1, f"ENTRY_PAY 台账应 1 笔，实 {len(ledgers)}（双写）"
+        dep = db.query(Deposit).filter(Deposit.child_id == c["id"]).first()
+        assert float(dep.available_amount) == 1200

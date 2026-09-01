@@ -469,7 +469,12 @@ class OrderService:
 
     def confirm_payment(self, admin, order_id: int, req) -> Order:
         """人工收款确认 → paid → 联动会员开通。"""
-        order = self.db.query(Order).filter(Order.id == order_id, Order.is_deleted == 0).first()
+        order = (
+            self.db.query(Order)
+            .filter(Order.id == order_id, Order.is_deleted == 0)
+            .with_for_update()  # P1-F2：锁定读，双管理员并发确认串行化（防双押金记账/到期日覆盖/双事件）
+            .first()
+        )
         if not order:
             raise NotFoundError("订单不存在")
         if not order.can_transition(Order.STATUS_PAID):

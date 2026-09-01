@@ -52,7 +52,16 @@ class DepositService:
         child = self.db.query(Child).filter(Child.id == order.child_id).first()
         if not child:
             raise NotFoundError("孩子不存在")
-        dep = self._get_or_create(child.id)
+        dep = (
+            self.db.query(Deposit)
+            .filter(Deposit.child_id == child.id, Deposit.is_deleted == 0)
+            .with_for_update()  # P1-F2 双保险：幂等检查基于锁定读（双确认时后到者阻塞后看到已缴）
+            .first()
+        )
+        if dep is None:
+            dep = Deposit(child_id=child.id, amount=Decimal("0"))  # 对齐 _get_or_create 建卡分支
+            self.db.add(dep)
+            self.db.flush()
         standard = Decimal(ConfigService(self.db).get_value("deposit_amount"))
 
         if order.order_type == Order.TYPE_DEPOSIT:
