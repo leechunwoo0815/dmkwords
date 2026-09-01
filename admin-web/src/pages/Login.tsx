@@ -46,12 +46,12 @@ export default function Login() {
         <Typography.Paragraph type="secondary" style={{ textAlign: "center", marginBottom: 24 }}>
           少儿英语分级阅读系统
         </Typography.Paragraph>
-        <Form form={form} layout="vertical" onFinish={onFinish} autoComplete="off">
+        <Form form={form} layout="vertical" onFinish={onFinish} autoComplete="on">
           <Form.Item name="username" label="用户名" rules={[{ required: true, message: "请输入用户名" }]}>
-            <Input placeholder="admin / staff01" size="large" />
+            <Input placeholder="用户名" size="large" autoComplete="username" />
           </Form.Item>
           <Form.Item name="password" label="密码" rules={[{ required: true, message: "请输入密码" }]}>
-            <Input.Password placeholder="dmkwords123" size="large" />
+            <Input.Password placeholder="密码" size="large" autoComplete="current-password" />
           </Form.Item>
           <Form.Item style={{ marginBottom: 8, marginTop: 8 }}>
             <Button type="primary" htmlType="submit" block size="large">
