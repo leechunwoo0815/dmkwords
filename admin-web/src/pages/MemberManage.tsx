@@ -321,7 +321,23 @@ export default function MemberManage() {
 
       <Tabs activeKey={tab} onChange={changeTab} items={[
         { key: "children", label: `孩子档案（${childTotal}）` },
-        { key: "orders", label: `订单（${orderCounts.total || orderTotal} · 待确认 ${orderCounts.pending_manual_confirm}）` },
+        {
+          key: "orders",
+          // WM3-D1：待确认数 M>0 时红底白字胶囊（M=0 保持原样避免满屏红）
+          label: (
+            <>
+              订单（{orderCounts.total || orderTotal} · 待确认{" "}
+              {orderCounts.pending_manual_confirm > 0 ? (
+                <span style={{ background: "#ff4d4f", color: "#fff", borderRadius: 10, padding: "0 6px" }}>
+                  {orderCounts.pending_manual_confirm}
+                </span>
+              ) : (
+                orderCounts.pending_manual_confirm
+              )}
+              ）
+            </>
+          ),
+        },
       ]} />
 
       {tab === "children" && (
