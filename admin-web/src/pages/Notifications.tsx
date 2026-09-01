@@ -471,7 +471,7 @@ export default function Notifications() {
           value={adminTab === "done" ? "done" : "todo"}
           style={{ width: 170 }}
           options={[
-            { value: "todo", label: `待处理（${todoTabCount}）` },
+            { value: "todo", label: todoTabCount === null ? "待处理" : `待处理（${todoTabCount}）` },
             { value: "done", label: "已处理" },
           ]}
           onChange={changeAdminTab}
