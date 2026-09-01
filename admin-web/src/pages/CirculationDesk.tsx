@@ -22,6 +22,7 @@ import {
   apiOverdueList,
   apiRenew,
   apiReturnBook,
+  type BorrowRecordResponse,
   type ChildCard,
   type OverdueItem,
 } from "../api/circulation";
@@ -226,9 +227,9 @@ export default function CirculationDesk() {
               { title: "借出时间", dataIndex: "borrowed_at", width: 170, render: (v: string) => v?.slice(0, 16) },
               { title: "到期日", dataIndex: "due_at", width: 170, render: (v: string) => v?.slice(0, 16) },
               { title: "状态", dataIndex: "status", width: 90, render: (s: string) => s === "overdue" ? <Tag color="red">逾期</Tag> : <Tag color="blue">借出中</Tag> },
-              { title: "续借", dataIndex: "renew_used", width: 90, render: (v: number) => v >= 1 ? <Tag>已用</Tag> : <Button type="link" size="small" onClick={async () => {
+              { title: "续借", dataIndex: "renew_used", width: 90, render: (v: number, r: BorrowRecordResponse) => v >= 1 ? <Tag>已用</Tag> : <Button type="link" size="small" onClick={async () => {
                 try {
-                  await apiRenew(card.records.find((r) => r.renew_used === 0)?.id ?? 0);
+                  await apiRenew(r.id);  // WM5-F1：用被点击行的 r.id，原 find(...) 全局查找导致多本在借时永远续第 1 行
                   message.success("续借成功（+7 天）");
                   await refresh();
                 } catch (e) { message.error(e instanceof Error ? e.message : "续借失败"); }
