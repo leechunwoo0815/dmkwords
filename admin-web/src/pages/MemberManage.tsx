@@ -126,7 +126,11 @@ export default function MemberManage() {
   const parentSearchTimer = useRef<number>();
   const searchParents = useCallback((kw: string) => {
     window.clearTimeout(parentSearchTimer.current);
-    if (!kw.trim()) { setParentOptions([]); return; }
+    if (!kw.trim()) {
+      // WM3-B4：空关键字=默认展示最新 5 位（后端 ParentService.search(None) id 倒序）
+      apiSearchParents("").then((list) => setParentOptions(list.slice(0, 5))).catch(() => setParentOptions([]));
+      return;
+    }
     parentSearchTimer.current = window.setTimeout(() => {
       setParentSearching(true);
       apiSearchParents(kw.trim())
@@ -309,7 +313,18 @@ export default function MemberManage() {
           会员管理
         </Typography.Title>
         <Space>
-          <Button onClick={() => { childForm.resetFields(); setChildOpen(true); }}>为孩子建档</Button>
+          <Button onClick={() => {
+            childForm.resetFields();
+            setChildOpen(true);
+            // WM3-B4：建档弹窗打开即拉最新家长前 5 位，预选第一位（仍可改选/搜索）
+            apiSearchParents("")
+              .then((list) => {
+                setParentOptions(list.slice(0, 5));
+                const latest = list[0];
+                if (latest) childForm.setFieldsValue({ parent_id: latest.id });
+              })
+              .catch(() => { /* 静默：预选失败不阻塞建档 */ });
+          }}>为孩子建档</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => { parentForm.resetFields(); setParentOpen(true); }}>
             新建家长账号
           </Button>
