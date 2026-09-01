@@ -609,3 +609,48 @@ def test_execute_advance_failure_rolls_back_all(client: TestClient, session_pair
         req = db.query(RR).filter(RR.id == rr["id"]).first()
         # 方案 A：同事务 → 推进失败整体回滚，退款单不落 refunded 终态
         assert req.status != "refunded", f"推进崩溃后主流程半提交：{req.status}（事务分裂未修）"
+
+
+def test_checkout_res_lock_reads_fresh_state(session_pair):
+    """顺带-1（P1 审查遗留）：checkout 锁定读必须 populate_existing。
+
+    结构（P1-F4 探针同款，identity map 语义实证）：
+    A 普通读预约行（identity map 载入旧快照）→ B 推进 status=expired 并提交 →
+    A 锁定读：无 populate_existing 时返回已加载实例保留旧值（守卫读到 active 误核销）；
+    有 populate_existing 强制行数据刷新（读到 expired → 守卫拒绝）。
+    """
+    from datetime import datetime, timedelta
+
+    from backend.domain.reading.models import Reservation
+
+    s1, s2 = session_pair
+    res = Reservation(
+        child_id=1, book_id=1, copy_id=1,
+        expires_at=datetime.now() + timedelta(hours=72),
+        status=Reservation.STATUS_ACTIVE,
+    )
+    s1.add(res)
+    s1.commit()
+    rid = res.id
+
+    # A：普通读（载入 identity map 旧快照 active）——模拟 checkout _res_pre
+    pre = s1.query(Reservation).filter(Reservation.id == rid).first()
+    assert pre.status == Reservation.STATUS_ACTIVE
+
+    # B：推进 expired 并提交（模拟并发释放/取消后状态推进）
+    s2.query(Reservation).filter(Reservation.id == rid).with_for_update().first()
+    s2.query(Reservation).filter(Reservation.id == rid).update({"status": Reservation.STATUS_EXPIRED})
+    s2.commit()
+
+    # A：锁定读 + populate_existing（checkout 修复后路径）→ 必须读到新值
+    locked = (
+        s1.query(Reservation)
+        .filter(Reservation.id == rid)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    assert locked.status == Reservation.STATUS_EXPIRED, (
+        "锁定读未刷新 identity map 旧值——守卫将读到 active 误核销（顺带-1 RED 语义）"
+    )
+    s1.rollback()

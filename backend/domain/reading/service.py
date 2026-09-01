@@ -605,6 +605,7 @@ class ReservationAdminService:
             self.db.query(Reservation)
             .filter(Reservation.id == reservation_id, Reservation.is_deleted == 0)
             .with_for_update()
+            .populate_existing()  # 顺带-1：_res_pre 已载 identity map，锁定读不刷新则守卫读旧值（E-01 防复发第 2 条）
             .first()
         )
         if not res or res.status != Reservation.STATUS_ACTIVE:
