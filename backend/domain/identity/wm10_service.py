@@ -93,6 +93,7 @@ class RefundService:
                 Order.child_id == child.id,
                 Order.is_deleted == 0,
             )
+            .with_for_update()  # P1-F7：锁定读——apply 查重在锁内进行（并发双申请防僵尸单）
             .first()
         )
         if not order:

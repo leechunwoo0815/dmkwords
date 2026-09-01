@@ -13,7 +13,9 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.common.exceptions import NotFoundError, ValidationError
+from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
+from sqlalchemy import func
+
 from tests.unit.helpers import force_book_on
 
 
@@ -109,7 +111,7 @@ def test_execute_concurrent_no_double_write(client: TestClient, session_pair):
     rid = _approved_refund(client, h, mini, c, order)["id"]
 
     s1, s2 = session_pair
-    from backend.domain.identity.models import RefundRequest
+    from backend.domain.identity.models import Child, RefundRequest
 
     stale = s2.query(RefundRequest).filter(RefundRequest.id == rid).first()
     assert stale.status == "approved"  # B 旧快照
@@ -152,7 +154,7 @@ def test_review_concurrent_reject_cannot_overwrite_approve(client: TestClient, s
     rid = _approved_refund(client, h, mini, c, order)["id"]
 
     s1, s2 = session_pair
-    from backend.domain.identity.models import RefundRequest
+    from backend.domain.identity.models import Child, RefundRequest
     from backend.domain.identity.wm10_service import RefundService
 
     # 重建"B 快照早于 approve"场景：置回 pending → B 快照 → A approve 提交 → B reject
@@ -532,3 +534,46 @@ def test_first_activity_double_confirm_rejected(client: TestClient):
         f"/api/admin/orders/{o2['id']}/confirm-payment", json={"pay_method": "scan"}, headers=h
     )
     assert r2.status_code == 409, f"第二笔 99 元未拦: {r2.status_code} {r2.text[:120]}"
+
+
+def test_refund_apply_concurrent_single_request(client: TestClient, session_pair):
+    """P1-F7：B 旧快照（订单 paid、无进行中申请）；A 已提交退款申请（pending）；
+    B 再 apply 同一订单——Order 行锁后查重：B 阻塞后读到 pending → 409；
+    无锁 → 两条 pending 僵尸单（RED）。"""
+    h = _h(client)
+    p, c, mini = _family(client, h, "13800002311", "申请并发孩")
+    order = _pay(client, h, c["id"], "observation_fee")
+    s1, s2 = session_pair
+    from backend.domain.identity.models import Order, RefundRequest
+
+    stale = s2.query(Order).filter(Order.id == order["id"]).first()
+    assert stale.status == "paid"  # B 旧快照
+    # A 提交退款申请（HTTP）
+    r_a = client.post(
+        "/api/miniapp/refund-requests",
+        json={"child_id": c["id"], "order_id": order["id"], "reason": "先到申请"},
+        headers=mini,
+    )
+    assert r_a.status_code == 200, r_a.text
+    s2.expire_all()
+    # B（旧快照）再申请：Order 锁后查重 → 409；无锁 → 双 pending
+    from backend.domain.identity.models import Child
+    from backend.domain.identity.wm10_service import RefundService
+
+    # R-309：observation 订单的退款申请联动退会并冻结孩子——B 被
+    # Order 行锁后查重（409）或冻结守卫（422）拦下均可，双申请被防即达标
+    with pytest.raises((ConflictError, ValidationError)):
+        RefundService(s2).apply(
+            s2.query(Child).filter(Child.id == c["id"]).with_for_update().first(),
+            order["id"],
+            "并发申请",
+        )
+    s2.rollback()
+    with _db() as db:
+        db.commit()
+        cnt = (
+            db.query(func.count(RefundRequest.id))
+            .filter(RefundRequest.order_id == order["id"], RefundRequest.is_deleted == 0)
+            .scalar()
+        )
+        assert cnt == 1, f"退款申请应 1 条，实 {cnt}（僵尸单）"
