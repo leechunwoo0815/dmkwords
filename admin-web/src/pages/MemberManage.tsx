@@ -333,7 +333,8 @@ export default function MemberManage() {
             <Select
               placeholder="会员状态" allowClear style={{ width: 130 }} value={statusFilter}
               onChange={(v) => { setStatusFilter(v); childPg.setPage(1); }}
-              options={Object.entries(MEMBER_LABEL).map(([value, label]) => ({ value, label }))}
+              // WM3-A4：头部"全部"选项（空串后端 falsy 天然不过滤；allowClear 小 × 无感知）
+              options={[{ value: "", label: "全部" }, ...Object.entries(MEMBER_LABEL).map(([value, label]) => ({ value, label }))]}
             />
           </Space>
           <Table<Child> locale={{ emptyText: <PaintEmpty character="star" /> }}
@@ -407,7 +408,8 @@ export default function MemberManage() {
             <Select
               placeholder="订单状态" allowClear style={{ width: 140 }} value={orderStatus}
               onChange={(v) => { setOrderStatus(v); orderPg.setPage(1); }}
-              options={Object.entries(ORDER_STATUS_LABEL).map(([value, label]) => ({ value, label }))}
+              // WM3-A4：头部"全部"选项
+              options={[{ value: "", label: "全部" }, ...Object.entries(ORDER_STATUS_LABEL).map(([value, label]) => ({ value, label }))]}
             />
           </Space>
           <Table<Order> locale={{ emptyText: <PaintEmpty character="star" /> }}
