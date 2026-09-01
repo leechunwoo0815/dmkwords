@@ -205,25 +205,6 @@ class OrderService:
             raise NotFoundError("凭证不存在")
         return order.voucher_path
 
-    def set_voucher(self, admin, order_id: int, rel_path: str) -> Order:
-        """收款凭证落库（WM3-B2 两步式第一步：先传凭证；仅待人工确认可传）。"""
-        order = self.db.query(Order).filter(Order.id == order_id, Order.is_deleted == 0).first()
-        if not order:
-            raise NotFoundError("订单不存在")
-        if order.status != Order.STATUS_PENDING_MANUAL:
-            raise ValidationError(f"仅待人工确认订单可上传凭证（当前状态 {order.status}）")
-        order.voucher_path = rel_path
-        publish_audit(
-            self.db,
-            admin=admin,
-            action="order.voucher",
-            target_type="order",
-            target_id=order.order_no,
-            detail={"path": rel_path},
-        )
-        self.db.commit()
-        return order
-
     def confirm_payment(self, admin, order_id: int, req) -> Order:
         """人工收款确认 → paid → 联动会员开通。"""
         order = (
@@ -256,9 +237,8 @@ class OrderService:
 
         order.status = Order.STATUS_PAID
         order.pay_method = req.pay_method
-        # WM3-B2 两步式兼容：确认收款可带可选凭证路径（主路径为 /voucher 上传端点已落库）
-        if req.voucher_path:
-            order.voucher_path = req.voucher_path
+        # WM3-B2 审查返工 R1：假通道删除——凭证唯一通道为 /voucher 上传端点
+        # （落库即校验 JPG 落盘；confirm 收裸 path 无校验属注入面，不做）
         order.paid_at = datetime.now()
         order.paid_by = admin.id
         order.remark = req.remark or order.remark

@@ -85,9 +85,6 @@ class OrderConfirmRequest(BaseSchema):
         ..., pattern="^(scan|alipay|transfer|card|cash|wechat)$", description="收款方式"
     )
     remark: str = Field("", max_length=200, description="凭证说明（留痕）")
-    voucher_path: str | None = Field(
-        None, max_length=255, description="收款凭证路径（可选，WM3-B2 两步式兼容）"
-    )
 
 
 class VoucherUploadResponse(BaseSchema):

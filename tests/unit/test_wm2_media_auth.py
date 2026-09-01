@@ -78,9 +78,10 @@ def test_stale_admin_token_generation_rejected(client: TestClient):
 
     with get_session() as db:
         admin = db.query(AdminUser).filter(AdminUser.username == "admin").first()
-        # 直改库模拟 gen bump——审查确认：改密 API（staff reset_password / 修改密码）
-        # 当前均不 bump token_generation（全库零 bump 点），API 路径走不通；
-        # bump 机制接线属后续任务，此处直改测的是媒体端点的 gen 校验行为
+        # 直改库模拟 gen bump——测的是媒体端点的 gen 校验行为。
+        # 注：bump 已于 WM3 插修1 顺带-2 接线（StaffService.reset_password 内 +1，
+        # 见 test_password_reset_bumps_token_generation 全链测试）；此处直改库
+        # 覆盖的是"无 API 路径的 bump"（如未来 DB 迁移/人工处置）同校验行为
         admin.token_generation = admin.token_generation + 1
         db.commit()
     r = client.get(f"/api/admin/books/{book_id}/cover-media?token={token}")

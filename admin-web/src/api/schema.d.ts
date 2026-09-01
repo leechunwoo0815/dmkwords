@@ -1031,6 +1031,8 @@ export interface paths {
         /**
          * Upload Order Voucher
          * @description 收款凭证上传（WM3-B2 两步式第一步；仅待人工确认订单可传；统一转 JPG）。
+         *
+         *     存储/落库/失败清理全链在 OrderService.upload_voucher（Router 零异常处理纪律）。
          */
         post: operations["upload_order_voucher_api_admin_orders__order_id__voucher_post"];
         delete?: never;
@@ -1048,9 +1050,10 @@ export interface paths {
         };
         /**
          * Order Voucher Image
-         * @description 凭证查看（WM3-B2；<img> 无法带 Authorization → query token 双通道；
-         *     member.manage 权限语义经 validate_admin_payload + payload perms 校验
-         *     （catalog/media_auth 同款模式；独立端点不挂 book.manage 的 uploads）。
+         * @description 凭证查看（WM3-B2；<img> 无法带 Authorization → query token 双通道）。
+         *
+         *     鉴权（media 三道校验 + member.manage 权限实时派生）在 middleware/voucher_auth；
+         *     订单查询/路径安全在 OrderService（Router 零 ORM/try/admin 依赖纪律）。
          */
         get: operations["order_voucher_image_api_admin_members_orders__order_id__voucher_image_get"];
         put?: never;
@@ -3279,11 +3282,6 @@ export interface components {
              * @default
              */
             remark: string;
-            /**
-             * Voucher Path
-             * @description 收款凭证路径（可选，WM3-B2 两步式兼容）
-             */
-            voucher_path?: string | null;
         };
         /** OrderCreateRequest */
         OrderCreateRequest: {
