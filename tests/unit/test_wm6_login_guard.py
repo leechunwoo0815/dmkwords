@@ -34,14 +34,6 @@ def test_empty_dev_code_rejects_all(client: TestClient, monkeypatch):
     （修复前 login 不读配置，code=1234 恒 200——fail-closed 语义缺失即 RED。）"""
     from backend.config import get_settings
 
-    monkeypatch.setattr(
-        get_settings.cache_clear.__wrapped__
-        if hasattr(get_settings, "cache_clear")
-        else get_settings,
-        "_x",
-        None,
-        raising=False,
-    ) if False else None
     monkeypatch.setenv(
         "LOGIN_DEV_CODE", ""
     )  # BaseSettings 读 env：修复前字段不存在被忽略（1234 恒过 = RED）；修复后读到空串全拒
