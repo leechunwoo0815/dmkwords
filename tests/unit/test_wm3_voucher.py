@@ -17,7 +17,9 @@ def _h(client, username="admin"):
 
 
 def _parent(client, h, phone="13800003001") -> dict:
-    r = client.post("/api/admin/members/parents", json={"name": "凭证家长", "phone": phone}, headers=h)
+    r = client.post(
+        "/api/admin/members/parents", json={"name": "凭证家长", "phone": phone}, headers=h
+    )
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -104,7 +106,9 @@ def test_b2_voucher_image_parent_token_rejected(client: TestClient):
     )
     assert up.status_code == 200, up.text
     # 家长小程序登录拿 parent token（对齐 test_wm2_media_auth 同款路径）
-    ptok = client.post("/api/miniapp/login", json={"phone": p["phone"], "code": "1234"}).json()["token"]
+    ptok = client.post("/api/miniapp/login", json={"phone": p["phone"], "code": "1234"}).json()[
+        "token"
+    ]
     r = client.get(f"/api/admin/members/orders/{o['id']}/voucher-image?token={ptok}")
     assert r.status_code == 401, r.text
 

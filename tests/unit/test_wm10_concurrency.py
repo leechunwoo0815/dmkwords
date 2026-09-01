@@ -625,7 +625,9 @@ def test_checkout_res_lock_reads_fresh_state(session_pair):
 
     s1, s2 = session_pair
     res = Reservation(
-        child_id=1, book_id=1, copy_id=1,
+        child_id=1,
+        book_id=1,
+        copy_id=1,
         expires_at=datetime.now() + timedelta(hours=72),
         status=Reservation.STATUS_ACTIVE,
     )
@@ -639,7 +641,9 @@ def test_checkout_res_lock_reads_fresh_state(session_pair):
 
     # B：推进 expired 并提交（模拟并发释放/取消后状态推进）
     s2.query(Reservation).filter(Reservation.id == rid).with_for_update().first()
-    s2.query(Reservation).filter(Reservation.id == rid).update({"status": Reservation.STATUS_EXPIRED})
+    s2.query(Reservation).filter(Reservation.id == rid).update(
+        {"status": Reservation.STATUS_EXPIRED}
+    )
     s2.commit()
 
     # A：锁定读 + populate_existing（checkout 修复后路径）→ 必须读到新值
