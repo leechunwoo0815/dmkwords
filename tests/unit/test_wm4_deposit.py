@@ -180,9 +180,9 @@ def test_deduct_negative_amount_rejected(client: TestClient):
         headers=h,
     )
     assert r.status_code == 422, f"负数金额未拦: {r.status_code} {r.text[:120]}"
-    dep = client.get(
-        f"/api/admin/deposits", params={"keyword": "负数孩"}, headers=h
-    ).json()["items"][0]
+    dep = client.get("/api/admin/deposits", params={"keyword": "负数孩"}, headers=h).json()[
+        "items"
+    ][0]
     assert float(dep["available_amount"]) == 1200  # 余额分毫未动
 
 

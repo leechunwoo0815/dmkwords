@@ -61,7 +61,9 @@ def test_cross_parent_access_rejected_on_all_six_endpoints(client: TestClient):
     b_id = child_b["id"]
 
     # 1. GET /books/{id}/progress
-    r1 = client.get(f"/api/miniapp/books/{book_id}/progress", params={"child_id": b_id}, headers=mini_a)
+    r1 = client.get(
+        f"/api/miniapp/books/{book_id}/progress", params={"child_id": b_id}, headers=mini_a
+    )
     assert r1.status_code == 422, f"progress GET 越权未拦: {r1.status_code} {r1.text}"
     # 2. POST /reading/progress
     r2 = client.post(
@@ -104,10 +106,14 @@ def test_own_child_still_works(client: TestClient):
     # 押金（预约前提：deposit paid）
     do = client.post(f"/api/admin/deposits/children/{a_id}/orders", headers=h).json()
     client.post(
-        f"/api/admin/orders/{do['order_id']}/confirm-payment", json={"pay_method": "scan"}, headers=h
+        f"/api/admin/orders/{do['order_id']}/confirm-payment",
+        json={"pay_method": "scan"},
+        headers=h,
     )
 
-    r1 = client.get(f"/api/miniapp/books/{book_id}/progress", params={"child_id": a_id}, headers=mini_a)
+    r1 = client.get(
+        f"/api/miniapp/books/{book_id}/progress", params={"child_id": a_id}, headers=mini_a
+    )
     assert r1.status_code == 200, r1.text
     r2 = client.post(
         "/api/miniapp/reading/progress",

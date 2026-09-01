@@ -30,26 +30,7 @@ def authorize_media(request, token: str = "", db: Session | None = None) -> None
     if not payload:
         raise UnauthorizedError("登录已过期，请重新登录")
     # P0-F3：只验签名不够——家长 token 同密钥可伪造通过，必须校验 type
-    if payload.get("type") != "admin":
-        raise UnauthorizedError("非管理端凭证")
-    if db is None:
-        return
-    from backend.domain.admin.models import AdminUser
+    # P0-F3：完整校验（type + 账号状态 + gen 撤销）委托 middleware（域不依赖 admin）
+    from backend.middleware.admin_auth import validate_admin_payload
 
-    sub = payload.get("sub")
-    if not sub:
-        raise UnauthorizedError("Token中缺少管理员信息")
-    admin = (
-        db.query(AdminUser)
-        .filter(
-            AdminUser.id == int(sub),
-            AdminUser.is_deleted == 0,
-            AdminUser.status == AdminUser.STATUS_ACTIVE,
-        )
-        .first()
-    )
-    if not admin:
-        raise UnauthorizedError("管理员不存在或已禁用")
-    # token_generation 不一致 = 改密/禁用后签发的旧 token，立即失效（对齐 get_current_admin）
-    if int(payload.get("gen", 0)) != admin.token_generation:
-        raise UnauthorizedError("登录状态已失效，请重新登录")
+    validate_admin_payload(db, payload)

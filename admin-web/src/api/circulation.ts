@@ -3,6 +3,7 @@ import { request } from "./client";
 import type { components } from "./schema";
 
 export type ChildCard = components["schemas"]["ChildCardResponse"];
+export type BorrowRecordResponse = components["schemas"]["BorrowRecordResponse"];
 export type BorrowRecord = components["schemas"]["BorrowRecordResponse"];
 export type OverdueItem = components["schemas"]["OverdueItemResponse"];
 

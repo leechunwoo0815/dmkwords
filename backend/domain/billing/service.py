@@ -232,7 +232,9 @@ class DepositService:
             q = q.filter(Deposit.status == status)
         if keyword:
             like = f"%{keyword}%"
-            q = q.filter(or_(Child.name.like(like), Child.english_name.like(like)))  # func.or_ 在 MySQL 生成非法 SQL（E-20260830 族）
+            q = q.filter(
+                or_(Child.name.like(like), Child.english_name.like(like))
+            )  # func.or_ 在 MySQL 生成非法 SQL（E-20260830 族）
         total = q.count()
         rows = q.order_by(Deposit.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
         return rows, total

@@ -158,7 +158,6 @@ def deduct_deposit(
     admin: Any = Depends(require_perm("member.manage")),
     db: Session = Depends(get_db),
 ):
-    from decimal import Decimal
 
     dep, child_name = DepositService(db).deduct(
         admin, child_id, body.amount, body.reason, body.copy_id
