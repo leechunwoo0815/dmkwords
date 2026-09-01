@@ -370,13 +370,19 @@ class ReservationService:
                 Reservation.child_id == child.id,
                 Reservation.is_deleted == 0,
             )
+            .with_for_update()  # P1-F4：锁定读（锁序 Reservation → copy，与核销一致）
             .first()
         )
         if not res or res.status != Reservation.STATUS_ACTIVE:
             raise ValidationError("预约不存在或状态不可取消")
         res.status = Reservation.STATUS_CANCELLED
-        copy = self.db.query(BookCopy).filter(BookCopy.id == res.copy_id).first()
-        if copy and copy.status == BookCopy.STATUS_RESERVED:
+        copy = (
+            self.db.query(BookCopy)
+            .filter(BookCopy.id == res.copy_id)
+            .with_for_update()
+            .first()
+        )
+        if copy and copy.status == BookCopy.STATUS_RESERVED:  # 锁后当前读
             copy.status = BookCopy.STATUS_AVAILABLE
         self.db.commit()
         return res
@@ -395,10 +401,27 @@ class ReservationService:
             )
             .all()
         )
-        for res in due:
+        for item in due:
+            # P1-F4：逐条锁定读（锁序 Reservation → copy，与核销/取消一致）+
+            # 状态守卫——已被并发核销（checked_out）的预约跳过，防把已借出副本改回 available
+            res = (
+                self.db.query(Reservation)
+                .filter(Reservation.id == item.id)
+                .with_for_update()
+                .populate_existing()  # 强制用行数据刷新 identity map——due 扫描已按
+                # 旧快照加载过同一行，不刷新则状态守卫读到旧值失效（并发核销漏拦）
+                .first()
+            )
+            if not res or res.status != Reservation.STATUS_ACTIVE:
+                continue
             res.status = Reservation.STATUS_EXPIRED
-            copy = self.db.query(BookCopy).filter(BookCopy.id == res.copy_id).first()
-            if copy and copy.status == BookCopy.STATUS_RESERVED:
+            copy = (
+                self.db.query(BookCopy)
+                .filter(BookCopy.id == res.copy_id)
+                .with_for_update()
+                .first()
+            )
+            if copy and copy.status == BookCopy.STATUS_RESERVED:  # 锁后当前读
                 copy.status = BookCopy.STATUS_AVAILABLE
             event_bus.publish(
                 ReservationExpiredEvent(
@@ -410,7 +433,7 @@ class ReservationService:
             )
         if due:
             self.db.commit()
-        return len(due)
+        return len(due)  # 扫描数（跳过的并发核销单不在内，幂等语义不变）
 
     def expire_remind(self) -> int:
         """预约即将到期提醒（距 expires_at ≤ remind_hours 且未过；每次预约一条）。"""
@@ -577,6 +600,16 @@ class ReservationAdminService:
 
     def checkout(self, admin, reservation_id: int):
         """核销预约 → 标准借书链（额度/押金/同书未还全量校验后借出锁定的副本）。"""
+        # P1-F8：全局锁序统一 Child 最先（与 borrow 一致），消除 checkout 持 copy 锁
+        # 进 borrow 等 Child 锁的 AB-BA 死锁窗口（本函数 Child 锁后由 borrow 重入）
+        from backend.domain.identity.models import Child as ChildModel
+        from backend.domain.reading.models import Reservation as _Res
+
+        _res_pre = (
+            self.db.query(_Res).filter(_Res.id == reservation_id, _Res.is_deleted == 0).first()
+        )
+        if _res_pre:
+            self.db.query(ChildModel).filter(ChildModel.id == _res_pre.child_id).with_for_update().first()
         res = (
             self.db.query(Reservation)
             .filter(Reservation.id == reservation_id, Reservation.is_deleted == 0)

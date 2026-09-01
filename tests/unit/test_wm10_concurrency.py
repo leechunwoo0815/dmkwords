@@ -1,17 +1,20 @@
 # tests/unit/test_wm10_concurrency.py — P1 资金并发行锁（session_pair 基建复用）
 """并发缺陷：无行锁的"读→校验→写"在双事务下快照覆盖写。
-有效并发红的结构：B 先建旧快照（普通读）→ A 锁行修改并提交 → B 走被测 service：
-- 无锁实现：B 读旧快照校验通过 → 覆盖写（双写/覆盖先写）= RED
+有效并发红的结构：B 先建旧快照（普通读，REPEATABLE READ）→ A 推进并提交 →
+B 走被测 service（expire_all 模拟生产新请求语义——锁定读读最新已提交、
+普通读走旧快照，两实现在此正确分流）：
+- 无锁实现：B 读旧快照校验通过 → 覆盖写（双写/覆盖先写/物理双借）= RED
 - 锁定读实现：SELECT FOR UPDATE 总读最新已提交 → 校验失败拒绝 = GREEN
-REPEATABLE READ：跨事务读 A 提交数据需刷新快照（先例 test_wm13_admin_notify.py）。"""
+跨事务读 A 提交数据需刷新快照（先例：test_wm13_admin_notify.py）。"""
 
-
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
 
 from backend.common.exceptions import NotFoundError, ValidationError
+from tests.unit.helpers import force_book_on
 
 
 def _h(client, username="admin"):
@@ -42,6 +45,15 @@ def _pay(client, h, child_id, order_type):
     return o
 
 
+def _pay_deposit(client, h, child_id):
+    do = client.post(f"/api/admin/deposits/children/{child_id}/orders", headers=h).json()
+    client.post(
+        f"/api/admin/orders/{do['order_id']}/confirm-payment",
+        json={"pay_method": "scan"},
+        headers=h,
+    )
+
+
 def _paid_child(client, h, phone, name="孩"):
     p = client.post(
         "/api/admin/members/parents", json={"name": "并发家长", "phone": phone}, headers=h
@@ -51,13 +63,23 @@ def _paid_child(client, h, phone, name="孩"):
     ).json()
 
 
-def _pay_deposit(client, h, child_id):
-    do = client.post(f"/api/admin/deposits/children/{child_id}/orders", headers=h).json()
-    client.post(
-        f"/api/admin/orders/{do['order_id']}/confirm-payment",
-        json={"pay_method": "scan"},
+def _book_with_copies(client, h, title, copies=3) -> int:
+    book_id = client.post(
+        "/api/admin/books",
+        json={"isbn": None, "title": title, "word_count": 100, "copy_count": copies},
         headers=h,
-    )
+    ).json()["id"]
+    force_book_on(client, h, book_id)
+    return book_id
+
+
+def _db():
+    from backend.database import get_session
+
+    return get_session()
+
+
+# ---------- P1-F1：退款 execute/review 行锁 ----------
 
 
 def _approved_refund(client, h, mini, c, order) -> dict:
@@ -78,32 +100,26 @@ def _approved_refund(client, h, mini, c, order) -> dict:
 
 
 def test_execute_concurrent_no_double_write(client: TestClient, session_pair):
-    """P1-F1：B 旧快照 approved；A 已把单推进 processing 并提交；B 再 execute——
-    锁定读实现下 B 读到最新状态（processing）→ 422 拒绝；无锁实现下 B 覆盖写
-    走 success 分支 → 双写（RED）。"""
+    """B 旧快照 approved；A 已完整执行（refunded + 押金退款单 1 笔）；B 再 execute——
+    锁定读 → 读到 refunded → 422 拒绝；无锁 → 覆盖写重走 success 分支双写（RED）。"""
     h = _h(client)
     p, c, mini = _family(client, h, "13800002301", "并发退孩")
     order = _pay(client, h, c["id"], "observation_fee")
     _pay_deposit(client, h, c["id"])
-    rr = _approved_refund(client, h, mini, c, order)
-    rid = rr["id"]
+    rid = _approved_refund(client, h, mini, c, order)["id"]
 
     s1, s2 = session_pair
     from backend.domain.identity.models import RefundRequest
 
-    # B 建立旧快照（approved，早于 A 完整执行）
     stale = s2.query(RefundRequest).filter(RefundRequest.id == rid).first()
-    assert stale.status == "approved"
-    # A 走 HTTP 完整执行成功（refunded + 押金退款单 1 笔 + Ledger）
+    assert stale.status == "approved"  # B 旧快照
+    # A 走 HTTP 完整执行成功
     r_a = client.post(
         f"/api/admin/refund-requests/{rid}/execute",
         json={"success": True, "remark": "先到者执行"},
         headers=h,
     )
     assert r_a.status_code == 200, r_a.text
-    # identity map 会缓存 stale 对象（SQLAlchemy 不用行数据刷新已加载实例），
-    # expire_all 模拟生产"新请求新 session"语义：锁定读读最新已提交（refunded）→
-    # 校验拒绝；无锁实现普通读走旧快照 approved → 覆盖写重走 success 分支 → 双写
     s2.expire_all()
     from backend.domain.identity.wm10_service import RefundService
 
@@ -113,25 +129,23 @@ def test_execute_concurrent_no_double_write(client: TestClient, session_pair):
         )
     s2.rollback()
     s1.rollback()
-    # 实质断言：押金退款单只有一笔（无锁时 B 会再发一笔）
     with _db() as db:
         db.commit()
         dep_rr = (
             db.query(RefundRequest)
-            .filter(RefundRequest.kind == RefundRequest.KIND_DEPOSIT, RefundRequest.is_deleted == 0)
+            .filter(
+                RefundRequest.kind == RefundRequest.KIND_DEPOSIT, RefundRequest.is_deleted == 0
+            )
             .all()
         )
         assert len(dep_rr) == 1, f"押金退款单应 1 笔，实 {len(dep_rr)}（双写）"
-        ledgers = (
-            db.query(RefundRequest).filter(RefundRequest.withdrawal_id.isnot(None)).all()
-        )
-        assert len(ledgers) == 1
+        req = db.query(RefundRequest).filter(RefundRequest.id == rid).first()
+        assert req.status == RefundRequest.STATUS_REFUNDED
 
 
 def test_review_concurrent_reject_cannot_overwrite_approve(client: TestClient, session_pair):
-    """P1-F1 review：B 旧快照 pending；A 已 approve 提交；B 走 review reject——
-    锁定读实现下 B 读到 approved → 422（一 approve 一 reject，先写不被覆盖）；
-    无锁实现下 B 覆盖为 rejected（RED）。"""
+    """B 旧快照 pending；A 已 approve 提交；B 走 review reject——
+    锁定读 → approved 非 pending → 422（先写不被覆盖）；无锁 → 覆盖为 rejected（RED）。"""
     h = _h(client)
     p, c, mini = _family(client, h, "13800002302", "审核并发孩")
     order = _pay(client, h, c["id"], "observation_fee")
@@ -139,31 +153,20 @@ def test_review_concurrent_reject_cannot_overwrite_approve(client: TestClient, s
 
     s1, s2 = session_pair
     from backend.domain.identity.models import RefundRequest
-
-    stale = s2.query(RefundRequest).filter(RefundRequest.id == rid).first()
-    assert stale.status == "approved"  # B 快照
-    # A 改回 pending？不——构造卡片场景"B 校验通过（用 pending 旧值）"：
-    # B 的旧快照必须早于 A 的 approve。改用：B 建快照于 approve 之前。
-    s2.rollback()
-    # 重建场景：reset 为 pending 后重演
     from backend.domain.identity.wm10_service import RefundService
 
-    with _db() as db:
-        db.commit()
-    # 直接验证：A approve 已提交（上面 _approved_refund 已做）→ B（新会话新快照）
-    # 走 review reject 应被状态机拒绝（approved 非 pending）——这是串行回归；
-    # 并发部分：B 在 A approve 前建立快照。为可复现构造：
-    #   手动把单置回 pending（模拟时间回溯），B 建快照，A approve 提交，B reject。
+    # 重建"B 快照早于 approve"场景：置回 pending → B 快照 → A approve 提交 → B reject
     with _db() as db:
         req = db.query(RefundRequest).filter(RefundRequest.id == rid).first()
         req.status = RefundRequest.STATUS_PENDING
         db.commit()
-    s2.query(RefundRequest).filter(RefundRequest.id == rid).first()  # B 旧快照 pending
+    stale = s2.query(RefundRequest).filter(RefundRequest.id == rid).first()
+    assert stale.status == "pending"
     a = s1.query(RefundRequest).filter(RefundRequest.id == rid).with_for_update().first()
     a.status = RefundRequest.STATUS_APPROVED
     a.reviewed_by = 1
-    s1.commit()  # A approve 落库
-    s2.expire_all()  # 同上：模拟新请求 session
+    s1.commit()
+    s2.expire_all()
     with pytest.raises(ValidationError):
         RefundService(s2).review(
             type("A", (), {"id": 1, "display_name": "超管"})(), rid, False, "并发拒绝"
@@ -172,13 +175,11 @@ def test_review_concurrent_reject_cannot_overwrite_approve(client: TestClient, s
     with _db() as db:
         db.commit()
         req = db.query(RefundRequest).filter(RefundRequest.id == rid).first()
-        assert req.status == RefundRequest.STATUS_APPROVED, (
-            f"approve 被 reject 覆盖：{req.status}"
-        )
+        assert req.status == RefundRequest.STATUS_APPROVED, f"approve 被覆盖：{req.status}"
 
 
 def test_execute_double_submit_rejected(client: TestClient):
-    """串行防重回归：已 refunded 的单再 execute → 422（状态机守卫，防回归）。"""
+    """串行防重回归：已 refunded 的单再 execute → 422（状态机守卫）。"""
     h = _h(client)
     p, c, mini = _family(client, h, "13800002303", "防重孩")
     order = _pay(client, h, c["id"], "observation_fee")
@@ -206,29 +207,23 @@ def test_execute_double_submit_rejected(client: TestClient):
     assert r2.status_code == 422, f"重复执行未拦: {r2.status_code}"
 
 
-def _db():
-    from backend.database import get_session
-
-    return get_session()
+# ---------- P1-F2：confirm_payment 行锁 + 押金幂等双保险 ----------
 
 
 def test_confirm_payment_concurrent_idempotent(client: TestClient, session_pair):
-    """P1-F2：B 旧快照 pending_manual；A 已 confirm（paid + 押金台账 1 笔）提交；
-    B 再 confirm —— 锁定读实现下读到 paid → 422；无锁 → 覆盖写双押金台账（RED）。"""
+    """B 旧快照 pending_manual；A 已确认（paid + ENTRY_PAY 1 笔）提交；B 再 confirm——
+    锁定读 → paid → 422；无锁 → 覆盖写双 ENTRY_PAY 台账（RED）。"""
     h = _h(client)
     p, c, mini = _family(client, h, "13800002304", "确认并发孩")
     client.post(
         "/api/admin/orders", json={"child_id": c["id"], "order_type": "observation_fee"}, headers=h
     )
-    # 押金订单也在场（confirm observation 单会联动？不会——押金单单独 confirm 才记押金。
-    # 用 deposit 单测幂等最直接）
     do = client.post(f"/api/admin/deposits/children/{c['id']}/orders", headers=h).json()
     s1, s2 = session_pair
     from backend.domain.identity.models import Order
 
     stale = s2.query(Order).filter(Order.id == do["order_id"]).first()
     assert stale.status == "pending_manual_confirm"  # B 旧快照
-    # A 完整确认成功（押金 paid + ENTRY_PAY 台账 1 笔）
     r_a = client.post(
         f"/api/admin/orders/{do['order_id']}/confirm-payment",
         json={"pay_method": "scan", "remark": "先到者"},
@@ -236,7 +231,6 @@ def test_confirm_payment_concurrent_idempotent(client: TestClient, session_pair)
     )
     assert r_a.status_code == 200, r_a.text
     s2.expire_all()
-    # B（旧快照）再确认：锁定读 → 422；无锁 → 覆盖写双 ENTRY_PAY
     from backend.domain.identity.service import OrderService
 
     with pytest.raises(ValidationError):
@@ -256,12 +250,13 @@ def test_confirm_payment_concurrent_idempotent(client: TestClient, session_pair)
         assert float(dep.available_amount) == 1200
 
 
+# ---------- P1-F3：押金 deduct 锁定读 ----------
+
+
 def test_deduct_concurrent_no_balance_drift(client: TestClient, session_pair):
-    """P1-F3：余额 1200，B 旧快照；A 已扣 1100 提交；B 再扣 800 ——
-    锁定读实现：B 读到最新余额 100 → min(800,100)=100 → 拒绝（余额不足）或扣 100；
-    无锁实现：B 读旧快照 1200 → min(800,1200)=800 → 覆盖写 1200-800=400，
-    台账合计 1900 vs 余额 400 = 账实漂移（RED）。
-    断言：两条台账发生额之和 == 余额扣减总额（账实一致）。"""
+    """余额 1200：B 旧快照；A 已扣 1100 提交；B 再扣 800——
+    锁定读：读最新余额 100 → 扣 100 + over 700 挂未付（终态 available=0）；
+    无锁：按旧快照 1200 扣 800 → 覆盖写 400（A 的 1100 被吞，账实漂移，RED）。"""
     h = _h(client)
     c = _paid_child(client, h, "13800002305", "并发扣款孩")
     _pay_deposit(client, h, c["id"])
@@ -270,7 +265,6 @@ def test_deduct_concurrent_no_balance_drift(client: TestClient, session_pair):
 
     stale = s2.query(Deposit).filter(Deposit.child_id == c["id"]).first()
     assert float(stale.available_amount) == 1200  # B 旧快照
-    # A 完整扣款 1100（HTTP）
     r_a = client.post(
         f"/api/admin/deposits/children/{c['id']}/deduct",
         json={"amount": "1100", "reason": "先到者扣款"},
@@ -278,8 +272,6 @@ def test_deduct_concurrent_no_balance_drift(client: TestClient, session_pair):
     )
     assert r_a.status_code == 200, r_a.text
     s2.expire_all()
-    # B（旧快照 1200）再扣 800：锁定读 → 最新余额 100 → 拒绝（余额不足）；
-    # 无锁 → min(800,1200)=800 覆盖写 400（账实漂移）
     from backend.domain.billing.service import DepositService
 
     try:
@@ -292,40 +284,30 @@ def test_deduct_concurrent_no_balance_drift(client: TestClient, session_pair):
     with _db() as db:
         db.commit()
         dep = db.query(Deposit).filter(Deposit.child_id == c["id"]).first()
-        # 终态断言（卡片口径）：B 基于锁定读的最新余额（100）扣款 →
-        # available=0、deducted=1200（1100+100）、over 700 挂 unpaid_balance 待付；
-        # 无锁实现：B 按旧快照 1200 扣 800 → 覆盖写 available=400（A 的 1100 被吞）= RED
+        # 终态（卡片口径）：B 基于锁定读的最新余额 100 扣款 → available=0、
+        # deducted=1200（1100+100）、over 700 挂 unpaid_balance 待付；
+        # 无锁实现：available=400（A 的 1100 被吞）= RED
         assert float(dep.available_amount) == 0, f"余额应 0，实 {dep.available_amount}（覆盖写）"
         assert float(dep.deducted_amount) == 1200, f"deducted 应 1200，实 {dep.deducted_amount}"
         assert float(dep.unpaid_balance) == 700, f"unpaid 应 700，实 {dep.unpaid_balance}"
 
 
+# ---------- P1-F5：还书 record 锁 + overdue_mark 状态守卫 ----------
+
+
 def test_return_book_concurrent_no_double_return(client: TestClient, session_pair):
-    """P1-F5：B 旧快照（active）；A 已还书提交（returned）；B 再还同 copy——
-    锁定读实现：record 查询（FOR UPDATE）读最新 → 无进行中借阅 → 404；
-    无锁实现：B 读旧快照 active → 覆盖写双还 + 双事件（RED）。"""
+    """B 旧快照（active）；A 已还书提交（returned）；B 再还同 copy——
+    锁定读：record（FOR UPDATE）读最新 → 无进行中借阅 → 404；
+    无锁：B 读旧快照 active → 覆盖写双还 + 双事件（RED）。"""
     h = _h(client)
-    # 建孩子+会员+押金+借一本书
     p, c, mini = _family(client, h, "13800002306", "并发还孩")
     _pay(client, h, c["id"], "observation_fee")
     _pay_deposit(client, h, c["id"])
-    book_id = client.post(
-        "/api/admin/books",
-        json={"isbn": None, "title": "并发还书", "word_count": 100, "copy_count": 3},
-        headers=h,
-    ).json()["id"]
-    from tests.unit.helpers import force_book_on
-
-    force_book_on(client, h, book_id)
+    book_id = _book_with_copies(client, h, "并发还书")
     from backend.domain.catalog.models import BookCopy
 
     with _db() as db:
-        copy_id = (
-            db.query(BookCopy)
-            .filter(BookCopy.book_id == book_id, BookCopy.is_deleted == 0)
-            .first()
-            .id
-        )
+        copy_id = db.query(BookCopy).filter(BookCopy.book_id == book_id).first().id
     br = client.post(
         "/api/admin/circulation/borrow", json={"child_id": c["id"], "copy_id": copy_id}, headers=h
     ).json()
@@ -339,13 +321,11 @@ def test_return_book_concurrent_no_double_return(client: TestClient, session_pai
         .first()
     )
     assert stale is not None  # B 旧快照：进行中
-    # A 完整还书（HTTP）
     r_a = client.post(
         "/api/admin/circulation/return", json={"copy_id": copy_id, "condition": "normal"}, headers=h
     )
     assert r_a.status_code == 200, r_a.text
     s2.expire_all()
-    # B（旧快照 active）再还：锁定读 → 404；无锁 → 覆盖写
     from backend.domain.circulation.service import CirculationService
 
     with pytest.raises((ValidationError, NotFoundError)):
@@ -365,43 +345,27 @@ def test_return_book_concurrent_no_double_return(client: TestClient, session_pai
 
 
 def test_overdue_mark_does_not_overwrite_returned(client: TestClient, session_pair):
-    """P1-F5：overdue_mark 与还书并发——已 returned 的记录不被覆盖回 overdue。
-    结构：B（overdue_mark 用的 session）扫到 ACTIVE 旧快照 → A 还书提交 →
-    B 逐行 UPDATE 带状态守卫（只 ACTIVE→OVERDUE）→ returned 行不受影响。"""
+    """overdue_mark 与还书并发：已 returned 的记录不被覆盖回 overdue（状态守卫）。"""
     h = _h(client)
     p, c, mini = _family(client, h, "13800002307", "逾期并发孩")
     _pay(client, h, c["id"], "observation_fee")
     _pay_deposit(client, h, c["id"])
-    book_id = client.post(
-        "/api/admin/books",
-        json={"isbn": None, "title": "逾期并发书", "word_count": 100, "copy_count": 3},
-        headers=h,
-    ).json()["id"]
-    from tests.unit.helpers import force_book_on
-
-    force_book_on(client, h, book_id)
-    # 借书后把 due_at 拨到过去（制造逾期条件）
+    book_id = _book_with_copies(client, h, "逾期并发书")
     from backend.domain.catalog.models import BookCopy
-
-    with _db() as db:
-        copy_id = (
-            db.query(BookCopy)
-            .filter(BookCopy.book_id == book_id, BookCopy.is_deleted == 0)
-            .first()
-            .id
-        )
-    br = client.post(
-        "/api/admin/circulation/borrow", json={"child_id": c["id"], "copy_id": copy_id}, headers=h
-    ).json()
-    assert br.get("id"), f"借书失败: {br}"
-    from datetime import datetime, timedelta
-
     from backend.domain.circulation.models import BorrowRecord
 
     with _db() as db:
+        copy_id = db.query(BookCopy).filter(BookCopy.book_id == book_id).first().id
+    client.post(
+        "/api/admin/circulation/borrow", json={"child_id": c["id"], "copy_id": copy_id}, headers=h
+    )
+    with _db() as db:
         rec = (
             db.query(BorrowRecord)
-            .filter(BorrowRecord.copy_id == copy_id, BorrowRecord.status == BorrowRecord.STATUS_ACTIVE)
+            .filter(
+                BorrowRecord.copy_id == copy_id,
+                BorrowRecord.status == BorrowRecord.STATUS_ACTIVE,
+            )
             .first()
         )
         rec.due_at = datetime.now() - timedelta(days=3)
@@ -412,16 +376,14 @@ def test_overdue_mark_does_not_overwrite_returned(client: TestClient, session_pa
         .filter(BorrowRecord.copy_id == copy_id, BorrowRecord.status == BorrowRecord.STATUS_ACTIVE)
         .first()
     )
-    assert stale is not None
-    # A 还书提交
+    assert stale is not None  # B 扫描快照：ACTIVE
     r_a = client.post(
         "/api/admin/circulation/return", json={"copy_id": copy_id, "condition": "normal"}, headers=h
     )
     assert r_a.status_code == 200, r_a.text
-    # B 跑 overdue_mark（旧扫描结果）：状态守卫保证只 ACTIVE→OVERDUE
     from backend.domain.circulation.service import CirculationService
 
-    CirculationService(s2).overdue_mark()
+    CirculationService(s2).overdue_mark()  # B 旧扫描结果：状态守卫应跳过已 returned
     s2.commit()
     with _db() as db:
         db.commit()
@@ -429,3 +391,119 @@ def test_overdue_mark_does_not_overwrite_returned(client: TestClient, session_pa
         assert rec.status == BorrowRecord.STATUS_RETURNED, (
             f"已还记录被 overdue_mark 覆盖：{rec.status}"
         )
+
+
+# ---------- P1-F4：预约释放/取消 锁序（Reservation → copy） ----------
+
+
+def _reserved(client, h, mini, c, book_id):
+    r = client.post(
+        "/api/miniapp/reservations", json={"child_id": c["id"], "book_id": book_id}, headers=mini
+    )
+    assert r.status_code == 200, r.text
+    rid = r.json()["id"]
+    from backend.domain.reading.models import Reservation
+
+    with _db() as db:
+        res = db.query(Reservation).filter(Reservation.id == rid).first()
+        return rid, res.copy_id
+
+
+def test_expire_due_concurrent_no_phantom_available(client: TestClient, session_pair):
+    """B 旧快照（active + 已过期）；A 已提交核销终态（checked_out + borrowed +
+    活跃借阅）；B 跑 expire_due——锁定读：读到 checked_out → 跳过（copy 保持
+    borrowed）；无锁：覆盖写 expired + available → 活跃借阅下副本可被再借（物理双借，RED）。
+    A 的核销终态用 DB 模拟（并发对手已提交的既成事实），B 走真实 service。"""
+    h = _h(client)
+    p, c, mini = _family(client, h, "13800002308", "预约并发孩")
+    _pay(client, h, c["id"], "observation_fee")
+    _pay_deposit(client, h, c["id"])
+    book_id = _book_with_copies(client, h, "预约并发书")
+    rid, copy_id = _reserved(client, h, mini, c, book_id)
+    # 先拨过期（B 快照里必须已含 expires_at 过去，due 扫描才命中）
+    from backend.domain.reading.models import Reservation
+
+    with _db() as db:
+        res0 = db.query(Reservation).filter(Reservation.id == rid).first()
+        res0.expires_at = datetime.now() - timedelta(hours=1)
+        db.commit()
+    s1, s2 = session_pair
+    stale = s2.query(Reservation).filter(Reservation.id == rid).first()
+    assert stale.status == "active"  # B 旧快照（active + 已过期）
+    # A 的核销终态（已提交的既成事实）
+    from backend.domain.catalog.models import BookCopy
+    from backend.domain.circulation.models import BorrowRecord
+
+    with _db() as db:
+        res = db.query(Reservation).filter(Reservation.id == rid).first()
+        res.status = Reservation.STATUS_CHECKED_OUT
+        copy = db.query(BookCopy).filter(BookCopy.id == copy_id).first()
+        copy.status = BookCopy.STATUS_BORROWED
+        db.add(
+            BorrowRecord(
+                child_id=c["id"],
+                book_id=book_id,
+                copy_id=copy_id,
+                status=BorrowRecord.STATUS_ACTIVE,
+                due_at=datetime.now() + timedelta(days=14),
+            )
+        )
+        db.commit()
+    s2.expire_all()
+    from backend.domain.reading.service import ReservationService
+
+    ReservationService(s2).expire_due()  # 旧快照扫描命中 → 修复后逐条锁定读跳过
+    s2.commit()
+    with _db() as db:
+        db.commit()
+        res = db.query(Reservation).filter(Reservation.id == rid).first()
+        assert res.status == "checked_out", f"核销态被释放覆盖：{res.status}"
+        copy = db.query(BookCopy).filter(BookCopy.id == copy_id).first()
+        assert copy.status == BookCopy.STATUS_BORROWED, (
+            f"副本被改回 available（物理双借窗口）：{copy.status}"
+        )
+        rec = (
+            db.query(BorrowRecord)
+            .filter(
+                BorrowRecord.copy_id == copy_id,
+                BorrowRecord.status == BorrowRecord.STATUS_ACTIVE,
+                BorrowRecord.is_deleted == 0,
+            )
+            .first()
+        )
+        assert rec is not None, "活跃借阅记录丢失"
+
+
+def test_cancel_reservation_concurrent_no_phantom_available(
+    client: TestClient, session_pair
+):
+    """cancel 同款：B 旧快照 active；A 已核销提交；B（家长 token）cancel——
+    锁定读 → 422（状态不可取消）；无锁 → copy 被改回 available（RED）。"""
+    h = _h(client)
+    p, c, mini = _family(client, h, "13800002309", "取消并发孩")
+    _pay(client, h, c["id"], "observation_fee")
+    _pay_deposit(client, h, c["id"])
+    book_id = _book_with_copies(client, h, "取消并发书")
+    rid, copy_id = _reserved(client, h, mini, c, book_id)
+    # 先拨过期（A 核销前过期校验会用锁定读读最新值——先过期会让 A 被拒，
+    # 因此 A 核销在拨过期之前完成：拨过期放在 A 核销后仅影响 B 的扫描视图）
+    s1, s2 = session_pair
+    from backend.domain.reading.models import Reservation
+
+    stale = s2.query(Reservation).filter(Reservation.id == rid).first()
+    assert stale.status == "active"  # B 旧快照
+    # A 核销借出（HTTP，真实链路，预约未过期可核销）
+    r_a = client.post(f"/api/admin/reservations/{rid}/checkout", headers=h)
+    assert r_a.status_code == 200, r_a.text
+    s2.expire_all()
+    # B（家长 token 旧快照 active）取消：服务端锁定读最新（checked_out）→ 422
+    r_b = client.post(
+        f"/api/miniapp/reservations/{rid}/cancel", json={"child_id": c["id"]}, headers=mini
+    )
+    assert r_b.status_code == 422, f"核销后取消未拦: {r_b.status_code} {r_b.text[:100]}"
+    from backend.domain.catalog.models import BookCopy
+
+    with _db() as db:
+        db.commit()
+        copy = db.query(BookCopy).filter(BookCopy.id == copy_id).first()
+        assert copy.status == BookCopy.STATUS_BORROWED, f"副本状态被破坏：{copy.status}"
