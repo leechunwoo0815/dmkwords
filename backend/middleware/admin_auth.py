@@ -18,13 +18,11 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer()
 
 
-def validate_admin_payload(db: Session, payload: dict) -> None:
-    """P0-F3：媒体端点复用的完整 admin 凭证校验（type + 账号 + token_generation 撤销）。
+def _load_active_admin(db: Session, payload: dict) -> AdminUser:
+    """公共凭证校验（账号存在/active + token_generation 撤销），返回 AdminUser。
 
-    与 get_current_admin 同一标准；媒体鉴权走独立入口（query token），此处抽公共逻辑。
+    type 校验留各自入口（get_current_admin=403 有身份无权限；媒体=401 匿名入口语义）。
     """
-    if payload.get("type") != "admin":
-        raise UnauthorizedError("非管理端凭证")
     admin_id = payload.get("sub")
     if not admin_id:
         raise UnauthorizedError("Token中缺少管理员信息")
@@ -42,6 +40,17 @@ def validate_admin_payload(db: Session, payload: dict) -> None:
     # token_generation 不一致 = 改密/禁用后签发的旧 token，立即失效
     if int(payload.get("gen", 0)) != admin.token_generation:
         raise UnauthorizedError("登录状态已失效，请重新登录")
+    return admin
+
+
+def validate_admin_payload(db: Session, payload: dict) -> None:
+    """P0-F3：媒体端点完整凭证校验（type 401 + 公共加载/撤销）。
+
+    媒体走独立入口（query token），type 错误按未登录处理（401 语义）。
+    """
+    if payload.get("type") != "admin":
+        raise UnauthorizedError("非管理端凭证")
+    _load_active_admin(db, payload)
 
 
 async def get_current_admin(
@@ -59,24 +68,4 @@ async def get_current_admin(
     if payload.get("type") != "admin":
         raise ForbiddenError("需要管理员权限")
 
-    admin_id = payload.get("sub")
-    if not admin_id:
-        raise UnauthorizedError("Token中缺少管理员信息")
-
-    admin = (
-        db.query(AdminUser)
-        .filter(
-            AdminUser.id == int(admin_id),
-            AdminUser.is_deleted == 0,
-            AdminUser.status == AdminUser.STATUS_ACTIVE,
-        )
-        .first()
-    )
-    if not admin:
-        raise UnauthorizedError("管理员不存在或已禁用")
-
-    # token_generation 不一致 = 改密/禁用后签发的旧 token，立即失效
-    if int(payload.get("gen", 0)) != admin.token_generation:
-        raise UnauthorizedError("Token已失效，请重新登录")
-
-    return admin
+    return _load_active_admin(db, payload)
