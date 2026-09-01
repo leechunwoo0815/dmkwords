@@ -66,7 +66,9 @@ start() {
       if lsof -ti :8443 >/dev/null 2>&1; then
         echo "  https 后端已在 :8443"
       else
-        nohup .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8443 \
+        # P1-F10：8443 是 8002 的媒体镜像进程——双进程各自跑 APScheduler 会任务双执行
+        # （TaskRunLog 同任务同秒双条），禁掉镜像进程的调度器
+        SCHEDULER_ENABLED=false nohup .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8443 \
           --ssl-certfile certs/server.crt --ssl-keyfile certs/server.key \
           > "$LOG_DIR/backend-https.log" 2>&1 < /dev/null &
         echo $! > "${BACKEND_PID_FILE}.https"

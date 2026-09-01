@@ -111,7 +111,7 @@ def _first_activity_90d_remind(db: Session) -> int:
     return OrderService(db).first_activity_90d_remind()
 
 
-# 12 项定时任务（docs/09 §五 13+ 清单；周月报定时生成不在本批，见 WM11 报告口径决策）
+# 13 项定时任务（WM13-4 新增 transfer_expiring_warn 后 12→13；周月报定时生成不在本批）
 TASKS: dict[str, TaskSpec] = {
     "member_expire_check": TaskSpec(
         "member_expire_check", "会员过期落库", "会员", 300, _member_expire_check
