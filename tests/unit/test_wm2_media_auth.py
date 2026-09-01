@@ -85,3 +85,35 @@ def test_stale_admin_token_generation_rejected(client: TestClient):
         db.commit()
     r = client.get(f"/api/admin/books/{book_id}/cover-media?token={token}")
     assert r.status_code == 401, f"改密后旧 token 拉媒体未拦: {r.status_code}"
+
+
+def test_password_reset_bumps_token_generation(client: TestClient):
+    """顺带-2：超管重置员工密码 → 该员工旧 token 立即失效（gen bump 落库）。"""
+    h = _h(client)
+    # 建员工拿旧 token
+    r = client.post(
+        "/api/admin/staff",
+        json={"username": "genbump01", "password": "OldPass123", "display_name": "测试员工"},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    uid = r.json()["id"]
+    sr = client.post("/api/admin/login", json={"username": "genbump01", "password": "OldPass123"})
+    old_token = sr.json()["token"]
+    old_h = {"Authorization": f"Bearer {old_token}"}
+    assert client.get("/api/admin/todo-counts", headers=old_h).status_code == 200
+    # 超管重置该员工密码
+    rp = client.post(
+        f"/api/admin/staff/{uid}/reset-password",
+        json={"new_password": "NewPass456"},
+        headers=h,
+    )
+    assert rp.status_code == 200, rp.text
+    # 旧 token 调任意 admin 端点 → 401
+    rr = client.get("/api/admin/todo-counts", headers=old_h)
+    assert rr.status_code == 401, f"旧 token 未失效: {rr.status_code}"
+    # 新密码登录签发的新 token 正常
+    sr2 = client.post("/api/admin/login", json={"username": "genbump01", "password": "NewPass456"})
+    assert sr2.status_code == 200, sr2.text
+    new_h = {"Authorization": f"Bearer {sr2.json()['token']}"}
+    assert client.get("/api/admin/todo-counts", headers=new_h).status_code == 200

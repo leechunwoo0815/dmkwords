@@ -740,6 +740,10 @@ class StaffService:
     def reset_password(self, admin: AdminUser, user_id: int, new_password: str) -> None:
         user = self._get(admin, user_id)
         user.password_hash = hash_password(new_password)
+        # 顺带-2（WM1 遗留）：改密 bump token_generation → 旧 token 立即失效
+        # （docstring 承诺"改密后+1，旧token失效"从未生效；旧 token 由
+        # middleware/admin_auth gen 校验拦截。先改库再签发新 token 的调用方不受影响）
+        user.token_generation = (user.token_generation or 0) + 1
         publish_audit(
             self.db,
             admin=admin,
