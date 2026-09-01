@@ -15,6 +15,7 @@ from sqlalchemy.types import Numeric
 
 from backend.common.base_schema import BaseSchema
 from backend.common.exceptions import NotFoundError, UnauthorizedError, ValidationError
+from backend.config import get_settings
 from backend.database import get_db
 from backend.domain.catalog.models import Book
 from backend.domain.identity import guards
@@ -85,8 +86,10 @@ class ProgressReportRequest(BaseSchema):
 
 @router.post("/login")
 def login(body: LoginRequest, db: Session = Depends(get_db)):
-    if body.code != "1234":
-        raise ValidationError("验证码错误（开发期固定 1234）")
+    # P0-F2 fail-closed：LOGIN_DEV_CODE 置空时任何 code 全拒（生产禁用固定验证码）
+    dev_code = get_settings().LOGIN_DEV_CODE
+    if not dev_code or body.code != dev_code:
+        raise ValidationError("验证码错误")
     parent = db.query(Parent).filter(Parent.phone == body.phone, Parent.is_deleted == 0).first()
     if not parent:
         raise ValidationError("该手机号未注册（请到店建档）")

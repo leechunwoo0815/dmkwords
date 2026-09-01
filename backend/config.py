@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     APP_NAME: str = "DmkWords API"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
+    # P0-F2：开发期固定验证码（.env 可覆盖）；生产必须置空（validate_production 硬校验），
+    # 置空后 login 对任何 code 全拒（fail-closed），倒逼 WM12 接微信 code2session/SMS
+    LOGIN_DEV_CODE: str = "1234"
     ENABLE_TEST_TOKEN: bool = False
 
     # 数据库（MySQL 8.0 only，单一数据库铁律）
@@ -67,6 +70,8 @@ class Settings(BaseSettings):
             problems.append("DB_PASSWORD 为空")
         if not self.WECHAT_APP_ID or not self.WECHAT_APP_SECRET:
             problems.append("微信配置缺失")
+        if self.LOGIN_DEV_CODE:
+            problems.append("生产环境 LOGIN_DEV_CODE 必须置空（禁用固定验证码）")
         if problems:
             raise RuntimeError(f"生产环境配置校验失败: {'; '.join(problems)}")
 
