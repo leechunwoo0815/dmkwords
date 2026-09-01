@@ -174,7 +174,18 @@ class DepositService:
     ) -> Deposit:
         if amount <= 0:  # P0-F4 防御层：负数会反向增加可用余额（多退真钱）
             raise ValidationError("赔偿金额必须大于 0")
-        dep = self._get_or_create(child_id)
+        # P1-F3：锁定读——扣款基于当前真实余额计算，双管理员并发扣款串行化
+        # （无锁时 B 读旧快照覆盖写 → 账实永久漂移）
+        dep = (
+            self.db.query(Deposit)
+            .filter(Deposit.child_id == child_id, Deposit.is_deleted == 0)
+            .with_for_update()
+            .first()
+        )
+        if dep is None:
+            dep = Deposit(child_id=child_id, amount=Decimal("0"))
+            self.db.add(dep)
+            self.db.flush()
         if dep.status not in (Deposit.STATUS_PAID, Deposit.STATUS_PARTIALLY_DEDUCTED):
             raise ValidationError("押金未缴纳或状态异常，无法扣除（请先线下协商处理）")
         deduct = min(amount, dep.available_amount)

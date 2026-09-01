@@ -6,6 +6,8 @@
 REPEATABLE READ：跨事务读 A 提交数据需刷新快照（先例 test_wm13_admin_notify.py）。"""
 
 
+from decimal import Decimal
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -38,6 +40,15 @@ def _pay(client, h, child_id, order_type):
         f"/api/admin/orders/{o['id']}/confirm-payment", json={"pay_method": "scan"}, headers=h
     )
     return o
+
+
+def _paid_child(client, h, phone, name="孩"):
+    p = client.post(
+        "/api/admin/members/parents", json={"name": "并发家长", "phone": phone}, headers=h
+    ).json()
+    return client.post(
+        f"/api/admin/members/parents/{p['id']}/children", json={"name": name}, headers=h
+    ).json()
 
 
 def _pay_deposit(client, h, child_id):
@@ -243,3 +254,60 @@ def test_confirm_payment_concurrent_idempotent(client: TestClient, session_pair)
         assert len(ledgers) == 1, f"ENTRY_PAY 台账应 1 笔，实 {len(ledgers)}（双写）"
         dep = db.query(Deposit).filter(Deposit.child_id == c["id"]).first()
         assert float(dep.available_amount) == 1200
+
+
+def test_deduct_concurrent_no_balance_drift(client: TestClient, session_pair):
+    """P1-F3：余额 1200，B 旧快照；A 已扣 1100 提交；B 再扣 800 ——
+    锁定读实现：B 读到最新余额 100 → min(800,100)=100 → 拒绝（余额不足）或扣 100；
+    无锁实现：B 读旧快照 1200 → min(800,1200)=800 → 覆盖写 1200-800=400，
+    台账合计 1900 vs 余额 400 = 账实漂移（RED）。
+    断言：两条台账发生额之和 == 余额扣减总额（账实一致）。"""
+    h = _h(client)
+    c = _paid_child(client, h, "13800002305", "并发扣款孩")
+    _pay_deposit(client, h, c["id"])
+    s1, s2 = session_pair
+    from backend.domain.billing.models import Deposit
+
+    stale = s2.query(Deposit).filter(Deposit.child_id == c["id"]).first()
+    assert float(stale.available_amount) == 1200  # B 旧快照
+    # A 完整扣款 1100（HTTP）
+    r_a = client.post(
+        f"/api/admin/deposits/children/{c['id']}/deduct",
+        json={"amount": "1100", "reason": "先到者扣款"},
+        headers=h,
+    )
+    assert r_a.status_code == 200, r_a.text
+    s2.expire_all()
+    # B（旧快照 1200）再扣 800：锁定读 → 最新余额 100 → 拒绝（余额不足）；
+    # 无锁 → min(800,1200)=800 覆盖写 400（账实漂移）
+    from backend.domain.billing.service import DepositService
+
+    try:
+        DepositService(s2).deduct_for_compensation(
+            type("A", (), {"id": 1, "display_name": "超管"})(), c["id"], Decimal("800"), "并发扣款"
+        )
+        s2.commit()
+    except ValidationError:
+        s2.rollback()
+    from backend.domain.billing.models import DepositLedger
+
+    with _db() as db:
+        db.commit()
+        dep = db.query(Deposit).filter(Deposit.child_id == c["id"]).first()
+        ledgers = (
+            db.query(DepositLedger)
+            .filter(DepositLedger.deposit_id == dep.id, DepositLedger.entry_type == "deduct")
+            .all()
+        )
+        total_deduct = sum(float(l.amount) for l in ledgers)
+        # 账实一致（本卡核心断言）：台账扣款合计 == deducted_amount；
+        # 押金总额 == available + deducted（over 部分进 unpaid_balance 待付）
+        assert total_deduct == float(dep.deducted_amount), (
+            f"账实漂移：台账合计 {total_deduct} != deducted {dep.deducted_amount}"
+        )
+        assert float(dep.amount) == float(dep.available_amount) + float(dep.deducted_amount), (
+            f"总账不平衡：{dep.amount} != {dep.available_amount} + {dep.deducted_amount}"
+        )
+        # B 基于最新余额（100）扣款，而非旧快照 1200：B 的扣款发生额 ≤ 100
+        assert all(float(l.amount) <= 1100 for l in ledgers)
+        assert min(float(l.amount) for l in ledgers if float(l.amount) < 1100) <= 100
