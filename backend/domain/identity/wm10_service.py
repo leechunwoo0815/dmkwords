@@ -445,11 +445,14 @@ class RefundService:
             AdminNotifyService(self.db).mark_handled(
                 ref_type=AdminNotification.REF_REFUND_REQUEST, ref_id=str(req.id), admin=admin
             )
-        self.db.commit()
-        # 聚合推进关联退会流程（全部退款完成 → completed）
+        # P1-F9（方案 A）：聚合推进并入主事务（原双 commit 事务分裂——主流程提交后、
+        # 聚合推进前崩溃 → 退会永久卡 refunding + operation_locked 不解除）。
+        # 同事务内 flush 后 ORM 对象已更新，_advance_withdrawal 可见本事务终态；
+        # 推进失败 → 整体回滚（退款单不落 refunded），不再半提交。
         if success:
+            self.db.flush()  # P1-F9：autoflush=False——先刷本事务修改（refunded），聚合推进的查询才可见
             self._advance_withdrawal(request_id)
-            self.db.commit()
+        self.db.commit()
         return {"id": req.id, "status": req.status}
 
     def _complete_refund_withdrawal(self, admin, req: RefundRequest, order: Order) -> None:

@@ -12,10 +12,9 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-
-from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
 from sqlalchemy import func
 
+from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
 from tests.unit.helpers import force_book_on
 
 
@@ -111,7 +110,7 @@ def test_execute_concurrent_no_double_write(client: TestClient, session_pair):
     rid = _approved_refund(client, h, mini, c, order)["id"]
 
     s1, s2 = session_pair
-    from backend.domain.identity.models import Child, RefundRequest
+    from backend.domain.identity.models import RefundRequest
 
     stale = s2.query(RefundRequest).filter(RefundRequest.id == rid).first()
     assert stale.status == "approved"  # B 旧快照
@@ -154,7 +153,7 @@ def test_review_concurrent_reject_cannot_overwrite_approve(client: TestClient, s
     rid = _approved_refund(client, h, mini, c, order)["id"]
 
     s1, s2 = session_pair
-    from backend.domain.identity.models import Child, RefundRequest
+    from backend.domain.identity.models import RefundRequest
     from backend.domain.identity.wm10_service import RefundService
 
     # 重建"B 快照早于 approve"场景：置回 pending → B 快照 → A approve 提交 → B reject
@@ -577,3 +576,42 @@ def test_refund_apply_concurrent_single_request(client: TestClient, session_pair
             .scalar()
         )
         assert cnt == 1, f"退款申请应 1 条，实 {cnt}（僵尸单）"
+
+
+def test_execute_advance_failure_rolls_back_all(client: TestClient, session_pair, monkeypatch):
+    """P1-F9：execute 主流程与 _advance_withdrawal 同事务——聚合推进抛异常时
+    主流程整体回滚（退款单不落 refunded 终态）；修复前双 commit 半提交（RED）。"""
+    h = _h(client)
+    p, c, mini = _family(client, h, "13800002312", "事务边界孩")
+    order = _pay(client, h, c["id"], "formal_fee")  # formal 触发联动退会链
+    rr = client.post(
+        "/api/miniapp/refund-requests",
+        json={"child_id": c["id"], "order_id": order["id"], "reason": "事务边界"},
+        headers=mini,
+    ).json()
+    client.post(
+        f"/api/admin/refund-requests/{rr['id']}/review",
+        json={"approve": True, "remark": "同意"},
+        headers=h,
+    )
+    s1, s2 = session_pair
+    from backend.domain.identity.wm10_service import RefundService
+
+    def _boom(db, request_id):
+        raise RuntimeError("模拟推进崩溃")
+
+    monkeypatch.setattr(RefundService, "_advance_withdrawal", _boom)
+    with pytest.raises(RuntimeError):
+        RefundService(s2).execute(
+            type("A", (), {"id": 1, "display_name": "超管"})(), rr["id"], True, "执行"
+        )
+    s2.rollback()
+    with _db() as db:
+        db.commit()
+        from backend.domain.identity.models import RefundRequest as RR
+
+        req = db.query(RR).filter(RR.id == rr["id"]).first()
+        # 方案 A：同事务 → 推进失败整体回滚，退款单不落 refunded 终态
+        assert req.status != "refunded", (
+            f"推进崩溃后主流程半提交：{req.status}（事务分裂未修）"
+        )
