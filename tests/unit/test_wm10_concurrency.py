@@ -507,3 +507,28 @@ def test_cancel_reservation_concurrent_no_phantom_available(
         db.commit()
         copy = db.query(BookCopy).filter(BookCopy.id == copy_id).first()
         assert copy.status == BookCopy.STATUS_BORROWED, f"副本状态被破坏：{copy.status}"
+
+
+def test_first_activity_double_confirm_rejected(client: TestClient):
+    """P1-F6：两笔 pending 99 元单依次 confirm → 第二笔 ConflictError（R-321 每账号一次）。
+    无锁内复查时两笔都能 paid（RED）。"""
+    h = _h(client)
+    p, c, mini = _family(client, h, "13800002310", "99元孩")
+    o1 = client.post(
+        "/api/admin/orders",
+        json={"child_id": c["id"], "order_type": "first_activity_fee"},
+        headers=h,
+    ).json()
+    o2 = client.post(
+        "/api/admin/orders",
+        json={"child_id": c["id"], "order_type": "first_activity_fee"},
+        headers=h,
+    ).json()
+    r1 = client.post(
+        f"/api/admin/orders/{o1['id']}/confirm-payment", json={"pay_method": "scan"}, headers=h
+    )
+    assert r1.status_code == 200, r1.text
+    r2 = client.post(
+        f"/api/admin/orders/{o2['id']}/confirm-payment", json={"pay_method": "scan"}, headers=h
+    )
+    assert r2.status_code == 409, f"第二笔 99 元未拦: {r2.status_code} {r2.text[:120]}"

@@ -480,6 +480,23 @@ class OrderService:
         if not order.can_transition(Order.STATUS_PAID):
             raise ValidationError(f"订单状态 {order.status} 不可确认收款")
 
+        # P1-F6：99 元首单资格锁内复查（R-321 每账号一次）——apply 查重只查已 PAID，
+        # 双端并发可造两笔 pending 后先后确认穿透；order 已行锁（P1-F2），此处锁内复查
+        if order.order_type == Order.TYPE_FIRST_ACTIVITY:
+            paid_exists = (
+                self.db.query(func.count(Order.id))
+                .filter(
+                    Order.parent_id == order.parent_id,
+                    Order.order_type == Order.TYPE_FIRST_ACTIVITY,
+                    Order.status == Order.STATUS_PAID,
+                    Order.id != order.id,
+                    Order.is_deleted == 0,
+                )
+                .scalar()
+            )
+            if paid_exists:
+                raise ConflictError("该账号已购买过首场亲子活动（每账号仅一次）")
+
         order.status = Order.STATUS_PAID
         order.pay_method = req.pay_method
         order.paid_at = datetime.now()
