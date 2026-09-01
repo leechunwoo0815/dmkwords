@@ -293,9 +293,9 @@ export default function MemberManage() {
   }, [message]);
   useEffect(() => { if (tab === "orders") loadOrders(orderPg.page); }, [loadOrders, orderPg.page, tab]);
 
-  // W3 订单 Tab 待确认计数（轻量单请求）
+  // W3 订单 Tab 待确认计数（轻量单请求）；WM3-A1：页面挂载即拉，不设 tab 守卫
+  // （WM13-F4 同族漏网：守卫导致默认 tab 下计数恒 0；orderTotal 变化自动刷新）
   useEffect(() => {
-    if (tab !== "orders") return;
     apiOrderCounts()
       .then((c) => setOrderCounts({ pending_manual_confirm: c.pending_manual_confirm, total: c.total }))
       .catch(() => { /* 静默：计数失败不阻塞列表 */ });
