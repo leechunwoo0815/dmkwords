@@ -17,7 +17,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
 import { usePaintPagination } from "../hooks/usePaintPagination";
-import { TODO_REFRESH_EVENT } from "../hooks/useTodoCounts";
+import { TODO_REFRESH_EVENT, useTodoCounts } from "../hooks/useTodoCounts";
 import {
   AdminNotification,
   apiExportNotifications,
@@ -144,7 +144,7 @@ export default function Notifications() {
   // 管理待办（WM13）
   const [inbox, setInbox] = useState<AdminInboxItem[]>([]);
   const [inboxTotal, setInboxTotal] = useState(0);
-  const [pendingCount, setPendingCount] = useState(0);
+  const { counts: todoCounts, failed: todoFailed } = useTodoCounts();  // WM13-F4：与徽标同源
   const [inboxLoading, setInboxLoading] = useState(false);
   const [handleTarget, setHandleTarget] = useState<AdminInboxItem | null>(null);
   const [handleReason, setHandleReason] = useState("");
@@ -199,7 +199,6 @@ export default function Notifications() {
       });
       setInbox(data.items);
       setInboxTotal(data.total);
-      setPendingCount(data.pending_count);
     } catch (e) {
       message.error((e as Error).message);
     } finally {
@@ -380,6 +379,11 @@ export default function Notifications() {
     },
   ];
 
+  // WM13-F4：tab 标题与徽标同源（admin_total）；失败/未拉到 → 不显数字（U10 禁假 0）
+  const todoTabCount = todoFailed || !todoCounts ? null : todoCounts.admin_total;
+  const adminTabLabel =
+    todoTabCount === null ? "管理待办" : `管理待办（${todoTabCount} 待处理）`;
+
   const parentPanel = (
     <>
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
@@ -467,7 +471,7 @@ export default function Notifications() {
           value={adminTab === "done" ? "done" : "todo"}
           style={{ width: 170 }}
           options={[
-            { value: "todo", label: `待处理（${pendingCount}）` },
+            { value: "todo", label: `待处理（${todoTabCount}）` },
             { value: "done", label: "已处理" },
           ]}
           onChange={changeAdminTab}
@@ -540,7 +544,7 @@ export default function Notifications() {
         onChange={changeBox}
         items={[
           { key: "parent", label: `家长通知（未读 ${unreadCount}）`, children: parentPanel },
-          { key: "admin", label: `管理待办（${pendingCount} 待处理）`, children: adminPanel },
+          { key: "admin", label: adminTabLabel, children: adminPanel },
         ]}
       />
       <div style={{ marginTop: 16, textAlign: "right" }}>
