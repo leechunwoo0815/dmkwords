@@ -117,6 +117,19 @@ export function apiDeleteParent(parentId: number): Promise<{ id: number; deleted
 export function apiDeleteChild(childId: number): Promise<{ id: number; deleted: boolean }> {
   return request(`/api/admin/members/children/${childId}`, { method: "DELETE" });
 }
+// WM3-B2 收款凭证（两步式：先传凭证拿 path，确认收款端点已落库）
+export function apiUploadVoucher(orderId: number, fd: FormData): Promise<{ id: number; order_no: string; voucher_path: string }> {
+  return request(`/api/admin/orders/${orderId}/voucher`, { method: "POST", body: fd });
+}
+
+export function apiVoucherUrl(orderId: number): string {
+  const token = localStorage.getItem("dmkwords_admin_token");
+  const q = new URLSearchParams();
+  if (token) q.set("token", token);
+  const qs = q.toString();
+  return `/api/admin/members/orders/${orderId}/voucher-image${qs ? `?${qs}` : ""}`;
+}
+
 // C13：评估通过转正（创建年费订单，收款确认后转正式会员）
 export function apiEvaluateApprove(childId: number, reason: string): Promise<Order> {
   return request(`/api/admin/members/children/${childId}/evaluate-approve`, {

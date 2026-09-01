@@ -1019,6 +1019,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/orders/{order_id}/voucher": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Order Voucher
+         * @description 收款凭证上传（WM3-B2 两步式第一步；仅待人工确认订单可传；统一转 JPG）。
+         */
+        post: operations["upload_order_voucher_api_admin_orders__order_id__voucher_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/members/orders/{order_id}/voucher-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Order Voucher Image
+         * @description 凭证查看（WM3-B2；<img> 无法带 Authorization → query token 双通道；
+         *     member.manage 权限语义经 validate_admin_payload + payload perms 校验
+         *     （catalog/media_auth 同款模式；独立端点不挂 book.manage 的 uploads）。
+         */
+        get: operations["order_voucher_image_api_admin_members_orders__order_id__voucher_image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/orders/{order_id}/refund": {
         parameters: {
             query?: never;
@@ -2565,6 +2607,11 @@ export interface components {
             /** Files */
             files: string[];
         };
+        /** Body_upload_order_voucher_api_admin_orders__order_id__voucher_post */
+        Body_upload_order_voucher_api_admin_orders__order_id__voucher_post: {
+            /** File */
+            file: string;
+        };
         /** BookCreateRequest */
         BookCreateRequest: {
             /**
@@ -3232,6 +3279,11 @@ export interface components {
              * @default
              */
             remark: string;
+            /**
+             * Voucher Path
+             * @description 收款凭证路径（可选，WM3-B2 两步式兼容）
+             */
+            voucher_path?: string | null;
         };
         /** OrderCreateRequest */
         OrderCreateRequest: {
@@ -3276,6 +3328,8 @@ export interface components {
             paid_at: string | null;
             /** Remark */
             remark: string;
+            /** Voucher Path */
+            voucher_path?: string | null;
             /**
              * Create Time
              * Format: date-time
@@ -3815,6 +3869,15 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VoucherUploadResponse */
+        VoucherUploadResponse: {
+            /** Id */
+            id: number;
+            /** Order No */
+            order_no: string;
+            /** Voucher Path */
+            voucher_path: string;
         };
         /** WithdrawalApplyRequest */
         WithdrawalApplyRequest: {
@@ -5941,6 +6004,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_order_voucher_api_admin_orders__order_id__voucher_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_order_voucher_api_admin_orders__order_id__voucher_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    order_voucher_image_api_admin_members_orders__order_id__voucher_image_get: {
+        parameters: {
+            query?: {
+                token?: string;
+            };
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

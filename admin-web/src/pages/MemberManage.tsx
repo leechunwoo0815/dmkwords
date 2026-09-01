@@ -48,6 +48,8 @@ import {
   apiUpdateParent,
   apiDeleteParent,
   apiDeleteChild,
+  apiUploadVoucher,
+  apiVoucherUrl,
   type Child,
   type Order,
   type Parent,
@@ -122,6 +124,9 @@ export default function MemberManage() {
   const [parentLoading, setParentLoading] = useState(false);
   const [editParent, setEditParent] = useState<ParentRow | null>(null);
   const [parentEditForm] = Form.useForm();
+  // WM3-B2 凭证：确认收款弹窗单图 + 查看凭证 Modal
+  const [voucherFile, setVoucherFile] = useState<UploadFile[]>([]);
+  const [viewVoucher, setViewVoucher] = useState<Order | null>(null);
   const childPg = usePaintPagination(undefined, urlInitialPage);
   const orderPg = usePaintPagination(undefined, urlInitialPage);
   // 弹窗
@@ -550,6 +555,9 @@ export default function MemberManage() {
                         </Popconfirm>
                       </>
                     )}
+                    {r.status === "paid" && r.voucher_path && (
+                      <Button type="link" size="small" onClick={() => setViewVoucher(r)}>查看凭证</Button>
+                    )}
                     {r.status === "paid" && user?.role === "superadmin" && (
                       <Button type="link" size="small" danger onClick={() => onRefundOrder(r)}>退款</Button>
                     )}
@@ -732,15 +740,23 @@ export default function MemberManage() {
           if (!confirmOrder) return;
           const v = await confirmForm.validateFields();
           try {
+            // WM3-B2 两步式：选了凭证图先上传（可选传），再确认收款
+            const vf = voucherFile[0];
+            if (vf?.originFileObj) {
+              const fd = new FormData();
+              fd.append("file", vf.originFileObj);
+              await apiUploadVoucher(confirmOrder.id, fd);
+            }
             await apiConfirmPayment(confirmOrder.id, { pay_method: v.pay_method, remark: v.remark ?? "" });
             message.success("收款确认成功，会员权益已开通");
             setConfirmOrder(null);
+            setVoucherFile([]);
             loadOrders(orderPg.page);
           } catch (e) {
             message.error(e instanceof Error ? e.message : "确认失败");
           }
         }}
-        onCancel={() => confirmDiscardIfDirty(confirmForm.isFieldsTouched(), () => { setConfirmOrder(null); confirmForm.resetFields(); })}
+        onCancel={() => confirmDiscardIfDirty(confirmForm.isFieldsTouched(), () => { setConfirmOrder(null); setVoucherFile([]); confirmForm.resetFields(); })}
       >
         {confirmOrder && (
           <Typography.Paragraph>
@@ -756,6 +772,17 @@ export default function MemberManage() {
           </Form.Item>
           <Form.Item name="remark" label="凭证说明（留痕）">
             <Input.TextArea rows={2} placeholder="如：转账截图已存档 / 备注家长姓名" />
+          </Form.Item>
+          {/* WM3-B2：收款凭证上传（单图，可选传，带预览；统一转 JPG 存储） */}
+          <Form.Item label="收款凭证图（可选）" extra="转账/扫码截图存档，已支付订单可回看">
+            <Upload
+              listType="picture-card" fileList={voucherFile}
+              beforeUpload={() => false}
+              onChange={({ fileList: fl }) => setVoucherFile(fl.slice(0, 1))}
+              accept=".png,.jpg,.jpeg,.webp"
+            >
+              {voucherFile.length < 1 ? "+ 凭证图" : null}
+            </Upload>
           </Form.Item>
         </Form>
       </Modal>
@@ -918,6 +945,19 @@ export default function MemberManage() {
             <Input.TextArea rows={2} maxLength={200} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* WM3-B2 查看收款凭证 */}
+      <Modal
+        title={`收款凭证 — ${viewVoucher ? viewVoucher.order_no : ""}`}
+        open={!!viewVoucher}
+        footer={null}
+        onCancel={() => setViewVoucher(null)}
+        width={640}
+      >
+        {viewVoucher?.voucher_path ? (
+          <img src={apiVoucherUrl(viewVoucher.id)} alt="收款凭证" style={{ maxWidth: "100%" }} />
+        ) : null}
       </Modal>
     </>
   );
