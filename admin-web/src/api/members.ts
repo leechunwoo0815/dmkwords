@@ -17,6 +17,8 @@ export function apiListChildren(params: {
 }
 
 export type Parent = components["schemas"]["ParentResponse"];
+export type ParentRow = components["schemas"]["ParentWithStatsResponse"];
+export type PaginatedParents = components["schemas"]["PaginatedResponse_ParentWithStatsResponse_"];
 export type OrderCounts = {
   total: number; pending_payment: number; pending_manual_confirm: number;
   paid: number; cancelled: number; refunded: number;
@@ -78,12 +80,42 @@ export function apiMarkPendingEvaluation(childId: number, reason: string): Promi
 
 export function apiUpdateChild(
   childId: number,
-  body: { english_name?: string; grade?: string; ar_level?: string },
+  body: {
+    name?: string; english_name?: string; gender?: number;
+    birthday?: string; grade?: string; ar_level?: string;
+  },
 ): Promise<Child> {
   return request(`/api/admin/members/children/${childId}`, {
     method: "PUT",
     body: JSON.stringify(body),
   });
+}
+
+// WM3-B1 家长/孩子编辑+删除（订单守卫）
+export function apiListParentsPage(params: {
+  page: number; page_size: number; keyword?: string;
+}): Promise<PaginatedParents> {
+  const q = new URLSearchParams({ page: String(params.page), page_size: String(params.page_size) });
+  if (params.keyword) q.set("keyword", params.keyword);
+  return request(`/api/admin/members/parents-page?${q.toString()}`);
+}
+
+export function apiUpdateParent(
+  parentId: number,
+  body: { name?: string; phone?: string; remark?: string },
+): Promise<Parent> {
+  return request(`/api/admin/members/parents/${parentId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export function apiDeleteParent(parentId: number): Promise<{ id: number; deleted: boolean }> {
+  return request(`/api/admin/members/parents/${parentId}`, { method: "DELETE" });
+}
+
+export function apiDeleteChild(childId: number): Promise<{ id: number; deleted: boolean }> {
+  return request(`/api/admin/members/children/${childId}`, { method: "DELETE" });
 }
 // C13：评估通过转正（创建年费订单，收款确认后转正式会员）
 export function apiEvaluateApprove(childId: number, reason: string): Promise<Order> {

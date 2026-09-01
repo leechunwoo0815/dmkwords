@@ -18,7 +18,7 @@ import {
   Typography,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
-import { Upload } from "antd";
+import { Tooltip, Upload } from "antd";
 import type { UploadFile } from "antd";
 
 import { useAuth } from "../auth";
@@ -44,9 +44,14 @@ import {
   apiOrderCounts,
   apiSearchParents,
   apiUpdateChild,
+  apiListParentsPage,
+  apiUpdateParent,
+  apiDeleteParent,
+  apiDeleteChild,
   type Child,
   type Order,
   type Parent,
+  type ParentRow,
 } from "../api/members";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 
@@ -90,7 +95,8 @@ export default function MemberManage() {
   }, []);
   const urlInitialPage = Number(readUrl().get("page")) || 1;
   const [tab, setTab] = useState<string>(() => {
-    return readUrl().get("tab") === "orders" ? "orders" : "children";
+    const t0 = readUrl().get("tab");
+    return t0 === "orders" || t0 === "parents" ? t0 : "children";
   });
   const changeTab = useCallback((t: string) => {
     setTab(t);
@@ -110,6 +116,12 @@ export default function MemberManage() {
   const [orderLoading, setOrderLoading] = useState(false); // W6
   const [orderBy, setOrderBy] = useState<string | undefined>(); // W7
   const [orderCounts, setOrderCounts] = useState<{ pending_manual_confirm: number; total: number }>({ pending_manual_confirm: 0, total: 0 }); // W3
+  // WM3-B1 家长管理 tab
+  const [parents, setParents] = useState<ParentRow[]>([]);
+  const [parentTotal, setParentTotal] = useState(0);
+  const [parentLoading, setParentLoading] = useState(false);
+  const [editParent, setEditParent] = useState<ParentRow | null>(null);
+  const [parentEditForm] = Form.useForm();
   const childPg = usePaintPagination(undefined, urlInitialPage);
   const orderPg = usePaintPagination(undefined, urlInitialPage);
   // 弹窗
@@ -298,6 +310,19 @@ export default function MemberManage() {
   }, [message]);
   useEffect(() => { if (tab === "orders") loadOrders(orderPg.page); }, [loadOrders, orderPg.page, tab]);
 
+  // WM3-B1 家长管理列表
+  const loadParents = useCallback(
+    (page: number) => {
+      setParentLoading(true);
+      apiListParentsPage({ page, page_size: childPg.pageSize })
+        .then((r) => { setParents(r.items ?? []); setParentTotal(r.total); })
+        .catch((e: Error) => message.error(e.message))
+        .finally(() => setParentLoading(false));
+    },
+    [childPg.pageSize, message]
+  );
+  useEffect(() => { if (tab === "parents") loadParents(childPg.page); }, [loadParents, childPg.page, tab]);
+
   // W3 订单 Tab 待确认计数（轻量单请求）；WM3-A1：页面挂载即拉，不设 tab 守卫
   // （WM13-F4 同族漏网：守卫导致默认 tab 下计数恒 0；orderTotal 变化自动刷新）
   useEffect(() => {
@@ -336,6 +361,7 @@ export default function MemberManage() {
 
       <Tabs activeKey={tab} onChange={changeTab} items={[
         { key: "children", label: `孩子档案（${childTotal}）` },
+        { key: "parents", label: `家长（${parentTotal}）` },
         {
           key: "orders",
           // WM3-D1：待确认数 M>0 时红底白字胶囊（M=0 保持原样避免满屏红）
@@ -422,8 +448,31 @@ export default function MemberManage() {
                     <Button type="link" size="small" onClick={() => { setObsChild(r); setObsFileList([]); setObsRemark(""); }}>评估报告</Button>
                     <Button type="link" size="small" onClick={() => {
                       setEditChild(r);
-                      editForm.setFieldsValue({ english_name: r.english_name || "", grade: r.grade || "", ar_level: r.ar_level || "" });
+                      editForm.setFieldsValue({
+                        name: r.name, english_name: r.english_name || "",
+                        gender: r.gender ?? undefined, birthday: r.birthday || undefined,
+                        grade: r.grade || "", ar_level: r.ar_level || "",
+                      });
                     }}>编辑</Button>
+                    {/* WM3-B1 删除（订单守卫禁用+tooltip） */}
+                    <Popconfirm
+                      title={r.has_orders ? "该孩子已创建订单，禁止删除" : `确认删除孩子 ${r.name}？`}
+                      okText="删除" okButtonProps={{ danger: true }}
+                      disabled={r.has_orders}
+                      onConfirm={async () => {
+                        try {
+                          await apiDeleteChild(r.id);
+                          message.success("孩子已删除（软删，订单历史保留）");
+                          loadChildren(childPg.page);
+                        } catch (e) {
+                          message.error((e as Error).message);
+                        }
+                      }}
+                    >
+                      <Tooltip title={r.has_orders ? "该孩子已创建订单，禁止修改删除" : undefined}>
+                        <Button type="link" size="small" danger disabled={r.has_orders}>删除</Button>
+                      </Tooltip>
+                    </Popconfirm>
                   </Space>
                 ),
               },
@@ -511,6 +560,53 @@ export default function MemberManage() {
           />
           <PaintPagination current={orderPg.page} pageSize={orderPg.pageSize} total={orderTotal}
             onChange={(p, s) => { orderPg.onChange(p, s); updateUrl({ page: String(p) }); }} />
+        </>
+      )}
+
+      {tab === "parents" && (
+        <>
+          <Table<ParentRow> locale={{ emptyText: <PaintEmpty character="star" /> }}
+            rowKey="id" dataSource={parents} size="middle" loading={parentLoading}
+            pagination={false}
+            columns={[
+              { title: "姓名", dataIndex: "name", width: 140 },
+              { title: "手机号", dataIndex: "phone", width: 140 },
+              { title: "备注", dataIndex: "remark", width: 160, render: (v) => v || "—" },
+              { title: "名下孩子", dataIndex: "children_count", width: 90 },
+              { title: "创建时间", dataIndex: "create_time", width: 170, render: (v) => String(v ?? "").slice(0, 19).replace("T", " ") },
+              {
+                title: "操作", key: "op", width: 160,
+                render: (_, r) => (
+                  <Space>
+                    <Button type="link" size="small" onClick={() => {
+                      setEditParent(r);
+                      parentEditForm.setFieldsValue({ name: r.name, phone: r.phone, remark: r.remark || "" });
+                    }}>编辑</Button>
+                    <Popconfirm
+                      title={r.has_orders ? "名下孩子已创建订单，禁止删除" : `确认删除家长 ${r.name}（名下孩子一并隐藏）？`}
+                      okText="删除" okButtonProps={{ danger: true }}
+                      disabled={r.has_orders}
+                      onConfirm={async () => {
+                        try {
+                          await apiDeleteParent(r.id);
+                          message.success("家长已删除（软删，订单历史保留）");
+                          loadParents(childPg.page);
+                        } catch (e) {
+                          message.error((e as Error).message);
+                        }
+                      }}
+                    >
+                      <Tooltip title={r.has_orders ? "名下孩子已创建订单，禁止删除" : undefined}>
+                        <Button type="link" size="small" danger disabled={r.has_orders}>删除</Button>
+                      </Tooltip>
+                    </Popconfirm>
+                  </Space>
+                ),
+              },
+            ]}
+          />
+          <PaintPagination current={childPg.page} pageSize={childPg.pageSize} total={parentTotal}
+            onChange={(p, s) => { childPg.onChange(p, s); updateUrl({ page: String(p) }); }} />
         </>
       )}
 
@@ -731,6 +827,9 @@ export default function MemberManage() {
           try {
             const v = await editForm.validateFields();
             await apiUpdateChild(editChild.id, {
+              name: v.name || undefined,
+              gender: v.gender ?? undefined,
+              birthday: v.birthday || undefined,
               english_name: v.english_name || undefined,
               grade: v.grade || undefined,
               ar_level: v.ar_level || undefined,
@@ -745,8 +844,25 @@ export default function MemberManage() {
         onCancel={() => confirmDiscardIfDirty(editForm.isFieldsTouched(), () => { setEditChild(null); editForm.resetFields(); })}
       >
         <Form form={editForm} layout="vertical">
+          {editChild?.has_orders && (
+            <Typography.Paragraph type="warning">
+              该孩子已创建订单，禁止修改/删除（守卫口径：订单为消费留痕，R-315 解禁说明）
+            </Typography.Paragraph>
+          )}
+          <Form.Item name="name" label="孩子姓名" rules={[{ required: true }]}>
+            <Input maxLength={64} disabled={editChild?.has_orders} />
+          </Form.Item>
+          <Form.Item name="gender" label="性别">
+            <Radio.Group options={[{ value: 1, label: "男" }, { value: 2, label: "女" }]} disabled={editChild?.has_orders} />
+          </Form.Item>
+          <Form.Item name="birthday" label="生日">
+            <Input placeholder="如 2020-05-01" maxLength={10} disabled={editChild?.has_orders} />
+          </Form.Item>
           <Form.Item name="english_name" label="英文名（榜单展示用）">
-            <Input maxLength={64} />
+            <Input maxLength={64} disabled={editChild?.has_orders} />
+          </Form.Item>
+          <Form.Item name="grade" label="年级">
+            <Input maxLength={50} disabled={editChild?.has_orders} />
           </Form.Item>
           <Form.Item name="grade" label="年级">
             <Input maxLength={50} />
@@ -756,7 +872,50 @@ export default function MemberManage() {
             label="AR 值（老师评估，只升不降）"
             extra="首次填写任意值；再次填写仅允许高于当前值（降级将被拒绝）"
           >
-            <Input maxLength={10} placeholder="如 3.5" />
+            <Input maxLength={10} placeholder="如 3.5" disabled={editChild?.has_orders} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* WM3-B1 编辑家长 */}
+      <Modal
+        title={`编辑家长 — ${editParent?.name ?? ""}`}
+        open={!!editParent}
+        okText="保存"
+        cancelText="取消"
+        destroyOnClose
+        onOk={async () => {
+          if (!editParent) return;
+          try {
+            const v = await parentEditForm.validateFields();
+            await apiUpdateParent(editParent.id, {
+              name: v.name || undefined,
+              phone: v.phone || undefined,
+              remark: v.remark ?? undefined,
+            });
+            message.success(v.phone && v.phone !== editParent.phone ? "已保存（手机号即登录账号，家长需用新号登录）" : "已保存");
+            setEditParent(null);
+            loadParents(childPg.page);
+          } catch (e) {
+            if ((e as Error).message) message.error((e as Error).message);
+          }
+        }}
+        onCancel={() => confirmDiscardIfDirty(parentEditForm.isFieldsTouched(), () => { setEditParent(null); parentEditForm.resetFields(); })}
+      >
+        <Form form={parentEditForm} layout="vertical">
+          <Form.Item name="name" label="家长姓名" rules={[{ required: true }]}>
+            <Input maxLength={64} />
+          </Form.Item>
+          <Form.Item
+            name="phone"
+            label="手机号（登录标识）"
+            rules={[{ pattern: /^\d{11}$/, message: "请输入 11 位手机号" }]}
+            extra="手机号即小程序登录账号，修改后家长需用新号登录"
+          >
+            <Input maxLength={11} />
+          </Form.Item>
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={2} maxLength={200} />
           </Form.Item>
         </Form>
       </Modal>

@@ -163,6 +163,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/todo-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Todo Counts
+         * @description WM13 感知层聚合（Q9 权限粒度：审计五类仅超管；order_pending_manual 跟 member.manage）。
+         */
+        get: operations["todo_counts_api_admin_todo_counts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/notifications": {
         parameters: {
             query?: never;
@@ -784,6 +804,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/members/parents-page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Parents Page
+         * @description 家长管理 tab 分页（WM3-B1：children_count / has_orders 守卫标志）。
+         */
+        get: operations["parents_page_api_admin_members_parents_page_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/members/parents/{parent_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Parent
+         * @description 软删家长+名下孩子（WM3-B1；订单守卫 409）。
+         */
+        delete: operations["delete_parent_api_admin_members_parents__parent_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Parent
+         * @description 编辑家长（WM3-B1；订单守卫 409；手机号唯一 422——手机号即登录标识）。
+         */
+        patch: operations["update_parent_api_admin_members_parents__parent_id__patch"];
+        trace?: never;
+    };
     "/api/admin/members/parents/{parent_id}/children": {
         parameters: {
             query?: never;
@@ -849,11 +913,15 @@ export interface paths {
         get?: never;
         /**
          * Update Child
-         * @description 维护孩子资料（C19）：英文名/年级/AR 值（AR 只升不降）。
+         * @description 维护孩子资料（C19 + WM3-B1 扩展：姓名/性别/生日全开；AR 只升不降；订单守卫 409）。
          */
         put: operations["update_child_api_admin_members_children__child_id__put"];
         post?: never;
-        delete?: never;
+        /**
+         * Delete Child
+         * @description 软删孩子档案（WM3-B1；订单守卫 409）。
+         */
+        delete: operations["delete_child_api_admin_members_children__child_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2815,11 +2883,23 @@ export interface components {
             member_expire: string | null;
             /** Ar Level */
             ar_level: string | null;
+            /**
+             * Has Orders
+             * @description 存在未删订单（WM3-B1 守卫）
+             * @default false
+             */
+            has_orders: boolean;
         };
         /** ChildUpdateRequest */
         ChildUpdateRequest: {
+            /** Name */
+            name?: string | null;
             /** English Name */
             english_name?: string | null;
+            /** Gender */
+            gender?: number | null;
+            /** Birthday */
+            birthday?: string | null;
             /** Grade */
             grade?: string | null;
             /**
@@ -2852,6 +2932,12 @@ export interface components {
             member_expire: string | null;
             /** Ar Level */
             ar_level: string | null;
+            /**
+             * Has Orders
+             * @description 存在未删订单（WM3-B1 守卫）
+             * @default false
+             */
+            has_orders: boolean;
             /**
              * Parent Name
              * @default
@@ -2993,9 +3079,9 @@ export interface components {
         DeductRequest: {
             /**
              * Amount
-             * @description 赔偿金额（元）
+             * @description 赔偿金额（元，正数）
              */
-            amount: string;
+            amount: number | string;
             /**
              * Reason
              * @description 事由（关联图书等，留痕）
@@ -3348,6 +3434,38 @@ export interface components {
              */
             has_next: boolean;
         };
+        /** PaginatedResponse[ParentWithStatsResponse] */
+        PaginatedResponse_ParentWithStatsResponse_: {
+            /**
+             * Items
+             * @description 数据列表
+             */
+            items?: components["schemas"]["ParentWithStatsResponse"][];
+            /**
+             * Total
+             * @description 总数
+             * @default 0
+             */
+            total: number;
+            /**
+             * Page
+             * @description 当前页码
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @description 每页数量
+             * @default 20
+             */
+            page_size: number;
+            /**
+             * Has Next
+             * @description 是否有下一页
+             * @default false
+             */
+            has_next: boolean;
+        };
         /** ParentCreateRequest */
         ParentCreateRequest: {
             /** Name */
@@ -3373,6 +3491,43 @@ export interface components {
             phone: string;
             /** Remark */
             remark: string;
+        };
+        /** ParentUpdateRequest */
+        ParentUpdateRequest: {
+            /** Name */
+            name?: string | null;
+            /**
+             * Phone
+             * @description 手机号（登录标识）
+             */
+            phone?: string | null;
+            /** Remark */
+            remark?: string | null;
+        };
+        /**
+         * ParentWithStatsResponse
+         * @description 家长管理 tab 行（WM3-B1）：含孩子数与订单守卫标志。
+         */
+        ParentWithStatsResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Phone */
+            phone: string;
+            /** Remark */
+            remark: string;
+            /**
+             * Children Count
+             * @default 0
+             */
+            children_count: number;
+            /**
+             * Has Orders
+             * @description 名下任一孩子存在订单（禁改禁删守卫）
+             * @default false
+             */
+            has_orders: boolean;
         };
         /** ProgressReportRequest */
         ProgressReportRequest: {
@@ -3949,6 +4104,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    todo_counts_api_admin_todo_counts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };
@@ -5290,6 +5465,105 @@ export interface operations {
             };
         };
     };
+    parents_page_api_admin_members_parents_page_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                keyword?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedResponse_ParentWithStatsResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_parent_api_admin_members_parents__parent_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                parent_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_parent_api_admin_members_parents__parent_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                parent_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParentUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_children_api_admin_members_parents__parent_id__children_get: {
         parameters: {
             query?: never;
@@ -5447,6 +5721,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChildResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_child_api_admin_members_children__child_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
