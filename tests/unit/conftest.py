@@ -83,6 +83,26 @@ def db() -> Generator:
 
 
 @pytest.fixture
+def session_pair() -> Generator:
+    """P1 并发测试基建：双独立 session（各起事务）。
+
+    用法：session A 手动锁定主体行（with_for_update 不提交）模拟先到者，
+    session B 走被测 service —— B 应阻塞后读到 A 已提交的新状态并失败/跳过，
+    而非快照覆盖写。注意 MySQL REPEATABLE READ：B 会话跨事务读 A 提交的数据
+    需先 commit/expire_all 刷新快照（先例注释 test_wm13_admin_notify.py）。
+    """
+    s1 = SessionLocal()
+    s2 = SessionLocal()
+    try:
+        yield s1, s2
+    finally:
+        s1.rollback()
+        s2.rollback()
+        s1.close()
+        s2.close()
+
+
+@pytest.fixture
 def client() -> TestClient:
     return TestClient(app)
 

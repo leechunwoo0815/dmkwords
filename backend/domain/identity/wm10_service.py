@@ -273,6 +273,7 @@ class RefundService:
         req = (
             self.db.query(RefundRequest)
             .filter(RefundRequest.id == request_id, RefundRequest.is_deleted == 0)
+            .with_for_update()  # P1-F1：锁定读，并发 review/execute 串行化
             .first()
         )
         if not req or req.status != RefundRequest.STATUS_PENDING:
@@ -342,6 +343,7 @@ class RefundService:
         req = (
             self.db.query(RefundRequest)
             .filter(RefundRequest.id == request_id, RefundRequest.is_deleted == 0)
+            .with_for_update()  # P1-F1：锁定读，双超管并发执行串行化（防双台账/双押金退款单）
             .first()
         )
         if not req or req.status not in (
