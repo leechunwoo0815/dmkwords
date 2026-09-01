@@ -435,7 +435,7 @@ export default function MemberManage() {
                 </Tag>
               ) },
               { title: "收款方式", dataIndex: "pay_method", width: 100, render: (v) => v ? PAY_METHOD_OPTIONS.find((o) => o.value === v)?.label ?? v : "—" },
-              { title: "创建时间", dataIndex: "created_at", key: "created_at", width: 170, sorter: true },
+              { title: "创建时间", dataIndex: "create_time", key: "created_at", width: 170, sorter: true, render: (v) => String(v ?? "").slice(0, 19).replace("T", " ") },
               {
                 title: "操作", key: "op", width: 150,
                 render: (_, r) => (
