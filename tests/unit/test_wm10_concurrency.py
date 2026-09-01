@@ -206,9 +206,9 @@ def test_confirm_payment_concurrent_idempotent(client: TestClient, session_pair)
     B 再 confirm —— 锁定读实现下读到 paid → 422；无锁 → 覆盖写双押金台账（RED）。"""
     h = _h(client)
     p, c, mini = _family(client, h, "13800002304", "确认并发孩")
-    o = client.post(
+    client.post(
         "/api/admin/orders", json={"child_id": c["id"], "order_type": "observation_fee"}, headers=h
-    ).json()
+    )
     # 押金订单也在场（confirm observation 单会联动？不会——押金单单独 confirm 才记押金。
     # 用 deposit 单测幂等最直接）
     do = client.post(f"/api/admin/deposits/children/{c['id']}/orders", headers=h).json()
