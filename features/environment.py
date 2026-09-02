@@ -7,13 +7,29 @@ from backend.domain.admin.service import invalidate_config_cache
 from backend.main import app
 
 ADMIN_TABLES = ["audit_logs", "system_configs", "admin_users"]
+# F7：BDD 业务数据清理（对齐 conftest clean_db 全表清单；behave 写业务数据的
+# feature 自 WM3-B1 起，此前仅 admin 三表→跨场景唯一键残留 409）
+BDD_BIZ_TABLES = [
+    "orders",
+    "children",
+    "parents",
+    "observation_reports",
+    "borrow_records",
+    "reservations",
+    "deposit_ledgers",
+    "deposits",
+    "vocabularies",
+    "favorites",
+    "checkins",
+    "reading_progress",
+]
 
 
 def before_scenario(context, scenario):
     if "draft" in scenario.effective_tags:
         return
     with engine.begin() as conn:
-        for table in ADMIN_TABLES:
+        for table in ADMIN_TABLES + BDD_BIZ_TABLES:
             conn.execute(text(f"TRUNCATE TABLE {table}"))
     from backend.seeds.seed_admin import seed as seed_admin
     from backend.seeds.seed_configs import seed as seed_configs

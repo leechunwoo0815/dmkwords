@@ -220,8 +220,13 @@ class ChildService:
     ) -> Child:
         """维护孩子资料（C19 + WM3-B1 扩展：姓名/性别/生日全开）；AR 只升不降 + 订单守卫。"""
         child = self._get_child(child_id)
-        if self.has_orders(self.db, child_id):
-            raise ConflictError("该孩子已创建订单，禁止修改")
+        # F7 守卫口径细化（用户拍板 2026-09-01）：身份字段（姓名/性别/生日）有订单
+        # 禁改——学籍动态字段（英文名/年级/AR）放开（年级随学年变化，教学属性）。
+        # 删除守卫不变（有订单禁删）；AR 只升不降逻辑保留。
+        if self.has_orders(self.db, child_id) and any(
+            f is not None for f in (name, gender, birthday)
+        ):
+            raise ConflictError("身份字段（姓名/性别/生日）已创建订单禁止修改，英文名/年级/AR 可改")
         changed = []
         if name is not None:
             child.name = name

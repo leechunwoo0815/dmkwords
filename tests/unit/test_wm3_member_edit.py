@@ -179,3 +179,56 @@ def test_b1_child_list_has_orders_flag(client: TestClient):
     rows = {i["id"]: i for i in lr.json()["items"]}
     assert rows[c1["id"]]["has_orders"] is False
     assert rows[c2["id"]]["has_orders"] is True
+
+
+# ---- F7 守卫口径细化（用户拍板 2026-09-01）：身份字段锁 / 学籍字段放 ----
+
+
+def test_f7_child_with_orders_can_update_school_fields(client: TestClient):
+    """有订单孩子 PATCH 仅 grade → 200 落库（学籍动态字段放开）。"""
+    h = _h(client)
+    p = _parent(client, h, "13800003001")
+    c = _child(client, h, p["id"])
+    _order(client, h, c["id"])
+    r = client.put(f"/api/admin/members/children/{c['id']}", json={"grade": "二年级"}, headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["grade"] == "二年级"
+
+
+def test_f7_child_with_orders_name_still_rejected(client: TestClient):
+    """有订单孩子 PATCH 含 name（身份字段）→ 409（守卫细化不破）。"""
+    h = _h(client)
+    p = _parent(client, h, "13800003002")
+    c = _child(client, h, p["id"])
+    _order(client, h, c["id"])
+    r = client.put(f"/api/admin/members/children/{c['id']}", json={"name": "试图改"}, headers=h)
+    assert r.status_code == 409, r.text
+    assert "身份字段" in r.json()["detail"]
+
+
+def test_f7_child_with_orders_english_and_ar_upgrade_ok(client: TestClient):
+    """有订单孩子 PATCH english_name+ar_level（升级值）→ 200。"""
+    h = _h(client)
+    p = _parent(client, h, "13800003003")
+    c = _child(client, h, p["id"])
+    _order(client, h, c["id"])
+    r = client.put(
+        f"/api/admin/members/children/{c['id']}",
+        json={"english_name": "NewName", "ar_level": "3.5"},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["english_name"] == "NewName"
+    assert r.json()["ar_level"] == "3.5"
+
+
+def test_f7_child_with_orders_birthday_identity_rejected(client: TestClient):
+    """有订单孩子 PATCH 含 birthday（身份字段）→ 409。"""
+    h = _h(client)
+    p = _parent(client, h, "13800003004")
+    c = _child(client, h, p["id"])
+    _order(client, h, c["id"])
+    r = client.put(
+        f"/api/admin/members/children/{c['id']}", json={"birthday": "2020-01-01"}, headers=h
+    )
+    assert r.status_code == 409, r.text

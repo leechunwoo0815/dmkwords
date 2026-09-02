@@ -893,7 +893,7 @@ export default function MemberManage() {
         <Form form={editForm} layout="vertical">
           {editChild?.has_orders && (
             <Typography.Paragraph type="warning">
-              该孩子已创建订单，禁止修改/删除（守卫口径：订单为消费留痕，R-315 解禁说明）
+              该孩子已创建订单：姓名/性别/生日锁定，英文名/年级/AR 仍可修改
             </Typography.Paragraph>
           )}
           <Form.Item name="name" label="孩子姓名" rules={[{ required: true }]}>
@@ -905,18 +905,19 @@ export default function MemberManage() {
           <Form.Item name="birthday" label="生日">
             <Input placeholder="如 2020-05-01" maxLength={10} disabled={editChild?.has_orders} />
           </Form.Item>
+          {/* F7：学籍动态字段（英文名/年级/AR）放开（有订单也可改） */}
           <Form.Item name="english_name" label="英文名（榜单展示用）">
-            <Input maxLength={64} disabled={editChild?.has_orders} />
+            <Input maxLength={64} />
           </Form.Item>
           <Form.Item name="grade" label="年级">
-            <Input maxLength={50} disabled={editChild?.has_orders} />
+            <Input maxLength={50} />
           </Form.Item>
           <Form.Item
             name="ar_level"
             label="AR 值（老师评估，只升不降）"
             extra="首次填写任意值；再次填写仅允许高于当前值（降级将被拒绝）"
           >
-            <Input maxLength={10} placeholder="如 3.5" disabled={editChild?.has_orders} />
+            <Input maxLength={10} placeholder="如 3.5" />
           </Form.Item>
         </Form>
       </Modal>

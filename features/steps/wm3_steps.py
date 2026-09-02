@@ -148,3 +148,34 @@ def step_delete_parent_rejected(context) -> None:
 def step_phone_rejected(context) -> None:
     assert context.resp.status_code in (409, 422), context.resp.text
     assert "手机号" in context.resp.json()["detail"]
+
+
+# ---- F7 守卫口径细化（身份锁/学籍放）----
+
+
+@then("编辑保存成功 且孩子列表显示新年级")
+def step_edit_school_saved(context) -> None:
+    assert context.resp.status_code == 200, context.resp.text
+    found = _find_child(context, "学籍孩A")
+    assert found["grade"] == "二年级"
+
+
+@then("修改被拒绝返回 409 且提示身份字段锁定")
+def step_edit_identity_rejected(context) -> None:
+    assert context.resp.status_code == 409, context.resp.text
+    assert "身份字段" in context.resp.json()["detail"]
+
+
+@when('超管编辑孩子 "{child}" 年级改为 "{grade}"')
+def step_edit_child_grade(context, child: str, grade: str) -> None:
+    found = _find_child(context, child)
+    context.resp = context.client.put(
+        f"/api/admin/members/children/{found['id']}",
+        json={"grade": grade},
+        headers=context.admin_headers,
+    )
+
+
+@then("家长编辑保存成功")
+def step_parent_edit_saved(context) -> None:
+    assert context.resp.status_code == 200, context.resp.text
