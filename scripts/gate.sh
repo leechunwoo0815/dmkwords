@@ -9,6 +9,15 @@ if [ -d ".venv/bin" ]; then
   export PATH="$PWD/.venv/bin:$PATH"
 fi
 
+# --- v13 mkdir 教训终结（E-20260901-04）：日志自动归档，外部 mkdir/tee 从此不存在 ---
+# 用法不变：bash scripts/gate.sh full；可选 GATE_LOG_NAME=批次名 自定义日志文件名
+# （开发模型多次忘建目录 tee 白跑，提示词约束无效——流程性纪律一律进脚本，防呆设计）
+GATE_LOG_DIR="gate-runs/$(date +%Y-%m-%d)"
+GATE_LOG_FILE="${GATE_LOG_DIR}/gate-${GATE_LOG_NAME:-$(date +%H%M%S)}.log"
+mkdir -p "$GATE_LOG_DIR"
+exec > >(tee -a "$GATE_LOG_FILE") 2>&1
+echo "[gate] 本轮日志自动归档: ${GATE_LOG_FILE}"
+
 FAILED=0
 step() {
   echo ""
@@ -73,6 +82,7 @@ else
   skip "admin-web 未安装依赖（pnpm install 后启用）"
 fi
 
+sleep 0.3  # E-20260901-04：等 tee 落盘再退出，防日志末行截断
 echo ""
 if [ "$FAILED" -eq 0 ]; then
   echo "===== 全量门禁 PASS（退出码 0） ====="
