@@ -328,7 +328,9 @@ export default function MemberManage() {
     },
     [childPg.pageSize, message]
   );
-  useEffect(() => { if (tab === "parents") loadParents(childPg.page); }, [loadParents, childPg.page, tab]);
+  // F1（同族第三次，E-03 反模式 1）：家长 tab 标题计数唯一数据源=loadParents 的
+  // total——守卫导致默认 tab 下「家长（0）」。挂载即拉（与 A1 对称，模式已验证无害）
+  useEffect(() => { loadParents(childPg.page); }, [loadParents, childPg.page, tab]);
 
   // W3 订单 Tab 待确认计数（轻量单请求）；WM3-A1：页面挂载即拉，不设 tab 守卫
   // （WM13-F4 同族漏网：守卫导致默认 tab 下计数恒 0；orderTotal 变化自动刷新）
