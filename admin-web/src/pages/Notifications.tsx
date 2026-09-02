@@ -212,6 +212,28 @@ export default function Notifications() {
     else void loadParent();
   }, [box, loadParent, loadInbox]);
 
+  // W2：列表 60s 轮询（与 useTodoCounts 同周期）——小程序申请新退款后管理端
+  // 列表不刷新看不到（徽标轮询有、列表没有）。页面隐藏时暂停避免后台空转。
+  useEffect(() => {
+    if (document.visibilityState !== "visible") return;
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      if (box === "admin") void loadInbox();
+      else void loadParent();
+    }, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        if (box === "admin") void loadInbox();
+        else void loadParent();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [box, loadParent, loadInbox]);
+
   const changeBox = (next: string) => {
     const b = next === "admin" ? "admin" : "parent";
     const tab = b === "admin" ? "todo" : "all";
