@@ -20,14 +20,7 @@
     </view>
   </view>
 
-  <view class="calc-card" wx:if="{{preview}}">
-    <view class="card-h3">可退金额（服务端计算）</view>
-    <view class="calc-desc">{{preview.rule}}</view>
-    <view class="calc-result">
-      <text class="calc-result-label">预计可退</text>
-      <text class="calc-result-amount">￥{{preview.refundable_amount}}</text>
-    </view>
-  </view>
+  <include src="refund-calc.wxml"/>
 
   <view class="reason-card" wx:if="{{preview}}">
     <view class="card-h3">退款原因（必填）</view>

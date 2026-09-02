@@ -46,13 +46,33 @@ class RefundService:
     def preview(self, child: Child, order_id: int) -> dict:
         order = self._paid_order(child, order_id)
         amount = self._refundable_amount(order)
+        paid = order.amount
+        # X6 可退卡片三形态：proportional（比例退带折算过程）/ full（全额）/ zero（不可退）
+        if amount <= 0:
+            mode = "zero"
+        elif amount < paid:
+            mode = "proportional"
+        else:
+            mode = "full"
+        calc: dict = {"mode": mode}
+        if mode == "proportional":
+            days_used = self._days_used(order)
+            days_total = 30 if order.order_type == Order.TYPE_OBSERVATION else 365
+            calc.update(
+                {
+                    "days_used": days_used,
+                    "days_total": days_total,
+                    "days_remaining": max(0, days_total - days_used),
+                }
+            )
         return {
             "order_id": order.id,
             "order_no": order.order_no,
             "order_type": order.order_type,
-            "paid_amount": str(order.amount),
+            "paid_amount": str(paid),
             "refundable_amount": str(amount),
             "rule": self._rule_text(order),
+            "calc": calc,
         }
 
     def _refundable_amount(self, order: Order) -> Decimal:

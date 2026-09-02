@@ -492,3 +492,24 @@
   padding: 8rpx 28rpx;
   line-height: 1.6;
 }
+
+/* X6 三形态卡片 */
+.calc-detail {
+  display: flex;
+  justify-content: space-between;
+  font-size: 24rpx;
+  color: var(--muted);
+  margin-bottom: 8rpx;
+}
+.calc-arrow {
+  color: var(--warning);
+}
+.calc-zero-label {
+  color: var(--error);
+}
+.calc-zero-reason {
+  font-size: 22rpx;
+  color: var(--muted);
+  margin-top: 6rpx;
+  display: block;
+}

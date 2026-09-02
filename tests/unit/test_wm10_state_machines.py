@@ -421,3 +421,70 @@ def test_withdrawal_settle_preview_and_consistency(client: TestClient):
         assert rf
         actual = sum((x.amount for x in rf), Decimal("0"))
         assert actual == Decimal(body["total"]), (actual, body["total"])
+
+
+def test_refund_preview_calc_three_modes(client: TestClient):
+    """X6：可退卡片三形态——calc.mode: proportional（比例退带折算过程）/
+    full（活动费全额）/ zero（不可退）。"""
+    from datetime import datetime, timedelta
+
+    from backend.domain.identity.models import Order
+
+    h = _h(client)
+    p, c, mini = _family(client, h, "13800001307", "三形态孩")
+    # 观察期单必须是孩子首笔（先 formal 会被拒），顺序：observation → formal → activity
+    _pay(client, h, c["id"], "observation_fee")
+    _pay(client, h, c["id"], "formal_fee")
+    _pay(client, h, c["id"], "first_activity_fee")
+
+    # 比例退形态：paid_at 错开 100 天
+    with _db() as db:
+        o = (
+            db.query(Order)
+            .filter(Order.child_id == c["id"], Order.order_type == Order.TYPE_FORMAL)
+            .first()
+        )
+        o.paid_at = datetime.now() - timedelta(days=100)
+        db.commit()
+        formal_id = o.id
+
+    orders = client.get(f"/api/miniapp/orders?child_id={c['id']}", headers=mini).json()
+    by_type = {x["order_type"]: x["id"] for x in orders}
+
+    # 1. formal → proportional（实付/已用/剩余/总天数字段齐全）
+    pv1 = client.get(
+        "/api/miniapp/refund-preview",
+        params={"child_id": c["id"], "order_id": by_type["formal_fee"]},
+        headers=mini,
+    )
+    assert pv1.status_code == 200, pv1.text
+    b1 = pv1.json()
+    assert b1["calc"]["mode"] == "proportional"
+    assert 99 <= b1["calc"]["days_used"] <= 100 and b1["calc"]["days_total"] == 365
+    assert float(b1["refundable_amount"]) < float(b1["paid_amount"])
+
+    # 2. activity → full（未参加全额退）
+    pv2 = client.get(
+        "/api/miniapp/refund-preview",
+        params={"child_id": c["id"], "order_id": by_type["first_activity_fee"]},
+        headers=mini,
+    )
+    assert pv2.json()["calc"]["mode"] == "full"
+    assert float(pv2.json()["refundable_amount"]) == float(pv2.json()["paid_amount"])
+
+    # 3. observation 超 30 天 → zero（不可退）
+    with _db() as db:
+        o = (
+            db.query(Order)
+            .filter(Order.child_id == c["id"], Order.order_type == Order.TYPE_OBSERVATION)
+            .first()
+        )
+        o.paid_at = datetime.now() - timedelta(days=40)
+        db.commit()
+    pv3 = client.get(
+        "/api/miniapp/refund-preview",
+        params={"child_id": c["id"], "order_id": by_type["observation_fee"]},
+        headers=mini,
+    )
+    assert pv3.json()["calc"]["mode"] == "zero", pv3.text
+    assert float(pv3.json()["refundable_amount"]) == 0

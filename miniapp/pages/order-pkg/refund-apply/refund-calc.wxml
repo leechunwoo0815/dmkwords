@@ -1,0 +1,26 @@
+<!-- X6 可退卡片三形态：proportional（比例退带折算过程）/ full（全额）/ zero（不可退） -->
+<view class="calc-card" wx:if="{{preview}}">
+  <view class="card-h3">可退金额（服务端计算）</view>
+  <view class="calc-desc">{{preview.rule}}</view>
+
+  <view wx:if="{{preview.calc.mode === 'proportional'}}" class="calc-result">
+    <view class="calc-detail">
+      <text>实付 ￥{{preview.paid_amount}}</text>
+      <text class="calc-arrow">· 已用 {{preview.calc.days_used}}/{{preview.calc.days_total}} 天</text>
+    </view>
+    <text class="calc-result-label">预计可退</text>
+    <text class="calc-result-amount">￥{{preview.refundable_amount}}</text>
+  </view>
+
+  <view wx:elif="{{preview.calc.mode === 'full'}}" class="calc-result">
+    <view class="calc-detail"><text>实付 ￥{{preview.paid_amount}}</text></view>
+    <text class="calc-result-label">预计可退（全额）</text>
+    <text class="calc-result-amount">￥{{preview.refundable_amount}}</text>
+  </view>
+
+  <view wx:else class="calc-result">
+    <view class="calc-detail"><text>实付 ￥{{preview.paid_amount}}</text></view>
+    <text class="calc-result-label calc-zero-label">当前不可退</text>
+    <text class="calc-zero-reason">已超过可退期限或条件不满足，如有疑问请联系馆内</text>
+  </view>
+</view>
