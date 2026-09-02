@@ -135,8 +135,8 @@ export const PaintHScrollbar: React.FC<PaintHScrollbarProps> = ({ target, auto, 
     scrollTarget.scrollTo({ left: desiredScrollLeft, behavior: "smooth" });
   };
 
-  if (!visible) return null;
-
+  // 修复：auto 模式依赖 trackRef 做发现锚点——visible=false 时 return null 会让
+  // track 无 DOM → find() 死锁（永不可见）。改为常驻渲染 + display 控制显隐。
   return (
     <div
       ref={trackRef}
@@ -144,6 +144,7 @@ export const PaintHScrollbar: React.FC<PaintHScrollbarProps> = ({ target, auto, 
       onClick={onTrackClick}
       style={{
         width: "100%",
+        display: visible ? "block" : "none",
         height: 24,
         background: "var(--paint-ink-light)",
         border: "2px solid var(--paint-ink)",
