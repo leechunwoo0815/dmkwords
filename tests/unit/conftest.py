@@ -26,8 +26,10 @@ ADMIN_TABLES = [
     "activities",
     "vocabularies",
     "favorites",
-    # dictionary_words 不清（2026-08-29 用户裁定）：340 万词库是基础数据，
-    # 清了要重导 8 分钟；seed_dictionary 幂等补演示词，lookup 测试自洽
+    # dictionary_words 不清（2026-08-29 用户裁定；2026-09-02 更新：开发期词库
+    # 已裁至 100 行+seed 演示词 ≈309 行，全量 335 万备份在
+    # ~/dmkwords-backups/dictionary_words-full-20260902.sql.gz，上线再导回；
+    # gate 禁全表读写词库——超时根因）；seed_dictionary 幂等补演示词，lookup 测试自洽
     "checkin_streak_awards",
     "milestone_awards",
     "child_growth_states",
