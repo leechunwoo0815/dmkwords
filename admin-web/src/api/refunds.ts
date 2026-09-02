@@ -74,6 +74,23 @@ export function apiReviewWithdrawal(
   });
 }
 
+export interface SettlePreviewItem {
+  kind: string;
+  order_no: string | null;
+  amount: string;
+  rule: string;
+}
+
+export interface SettlePreview {
+  items: SettlePreviewItem[];
+  deposit_balance: string;
+  total: string;
+}
+
+export function apiSettlePreview(id: number): Promise<SettlePreview> {
+  return request(`/api/admin/withdrawals/${id}/settle-preview`);
+}
+
 export function apiListTransfers(status?: string): Promise<TransferItem[]> {
   const qs = status ? `?status=${encodeURIComponent(status)}` : "";
   return request(`/api/admin/transfers${qs}`);

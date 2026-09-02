@@ -365,3 +365,59 @@ def test_direct_withdrawal_apply_list_review(client: TestClient):
         # 年费刚付全额可退（比例>0）+ 押金可用余额，两张单并存
         assert rf and kinds == {"order", "deposit"}, kinds
         assert sum(x.amount for x in rf) > 0
+
+
+def test_withdrawal_settle_preview_and_consistency(client: TestClient):
+    """X2：退会审核预估结算（盲批→明批）。灵魂断言：preview total ==
+    review 后实际生成退款单金额合计（同一份结算代码，防公式漂移）。"""
+    from decimal import Decimal
+
+    from backend.domain.identity.models import WithdrawalRequest
+
+    h = _h(client)
+    p, c, mini = _family(client, h, "13800001306", "预估孩")
+    _pay(client, h, c["id"], "formal_fee")
+    _pay_deposit(client, h, c["id"])
+    w = client.post(
+        "/api/miniapp/withdrawals", json={"child_id": c["id"], "reason": "预估"}, headers=mini
+    )
+    assert w.status_code == 200
+    wid = w.json()["id"]
+
+    # 1. preview（normal+applying）：明细（kind/order_no/rule）+ 押金余额 + 合计
+    pv = client.get(f"/api/admin/withdrawals/{wid}/settle-preview", headers=h)
+    assert pv.status_code == 200, pv.text
+    body = pv.json()
+    assert {x["kind"] for x in body["items"]} == {"order", "deposit"}
+    assert all(x["rule"] for x in body["items"])
+    assert any(x["order_no"] for x in body["items"] if x["kind"] == "order")
+    total = sum(Decimal(x["amount"]) for x in body["items"])
+    assert Decimal(body["total"]) == total
+    assert Decimal(body["deposit_balance"]) == sum(
+        Decimal(x["amount"]) for x in body["items"] if x["kind"] == "deposit"
+    )
+
+    # 2. 非 normal（联动单）不可预估
+    with _db() as db:
+        wr = db.query(WithdrawalRequest).filter(WithdrawalRequest.id == wid).first()
+        wr.source = WithdrawalRequest.SOURCE_REFUND
+        db.commit()
+    pv2 = client.get(f"/api/admin/withdrawals/{wid}/settle-preview", headers=h)
+    assert pv2.status_code in (404, 422), pv2.text
+    with _db() as db:
+        wr = db.query(WithdrawalRequest).filter(WithdrawalRequest.id == wid).first()
+        wr.source = WithdrawalRequest.SOURCE_NORMAL
+        db.commit()
+
+    # 3. 灵魂断言：review 实际生成退款单合计 == preview total
+    rv = client.post(
+        f"/api/admin/withdrawals/{wid}/review", json={"approve": True, "remark": "同意"}, headers=h
+    )
+    assert rv.status_code == 200, rv.text
+    from backend.domain.identity.models import RefundRequest
+
+    with _db() as db:
+        rf = db.query(RefundRequest).filter(RefundRequest.withdrawal_id == wid).all()
+        assert rf
+        actual = sum((x.amount for x in rf), Decimal("0"))
+        assert actual == Decimal(body["total"]), (actual, body["total"])

@@ -10,6 +10,7 @@ import {
 import {
   apiListRefunds, apiListTransfers, apiListWithdrawals,
   apiReviewRefund, apiReviewTransfer, apiReviewWithdrawal, apiExecuteRefund,
+  apiSettlePreview, type SettlePreview,
   type RefundRequestItem, type TransferItem, type WithdrawalItem,
 } from "../api/refunds";
 import { usePaintPagination } from "../hooks/usePaintPagination";
@@ -71,6 +72,8 @@ export default function RefundCenter() {
     title: string;
     content: string;
   } | null>(null);
+  const [settlePreview, setSettlePreview] = useState<SettlePreview | null>(null);
+  const [settlePreviewError, setSettlePreviewError] = useState(false);
   const [execTarget, setExecTarget] = useState<{
     id: number;
     childName: string;
@@ -98,6 +101,14 @@ export default function RefundCenter() {
   ) => {
     setRemark("");
     setRemarkTarget({ kind, id, approve, title, content });
+    // X2：退会审核明批——弹窗打开即拉预估结算（失败降级不阻断审核）
+    if (kind === "withdrawal") {
+      setSettlePreview(null);
+      setSettlePreviewError(false);
+      apiSettlePreview(id)
+        .then(setSettlePreview)
+        .catch(() => setSettlePreviewError(true));
+    }
   };
 
   const doReview = async () => {
@@ -333,9 +344,32 @@ export default function RefundCenter() {
       <Modal
         title={remarkTarget?.title} open={!!remarkTarget}
         okText={remarkTarget?.approve ? "确认通过" : "确认拒绝"}
-        cancelText="取消" onOk={doReview} onCancel={() => setRemarkTarget(null)}
+        cancelText="取消" onOk={doReview} onCancel={() => { setRemarkTarget(null); setSettlePreview(null); setSettlePreviewError(false); }}
       >
         <Typography.Paragraph>{remarkTarget?.content}</Typography.Paragraph>
+        {remarkTarget?.kind === "withdrawal" && remarkTarget.approve && (
+          settlePreviewError ? (
+            <Typography.Text type="warning">预估获取失败，可继续审核（以结算结果为准）</Typography.Text>
+          ) : !settlePreview ? (
+            <Typography.Text type="secondary">预估计算中…</Typography.Text>
+          ) : (
+            <div style={{ marginBottom: 12 }}>
+              {settlePreview.items.map((it, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                  <span>{it.kind === "deposit" ? "押金退款" : `订单 ${it.order_no ?? ""}`}</span>
+                  <span style={{ color: "#888" }}>{it.rule}</span>
+                  <Typography.Text strong>￥{Number(it.amount).toLocaleString()}</Typography.Text>
+                </div>
+              ))}
+              <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #eee", marginTop: 6, paddingTop: 6 }}>
+                <Typography.Text strong>预估退款合计</Typography.Text>
+                <Typography.Text strong style={{ color: "#cf1322", fontSize: 16 }}>
+                  ￥{Number(settlePreview.total).toLocaleString()}
+                </Typography.Text>
+              </div>
+            </div>
+          )
+        )}
         <Input.TextArea
           rows={2} value={remark} onChange={(e) => setRemark(e.target.value)}
           placeholder={remarkTarget?.approve ? "备注（可选）" : "拒绝原因（必填，家长可见）"}

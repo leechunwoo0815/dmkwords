@@ -380,6 +380,16 @@ def admin_withdrawal_list(
     return WithdrawalService(db).admin_list(status)
 
 
+@router.get("/withdrawals/{request_id}/settle-preview")
+def admin_withdrawal_settle_preview(
+    request_id: int,
+    admin: Any = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    """X2：退会审核预估结算明细（审核前明批，与真正结算同一份计算代码）。"""
+    return WithdrawalService(db).settle_preview(request_id)
+
+
 @router.post("/withdrawals/{request_id}/review")
 def admin_withdrawal_review(
     request_id: int,

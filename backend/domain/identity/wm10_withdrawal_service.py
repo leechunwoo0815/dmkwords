@@ -225,6 +225,91 @@ class WithdrawalService:
             )
         return out
 
+    def _settle_items(self, child: Child) -> list[dict]:
+        """结算明细（X2 共享）：preview 与 review 调同一份代码，防两套公式漂移。
+        返回 [{kind, order_id, deposit_id, order_no, amount, rule}]。"""
+        from backend.domain.billing.models import Deposit
+        from backend.domain.identity.wm10_service import RefundService
+
+        refund_svc = RefundService(self.db)
+        items: list[dict] = []
+        # 1) 会员费订单（可退金额 > 0 的 paid 单，按剩余天数比例）
+        member_orders = (
+            self.db.query(Order)
+            .filter(
+                Order.child_id == child.id,
+                Order.order_type.in_([Order.TYPE_OBSERVATION, Order.TYPE_FORMAL]),
+                Order.status == Order.STATUS_PAID,
+                Order.is_deleted == 0,
+            )
+            .all()
+        )
+        for order in member_orders:
+            amount = refund_svc._refundable_amount(order)
+            if amount <= 0:
+                continue
+            items.append(
+                {
+                    "kind": RefundRequest.KIND_ORDER,
+                    "order_id": order.id,
+                    "order_no": order.order_no,
+                    "amount": amount,
+                    "rule": refund_svc._rule_text(order),
+                }
+            )
+        # 2) 押金（可用余额；已扣除部分不退）
+        dep = (
+            self.db.query(Deposit)
+            .filter(Deposit.child_id == child.id, Deposit.is_deleted == 0)
+            .first()
+        )
+        if dep and dep.available_amount > 0:
+            items.append(
+                {
+                    "kind": RefundRequest.KIND_DEPOSIT,
+                    "deposit_id": dep.id,
+                    "amount": dep.available_amount,
+                    "rule": "押金退可用余额（已扣除部分不退）",
+                }
+            )
+        return items
+
+    def settle_preview(self, request_id: int) -> dict:
+        """X2 预估结算（审核前明批）：仅 normal 来源且 applying 态可查。"""
+        from decimal import Decimal
+
+        req = (
+            self.db.query(WithdrawalRequest)
+            .filter(WithdrawalRequest.id == request_id, WithdrawalRequest.is_deleted == 0)
+            .first()
+        )
+        if not req or req.status != WithdrawalRequest.STATUS_APPLYING:
+            raise NotFoundError("退会申请不存在或不在待审核态")
+        if req.source != WithdrawalRequest.SOURCE_NORMAL:
+            raise ValidationError("联动退会单由退款/转让审核推进，无需预估")
+        child = self.db.query(Child).filter(Child.id == req.child_id).first()
+        if not child:
+            raise NotFoundError("孩子不存在")
+        items = self._settle_items(child)
+        total = sum((it["amount"] for it in items), Decimal("0"))
+        deposit_balance = next(
+            (it["amount"] for it in items if it["kind"] == RefundRequest.KIND_DEPOSIT),
+            Decimal("0"),
+        )
+        return {
+            "items": [
+                {
+                    "kind": it["kind"],
+                    "order_no": it.get("order_no"),
+                    "amount": str(it["amount"].quantize(Decimal("0.01"))),
+                    "rule": it["rule"],
+                }
+                for it in items
+            ],
+            "deposit_balance": str(deposit_balance.quantize(Decimal("0.01"))),
+            "total": str(total.quantize(Decimal("0.01"))),
+        }
+
     def review(self, admin, request_id: int, approve: bool, remark: str) -> dict:
         """R-311 六态流转：approve → pending_settle（结算生成退款单）→ refunding；
         全部退款单 refunded 后由 RefundService.execute 聚合推进 completed。"""
@@ -246,59 +331,37 @@ class WithdrawalService:
             req.status = WithdrawalRequest.STATUS_PENDING_SETTLE
             # ---- 结算：计算三类可退金额并生成退款单（R-311：观察期费/年费/押金）----
             refund_ids = []
-            # 1) 会员费订单（可退金额 > 0 的 paid 单）
-            from backend.domain.identity.wm10_service import RefundService
-
-            refund_svc = RefundService(self.db)
-            member_orders = (
-                self.db.query(Order)
-                .filter(
-                    Order.child_id == child.id,
-                    Order.order_type.in_([Order.TYPE_OBSERVATION, Order.TYPE_FORMAL]),
-                    Order.status == Order.STATUS_PAID,
-                    Order.is_deleted == 0,
-                )
-                .all()
-            )
-            for order in member_orders:
-                amount = refund_svc._refundable_amount(order)
-                if amount <= 0:
-                    continue
-                rr = RefundRequest(
-                    kind=RefundRequest.KIND_ORDER,
-                    order_id=order.id,
-                    withdrawal_id=req.id,
-                    child_id=child.id,
-                    amount=amount,
-                    reason="退会结算：会员费按剩余天数比例退",
-                )
-                self.db.add(rr)
-                self.db.flush()
-                order.refund_status = Order.REFUND_STATUS_PENDING
-                refund_ids.append(rr.id)
-            # 2) 押金（可用余额；已扣除部分不退）
+            # 结算：与 settle_preview 共用 _settle_items（X2 同源，防公式漂移）
             from backend.domain.billing.models import Deposit
 
-            dep = (
-                self.db.query(Deposit)
-                .filter(Deposit.child_id == child.id, Deposit.is_deleted == 0)
-                .first()
-            )
+            settle = self._settle_items(child)
             deposit_refund_id = None
-            if dep and dep.available_amount > 0:
+            for it in settle:
                 rr = RefundRequest(
-                    kind=RefundRequest.KIND_DEPOSIT,
-                    deposit_id=dep.id,
+                    kind=it["kind"],
+                    order_id=it.get("order_id"),
+                    deposit_id=it.get("deposit_id"),
                     withdrawal_id=req.id,
                     child_id=child.id,
-                    amount=dep.available_amount,
-                    reason="退会结算：押金退可用余额",
+                    amount=it["amount"],
+                    reason=f"退会结算：{it['rule']}",
                 )
                 self.db.add(rr)
                 self.db.flush()
-                deposit_refund_id = rr.id
+                if it["kind"] == RefundRequest.KIND_ORDER:
+                    order = (
+                        self.db.query(Order).filter(Order.id == it["order_id"]).first()
+                    )
+                    order.refund_status = Order.REFUND_STATUS_PENDING
+                else:
+                    deposit_refund_id = rr.id
+                    dep = (
+                        self.db.query(Deposit)
+                        .filter(Deposit.id == it["deposit_id"])
+                        .first()
+                    )
+                    dep.status = Deposit.STATUS_REFUNDING
                 refund_ids.append(rr.id)
-                dep.status = Deposit.STATUS_REFUNDING
             # 3) 有退款单 → refunding；无可退 → 直接 completed + withdrawn
             if refund_ids:
                 req.status = WithdrawalRequest.STATUS_REFUNDING
