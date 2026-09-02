@@ -124,6 +124,12 @@ export default function RefundCenter() {
   const pendingRefunds = refunds.filter((r) => r.status === "pending");
   const pendingWithdrawals = withdrawals.filter((w) => w.status === "applying");
   const pendingTransfers = transfers.filter((t) => t.status === "pending");
+  // W1 tab 标签双计数：表格显示全量记录（含 approved 待执行等），单数 pending 会
+  // 造成「待审 0 却有活干」观感矛盾——待执行/退款中单列（M>0 红字）
+  const refundExecutable = refunds.filter(
+    (r) => r.status === "approved" || r.status === "failed",
+  ).length;
+  const withdrawalRefunding = withdrawals.filter((w) => w.status === "refunding").length;
 
   const askExecute = (r: RefundRequestItem) => {
     setExecSuccess(true);
@@ -167,7 +173,18 @@ export default function RefundCenter() {
         items={[
           {
             key: "refunds",
-            label: `退款待审（${pendingRefunds.length}）`,
+            label: (
+              <>
+                退款（待审 {pendingRefunds.length}
+                {refundExecutable > 0 && (
+                  <span style={{ color: "#cf1322", fontWeight: 700 }}>
+                    {" · 待执行 "}
+                    {refundExecutable}
+                  </span>
+                )}
+                ）
+              </>
+            ),
             children: (<>
               <Table<RefundRequestItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
                 rowKey="id"
@@ -223,7 +240,18 @@ export default function RefundCenter() {
           },
           {
             key: "withdrawals",
-            label: `退会待审（${pendingWithdrawals.length}）`,
+            label: (
+              <>
+                退会（待审 {pendingWithdrawals.length}
+                {withdrawalRefunding > 0 && (
+                  <span style={{ color: "#cf1322", fontWeight: 700 }}>
+                    {" · 退款中 "}
+                    {withdrawalRefunding}
+                  </span>
+                )}
+                ）
+              </>
+            ),
             children: (<>
               <Table<WithdrawalItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
                 rowKey="id"
@@ -264,7 +292,7 @@ export default function RefundCenter() {
           },
           {
             key: "transfers",
-            label: `转让待审（${pendingTransfers.length}）`,
+            label: `转让（待审 ${pendingTransfers.length}）`,
             children: (<>
               <Table<TransferItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
                 rowKey="id"
