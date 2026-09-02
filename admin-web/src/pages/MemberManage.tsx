@@ -420,6 +420,10 @@ export default function MemberManage() {
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>{r.parent_phone}</Typography.Text>
                 </div>
               ) },
+              { title: "性别", dataIndex: "gender", width: 70, render: (g) => (g === 1 ? "男" : g === 2 ? "女" : "—") },
+              { title: "年级", dataIndex: "grade", width: 90, render: (v) => v || "—" },
+              // F4：AR 值列（BookManage 风格；空显 —）
+              { title: "AR", dataIndex: "ar_level", width: 70, render: (v) => (v ? <Typography.Text code>{v}</Typography.Text> : "—") },
               { title: "会员状态", dataIndex: "member_status", width: 110, render: (s: string) => (
                 <Tag color={MEMBER_COLOR[s]}>{MEMBER_LABEL[s] ?? s}</Tag>
               ) },
