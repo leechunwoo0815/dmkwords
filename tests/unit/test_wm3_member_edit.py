@@ -236,6 +236,7 @@ def test_f7_child_with_orders_birthday_identity_rejected(client: TestClient):
 
 # ---- F2 家长 tab 创建时间（后端 schema 漏字段，前端列已就绪） ----
 
+
 def test_f2_parents_page_includes_create_time(client: TestClient):
     """parents-page 响应含 create_time 且为 ISO 串（前端创建时间列数据源）。"""
     h = _h(client)
