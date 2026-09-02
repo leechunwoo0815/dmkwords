@@ -72,6 +72,8 @@ class ParentWithStatsResponse(BaseSchema):
     remark: str
     children_count: int = 0
     has_orders: bool = Field(False, description="名下任一孩子存在订单（禁改禁删守卫）")
+    # F2：家长 tab 创建时间列（前端 dataIndex 就绪等后端；alias 对齐 OrderResponse 同款）
+    created_at: datetime = Field(alias="create_time")
 
 
 class OrderCreateRequest(BaseSchema):

@@ -232,3 +232,16 @@ def test_f7_child_with_orders_birthday_identity_rejected(client: TestClient):
         f"/api/admin/members/children/{c['id']}", json={"birthday": "2020-01-01"}, headers=h
     )
     assert r.status_code == 409, r.text
+
+
+# ---- F2 家长 tab 创建时间（后端 schema 漏字段，前端列已就绪） ----
+
+def test_f2_parents_page_includes_create_time(client: TestClient):
+    """parents-page 响应含 create_time 且为 ISO 串（前端创建时间列数据源）。"""
+    h = _h(client)
+    _parent(client, h, "13800004001")
+    lr = client.get("/api/admin/members/parents-page?page=1&page_size=20", headers=h)
+    assert lr.status_code == 200, lr.text
+    row = lr.json()["items"][0]
+    assert "create_time" in row, f"create_time 缺失: {row.keys()}"
+    assert isinstance(row["create_time"], str) and len(row["create_time"]) >= 19

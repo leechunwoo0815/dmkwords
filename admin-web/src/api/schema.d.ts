@@ -3580,6 +3580,11 @@ export interface components {
              * @default false
              */
             has_orders: boolean;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
         };
         /** ProgressReportRequest */
         ProgressReportRequest: {
