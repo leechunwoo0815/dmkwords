@@ -520,3 +520,43 @@ def test_my_orders_includes_parent_level_orders(client: TestClient):
     assert len(rows) == 2, [r["order_no"] for r in rows]
     nos = {r["order_no"] for r in rows}
     assert f"DMK-PARENT-LEVEL-{c['id']}" in nos, "家长级单（child_id NULL）不能漏"
+
+
+def test_refund_apply_rejects_zero_refundable(client: TestClient):
+    """R1（X6 漏项返工）：可退金额为 0 的订单禁止提交退款——
+    0 元申请会联动创建退会单+锁孩子，审核员误批即 withdrawn，真业务陷阱。"""
+    from datetime import datetime, timedelta
+
+    from backend.domain.identity.models import Order
+
+    h = _h(client)
+    p, c, mini = _family(client, h, "13800001309", "零可退孩")
+    # 观察期单必须首笔；然后立刻把 paid_at 推到 40 天前（30 天期耗尽 → 可退 0）
+    _pay(client, h, c["id"], "observation_fee")
+    with _db() as db:
+        o = (
+            db.query(Order)
+            .filter(Order.child_id == c["id"], Order.order_type == Order.TYPE_OBSERVATION)
+            .first()
+        )
+        o.paid_at = datetime.now() - timedelta(days=40)
+        db.commit()
+
+    orders = client.get(f"/api/miniapp/orders?child_id={c['id']}", headers=mini).json()
+    obs = next(x for x in orders if x["order_type"] == "observation_fee")
+
+    r = client.post(
+        "/api/miniapp/refund-requests",
+        json={"child_id": c["id"], "order_id": obs["id"], "reason": "试试零元"},
+        headers=mini,
+    )
+    assert r.status_code == 422, r.text
+    assert "无可退金额" in r.json()["detail"]
+
+    # 联动守卫：不得创建退款单，不得锁孩子/建退会单
+    from backend.domain.identity.models import Child, RefundRequest, WithdrawalRequest
+
+    with _db() as db:
+        assert db.query(RefundRequest).filter(RefundRequest.child_id == c["id"]).count() == 0
+        assert db.query(WithdrawalRequest).filter(WithdrawalRequest.child_id == c["id"]).count() == 0
+        assert db.query(Child).filter(Child.id == c["id"]).first().operation_locked == 0

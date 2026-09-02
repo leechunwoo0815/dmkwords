@@ -57,6 +57,16 @@ Page({
 
   onReason(e) { this.setData({ reason: e.detail.value }) },
 
+  // R1（X6 返工）：zero 模式禁提交（按钮置灰+前置校验双保险，防绕过）
+  _ensureRefundable() {
+    const pv = this.data.preview
+    if (pv && pv.calc && pv.calc.mode === 'zero') {
+      wx.showToast({ title: '当前订单无可退金额', icon: 'none' })
+      return false
+    }
+    return true
+  },
+
   // W5：撤销待审核退款申请（后端语义：仅 pending 可撤，撤后 cancelled+订单恢复）
   onCancelRefund(e) {
     const id = Number(e.currentTarget.dataset.id)
@@ -77,6 +87,7 @@ Page({
   },
 
   async onSubmit() {
+    if (!this._ensureRefundable()) return
     const { selected, reason } = this.data
     if (!selected) { wx.showToast({ title: '先选择订单', icon: 'none' }); return }
     if (!reason.trim()) { wx.showToast({ title: '请填写退款原因', icon: 'none' }); return }

@@ -130,6 +130,10 @@ class RefundService:
         if not reason or not reason.strip():
             raise ValidationError("必须填写退款原因")
         order = self._paid_order(child, order_id)
+        # R1（X6 返工）：0 元禁提交——0 元申请会联动创建退会单+锁孩子，
+        # 审核员误批即 withdrawn（真业务陷阱，非纯 UX）
+        if self._refundable_amount(order) <= 0:
+            raise ValidationError("该订单当前无可退金额")
         # dup 检查先于锁定检查（同订单重复申请给更具体的错误）
         dup = (
             self.db.query(func.count(RefundRequest.id))

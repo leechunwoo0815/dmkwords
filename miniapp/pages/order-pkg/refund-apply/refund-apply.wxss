@@ -513,3 +513,14 @@
   margin-top: 6rpx;
   display: block;
 }
+
+/* R1：zero 模式禁提交 */
+.submit-btn-disabled {
+  opacity: 0.45;
+}
+.zero-tip {
+  font-size: 22rpx;
+  color: var(--error);
+  margin-top: 10rpx;
+  text-align: center;
+}

@@ -27,7 +27,9 @@
     <textarea class="reason-textarea" placeholder="如：孩子时间安排变化…" value="{{reason}}"
       bindinput="onReason" maxlength="200" />
     <view class="submit-wrap">
-      <button class="submit-btn" bindtap="onSubmit">提交退款申请</button>
+      <button class="submit-btn {{preview.calc.mode === 'zero' ? 'submit-btn-disabled' : ''}}"
+        disabled="{{preview.calc.mode === 'zero'}}" bindtap="onSubmit">提交退款申请</button>
+      <view wx:if="{{preview.calc.mode === 'zero'}}" class="zero-tip">当前订单无可退金额，无法提交退款申请</view>
     </view>
   </view>
 
