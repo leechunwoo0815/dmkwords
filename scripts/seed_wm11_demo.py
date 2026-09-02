@@ -536,7 +536,10 @@ def _ensure_demo_wm3_states(db: Session) -> None:
     # 真实链路 formal/observation 必有订单；否则 B1 守卫按"无订单"放行编辑删除，
     # 出现「正式会员可删」的假象）。幂等：按 child_id+type+status 查存在即跳过。
 
-    def ensure_paid_order(child: Child, order_type: str, amount: str) -> None:
+    # 插修4-X5：paid_at 按孩错开天数——比例退「剩余天数」在预估/可退卡片上可见
+    # （全今天则永远接近全额，验收看不出按天折算）；exists 分支同步归一，重 seed 生效。
+    def ensure_paid_order(child: Child, order_type: str, amount: str, days_ago: int = 0) -> None:
+        paid_at = datetime.now() - timedelta(days=days_ago)
         exists = (
             db.query(Order)
             .filter(
@@ -548,6 +551,7 @@ def _ensure_demo_wm3_states(db: Session) -> None:
             .first()
         )
         if exists:
+            exists.paid_at = paid_at
             return
         admin_id = db.query(AdminUser).filter(AdminUser.username == "admin").first()
         db.add(
@@ -559,16 +563,16 @@ def _ensure_demo_wm3_states(db: Session) -> None:
                 amount=Decimal(amount),
                 status=Order.STATUS_PAID,
                 pay_method="scan",
-                paid_at=datetime.now(),
+                paid_at=paid_at,
                 paid_by=admin_id.id if admin_id else None,
                 remark="演示数据：配套已支付订单（状态真实化）",
             )
         )
         db.flush()
 
-    ensure_paid_order(obs, Order.TYPE_OBSERVATION, "500.00")
-    ensure_paid_order(pend, Order.TYPE_OBSERVATION, "500.00")
-    ensure_paid_order(expiring, Order.TYPE_FORMAL, "6000.00")
+    ensure_paid_order(obs, Order.TYPE_OBSERVATION, "500.00", days_ago=10)
+    ensure_paid_order(pend, Order.TYPE_OBSERVATION, "500.00", days_ago=5)
+    ensure_paid_order(expiring, Order.TYPE_FORMAL, "6000.00", days_ago=100)
     pending_order = (
         db.query(Order)
         .filter(
