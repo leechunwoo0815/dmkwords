@@ -16,7 +16,8 @@ from sqlalchemy.orm import Session
 
 from backend.common.notification_models import Notification, TaskRunLog
 from backend.database import SessionLocal
-from backend.domain.identity.models import Child, Parent
+from backend.domain.admin.models import AdminUser
+from backend.domain.identity.models import Child, Order, Parent
 
 
 def _ensure_demo_parent(db: Session) -> Parent:
@@ -31,7 +32,7 @@ def _ensure_demo_parent(db: Session) -> Parent:
 
 def _ensure_demo_child(db: Session, parent: Parent) -> None:
     """演示孩（C45 配套）：无孩子时 member 页功能网格不渲染，补一个 formal 孩让演示完整。"""
-    from backend.domain.identity.models import Child, Order
+    from backend.domain.identity.models import Child
 
     exists = db.query(Child).filter(Child.parent_id == parent.id, Child.is_deleted == 0).first()
     if exists:
@@ -504,7 +505,7 @@ def _ensure_demo_wm3_states(db: Session) -> None:
     import time
     from decimal import Decimal
 
-    from backend.domain.identity.models import Child, Order
+    from backend.domain.identity.models import Child
 
     parent = db.query(Parent).filter(Parent.phone == "13800007777", Parent.is_deleted == 0).first()
     if not parent:
@@ -525,11 +526,49 @@ def _ensure_demo_wm3_states(db: Session) -> None:
             db.flush()
         return c
 
-    ensure_child("观察期孩", Child.MEMBER_OBSERVATION, today + timedelta(days=30))
-    ensure_child("待评估孩", Child.MEMBER_PENDING_EVALUATION, None)
+    obs = ensure_child("观察期孩", Child.MEMBER_OBSERVATION, today + timedelta(days=30))
+    pend = ensure_child("待评估孩", Child.MEMBER_PENDING_EVALUATION, None)
     expired = ensure_child("过期孩", Child.MEMBER_FORMAL, today - timedelta(days=1))
     # WM3-D2：临期孩（formal + today+3，相对日期每次 seed 都新鲜）——验收第 19 步橙字「剩 3 天」
-    ensure_child("临期孩", Child.MEMBER_FORMAL, today + timedelta(days=3))
+    expiring = ensure_child("临期孩", Child.MEMBER_FORMAL, today + timedelta(days=3))
+
+    # 插修2 用户拍板 A：演示孩补配套订单（真实化——会员状态由订单收款驱动，
+    # 真实链路 formal/observation 必有订单；否则 B1 守卫按"无订单"放行编辑删除，
+    # 出现「正式会员可删」的假象）。幂等：按 child_id+type+status 查存在即跳过。
+
+    def ensure_paid_order(child: Child, order_type: str, amount: str) -> None:
+        exists = (
+            db.query(Order)
+            .filter(
+                Order.child_id == child.id,
+                Order.order_type == order_type,
+                Order.status == Order.STATUS_PAID,
+                Order.is_deleted == 0,
+            )
+            .first()
+        )
+        if exists:
+            return
+        admin_id = db.query(AdminUser).filter(AdminUser.username == "admin").first()
+        db.add(
+            Order(
+                order_no=f"WM3-DEMO-P-{int(time.time() * 1000) % 10**10}-{child.id}",
+                order_type=order_type,
+                parent_id=parent.id,
+                child_id=child.id,
+                amount=Decimal(amount),
+                status=Order.STATUS_PAID,
+                pay_method="scan",
+                paid_at=datetime.now(),
+                paid_by=admin_id.id if admin_id else None,
+                remark="演示数据：配套已支付订单（状态真实化）",
+            )
+        )
+        db.flush()
+
+    ensure_paid_order(obs, Order.TYPE_OBSERVATION, "500.00")
+    ensure_paid_order(pend, Order.TYPE_OBSERVATION, "500.00")
+    ensure_paid_order(expiring, Order.TYPE_FORMAL, "6000.00")
     pending_order = (
         db.query(Order)
         .filter(
@@ -565,7 +604,6 @@ def _ensure_demo_wm13_states(db: Session) -> None:
 
     from backend.domain.identity.models import (
         Child,
-        Order,
         RefundRequest,
         TransferRequest,
     )
