@@ -1,4 +1,5 @@
 import PaintEmpty from "../components/PaintEmpty";
+import { PaintHScrollbar } from "../components/PaintHScrollbar";
 // 员工管理（WM1 §11.1 超管职责：创建/禁用/改角色/重置密码，仅超管可见）
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -121,6 +122,7 @@ export default function Staff() {
           },
         ]}
       />
+          <PaintHScrollbar auto />
 
       <Modal title="新建员工" open={createOpen} okText="创建" cancelText="取消"
         onOk={doCreate} onCancel={() => setCreateOpen(false)} destroyOnClose>

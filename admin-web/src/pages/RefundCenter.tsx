@@ -14,6 +14,7 @@ import {
 } from "../api/refunds";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { TODO_REFRESH_EVENT } from "../hooks/useTodoCounts";
+import { PaintHScrollbar } from "../components/PaintHScrollbar";
 
 const KIND_LABEL: Record<string, string> = { order: "订单退款", deposit: "押金退款" };
 const ORDER_TYPE_LABEL: Record<string, string> = {
@@ -215,6 +216,7 @@ export default function RefundCenter() {
                   },
                 ]}
               />
+          <PaintHScrollbar auto />
               <PaintPagination current={refundPg.page} pageSize={refundPg.pageSize} total={refunds.length} onChange={refundPg.onChange} />
             </>),
 
@@ -255,6 +257,7 @@ export default function RefundCenter() {
                   },
                 ]}
               />
+          <PaintHScrollbar auto />
               <PaintPagination current={withdrawalPg.page} pageSize={withdrawalPg.pageSize} total={withdrawals.length} onChange={withdrawalPg.onChange} />
             </>),
 
@@ -291,6 +294,7 @@ export default function RefundCenter() {
                   },
                 ]}
               />
+          <PaintHScrollbar auto />
               <PaintPagination current={transferPg.page} pageSize={transferPg.pageSize} total={transfers.length} onChange={transferPg.onChange} />
             </>),
 

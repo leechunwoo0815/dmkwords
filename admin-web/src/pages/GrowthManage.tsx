@@ -14,6 +14,7 @@ import {
 import { getToken } from "../api/client";
 import { apiListChildren, type Child } from "../api/members";
 import { usePaintPagination } from "../hooks/usePaintPagination";
+import { PaintHScrollbar } from "../components/PaintHScrollbar";
 
 const REASON_LABEL: Record<string, string> = {
   words_convert: "词数折算", quiz_first_pass: "测验首过",
@@ -183,6 +184,7 @@ export default function GrowthManage() {
           },
         ]}
       />
+          <PaintHScrollbar auto />
       <PaintPagination current={page} pageSize={pageSize} total={childrenTotal} onChange={onPageChange} />
 
       <Drawer
@@ -220,6 +222,7 @@ export default function GrowthManage() {
                 {
                   key: "words", label: `词数流水（${growth.words_ledger.length}）`,
                   children: (
+                    <>
                     <Table locale={{ emptyText: <PaintEmpty character="rabbit" /> }}
                       rowKey="id" size="small" dataSource={growth.words_ledger}
                       pagination={false}
@@ -229,11 +232,14 @@ export default function GrowthManage() {
                         { title: "入账时间", dataIndex: "created_at", width: 170 },
                       ]}
                     />
-                  ),
+          <PaintHScrollbar auto />
+          </>
+          ),
                 },
                 {
                   key: "points", label: `积分明细（${growth.points_ledger.length}）`,
                   children: (
+                    <>
                     <Table locale={{ emptyText: <PaintEmpty character="rabbit" /> }}
                       rowKey="id" size="small" dataSource={growth.points_ledger}
                       pagination={false}
@@ -244,11 +250,14 @@ export default function GrowthManage() {
                         { title: "时间", dataIndex: "created_at", width: 170 },
                       ]}
                     />
-                  ),
+          <PaintHScrollbar auto />
+          </>
+          ),
                 },
                 {
                   key: "quiz", label: `测验记录（${growth.quiz_overview.length}）`,
                   children: (
+                    <>
                     <Table locale={{ emptyText: <PaintEmpty character="rabbit" /> }}
                       rowKey="book_id" size="small" dataSource={growth.quiz_overview}
                       pagination={false}
@@ -267,7 +276,9 @@ export default function GrowthManage() {
                         },
                       ]}
                     />
-                  ),
+          <PaintHScrollbar auto />
+          </>
+          ),
                 },
               ]}
             />

@@ -42,6 +42,7 @@ import {
 } from "../api/catalog";
 import { GRADE_OPTIONS } from "../constants/grade";
 import { AR_LEVEL_RULE } from "../constants/book";
+import { PaintHScrollbar } from "../components/PaintHScrollbar";
 
 const COPY_STATUS_LABEL: Record<string, string> = {
   available: "在馆", reserved: "预约锁定", borrowed: "已借出",
@@ -342,6 +343,7 @@ export default function BookDetail() {
           },
           ]}
         />
+          <PaintHScrollbar auto />
       </Card>
 
       {/* 测验题目 */}
@@ -397,6 +399,7 @@ export default function BookDetail() {
             },
           ]}
         />
+          <PaintHScrollbar auto />
       </Card>
 
       <Modal

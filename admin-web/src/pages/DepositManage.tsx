@@ -26,6 +26,7 @@ import {
   type DepositLedger,
 } from "../api/deposits";
 import { usePaintPagination } from "../hooks/usePaintPagination";
+import { PaintHScrollbar } from "../components/PaintHScrollbar";
 
 const STATUS_LABEL: Record<string, string> = {
   unpaid: "未缴纳", paid: "已缴纳",
@@ -134,6 +135,7 @@ export default function DepositManage() {
           },
         ]}
       />
+          <PaintHScrollbar auto />
       <PaintPagination current={page} pageSize={pageSize} total={total} onChange={onPageChange} />
 
       <Drawer

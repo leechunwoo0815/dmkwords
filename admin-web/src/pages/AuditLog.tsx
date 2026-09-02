@@ -5,6 +5,7 @@ import PaintPagination from "../components/PaintPagination";
 
 import { apiListAuditLogs, type AuditLog } from "../api/admin";
 import { usePaintPagination } from "../hooks/usePaintPagination";
+import { PaintHScrollbar } from "../components/PaintHScrollbar";
 
 const ACTION_LABEL: Record<string, string> = {
   login: "登录",
@@ -146,6 +147,7 @@ export default function AuditLogPage() {
           { title: "原因", dataIndex: "reason", ellipsis: true, width: 180 },
         ]}
       />
+          <PaintHScrollbar auto />
       <PaintPagination current={page} pageSize={pageSize} total={total} onChange={onPageChange} />
     </>
   );

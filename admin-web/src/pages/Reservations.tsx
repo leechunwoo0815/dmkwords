@@ -10,6 +10,7 @@ import {
   type ReservationItem,
 } from "../api/reservations";
 import { usePaintPagination } from "../hooks/usePaintPagination";
+import { PaintHScrollbar } from "../components/PaintHScrollbar";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "锁定中", expired: "已超时", cancelled: "已取消",
@@ -100,6 +101,7 @@ export default function Reservations() {
           },
         ]}
       />
+          <PaintHScrollbar auto />
       <PaintPagination current={page} pageSize={pageSize} total={items.length} onChange={onPageChange} />
     </div>
   );

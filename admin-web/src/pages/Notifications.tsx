@@ -18,6 +18,7 @@ import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { TODO_REFRESH_EVENT, useTodoCounts } from "../hooks/useTodoCounts";
+import { PaintHScrollbar } from "../components/PaintHScrollbar";
 import {
   AdminNotification,
   apiExportNotifications,
@@ -461,6 +462,7 @@ export default function Notifications() {
           },
         ]}
       />
+          <PaintHScrollbar auto />
     </>
   );
 
@@ -521,6 +523,7 @@ export default function Notifications() {
         }}
         columns={inboxColumns}
       />
+          <PaintHScrollbar auto />
     </>
   );
 

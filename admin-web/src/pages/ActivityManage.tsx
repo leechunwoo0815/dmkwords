@@ -14,6 +14,7 @@ import {
 } from "../api/activities";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { TODO_REFRESH_EVENT } from "../hooks/useTodoCounts";
+import { PaintHScrollbar } from "../components/PaintHScrollbar";
 
 const TYPE_OPTIONS = [
   { value: "lecture", label: "宣讲会" },
@@ -186,6 +187,7 @@ export default function ActivityManage() {
                     },
                   ]}
                 />
+          <PaintHScrollbar auto />
                 <PaintPagination current={activityPg.page} pageSize={activityPg.pageSize} total={activities.length} onChange={activityPg.onChange} />
               </>
             ),
@@ -193,6 +195,7 @@ export default function ActivityManage() {
           {
             key: "refunds", label: `退款待审（${refunds.length}）`,
             children: (
+              <>
               <Table<EnrollmentItem> locale={{ emptyText: <PaintEmpty character="star" /> }}
                 rowKey={(r) => String(r.enrollment_id ?? r.id)} dataSource={refunds} size="middle"
                 pagination={false}
@@ -212,7 +215,9 @@ export default function ActivityManage() {
                   },
                 ]}
               />
-            ),
+          <PaintHScrollbar auto />
+          </>
+          ),
           },
         ]}
       />
@@ -232,6 +237,7 @@ export default function ActivityManage() {
             { title: "报名时间", dataIndex: "created_at", render: (v) => v.replace("T", " ").slice(0, 19) },
           ]}
         />
+          <PaintHScrollbar auto />
       </Drawer>
 
       <Modal

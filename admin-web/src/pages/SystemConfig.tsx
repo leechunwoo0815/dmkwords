@@ -16,6 +16,7 @@ import {
 import { apiListConfigs, apiUpdateConfig, type SystemConfig } from "../api/admin";
 import { hasPermission, useAuth } from "../auth";
 import { usePaintPagination } from "../hooks/usePaintPagination";
+import { PaintHScrollbar } from "../components/PaintHScrollbar";
 
 const TYPE_LABEL: Record<string, string> = {
   int: "整数",
@@ -168,6 +169,7 @@ export default function SystemConfigPage() {
           },
         ]}
       />
+          <PaintHScrollbar auto />
       <PaintPagination current={page} pageSize={pageSize} total={filtered.length} onChange={onPageChange} />
       <Modal
         title={`修改：${editing?.display_name || editing?.description || ""}`}

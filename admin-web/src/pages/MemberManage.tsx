@@ -56,6 +56,7 @@ import {
   type ParentRow,
 } from "../api/members";
 import { usePaintPagination } from "../hooks/usePaintPagination";
+import { PaintHScrollbar } from "../components/PaintHScrollbar";
 
 const MEMBER_LABEL: Record<string, string> = {
   none: "未入会", observation: "观察期", pending_evaluation: "待评估",
@@ -491,6 +492,7 @@ export default function MemberManage() {
               },
             ]}
           />
+          <PaintHScrollbar auto />
           <PaintPagination current={childPg.page} pageSize={childPg.pageSize} total={childTotal}
             onChange={(p, s) => { childPg.onChange(p, s); updateUrl({ page: String(p) }); }} />
         </>
@@ -574,6 +576,7 @@ export default function MemberManage() {
               },
             ]}
           />
+          <PaintHScrollbar auto />
           <PaintPagination current={orderPg.page} pageSize={orderPg.pageSize} total={orderTotal}
             onChange={(p, s) => { orderPg.onChange(p, s); updateUrl({ page: String(p) }); }} />
         </>
@@ -623,6 +626,7 @@ export default function MemberManage() {
               },
             ]}
           />
+          <PaintHScrollbar auto />
           <PaintPagination current={childPg.page} pageSize={childPg.pageSize} total={parentTotal}
             onChange={(p, s) => { childPg.onChange(p, s); updateUrl({ page: String(p) }); }} />
         </>

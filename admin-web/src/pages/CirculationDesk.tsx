@@ -1,4 +1,5 @@
 import PaintEmpty from "../components/PaintEmpty";
+import { PaintHScrollbar } from "../components/PaintHScrollbar";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -239,6 +240,7 @@ export default function CirculationDesk() {
               ) },
             ]}
           />
+          <PaintHScrollbar auto />
         </>
       )}
 
@@ -256,6 +258,7 @@ export default function CirculationDesk() {
           { title: "逾期天数", dataIndex: "days_overdue", width: 100, render: (d: number) => <Tag color={d > 7 ? "red" : "orange"}>{d} 天</Tag> },
         ]}
       />
+          <PaintHScrollbar auto />
     </>
   );
 }

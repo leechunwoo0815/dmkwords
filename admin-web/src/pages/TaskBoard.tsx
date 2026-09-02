@@ -3,6 +3,7 @@ import { Button, Card, message, Popconfirm, Popover, Table, Tag } from "antd";
 import { PlayCircleOutlined, ReloadOutlined } from "@ant-design/icons";
 
 import PaintEmpty from "../components/PaintEmpty";
+import { PaintHScrollbar } from "../components/PaintHScrollbar";
 import {
   apiRunTask,
   apiTaskRuns,
@@ -158,6 +159,7 @@ export default function TaskBoard() {
             },
           ]}
         />
+          <PaintHScrollbar auto />
       </Card>
       <Card title="运行记录">
         <Table<TaskRunItem>
@@ -187,6 +189,7 @@ export default function TaskBoard() {
             },
           ]}
         />
+          <PaintHScrollbar auto />
       </Card>
     </div>
   );
