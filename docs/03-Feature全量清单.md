@@ -161,10 +161,35 @@
 | FEAT-074 | 家长/孩子编辑+删除（订单守卫） | 运营修正 | P1 | F2 | 编辑：家长姓名/手机号（唯一 422+登录标识提示）/孩子姓名/英文名/性别/生日/年级；删除：软删（家长连带名下孩子）；守卫双保险：孩子存在未删订单（任意状态含 cancelled）→ 409 禁改禁删，家长名下任一孩子有订单 → 409；UI 按钮禁用+tooltip；家长 tab（N）含孩子数/守卫标志〔R-315 解禁口径〕 | wm3_member_edit.feature | IMPLEMENTED |
 | FEAT-074 变更记录 1 | 守卫口径细化（F7，用户拍板 2026-09-01） | — | — | — | 有订单孩子仅身份字段（姓名/性别/生日）禁改 409；学籍动态字段（英文名/年级/AR）放开可改（年级随学年变化）；删除守卫不变；家长守卫不变（家长编辑的即身份字段） | wm3_member_edit.feature @wm3-f7 | IMPLEMENTED |
 | FEAT-075 | 收款凭证上传与查看 | 资金留痕 | P1 | F2 | 待确认订单上传凭证图（image/*，可选传）；确认收款带 voucher_path；已支付订单可查看凭证大图（member.manage 权限独立通道，勿挂 book.manage uploads）；家长 token 401 回归〔R-316 模式复用〕 | —（B2 单测为主） | IMPLEMENTED |
+| FEAT-076 | 小程序「我的订单」页（每笔钱完整账本） | 资金可见性 | P1 | F2 | order-history 页（历史幽灵页落地）：孩子选择+订单列表（类型徽标/订单号/金额强字/状态中文/支付时间）；每行 paid 态「申请退款」快捷入口跳 refund-apply；member 页菜单入口；后端 my-orders 或_ 查询（孩子单 ∪ 家长级单 child_id NULL，漏查会丢家长级活动费单）；空态 | —（X7 单测 9 例） | IMPLEMENTED |
+| FEAT-077 | 退会审核预估结算（盲批→明批） | 资金安全 | P0 | F2 | GET /withdrawals/{id}/settle-preview（super_admin，仅 normal+applying；联动单 422）：明细行（kind/order_no/amount/rule）+押金余额+合计；审核弹窗展示；**preview 与 review 调同一份 _settle_items（同源，灵魂断言：preview total == review 实际退款单合计，防两套公式漂移——WM5 上限公式两套前车之鉴）**〔R-311 结算段〕 | —（X2 单测含一致性断言） | IMPLEMENTED |
+| FEAT-078 | 可退金额三形态展示 + 0 元拦截 | 资金可见性 | P1 | F2 | 小程序可退卡片三形态：proportional（实付 · 已用 N/总天 → 预计可退，比例退折算过程可见）/ full（全额徽标）/ zero（不可退+原因）；0 元禁提交三层守卫（后端 422「该订单当前无可退金额」/前端按钮置灰+提示/前置校验双保险）——0 元申请会联动建退会单+锁孩子，审核员误批即 withdrawn（真业务陷阱） | —（X6+R1 单测） | IMPLEMENTED |
+| FEAT-079 | 小程序退款申请撤销入口 | 用户自主权 | P1 | F2 | refund-apply 退款记录行 pending 态「撤销申请」按钮（wx.showModal 确认→cancelRefund→列表刷新）；后端 cancel 端点本就绪（仅 pending 可撤，撤后 cancelled+订单恢复）；管理端 todo 显示「已失效·家长已撤销」已有（WM13 S1 灵魂设计的前端断链修复） | refund.feature（存量 @draft）；R1/X5 pytest 兜底 | IMPLEMENTED |
 
 随修项（bugfix/小缺口，不单开 FEAT，WM3 插修 1）：A1 计数懒加载守卫（WM13-F4 同族）、
 A2 创建时间字段错配、A3 refunded 标签、A4 筛选「全部」、A5 订单关键字搜索、
 B4 建档家长默认最新+前 5、D1 待确认红底白字、D2 临期演示数据、D3 文档笔误。
+
+随修项（WM3 插修 2，首轮目视反馈）：F1 家长 tab 计数守卫（同族第三犯，E-20260901-03）、
+F2 家长 tab create_time 后端补齐、F3 编辑弹窗重复 grade 字段（复制粘贴事故）、
+F4 孩子列表性别/年级/AR 三列（用户拍板）、F5 凭证/评估报告 Upload onPreview 本地
+Modal 预览（禁 antd 默认 window.open 空白页）、F6 client.ts 基建双修（FormData 禁设
+Content-Type + 422 detail 数组拼接禁 [object Object]）、F8 家长编辑按钮 disabled
+一致化、F7 已升 FEAT-074 变更记录 1。
+
+随修项（WM13 插修 3，验收反馈）：W1 RefundCenter tab 双计数（待审 N · 待执行/退款中
+M，M>0 红字）、W2 通知列表 60s 轮询（页面激活时）、W3 凭证预览限高 70vh 整屏、
+W4 验收动线 xlsx 修正（8888 名下零订单→改 7777 临期孩）。
+
+随修项（插修 4，退会走查反馈）：X1 退会 tab 审核断链【P0】（操作列 pending vs
+applying 一词之差，直接退会永不可审；同批 L136 tab 计数同修）、X3 执行退款 toast
+带金额、X4 通知轮询挂载隐藏边界、X5 seed 已付订单补 paid_at 错开天数（比例退可见）。
+
+基建随修（不占 FEAT）：gate.sh 防呆归档（E-20260901-04，GATE_LOG_NAME 自动 mkdir+tee）
++ 单测/覆盖率双跑合并（-42% 门禁时长，2026-09-02 裁定见 docs/09 §九）、
+admin 改密 bump token_generation（WM1 遗留"改密踢旧 token"文档化属性落地）、
+checkout Reservation 锁定读补 populate_existing（P1 遗留）、vite host 局域网验收、
+词库开发期裁剪（335.7 万行备份 ~/dmkwords-backups/，上线导回）。
 
 ## 需求锚点对照（V1.0.1 → Feature 映射）
 
