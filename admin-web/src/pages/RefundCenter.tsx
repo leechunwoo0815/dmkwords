@@ -271,7 +271,7 @@ export default function RefundCenter() {
                   { title: "申请时间", dataIndex: "created_at", width: 165, render: (v) => v.replace("T", " ").slice(0, 19) },
                   {
                     title: "操作", key: "op", width: 260, render: (_, r) => (
-                      r.status === "pending" ? (
+                      r.status === "applying" ? (
                         <Space>
                           <Button type="primary" size="small" onClick={() => askReview("withdrawal", r.id, true,
                             "通过退会",

@@ -319,3 +319,49 @@ def test_first_activity_refund_release_quota(client: TestClient):
         headers=h,
     )
     assert again.status_code == 200, again.text
+
+
+def test_direct_withdrawal_apply_list_review(client: TestClient):
+    """直接退会 e2e（X1 链路锁）：miniapp 申请 → admin_list(applying) 可见 →
+    super admin review 通过 → pending_settle + 押金退款单生成。"""
+    h = _h(client)
+    p, c, mini = _family(client, h, "13800001305", "直接退会孩")
+    _pay(client, h, c["id"], "formal_fee")
+    _pay_deposit(client, h, c["id"])
+
+    # 1. 家长小程序申请退会（source=normal）
+    w = client.post(
+        "/api/miniapp/withdrawals", json={"child_id": c["id"], "reason": "搬家了"}, headers=mini
+    )
+    assert w.status_code == 200, w.text
+    wid = w.json()["id"]
+    assert w.json()["status"] == "applying"
+
+    # 2. 管理端 applying 列表可见（前端退会 tab 操作列的判断依据）
+    lst = client.get("/api/admin/withdrawals", params={"status": "applying"}, headers=h)
+    assert lst.status_code == 200, lst.text
+    row = next(x for x in lst.json() if x["id"] == wid)
+    assert row["status"] == "applying" and row["child_name"] == "直接退会孩"
+
+    # 3. super admin 审核通过 → 结算 + 押金退款单（无使用全额退）
+    rv = client.post(
+        f"/api/admin/withdrawals/{wid}/review",
+        json={"approve": True, "remark": "同意"},
+        headers=h,
+    )
+    assert rv.status_code == 200, rv.text
+    # R-311：approve 同步结算，有退款单 → refunding（pending_settle 为事务内中间态）
+    assert rv.json()["status"] == "refunding"
+
+    from backend.domain.identity.models import RefundRequest
+
+    with _db() as db:
+        rf = (
+            db.query(RefundRequest)
+            .filter(RefundRequest.withdrawal_id == wid)
+            .all()
+        )
+        kinds = {x.kind for x in rf}
+        # 年费刚付全额可退（比例>0）+ 押金可用余额，两张单并存
+        assert rf and kinds == {"order", "deposit"}, kinds
+        assert sum(x.amount for x in rf) > 0
