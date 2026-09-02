@@ -134,7 +134,7 @@ export default function DepositManage() {
             ),
           },
         ]}
-      />
+       scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
       <PaintPagination current={page} pageSize={pageSize} total={total} onChange={onPageChange} />
 

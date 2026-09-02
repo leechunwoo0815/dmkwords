@@ -342,7 +342,7 @@ export default function BookDetail() {
             ),
           },
           ]}
-        />
+         scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
       </Card>
 
@@ -398,7 +398,7 @@ export default function BookDetail() {
               ),
             },
           ]}
-        />
+         scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
       </Card>
 

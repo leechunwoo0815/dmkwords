@@ -461,7 +461,7 @@ export default function Notifications() {
             ),
           },
         ]}
-      />
+       scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
     </>
   );
@@ -522,7 +522,7 @@ export default function Notifications() {
           return {};
         }}
         columns={inboxColumns}
-      />
+       scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
     </>
   );

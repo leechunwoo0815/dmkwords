@@ -158,7 +158,7 @@ export default function TaskBoard() {
               ),
             },
           ]}
-        />
+         scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
       </Card>
       <Card title="运行记录">
@@ -188,7 +188,7 @@ export default function TaskBoard() {
                 v ?? <span style={{ color: "rgba(0,0,0,0.45)" }}>—</span>,
             },
           ]}
-        />
+         scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
       </Card>
     </div>

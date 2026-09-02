@@ -100,7 +100,7 @@ export default function Reservations() {
             ),
           },
         ]}
-      />
+       scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
       <PaintPagination current={page} pageSize={pageSize} total={items.length} onChange={onPageChange} />
     </div>

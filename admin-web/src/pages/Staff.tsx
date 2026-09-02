@@ -121,7 +121,7 @@ export default function Staff() {
             ),
           },
         ]}
-      />
+       scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
 
       <Modal title="新建员工" open={createOpen} okText="创建" cancelText="取消"

@@ -491,7 +491,7 @@ export default function MemberManage() {
                 ),
               },
             ]}
-          />
+           scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
           <PaintPagination current={childPg.page} pageSize={childPg.pageSize} total={childTotal}
             onChange={(p, s) => { childPg.onChange(p, s); updateUrl({ page: String(p) }); }} />
@@ -575,7 +575,7 @@ export default function MemberManage() {
                 ),
               },
             ]}
-          />
+           scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
           <PaintPagination current={orderPg.page} pageSize={orderPg.pageSize} total={orderTotal}
             onChange={(p, s) => { orderPg.onChange(p, s); updateUrl({ page: String(p) }); }} />
@@ -625,7 +625,7 @@ export default function MemberManage() {
                 ),
               },
             ]}
-          />
+           scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
           <PaintPagination current={childPg.page} pageSize={childPg.pageSize} total={parentTotal}
             onChange={(p, s) => { childPg.onChange(p, s); updateUrl({ page: String(p) }); }} />

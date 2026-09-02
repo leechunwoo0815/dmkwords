@@ -183,7 +183,7 @@ export default function GrowthManage() {
             ),
           },
         ]}
-      />
+       scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
       <PaintPagination current={page} pageSize={pageSize} total={childrenTotal} onChange={onPageChange} />
 
@@ -231,7 +231,7 @@ export default function GrowthManage() {
                         { title: "词数", dataIndex: "word_count", width: 100, render: (v) => <Typography.Text strong>+{v.toLocaleString()}</Typography.Text> },
                         { title: "入账时间", dataIndex: "created_at", width: 170 },
                       ]}
-                    />
+                     scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
           </>
           ),
@@ -249,7 +249,7 @@ export default function GrowthManage() {
                         { title: "积分", dataIndex: "points", width: 80, render: (v) => <Typography.Text strong style={{ color: "var(--paint-secondary)" }}>+{v}</Typography.Text> },
                         { title: "时间", dataIndex: "created_at", width: 170 },
                       ]}
-                    />
+                     scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
           </>
           ),
@@ -275,7 +275,7 @@ export default function GrowthManage() {
                           ),
                         },
                       ]}
-                    />
+                     scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
           </>
           ),

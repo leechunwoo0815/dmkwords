@@ -146,7 +146,7 @@ export default function AuditLogPage() {
           },
           { title: "原因", dataIndex: "reason", ellipsis: true, width: 180 },
         ]}
-      />
+       scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
       <PaintPagination current={page} pageSize={pageSize} total={total} onChange={onPageChange} />
     </>

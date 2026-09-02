@@ -168,7 +168,7 @@ export default function SystemConfigPage() {
               ) : null,
           },
         ]}
-      />
+       scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
       <PaintPagination current={page} pageSize={pageSize} total={filtered.length} onChange={onPageChange} />
       <Modal

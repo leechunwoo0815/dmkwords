@@ -239,7 +239,7 @@ export default function CirculationDesk() {
                 <Button type="primary" size="small" onClick={() => doReturn(r)}>还书</Button>
               ) },
             ]}
-          />
+           scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
         </>
       )}
@@ -257,7 +257,7 @@ export default function CirculationDesk() {
           { title: "到期日", dataIndex: "due_at", width: 170, render: (v: string) => v?.slice(0, 16) },
           { title: "逾期天数", dataIndex: "days_overdue", width: 100, render: (d: number) => <Tag color={d > 7 ? "red" : "orange"}>{d} 天</Tag> },
         ]}
-      />
+       scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
     </>
   );

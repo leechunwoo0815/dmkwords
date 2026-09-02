@@ -215,7 +215,7 @@ export default function RefundCenter() {
                     ),
                   },
                 ]}
-              />
+               scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
               <PaintPagination current={refundPg.page} pageSize={refundPg.pageSize} total={refunds.length} onChange={refundPg.onChange} />
             </>),
@@ -256,7 +256,7 @@ export default function RefundCenter() {
                     ),
                   },
                 ]}
-              />
+               scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
               <PaintPagination current={withdrawalPg.page} pageSize={withdrawalPg.pageSize} total={withdrawals.length} onChange={withdrawalPg.onChange} />
             </>),
@@ -293,7 +293,7 @@ export default function RefundCenter() {
                     ),
                   },
                 ]}
-              />
+               scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
               <PaintPagination current={transferPg.page} pageSize={transferPg.pageSize} total={transfers.length} onChange={transferPg.onChange} />
             </>),

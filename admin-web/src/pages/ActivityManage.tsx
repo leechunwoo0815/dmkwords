@@ -186,7 +186,7 @@ export default function ActivityManage() {
                       ),
                     },
                   ]}
-                />
+                 scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
                 <PaintPagination current={activityPg.page} pageSize={activityPg.pageSize} total={activities.length} onChange={activityPg.onChange} />
               </>
@@ -214,7 +214,7 @@ export default function ActivityManage() {
                     ),
                   },
                 ]}
-              />
+               scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
           </>
           ),
@@ -236,7 +236,7 @@ export default function ActivityManage() {
             { title: "签到时间", dataIndex: "checked_in_at", width: 160, render: (v) => v ? v.replace("T", " ").slice(0, 19) : "—" },
             { title: "报名时间", dataIndex: "created_at", render: (v) => v.replace("T", " ").slice(0, 19) },
           ]}
-        />
+         scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
       </Drawer>
 
