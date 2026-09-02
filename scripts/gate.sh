@@ -39,8 +39,12 @@ step 1 "lint (ruff)"
 run ruff check backend/ tests/ features/ scripts/
 run ruff format --check .
 
-step 2 "单测（真实 MySQL 同构环境）"
-run python -m pytest tests/ -x -q --tb=short
+step 2 "单测 + 覆盖率（真实 MySQL 同构环境，单次跑全量）"
+# 2026-09-02 优化裁定（用户）：原 [2] 纯单测 + [7] 带覆盖率跑同一批测试两遍，
+# 占门禁总时长 96%（550s+712s）且双轮内存高峰——合并为单次（-42% 总时长）；
+# cov-fail-under 照常拦截；-x 快速失败语义随合并取消（门禁本就要看全貌）。
+# --durations=20：输出 top 慢测试清单（纯观测，为后续并行化铺路）
+run python -m pytest tests/ -q --tb=short --cov=backend --cov-fail-under=25 --cov-report=term-missing:skip-covered --durations=20
 
 step 3 "BDD (behave)"
 run python -m behave features/ --no-capture -q
@@ -71,11 +75,7 @@ else
   skip "alembic versions 为空，F0 起启用"
 fi
 
-step 7 "覆盖率（WM1 基线 25%，随模块逐级抬升，终态整体85/关键域90）"
-# 宪法目标 85/90，当前实测 ~78.7%，抬线决策见 docs/09 偿债窗口条目（验收期不抬）
-run python -m pytest tests/ -q --cov=backend --cov-fail-under=25 --cov-report=term-missing:skip-covered
-
-step 8 "前端类型检查（tsc）"
+step 7 "前端类型检查（tsc）"
 if [ -f "admin-web/node_modules/.bin/tsc" ]; then
   run bash -c "cd admin-web && pnpm exec tsc --noEmit"
 else
