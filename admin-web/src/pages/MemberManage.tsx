@@ -127,6 +127,8 @@ export default function MemberManage() {
   // WM3-B2 凭证：确认收款弹窗单图 + 查看凭证 Modal
   const [voucherFile, setVoucherFile] = useState<UploadFile[]>([]);
   const [viewVoucher, setViewVoucher] = useState<Order | null>(null);
+  // F5：本地预览（onPreview 自定义；antd 默认 window.open(file.name)=空白页）
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
   const childPg = usePaintPagination(undefined, urlInitialPage);
   const orderPg = usePaintPagination(undefined, urlInitialPage);
   // 弹窗
@@ -779,6 +781,13 @@ export default function MemberManage() {
               listType="picture-card" fileList={voucherFile}
               beforeUpload={() => false}
               onChange={({ fileList: fl }) => setVoucherFile(fl.slice(0, 1))}
+              onPreview={(file) => {
+                // F5：本地 blob 预览（不走后端；URL.createObjectURL 挂 unmount 回收）
+                if (file.originFileObj) {
+                  const url = URL.createObjectURL(file.originFileObj);
+                  setLocalPreview(url);
+                }
+              }}
               accept=".png,.jpg,.jpeg,.webp"
             >
               {voucherFile.length < 1 ? "+ 凭证图" : null}
@@ -800,6 +809,13 @@ export default function MemberManage() {
           listType="picture-card" fileList={obsFileList}
           beforeUpload={() => false}
           onChange={({ fileList: fl }) => setObsFileList(fl.slice(0, 9))}
+          onPreview={(file) => {
+            // F5 同族（E-03 反模式 3）：评估报告图同样禁 antd 默认 window.open
+            if (file.originFileObj) {
+              const url = URL.createObjectURL(file.originFileObj);
+              setLocalPreview(url);
+            }
+          }}
           accept=".png,.jpg,.jpeg"
         >
           {obsFileList.length < 9 ? "+ 图片" : null}
@@ -958,6 +974,20 @@ export default function MemberManage() {
         {viewVoucher?.voucher_path ? (
           <img src={apiVoucherUrl(viewVoucher.id)} alt="收款凭证" style={{ maxWidth: "100%" }} />
         ) : null}
+      </Modal>
+
+      {/* F5 本地预览（确认收款弹窗选图后点眼睛） */}
+      <Modal
+        title="凭证图预览（本地上传前）"
+        open={!!localPreview}
+        footer={null}
+        onCancel={() => {
+          if (localPreview) URL.revokeObjectURL(localPreview);
+          setLocalPreview(null);
+        }}
+        width={640}
+      >
+        {localPreview ? <img src={localPreview} alt="凭证预览" style={{ maxWidth: "100%" }} /> : null}
       </Modal>
     </>
   );
