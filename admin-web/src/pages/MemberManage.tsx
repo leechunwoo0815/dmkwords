@@ -590,10 +590,12 @@ export default function MemberManage() {
                 title: "操作", key: "op", width: 160,
                 render: (_, r) => (
                   <Space>
-                    <Button type="link" size="small" onClick={() => {
-                      setEditParent(r);
-                      parentEditForm.setFieldsValue({ name: r.name, phone: r.phone, remark: r.remark || "" });
-                    }}>编辑</Button>
+                    <Tooltip title={r.has_orders ? "名下孩子已创建订单，禁止修改" : undefined}>
+                      <Button type="link" size="small" disabled={r.has_orders} onClick={() => {
+                        setEditParent(r);
+                        parentEditForm.setFieldsValue({ name: r.name, phone: r.phone, remark: r.remark || "" });
+                      }}>编辑</Button>
+                    </Tooltip>
                     <Popconfirm
                       title={r.has_orders ? "名下孩子已创建订单，禁止删除" : `确认删除家长 ${r.name}（名下孩子一并隐藏）？`}
                       okText="删除" okButtonProps={{ danger: true }}
@@ -908,9 +910,6 @@ export default function MemberManage() {
           </Form.Item>
           <Form.Item name="grade" label="年级">
             <Input maxLength={50} disabled={editChild?.has_orders} />
-          </Form.Item>
-          <Form.Item name="grade" label="年级">
-            <Input maxLength={50} />
           </Form.Item>
           <Form.Item
             name="ar_level"
