@@ -215,7 +215,7 @@ export default function Notifications() {
   // W2：列表 60s 轮询（与 useTodoCounts 同周期）——小程序申请新退款后管理端
   // 列表不刷新看不到（徽标轮询有、列表没有）。页面隐藏时暂停避免后台空转。
   useEffect(() => {
-    if (document.visibilityState !== "visible") return;
+    // X4：不因挂载时隐藏而跳过注册——后台标签页打开本页时，切回后轮询必须已就位
     const id = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
       if (box === "admin") void loadInbox();
