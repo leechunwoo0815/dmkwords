@@ -349,17 +349,11 @@ class WithdrawalService:
                 self.db.add(rr)
                 self.db.flush()
                 if it["kind"] == RefundRequest.KIND_ORDER:
-                    order = (
-                        self.db.query(Order).filter(Order.id == it["order_id"]).first()
-                    )
+                    order = self.db.query(Order).filter(Order.id == it["order_id"]).first()
                     order.refund_status = Order.REFUND_STATUS_PENDING
                 else:
                     deposit_refund_id = rr.id
-                    dep = (
-                        self.db.query(Deposit)
-                        .filter(Deposit.id == it["deposit_id"])
-                        .first()
-                    )
+                    dep = self.db.query(Deposit).filter(Deposit.id == it["deposit_id"]).first()
                     dep.status = Deposit.STATUS_REFUNDING
                 refund_ids.append(rr.id)
             # 3) 有退款单 → refunding；无可退 → 直接 completed + withdrawn

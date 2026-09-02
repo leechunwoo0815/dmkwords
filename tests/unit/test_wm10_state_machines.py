@@ -356,11 +356,7 @@ def test_direct_withdrawal_apply_list_review(client: TestClient):
     from backend.domain.identity.models import RefundRequest
 
     with _db() as db:
-        rf = (
-            db.query(RefundRequest)
-            .filter(RefundRequest.withdrawal_id == wid)
-            .all()
-        )
+        rf = db.query(RefundRequest).filter(RefundRequest.withdrawal_id == wid).all()
         kinds = {x.kind for x in rf}
         # 年费刚付全额可退（比例>0）+ 押金可用余额，两张单并存
         assert rf and kinds == {"order", "deposit"}, kinds
@@ -446,7 +442,6 @@ def test_refund_preview_calc_three_modes(client: TestClient):
         )
         o.paid_at = datetime.now() - timedelta(days=100)
         db.commit()
-        formal_id = o.id
 
     orders = client.get(f"/api/miniapp/orders?child_id={c['id']}", headers=mini).json()
     by_type = {x["order_type"]: x["id"] for x in orders}
@@ -501,7 +496,6 @@ def test_my_orders_includes_parent_level_orders(client: TestClient):
 
     # 家长级单（child_id NULL，parent_id 挂家长）——防御性场景
     with _db() as db:
-        admin_id = 1
         db.add(
             Order(
                 order_no=f"DMK-PARENT-LEVEL-{c['id']}",
@@ -558,5 +552,7 @@ def test_refund_apply_rejects_zero_refundable(client: TestClient):
 
     with _db() as db:
         assert db.query(RefundRequest).filter(RefundRequest.child_id == c["id"]).count() == 0
-        assert db.query(WithdrawalRequest).filter(WithdrawalRequest.child_id == c["id"]).count() == 0
+        assert (
+            db.query(WithdrawalRequest).filter(WithdrawalRequest.child_id == c["id"]).count() == 0
+        )
         assert db.query(Child).filter(Child.id == c["id"]).first().operation_locked == 0
