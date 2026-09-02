@@ -982,7 +982,7 @@ export default function MemberManage() {
         width={640}
       >
         {viewVoucher?.voucher_path ? (
-          <img src={apiVoucherUrl(viewVoucher.id)} alt="收款凭证" style={{ maxWidth: "100%" }} />
+          <img src={apiVoucherUrl(viewVoucher.id)} alt="收款凭证" style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }} />
         ) : null}
       </Modal>
 
@@ -997,7 +997,7 @@ export default function MemberManage() {
         }}
         width={640}
       >
-        {localPreview ? <img src={localPreview} alt="凭证预览" style={{ maxWidth: "100%" }} /> : null}
+        {localPreview ? <img src={localPreview} alt="凭证预览" style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }} /> : null}
       </Modal>
     </>
   );
