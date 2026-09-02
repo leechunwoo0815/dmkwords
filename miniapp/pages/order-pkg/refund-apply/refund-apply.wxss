@@ -483,3 +483,12 @@
 .info-row:last-child {
   border-bottom: none;
 }
+
+/* W5 撤销申请按钮（对齐 secondary 胶囊贴纸风） */
+.cancel-refund-btn {
+  background: var(--surface) !important;
+  color: var(--warning-dark, #b45309) !important;
+  font-size: 24rpx;
+  padding: 8rpx 28rpx;
+  line-height: 1.6;
+}

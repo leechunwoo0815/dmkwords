@@ -85,6 +85,10 @@ module.exports = {
   myRefunds(childId) {
     return req.get('/api/miniapp/refund-requests', null, { params: { child_id: childId } })
   },
+  // W5 撤销断链修复：后端 POST /refund-requests/{id}/cancel 全就绪（仅 pending 可撤）
+  cancelRefund(requestId, childId) {
+    return req.post(`/api/miniapp/refund-requests/${requestId}/cancel`, { child_id: childId })
+  },
   applyWithdrawal(childId, reason) {
     return req.post('/api/miniapp/withdrawals', { child_id: childId, reason })
   },

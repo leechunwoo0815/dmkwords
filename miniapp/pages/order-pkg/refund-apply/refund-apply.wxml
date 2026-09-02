@@ -41,14 +41,18 @@
   <view class="tip-card" wx:if="{{refunds.length}}">
     <view class="card-h3">退款记录</view>
     <view wx:for="{{refunds}}" wx:key="id" style="padding:14rpx 0;border-bottom:1rpx solid var(--border);">
-      <view style="display:flex;justify-content:space-between;">
+      <view style="display:flex;justify-content:space-between;align-items:center;">
         <text>￥{{item.amount}}</text>
-        <text style="color:{{item.status === 'approved' ? 'var(--success)' : item.status === 'rejected' ? 'var(--error)' : 'var(--warning)'}};">
-          {{item.status === 'pending' ? '审核中' : item.status === 'approved' ? '已退款' : '已拒绝'}}
+        <text style="color:{{item.status === 'approved' ? 'var(--success)' : item.status === 'rejected' ? 'var(--error)' : item.status === 'cancelled' ? 'var(--muted)' : 'var(--warning)'}};">
+          {{item.status === 'pending' ? '审核中' : item.status === 'approved' ? '已退款' : item.status === 'cancelled' ? '已撤销' : '已拒绝'}}
         </text>
       </view>
       <view wx:if="{{item.review_remark}}" style="font-size:24rpx;color:var(--muted);margin-top:6rpx;">
         审核意见：{{item.review_remark}}
+      </view>
+      <!-- W5 撤销入口：仅 pending 可撤（已审结/已失效不显示按钮） -->
+      <view wx:if="{{item.status === 'pending'}}" style="margin-top:12rpx;display:flex;justify-content:flex-end;">
+        <button class="cancel-refund-btn" size="mini" data-id="{{item.id}}" bindtap="onCancelRefund">撤销申请</button>
       </view>
     </view>
   </view>

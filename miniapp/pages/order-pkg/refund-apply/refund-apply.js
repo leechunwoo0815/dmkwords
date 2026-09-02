@@ -57,6 +57,25 @@ Page({
 
   onReason(e) { this.setData({ reason: e.detail.value }) },
 
+  // W5：撤销待审核退款申请（后端语义：仅 pending 可撤，撤后 cancelled+订单恢复）
+  onCancelRefund(e) {
+    const id = Number(e.currentTarget.dataset.id)
+    wx.showModal({
+      title: '撤销退款申请',
+      content: '撤销后如仍需退款，需要重新申请。确定撤销？',
+      confirmText: '撤销',
+      confirmColor: '#d46b08',
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          await api.cancelRefund(id, this._childId)
+          wx.showToast({ title: '已撤销', icon: 'success' })
+          this.load()
+        } catch (e) { /* toast 已弹 */ }
+      },
+    })
+  },
+
   async onSubmit() {
     const { selected, reason } = this.data
     if (!selected) { wx.showToast({ title: '先选择订单', icon: 'none' }); return }
