@@ -118,6 +118,11 @@ Page({
     wx.navigateTo({ url: `/pages/member-pkg/report/report?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
 
+  goOrders() {
+    const c = this.data.currentChild || {}
+    wx.navigateTo({ url: `/pages/order-pkg/order-history/order-history?child_id=${c.id || ''}&child_name=${encodeURIComponent(c.name || '')}` })
+  },
+
   goDeposit() {
     const c = this.data.currentChild
     if (!c) return

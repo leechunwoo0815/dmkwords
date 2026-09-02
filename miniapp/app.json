@@ -38,7 +38,8 @@
         "refund-apply/refund-apply",
         "benefit-transfer/benefit-transfer",
         "deposit/deposit",
-        "messages/messages"
+        "messages/messages",
+        "order-history/order-history"
       ]
     },
     {

@@ -85,6 +85,10 @@
         <text class="fi-icon">💳</text>
         <text class="fi-label">押金</text>
       </view>
+      <view class="func-item" bindtap="goOrders">
+        <text class="fi-icon">📋</text>
+        <text class="fi-label">我的订单</text>
+      </view>
       <view class="func-item" bindtap="goRefund">
         <text class="fi-icon">💰</text>
         <text class="fi-label">退款申请</text>

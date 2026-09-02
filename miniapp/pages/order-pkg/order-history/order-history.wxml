@@ -1,0 +1,39 @@
+<view class="page-bg">
+  <!-- Nav Bar -->
+  <view class="nav-bar">
+    <view class="back" bindtap="onBack">‹</view>
+    <view class="nav-title">我的订单{{childName ? ' · ' + childName : ''}}</view>
+  </view>
+
+  <!-- Tabs -->
+  <view class="tabs">
+    <view wx:for="{{tabs}}" wx:key="key"
+      class="tab {{activeTab === item.key ? 'active' : ''}}"
+      data-tab="{{item.key}}" bindtap="onTab">{{item.label}}</view>
+  </view>
+
+  <!-- Order List -->
+  <view class="order-list" wx:if="{{filtered.length}}">
+    <view wx:for="{{filtered}}" wx:key="id" class="order-card">
+      <view class="order-header">
+        <text class="order-id">{{item.order_no}}</text>
+        <text class="order-status badge-{{item.status === 'paid' ? 'paid' : item.status === 'refunded' ? 'refunded' : 'pending'}}">{{item.statusText}}</text>
+      </view>
+      <view class="order-body">
+        <view class="order-icon {{item.icon}}">
+          <text class="order-icon-text">{{item.typeText[0]}}</text>
+        </view>
+        <view class="order-info">
+          <view class="order-type">{{item.typeText}}</view>
+          <view class="order-time">{{item.timeText}}</view>
+          <view wx:if="{{item.refundText}}" class="order-amount-refund">{{item.refundText}}</view>
+        </view>
+        <view class="order-amount">￥{{item.amount}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:else style="padding:80rpx 0;text-align:center;color:var(--muted);font-size:26rpx;">
+    暂无订单
+  </view>
+</view>

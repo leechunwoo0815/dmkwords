@@ -488,3 +488,35 @@ def test_refund_preview_calc_three_modes(client: TestClient):
     )
     assert pv3.json()["calc"]["mode"] == "zero", pv3.text
     assert float(pv3.json()["refundable_amount"]) == 0
+
+
+def test_my_orders_includes_parent_level_orders(client: TestClient):
+    """X7：我的订单 or_ 查询——活动费家长级单（child_id NULL，schema 预留
+    「活动费可能家长级」）必须随 child_id 单一起返回。"""
+    from backend.domain.identity.models import Order
+
+    h = _h(client)
+    p, c, mini = _family(client, h, "13800001308", "订单孩")
+    _pay(client, h, c["id"], "formal_fee")
+
+    # 家长级单（child_id NULL，parent_id 挂家长）——防御性场景
+    with _db() as db:
+        admin_id = 1
+        db.add(
+            Order(
+                order_no=f"DMK-PARENT-LEVEL-{c['id']}",
+                order_type=Order.TYPE_ACTIVITY,
+                parent_id=p["id"],
+                child_id=None,
+                amount=__import__("decimal").Decimal("99.00"),
+                status=Order.STATUS_PAID,
+                pay_method="scan",
+                paid_at=__import__("datetime").datetime.now(),
+            )
+        )
+        db.commit()
+
+    rows = client.get(f"/api/miniapp/orders?child_id={c['id']}", headers=mini).json()
+    assert len(rows) == 2, [r["order_no"] for r in rows]
+    nos = {r["order_no"] for r in rows}
+    assert f"DMK-PARENT-LEVEL-{c['id']}" in nos, "家长级单（child_id NULL）不能漏"

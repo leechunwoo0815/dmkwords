@@ -50,11 +50,21 @@ class TransferApplyRequest(BaseSchema):
 def my_orders(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     _child_of_parent(db, parent.id, child_id)
+    from sqlalchemy import or_
+
     from backend.domain.identity.models import Order
 
+    # X7：or_ 查询——孩子名下单 ∪ 家长级单（child_id NULL；schema 注释
+    # 「活动费可能家长级」，漏查会丢 99 元首场活动费等家长级记录）
     rows = (
         db.query(Order)
-        .filter(Order.child_id == child_id, Order.is_deleted == 0)
+        .filter(
+            or_(
+                Order.child_id == child_id,
+                (Order.child_id.is_(None)) & (Order.parent_id == parent.id),
+            ),
+            Order.is_deleted == 0,
+        )
         .order_by(Order.id.desc())
         .limit(50)
         .all()
@@ -66,6 +76,7 @@ def my_orders(child_id: int, auth: Any = Depends(get_current_parent)):
             "order_type": r.order_type,
             "amount": str(r.amount),
             "status": r.status,
+            "refund_status": r.refund_status or "",
             "created_at": str(r.create_time),
             "paid_at": str(r.paid_at) if r.paid_at else None,
         }
