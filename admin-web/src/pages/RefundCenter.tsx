@@ -162,7 +162,9 @@ export default function RefundCenter() {
     }
     try {
       await apiExecuteRefund(execTarget.id, execSuccess, execRemark);
-      message.success(execSuccess ? "已登记退款完成" : "已登记退款失败");
+      // X3：反馈带金额+类型，执行者不用回头查列
+      const amountTxt = `￥${Number(execTarget.amount).toLocaleString()}（${KIND_LABEL[execTarget.kind] ?? execTarget.kind}）`;
+      message.success(execSuccess ? `已登记退款完成：${amountTxt}` : `已登记退款失败：${amountTxt}`);
       // WM13 L3：执行完成主动刷新待办徽标/待办卡
       window.dispatchEvent(new Event(TODO_REFRESH_EVENT));
       setExecTarget(null);
