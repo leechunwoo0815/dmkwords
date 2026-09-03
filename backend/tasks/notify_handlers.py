@@ -33,7 +33,6 @@ from backend.common.notifications import (
     SCENE_READING_MILESTONE,
     SCENE_READING_QUIZ_RESULT,
     SCENE_RESERVATION_CREATED,
-    SCENE_RESERVATION_EXPIRING,
     SCENE_RESERVATION_RELEASED,
     NotificationService,
 )
