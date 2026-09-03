@@ -236,11 +236,18 @@ class RefundService:
             w = (
                 self.db.query(WithdrawalRequest)
                 .filter(WithdrawalRequest.id == req.withdrawal_id)
+                .with_for_update().populate_existing()  # B-13：锁定读防并发覆盖
                 .first()
             )
             if w and w.status == WithdrawalRequest.STATUS_APPLYING:
                 w.status = WithdrawalRequest.STATUS_CANCELLED
                 child.operation_locked = 0
+            elif w and w.status in (
+                WithdrawalRequest.STATUS_REFUNDING,
+                WithdrawalRequest.STATUS_PENDING_SETTLE,
+            ):
+                # T5/B-13：结算退款单终态推进（全部撤销）——全撤退会失败、部分成功 completed
+                self._settle_withdrawal_on_terminal(req, w, child)
         # WM13 L2 回写：家长撤销 → 该单管理待办审计标注来源（幂等）
         AdminNotifyService(self.db).mark_handled(
             ref_type=AdminNotification.REF_REFUND_REQUEST,
@@ -332,13 +339,20 @@ class RefundService:
                 w = (
                     self.db.query(WithdrawalRequest)
                     .filter(WithdrawalRequest.id == req.withdrawal_id)
+                    .with_for_update().populate_existing()  # B-13：锁定读防并发覆盖
                     .first()
                 )
+                child = self.db.query(Child).filter(Child.id == req.child_id).first()
                 if w and w.status == WithdrawalRequest.STATUS_APPLYING:
                     w.status = WithdrawalRequest.STATUS_REJECTED
-                    child = self.db.query(Child).filter(Child.id == req.child_id).first()
                     if child:
                         child.operation_locked = 0
+                elif w and w.status in (
+                    WithdrawalRequest.STATUS_REFUNDING,
+                    WithdrawalRequest.STATUS_PENDING_SETTLE,
+                ):
+                    # T5/B-13：结算退款单终态推进（全部拒绝）——全拒退会失败、部分成功 completed
+                    self._settle_withdrawal_on_terminal(req, w, child)
         req.review_remark = remark or None
         req.reviewed_by = admin.id
         req.reviewed_at = datetime.now()
@@ -574,6 +588,49 @@ class RefundService:
                 if child.member_status != Child.MEMBER_WITHDRAWN:
                     child.member_status = Child.MEMBER_WITHDRAWN
                     child.withdraw_reason = "user_withdrawal"
+                child.operation_locked = 0
+
+    def _settle_withdrawal_on_terminal(
+        self, req: RefundRequest, w: WithdrawalRequest, child: Child | None
+    ) -> None:
+        """结算退款单全部 reject/cancel 时推进退会状态（T5/B-13 20260903）。
+
+        业务语义（用户确认）：全拒/全撤 = 退会整体失败（钱没退，会员资格不剥夺）
+        → REJECTED + 解锁；部分成功（refunded_cnt > 0）→ _advance_withdrawal
+        语义 completed（幂等）。"""
+        self.db.flush()  # 调用方已将本单改终态（rejected/cancelled）落库，open_cnt 才不含自身
+        open_cnt = (
+            self.db.query(func.count(RefundRequest.id))
+            .filter(
+                RefundRequest.withdrawal_id == w.id,
+                RefundRequest.status.in_(
+                    [
+                        RefundRequest.STATUS_PENDING,
+                        RefundRequest.STATUS_APPROVED,
+                        RefundRequest.STATUS_PROCESSING,
+                        RefundRequest.STATUS_FAILED,
+                    ]
+                ),
+                RefundRequest.is_deleted == 0,
+            )
+            .scalar()
+        )
+        if open_cnt:
+            return
+        refunded_cnt = (
+            self.db.query(func.count(RefundRequest.id))
+            .filter(
+                RefundRequest.withdrawal_id == w.id,
+                RefundRequest.status == RefundRequest.STATUS_REFUNDED,
+                RefundRequest.is_deleted == 0,
+            )
+            .scalar()
+        )
+        if refunded_cnt > 0:
+            self._advance_withdrawal(req.id)  # completed（幂等）
+        else:
+            w.status = WithdrawalRequest.STATUS_REJECTED
+            if child:
                 child.operation_locked = 0
 
     def _refund_activity_enrollment(self, order: Order) -> None:
