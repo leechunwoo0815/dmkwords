@@ -602,11 +602,13 @@ class ActivityService:
         return out
 
     def cancel(self, child: Child, enrollment_id: int) -> dict:
-        """免费活动报名取消（开始前）。"""
+        """免费活动报名取消（开始前）。付费活动必须走退款矩阵（B-6/T14 守卫）。"""
         e = self._my_enrollment(child, enrollment_id)
         if e.status != ActivityEnrollment.STATUS_ENROLLED:
             raise ValidationError(f"状态 {e.status} 不可取消")
         a = self._get(e.activity_id)
+        if (a.fee or 0) > 0 or e.order_id:
+            raise ValidationError("付费活动请走退款流程（报名费原路退回）")
         if a.start_at <= datetime.now():
             raise ValidationError("活动已开始，不能取消（请联系馆员）")
         e.status = ActivityEnrollment.STATUS_CANCELLED
