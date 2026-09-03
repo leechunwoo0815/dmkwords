@@ -466,15 +466,31 @@ class OrderService:
         )
         if not orders:
             return 0
+        marked = 0
+        from sqlalchemy import update as sa_update
+
         for order in orders:
-            order.status = Order.STATUS_CANCELLED
+            # E-6/T18：条件 UPDATE 守卫（对齐 overdue_mark 先例）——管理员并发
+            # confirm_payment 的 PAID 单不被覆盖回 CANCELLED（钱收了单没了）
+            result = self.db.execute(
+                sa_update(Order)
+                .where(
+                    Order.id == order.id,
+                    Order.status.in_([Order.STATUS_PENDING_PAYMENT, Order.STATUS_PENDING_MANUAL]),
+                )
+                .values(status=Order.STATUS_CANCELLED)
+            )
+            if result.rowcount == 0:
+                continue  # 状态已被并发事务改变（如收款确认），跳过（含报名联动全部跳过）
+            order.status = Order.STATUS_CANCELLED  # ORM 对象同步，供后续联动逻辑
             self.db.flush()
             if order.order_type == Order.TYPE_ACTIVITY:
                 from backend.domain.activity.service import ActivityService
 
                 ActivityService(self.db).cancel_enrollment_by_order(order)
+            marked += 1
         self.db.commit()
-        return len(orders)
+        return marked
 
     def first_activity_90d_remind(self) -> int:
         """99 元首场活动购后 90 天提醒转年费（FEAT-068）。每家长一条。"""
