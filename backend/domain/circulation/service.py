@@ -199,7 +199,8 @@ class CirculationService:
                 raise ValidationError("押金未缴纳（可人工放行并填写原因）")
             warnings.append("押金未缴纳")
 
-        # 借阅上限：30 − 逾期未还数（V1.1 §5.4）
+        # 借阅上限：30 − 在借数（E-9 20260903：逾期已在 active 内，单次扣减；
+        # 原公式 borrow_limit - overdue - active 逾期一本双扣）
         borrow_limit = int(ConfigService(self.db).get_value("borrow_limit"))
         now = datetime.now()
         active_count = (
@@ -221,7 +222,7 @@ class CirculationService:
             )
             .scalar()
         )
-        quota = borrow_limit - overdue_count - active_count
+        quota = borrow_limit - active_count
         if quota <= 0 and not override_reason:
             raise ValidationError(
                 f"可借上限已满（上限 {borrow_limit}，逾期 {overdue_count} 本，在借 {active_count} 本）"
