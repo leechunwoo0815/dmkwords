@@ -402,7 +402,7 @@ class ActivityService:
         a = (
             self.db.query(Activity)
             .filter(Activity.id == activity_id, Activity.is_deleted == 0)
-            .with_for_update()
+            .with_for_update().populate_existing()
             .first()
         )
         if not a:

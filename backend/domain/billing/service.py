@@ -55,7 +55,7 @@ class DepositService:
         dep = (
             self.db.query(Deposit)
             .filter(Deposit.child_id == child.id, Deposit.is_deleted == 0)
-            .with_for_update()  # P1-F2 双保险：幂等检查基于锁定读（双确认时后到者阻塞后看到已缴）
+            .with_for_update().populate_existing()  # P1-F2 双保险：幂等检查基于锁定读（双确认时后到者阻塞后看到已缴）
             .first()
         )
         if dep is None:
@@ -179,7 +179,7 @@ class DepositService:
         dep = (
             self.db.query(Deposit)
             .filter(Deposit.child_id == child_id, Deposit.is_deleted == 0)
-            .with_for_update()
+            .with_for_update().populate_existing()
             .first()
         )
         if dep is None:

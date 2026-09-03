@@ -340,7 +340,7 @@ class ReservationService:
                 BookCopy.is_deleted == 0,
             )
             .order_by(BookCopy.id)
-            .with_for_update()
+            .with_for_update().populate_existing()
             .first()
         )
         if not copy:
@@ -367,13 +367,13 @@ class ReservationService:
                 Reservation.child_id == child.id,
                 Reservation.is_deleted == 0,
             )
-            .with_for_update()  # P1-F4：锁定读（锁序 Reservation → copy，与核销一致）
+            .with_for_update().populate_existing()  # P1-F4：锁定读（锁序 Reservation → copy，与核销一致）
             .first()
         )
         if not res or res.status != Reservation.STATUS_ACTIVE:
             raise ValidationError("预约不存在或状态不可取消")
         res.status = Reservation.STATUS_CANCELLED
-        copy = self.db.query(BookCopy).filter(BookCopy.id == res.copy_id).with_for_update().first()
+        copy = self.db.query(BookCopy).filter(BookCopy.id == res.copy_id).with_for_update().populate_existing().first()
         if copy and copy.status == BookCopy.STATUS_RESERVED:  # 锁后当前读
             copy.status = BookCopy.STATUS_AVAILABLE
         self.db.commit()
@@ -408,7 +408,7 @@ class ReservationService:
                 continue
             res.status = Reservation.STATUS_EXPIRED
             copy = (
-                self.db.query(BookCopy).filter(BookCopy.id == res.copy_id).with_for_update().first()
+                self.db.query(BookCopy).filter(BookCopy.id == res.copy_id).with_for_update().populate_existing().first()
             )
             if copy and copy.status == BookCopy.STATUS_RESERVED:  # 锁后当前读
                 copy.status = BookCopy.STATUS_AVAILABLE
@@ -600,7 +600,7 @@ class ReservationAdminService:
         if _res_pre:
             self.db.query(ChildModel).filter(
                 ChildModel.id == _res_pre.child_id
-            ).with_for_update().first()
+            ).with_for_update().populate_existing().first()
         res = (
             self.db.query(Reservation)
             .filter(Reservation.id == reservation_id, Reservation.is_deleted == 0)
@@ -612,7 +612,7 @@ class ReservationAdminService:
             raise ValidationError("预约不存在或状态不可核销")
         if res.expires_at < datetime.now():
             raise ValidationError("预约已超时，请先走逾期释放")
-        copy = self.db.query(BookCopy).filter(BookCopy.id == res.copy_id).with_for_update().first()
+        copy = self.db.query(BookCopy).filter(BookCopy.id == res.copy_id).with_for_update().populate_existing().first()
         if not copy or copy.status != BookCopy.STATUS_RESERVED:
             raise ConflictError("预约副本状态异常（可能已被释放）")
         # 副本 reserved→available 后走标准借书（borrow 内部 commit，一并提交预约状态）
