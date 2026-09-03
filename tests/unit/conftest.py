@@ -57,6 +57,10 @@ ADMIN_TABLES = [
 @pytest.fixture(autouse=True)
 def clean_db():
     """每个测试独立数据：截断 admin 三表 → 重播种子 → 清配置缓存。"""
+    # I-3/T8：RateLimiter 全局实例（内存）跨测试累积会误伤——每测试重置
+    from backend.middleware.rate_limit import _limiter as _rate_limiter
+
+    _rate_limiter._requests.clear()
     with engine.begin() as conn:
         # 2026-08-24 事故加固：dev.sh 后端与 pytest 共库，后端连接持有表锁会导致
         # TRUNCATE 挂起无输出。先设短锁等待超时，让问题显式报错而非假死 15 分钟。

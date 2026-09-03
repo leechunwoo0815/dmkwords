@@ -11,8 +11,9 @@ from pydantic import Field
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
-from backend.common.exceptions import NotFoundError
+from backend.common.exceptions import NotFoundError, ValidationError
 from backend.database import get_db
+from backend.middleware.rate_limit import rate_limit
 from backend.domain.catalog.models import Book
 from backend.domain.identity import guards
 from backend.domain.identity.auth import (
@@ -44,7 +45,7 @@ class ProgressReportRequest(BaseSchema):
     session_start: int | None = Field(None, ge=0)
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(rate_limit(3, 60))])
 def login(body: LoginRequest, db: Session = Depends(get_db)):
     """家长登录（A-1/T6 下沉：逻辑在 identity.auth.authenticate_parent）。"""
     return authenticate_parent(db, body.phone, body.code)

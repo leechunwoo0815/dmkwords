@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from backend.common.base_schema import PaginatedResponse
 from backend.database import get_db
+from backend.middleware.rate_limit import rate_limit
 from backend.domain.admin.models import AdminUser
 from backend.domain.admin.schemas import (
     AdminNotificationHandleRequest,
@@ -39,7 +40,7 @@ from backend.middleware.admin_rbac import require_perm, require_super_admin
 router = APIRouter(tags=["admin"])
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", response_model=LoginResponse, dependencies=[Depends(rate_limit(5, 60))])
 def login(body: LoginRequest, db: Session = Depends(get_db)):
     token, user = AuthService(db).login(body.username, body.password)
     return LoginResponse(

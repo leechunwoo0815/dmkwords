@@ -27,6 +27,14 @@ SEED_ACCOUNTS = [
 
 
 def seed() -> list[str]:
+    # C-1/2（外部审计 20260903）：生产模式拒绝默认弱口令——非 DEBUG 即生产，
+    # 防止误播种 admin/dmkwords123 被接管；生产口令经 .env 环境变量注入覆盖
+    from backend.config import get_settings
+
+    if not get_settings().DEBUG:
+        raise RuntimeError(
+            "生产环境禁止播种默认口令（admin/dmkwords123）——请通过 .env 环境变量注入强口令"
+        )
     db = get_session()
     created: list[str] = []
     try:
