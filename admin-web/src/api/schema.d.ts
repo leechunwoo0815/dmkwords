@@ -1075,7 +1075,8 @@ export interface paths {
         put?: never;
         /**
          * Refund Order
-         * @description 订单退款执行（超管；审核路径的家庭申请流程见 WM10 退款中心）。
+         * @description 超管代家长发起退款申请（B-15 改造 20260903）：走 R-308 审核链，不再直接退款。
+         *     返回 RefundRequest 视图（pending），后续 review→execute 与家长申请同链。
          */
         post: operations["refund_order_api_admin_orders__order_id__refund_post"];
         delete?: never;
@@ -1150,6 +1151,26 @@ export interface paths {
         };
         /** Admin Withdrawal List */
         get: operations["admin_withdrawal_list_api_admin_withdrawals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/withdrawals/{request_id}/settle-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin Withdrawal Settle Preview
+         * @description X2：退会审核预估结算明细（审核前明批，与真正结算同一份计算代码）。
+         */
+        get: operations["admin_withdrawal_settle_preview_api_admin_withdrawals__request_id__settle_preview_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1340,7 +1361,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Login */
+        /**
+         * Login
+         * @description 家长登录（A-1/T6 下沉：逻辑在 identity.auth.authenticate_parent）。
+         */
         post: operations["login_api_miniapp_login_post"];
         delete?: never;
         options?: never;
@@ -1886,7 +1910,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** My Orders */
+        /**
+         * My Orders
+         * @description 家长视角订单列表（A-1/T6 下沉：逻辑在 OrderService.my_orders）。
+         */
         get: operations["my_orders_api_miniapp_orders_get"];
         put?: never;
         post?: never;
@@ -1903,7 +1930,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** My Notifications */
+        /**
+         * My Notifications
+         * @description 家长端消息中心（A-1/T6 下沉：逻辑在 NotificationService.list_mine）。
+         */
         get: operations["my_notifications_api_miniapp_notifications_get"];
         put?: never;
         post?: never;
@@ -1922,7 +1952,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Mark Notifications Read */
+        /**
+         * Mark Notifications Read
+         * @description 标记已读（A-1/T6 下沉：逻辑在 NotificationService.mark_read）。
+         */
         post: operations["mark_notifications_read_api_miniapp_notifications_read_post"];
         delete?: never;
         options?: never;
@@ -2104,7 +2137,7 @@ export interface paths {
         };
         /**
          * My Deposit
-         * @description 押金账户状态（家长端押金页）。
+         * @description 押金账户状态（家长端押金页，A-1/T6 下沉：逻辑在 DepositService.my_deposit_view）。
          */
         get: operations["my_deposit_api_miniapp_deposits_get"];
         put?: never;
@@ -6231,6 +6264,37 @@ export interface operations {
             };
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_withdrawal_settle_preview_api_admin_withdrawals__request_id__settle_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: number;
+            };
             cookie?: never;
         };
         requestBody?: never;

@@ -115,7 +115,7 @@ class ActivityService:
             "start_at": str(a.start_at),
             "location": a.location,
             "fee": str(a.fee),
-            "fee_display": "免费" if float(a.fee) == 0 else f"{a.fee} 元",
+            "fee_display": "免费" if not a.fee else f"{a.fee} 元",
             "member_only": bool(a.member_only),
             "enroll_deadline": str(a.enroll_deadline) if a.enroll_deadline else None,
             "status": a.status,
@@ -436,7 +436,7 @@ class ActivityService:
 
         fee = a.fee
         order = None
-        if float(fee) > 0:
+        if fee is not None and fee > 0:
             # 收费活动：先建订单（待人工收款确认）占名额
             from backend.domain.identity.service import OrderService
 

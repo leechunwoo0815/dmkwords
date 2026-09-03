@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -22,7 +23,8 @@ class ActivityCreateRequest(BaseSchema):
     start_at: datetime
     location: str = Field("", max_length=200)
     max_quota: int = Field(..., gt=0, le=1000)
-    fee: float = Field(0, ge=0)
+    # B-8/T15：金额严禁 float（宪法红线），Decimal 落 Numeric(10,2)
+    fee: Decimal = Field(Decimal("0"), ge=0)
     description: str | None = Field(None, max_length=2000)
     member_only: bool = False
     enroll_deadline: datetime | None = None
