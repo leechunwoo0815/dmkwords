@@ -266,6 +266,16 @@ class ReservationService:
         self.db = db
 
     def create(self, child: Child, book_id: int) -> Reservation:
+        # 锁主体行：同一孩子的并发预约串行化（E-7 提前 20260903，与 borrow/checkout
+        # 同款锁序 Child 最先；Reservation 无唯一索引兜底，RC 不能替代行锁）
+        child = (
+            self.db.query(Child)
+            .filter(Child.id == child.id, Child.is_deleted == 0)
+            .with_for_update().populate_existing()
+            .first()
+        )
+        if not child:
+            raise NotFoundError("孩子不存在")
         # 校验：有效会员 + 押金 + 无逾期 + 额度（在借+预约 ≤ 上限）
         if child.operation_locked:
             raise ValidationError("孩子正在转让/退会审核流程中，预约已冻结")
