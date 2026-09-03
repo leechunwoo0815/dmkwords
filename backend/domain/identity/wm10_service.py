@@ -323,7 +323,13 @@ class RefundService:
         if approve:
             req.status = RefundRequest.STATUS_APPROVED
             if req.kind == RefundRequest.KIND_ORDER and req.order_id:
-                order = self.db.query(Order).filter(Order.id == req.order_id).first()
+                order = (
+                    self.db.query(Order)
+                    .filter(Order.id == req.order_id)
+                    .with_for_update()
+                    .populate_existing()  # B-5/T24：防御纵深（RefundRequest 主锁已串行化主场景）
+                    .first()
+                )
                 if order:
                     order.refund_status = Order.REFUND_STATUS_APPROVED
             # R-309 联动退会：审核通过 → 进入执行阶段（refunding），
@@ -341,7 +347,13 @@ class RefundService:
                 raise ValidationError("拒绝退款必须填写原因（家长可见）")
             req.status = RefundRequest.STATUS_REJECTED
             if req.kind == RefundRequest.KIND_ORDER and req.order_id:
-                order = self.db.query(Order).filter(Order.id == req.order_id).first()
+                order = (
+                    self.db.query(Order)
+                    .filter(Order.id == req.order_id)
+                    .with_for_update()
+                    .populate_existing()  # B-5/T24：防御纵深同上
+                    .first()
+                )
                 if order and order.refund_status == Order.REFUND_STATUS_PENDING:
                     order.refund_status = Order.REFUND_STATUS_NONE
             # 联动退会申请一并拒绝 + 解锁（R-309 联动创建的；拒绝后家长可再申请）
@@ -424,6 +436,9 @@ class RefundService:
                 dep = self.db.query(Deposit).filter(Deposit.id == req.deposit_id).first()
                 if dep:
                     dep.status = Deposit.STATUS_REFUNDED
+                    # B-4/T24：先扣减再记账——balance_after 取实扣后余额
+                    # （当前全额退结果同为 0；未来部分退款台账不再断链）
+                    dep.available_amount = dep.available_amount - req.amount
                     from backend.domain.billing.models import DepositLedger
 
                     self.db.add(
@@ -431,12 +446,11 @@ class RefundService:
                             deposit_id=dep.id,
                             entry_type=DepositLedger.ENTRY_REFUND,
                             amount=req.amount,
-                            balance_after=Decimal("0"),
+                            balance_after=dep.available_amount,
                             reason=remark or "押金退款执行",
                             operator_id=admin.id,
                         )
                     )
-                    dep.available_amount = Decimal("0")
         else:
             if not remark or not remark.strip():
                 raise ValidationError("执行失败必须填写原因（留痕）")
