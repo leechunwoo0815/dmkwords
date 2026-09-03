@@ -108,7 +108,14 @@ class WithdrawalService:
 
     def apply(self, child: Child, reason: str) -> dict:
         # P1-F7：锁 Child 主体行（并发双 apply 串行化；operation_locked 写同在锁内）
-        child = self.db.query(Child).filter(Child.id == child.id).with_for_update().populate_existing().first() or child
+        child = (
+            self.db.query(Child)
+            .filter(Child.id == child.id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+            or child
+        )
         if child.member_status == Child.MEMBER_WITHDRAWN:
             raise ValidationError("孩子已是退会状态")
         if not child.is_active_member:
@@ -316,12 +323,19 @@ class WithdrawalService:
         req = (
             self.db.query(WithdrawalRequest)
             .filter(WithdrawalRequest.id == request_id, WithdrawalRequest.is_deleted == 0)
-            .with_for_update().populate_existing()  # B-14（外部审计 20260903）：并发双审批防双结算——锁定读刷新 identity map
+            .with_for_update()
+            .populate_existing()  # B-14（外部审计 20260903）：并发双审批防双结算——锁定读刷新 identity map
             .first()
         )
         if not req or req.status != WithdrawalRequest.STATUS_APPLYING:
             raise ValidationError("退会申请不存在或已处理")
-        child = self.db.query(Child).filter(Child.id == req.child_id).with_for_update().populate_existing().first()
+        child = (
+            self.db.query(Child)
+            .filter(Child.id == req.child_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
         if not child:
             raise NotFoundError("孩子不存在")
         if approve:

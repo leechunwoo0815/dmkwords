@@ -173,7 +173,8 @@ class OrderService:
         order = (
             self.db.query(Order)
             .filter(Order.id == order_id, Order.is_deleted == 0)
-            .with_for_update().populate_existing()  # B-15：锁定读防并发旁路
+            .with_for_update()
+            .populate_existing()  # B-15：锁定读防并发旁路
             .first()
         )
         if not order:
@@ -260,7 +261,8 @@ class OrderService:
         order = (
             self.db.query(Order)
             .filter(Order.id == order_id, Order.is_deleted == 0)
-            .with_for_update().populate_existing()  # P1-F2：锁定读，双管理员并发确认串行化（防双押金记账/到期日覆盖/双事件）
+            .with_for_update()
+            .populate_existing()  # P1-F2：锁定读，双管理员并发确认串行化（防双押金记账/到期日覆盖/双事件）
             .first()
         )
         if not order:

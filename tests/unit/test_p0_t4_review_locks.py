@@ -16,7 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.common.exceptions import ValidationError
-from tests.unit.test_wm10_concurrency import _h, _family, _pay, _pay_deposit
+from tests.unit.test_wm10_concurrency import _family, _h, _pay, _pay_deposit
 
 
 def _db():
@@ -35,10 +35,10 @@ def test_withdrawal_review_double_approve_blocked(client: TestClient, session_pa
 
     h = _h(client)
     p, c, mini = _family(client, h, "13980004401", "退会锁孩")
-    order = _pay(client, h, c["id"], "observation_fee")
+    _pay(client, h, c["id"], "observation_fee")
     _pay_deposit(client, h, c["id"])
     # 直插退会申请 applying（child 无借书/无进行中退款申请 → preconditions 空，避开联动链）
-    from backend.domain.identity.models import Child, WithdrawalRequest
+    from backend.domain.identity.models import Child
 
     with _db() as db:
         w = WithdrawalRequest(

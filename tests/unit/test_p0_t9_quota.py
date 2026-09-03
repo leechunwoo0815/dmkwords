@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
-from tests.unit.test_wm10_concurrency import _h, _family, _pay, _pay_deposit, _book_with_copies
+from tests.unit.test_wm10_concurrency import _book_with_copies, _family, _h, _pay, _pay_deposit
 
 
 def _db():
@@ -35,9 +35,7 @@ def _overdue_all(client, h, child_id):
     with _db() as db:
         db.query(BorrowRecord).filter(
             BorrowRecord.child_id == child_id,
-            BorrowRecord.status.in_(
-                [BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]
-            ),
+            BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
         ).update({"due_at": datetime.now() - timedelta(days=3)})
         db.commit()
 

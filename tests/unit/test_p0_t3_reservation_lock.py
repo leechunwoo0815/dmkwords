@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 from sqlalchemy import func
 
-from tests.unit.test_wm10_concurrency import _h, _family, _pay, _pay_deposit, _book_with_copies
+from tests.unit.test_wm10_concurrency import _book_with_copies, _family, _h, _pay, _pay_deposit
 
 
 def _db():

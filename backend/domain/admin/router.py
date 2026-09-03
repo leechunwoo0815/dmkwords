@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 
 from backend.common.base_schema import PaginatedResponse
 from backend.database import get_db
-from backend.middleware.rate_limit import rate_limit
 from backend.domain.admin.models import AdminUser
 from backend.domain.admin.schemas import (
     AdminNotificationHandleRequest,
@@ -36,6 +35,7 @@ from backend.domain.admin.service import (
 )
 from backend.middleware.admin_auth import get_current_admin
 from backend.middleware.admin_rbac import require_perm, require_super_admin
+from backend.middleware.rate_limit import rate_limit
 
 router = APIRouter(tags=["admin"])
 

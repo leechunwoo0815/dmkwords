@@ -16,7 +16,7 @@ operation_locked=1，无出口（execute 失败有出口回 pending_settle，但
 
 from fastapi.testclient import TestClient
 
-from tests.unit.test_wm10_concurrency import _h, _family, _pay, _pay_deposit
+from tests.unit.test_wm10_concurrency import _family, _h, _pay, _pay_deposit
 
 
 def _db():

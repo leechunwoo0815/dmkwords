@@ -100,7 +100,13 @@ class CirculationService:
         override_reason: str | None = None,
     ) -> tuple[BorrowRecord, list[str]]:
         # 锁主体行：同一孩子的并发借书串行化（模式手册 P10）
-        child = self.db.query(Child).filter(Child.id == child_id).with_for_update().populate_existing().first()
+        child = (
+            self.db.query(Child)
+            .filter(Child.id == child_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
         if not child:
             raise NotFoundError("孩子不存在")
         if child.operation_locked:
@@ -132,7 +138,13 @@ class CirculationService:
 
         # 定位副本
         if copy_id:
-            copy = self.db.query(BookCopy).filter(BookCopy.id == copy_id).with_for_update().populate_existing().first()
+            copy = (
+                self.db.query(BookCopy)
+                .filter(BookCopy.id == copy_id)
+                .with_for_update()
+                .populate_existing()
+                .first()
+            )
             if not copy:
                 raise NotFoundError("副本不存在")
             book = self.db.query(Book).filter(Book.id == copy.book_id).first()
@@ -140,7 +152,13 @@ class CirculationService:
             book, copy = self.find_copy_by_isbn(isbn)
             if not copy:
                 raise ConflictError(f"《{book.title}》当前无在馆副本")
-            copy = self.db.query(BookCopy).filter(BookCopy.id == copy.id).with_for_update().populate_existing().first()
+            copy = (
+                self.db.query(BookCopy)
+                .filter(BookCopy.id == copy.id)
+                .with_for_update()
+                .populate_existing()
+                .first()
+            )
         else:
             raise ValidationError("请提供副本ID或ISBN")
 
@@ -313,12 +331,19 @@ class CirculationService:
                 BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
                 BorrowRecord.is_deleted == 0,
             )
-            .with_for_update().populate_existing()
+            .with_for_update()
+            .populate_existing()
             .first()
         )
         if not record:
             raise NotFoundError("该副本没有进行中的借阅")
-        copy = self.db.query(BookCopy).filter(BookCopy.id == copy_id).with_for_update().populate_existing().first()
+        copy = (
+            self.db.query(BookCopy)
+            .filter(BookCopy.id == copy_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
 
         was_overdue = record.due_at < datetime.now()
         record.status = BorrowRecord.STATUS_RETURNED

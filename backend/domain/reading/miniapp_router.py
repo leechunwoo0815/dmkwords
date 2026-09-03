@@ -11,9 +11,8 @@ from pydantic import Field
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
-from backend.common.exceptions import NotFoundError, ValidationError
+from backend.common.exceptions import NotFoundError
 from backend.database import get_db
-from backend.middleware.rate_limit import rate_limit
 from backend.domain.catalog.models import Book
 from backend.domain.identity import guards
 from backend.domain.identity.auth import (
@@ -29,6 +28,7 @@ from backend.domain.reading.service import (
     ShelfService,
     VocabularyService,
 )
+from backend.middleware.rate_limit import rate_limit
 
 router = APIRouter(tags=["miniapp"])
 

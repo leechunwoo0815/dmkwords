@@ -207,11 +207,7 @@ class BookService:
 
     def get_book_public(self, book_id: int) -> Book | None:
         """公开书目查询（详情/音频/封面共用，A-1/T6 下沉）。"""
-        return (
-            self.db.query(Book)
-            .filter(Book.id == book_id, Book.is_deleted == 0)
-            .first()
-        )
+        return self.db.query(Book).filter(Book.id == book_id, Book.is_deleted == 0).first()
 
     def create_book(self, admin, req: BookCreateRequest) -> Book:
         isbn = clean_isbn(req.isbn)

@@ -51,9 +51,7 @@ def test_review_lock_refreshes_identity_map(session_pair):
     s2.commit()
 
     # 对照 1（RED 语义）：裸锁定读命中 identity map 旧值——陷阱机制实锤
-    stale_locked = (
-        s1.query(RefundRequest).filter(RefundRequest.id == rid).with_for_update().first()
-    )
+    stale_locked = s1.query(RefundRequest).filter(RefundRequest.id == rid).with_for_update().first()
     assert stale_locked.status == RefundRequest.STATUS_PENDING, (
         "identity map 旧值未命中？——场景构造失效，对照 1 无效"
     )

@@ -32,6 +32,9 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+# 外部专家审查报告是外部交付物/审计留痕，格式门禁不改写其内容
+# （ruff 0.16 起默认格式化 md 内 python 代码块，gate p0batch1 首轮 4 文件实证）
+extend-exclude = ["外部专家意见"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B"]
