@@ -128,12 +128,19 @@ class RefundService:
 
     # ---------- 家长申请 ----------
     def apply(
-        self, child: Child, order_id: int, reason: str, skip_lock_check: bool = False
+        self,
+        child: Child,
+        order_id: int,
+        reason: str,
+        skip_lock_check: bool = False,
+        skip_commit: bool = False,
     ) -> RefundRequest:
         """创建统一退款申请（R-308 七态入口）。
 
         skip_lock_check：馆员批量路径（T16 活动取消）传 True——活动取消是馆员操作，
-        孩子转让/退会锁定不应阻断退款台账创建（家长主动申请仍硬拦截）。"""
+        孩子转让/退会锁定不应阻断退款台账创建（家长主动申请仍硬拦截）。
+        skip_commit：T31 批量事务原子性——调用方（cancel_activity 循环）统一收口
+        commit，单失败整体回滚无半程（家长主动单笔路径默认 False 即时提交）。"""
         if not reason or not reason.strip():
             raise ValidationError("必须填写退款原因")
         order = self._paid_order(child, order_id)
@@ -247,7 +254,8 @@ class RefundService:
             applicant_name=f"{parent.name if parent else ''}·{child.name}",
             amount=req.amount,
         )
-        self.db.commit()
+        if not skip_commit:
+            self.db.commit()
         return req
 
     def cancel(self, child: Child, request_id: int) -> RefundRequest:

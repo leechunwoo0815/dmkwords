@@ -187,9 +187,24 @@ class ActivityService:
             .populate_existing()  # E-5/T17：取消全程锁活动行，与 enroll 活动锁串行化
             .first()
         )
-        if a.status != Activity.STATUS_PUBLISHED:
+        if a.status != Activity.STATUS_PUBLISHED and not (a.status == Activity.STATUS_CANCELLED):
             raise ValidationError("活动状态不可取消")
-        a.status = Activity.STATUS_CANCELLED
+        # T31 断点续跑幂等：活动已 cancelled（历史半程失败后重跑）且仍有 ENROLLED
+        # 报名 → 继续处理剩余报名；无 ENROLLED 则重复取消无意义，拦截
+        if a.status == Activity.STATUS_CANCELLED:
+            remaining = (
+                self.db.query(func.count(ActivityEnrollment.id))
+                .filter(
+                    ActivityEnrollment.activity_id == activity_id,
+                    ActivityEnrollment.status == ActivityEnrollment.STATUS_ENROLLED,
+                    ActivityEnrollment.is_deleted == 0,
+                )
+                .scalar()
+            )
+            if not remaining:
+                raise ValidationError("活动已取消（无待处理报名）")
+        else:
+            a.status = Activity.STATUS_CANCELLED
         enrollments = (
             self.db.query(ActivityEnrollment)
             .filter(
@@ -222,6 +237,7 @@ class ActivityService:
                             e.order_id,
                             f"活动《{a.title}》取消退款（馆员批量）",
                             skip_lock_check=True,
+                            skip_commit=True,  # T31：循环内不提交，尾部统一收口（原子性）
                         )
                     # WM13 触发点4：累计待退金额（关联订单金额，Q6 裁定）
                     o = self.db.query(Order).filter(Order.id == e.order_id).first()
