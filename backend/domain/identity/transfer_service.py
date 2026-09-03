@@ -356,6 +356,7 @@ class TransferService:
         req = (
             self.db.query(TransferRequest)
             .filter(TransferRequest.id == transfer_id, TransferRequest.is_deleted == 0)
+            .with_for_update().populate_existing()  # B-1（外部审计 20260903）：并发双审批防双 12 步事务——锁定读刷新 identity map
             .first()
         )
         if not req or req.status != TransferRequest.STATUS_PENDING:
@@ -365,8 +366,8 @@ class TransferService:
             self._unlock_both(req)
             self.db.commit()
             raise ValidationError("转让已超时自动取消")
-        source = self.db.query(Child).filter(Child.id == req.source_child_id).first()
-        target = self.db.query(Child).filter(Child.id == req.target_child_id).first()
+        source = self.db.query(Child).filter(Child.id == req.source_child_id).with_for_update().populate_existing().first()
+        target = self.db.query(Child).filter(Child.id == req.target_child_id).with_for_update().populate_existing().first()
         if not source or not target:
             raise NotFoundError("孩子不存在")
         if approve:
