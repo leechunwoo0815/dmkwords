@@ -1,4 +1,6 @@
 // frontend/utils/consent.js — 三段式监护人同意（前端流程唯一入口）
+// F-L7/T34：TODO——本模块引用的后端端点未实现（consent 三段式=PRD F3），
+//   废弃或实现待产品定（域F LOW 清偿登记）；未接入任何页面
 //
 // 用法：
 //   const consent = require('../../utils/consent')

@@ -289,7 +289,11 @@ export default function GrowthManage() {
       <Modal
         title={report ? `${report.data.child_name} 的${report.data.kind === "weekly" ? "周报" : "月报"}` : "报告"}
         open={!!report} footer={null} width={480}
-        onCancel={() => setReport(null)}
+        onCancel={() => {
+          // F-L3/T34：Object URL 随 modal 关闭回收，防内存泄漏
+          if (reportUrl) URL.revokeObjectURL(reportUrl);
+          setReport(null);
+        }}
       >
         {report && (
           <>

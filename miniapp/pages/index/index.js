@@ -115,16 +115,19 @@ Page({
 
   // 提醒条：未读消息 + 预约中数量
   async loadBadges(childId) {
-    try {
-      const n = await api.notifications(1, 1)
-      this.setData({ unreadCount: n.unread || 0 })
-    } catch (e) { /* 静默 */ }
-    try {
-      const rs = await api.listReservations(childId)
-      // F-M1/T26：后端枚举是 active（waiting/ready 不存在，枚举错配同族第 4 案，徽标恒 0）
-      const active = (rs || []).filter((r) => r.status === 'active')
+    // F-L14/T34：两独立请求并行（原串行 await 拖慢首页徽标）
+    const [nRes, rsRes] = await Promise.allSettled([
+      api.notifications(1, 1),
+      api.listReservations(childId),
+    ])
+    if (nRes.status === 'fulfilled') {
+      this.setData({ unreadCount: nRes.value.unread || 0 })
+    }
+    if (rsRes.status === 'fulfilled') {
+      // F-M1/T26：后端枚举是 active（waiting/ready 不存在，枚举错配同族第 4 案）
+      const active = (rsRes.value || []).filter((r) => r.status === 'active')
       this.setData({ reservationCount: active.length })
-    } catch (e) { /* 静默 */ }
+    }
   },
 
   // 今日推荐：从书库取 6 本真实书目（封面横滑卡）

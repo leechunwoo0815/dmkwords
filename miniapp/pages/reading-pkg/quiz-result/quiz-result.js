@@ -21,7 +21,8 @@ Page({
       result,
       childId,
       childName: decodeURIComponent(options.child_name || ''),
-      percent: Math.round((result.score * 100) / result.total),
+      // F-L6/T34：除零守卫
+      percent: result.total ? Math.round((result.score * 100) / result.total) : 0,
     })
   },
 

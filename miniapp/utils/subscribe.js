@@ -1,4 +1,6 @@
 // frontend/utils/subscribe.js — 微信订阅消息授权
+// F-L7/T34：TODO——本模块引用的后端端点未实现（consent 三段式=PRD F3），
+//   废弃或实现待产品定（域F LOW 清偿登记）；未接入任何页面
 // 模板 ID 与后端 backend/integrations/wechat/config.py SubscribeTemplate 一一对应；
 // 微信后台申请后填入，未配置（空）时跳过授权请求（不打扰用户）。
 // 订阅消息为一次性授权：用户接受后仅可推送一次，需在关键操作后请求。

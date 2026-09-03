@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Card, message, Popconfirm, Popover, Table, Tag } from "antd";
+import {
+  App as AntdApp,
+  Button,
+  Card,
+  Popconfirm,
+  Popover,
+  Table,
+  Tag,
+} from "antd";
 import { PlayCircleOutlined, ReloadOutlined } from "@ant-design/icons";
 
 import PaintEmpty from "../components/PaintEmpty";
@@ -55,6 +63,7 @@ function lastRunCell(last: TaskSpecItem["last_run"] | undefined): React.ReactNod
 }
 
 export default function TaskBoard() {
+  const { message } = AntdApp.useApp(); // F-L4/T34：App context 化（禁静态 message）
   const [specs, setSpecs] = useState<TaskSpecItem[]>([]);
   const [runs, setRuns] = useState<TaskRunItem[]>([]);
   const [running, setRunning] = useState<string | null>(null);

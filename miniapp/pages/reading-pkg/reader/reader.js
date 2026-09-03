@@ -153,14 +153,23 @@ Page({
       const cur = audio.currentTime || 0
       // 时长校准兜底：onCanplay 在部分基础库不触发，sliderMax 会停在初始值，滑块看似不动
       const realDur = audio.duration || 0
+      // F-L12/T34：高频路径（~250ms）双 setData 合并为一次
       if (realDur > 0 && Math.floor(realDur) !== this.data.sliderMax) {
-        this.setData({ duration: realDur, displayDuration: fmt(realDur), sliderMax: Math.floor(realDur) })
+        this.setData({
+          duration: realDur,
+          displayDuration: fmt(realDur),
+          sliderMax: Math.floor(realDur),
+          currentTime: cur,
+          displayTime: fmt(cur),
+          sliderValue: Math.floor(cur),
+        })
+      } else {
+        this.setData({
+          currentTime: cur,
+          displayTime: fmt(cur),
+          sliderValue: Math.floor(cur),
+        })
       }
-      this.setData({
-        currentTime: cur,
-        displayTime: fmt(cur),
-        sliderValue: Math.floor(cur),
-      })
       // F-H5/T26：onTimeUpdate 实际触发频率 ~250ms 而非 1s，原计数法上报量 ~4×；
       // 改墙钟差值判断（HEARTBEAT_SEC 秒真实间隔一次）
       if (!this._lastBeatAt) this._lastBeatAt = Date.now()

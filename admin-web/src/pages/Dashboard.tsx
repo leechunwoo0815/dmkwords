@@ -7,7 +7,15 @@ import {
   ReloadOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Col, message, Row, Tag, Typography } from "antd";
+import {
+  App as AntdApp,
+  Button,
+  Card,
+  Col,
+  Row,
+  Tag,
+  Typography,
+} from "antd";
 import { useNavigate } from "react-router-dom";
 
 import PaintLoading from "../components/PaintLoading";
@@ -125,6 +133,7 @@ function TodoCard({
 }
 
 export default function Dashboard() {
+  const { message } = AntdApp.useApp(); // F-L4/T34：App context 化（禁静态 message）
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const { counts, failed, reload } = useTodoCounts();

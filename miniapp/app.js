@@ -29,7 +29,7 @@ App({
     })
 
     const savedToken = wx.getStorageSync('token')
-    const savedUser = wx.getStorageSync('userInfo')
+    const savedUser = wx.getStorageSync('parent') // F-L18/T34：login.js 写入的是 parent（原读 userInfo 死 key，冷启动永 null）
     if (savedToken) {
       this.globalData.token = savedToken
       this.globalData.userInfo = savedUser || null

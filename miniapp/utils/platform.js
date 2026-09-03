@@ -1,4 +1,6 @@
 // frontend/utils/platform.js — 平台判断与 iOS 支付引导（P1-1：统一各页重复判定）
+// F-L7/T34：TODO——本模块引用的后端端点未实现（consent 三段式=PRD F3），
+//   废弃或实现待产品定（域F LOW 清偿登记）；未接入任何页面
 const req = require('./request')
 
 /** 是否 iOS 平台（统一封装，各页不再重复 wx.getWindowInfo/getDeviceInfo） */

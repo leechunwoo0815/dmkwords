@@ -3,13 +3,13 @@ import {
   Button,
   Card,
   Input,
-  message,
   Modal,
   Select,
   Table,
   Tabs,
   Tag,
   Typography,
+  App as AntdApp,
 } from "antd";
 import { DownloadOutlined, LinkOutlined } from "@ant-design/icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -120,6 +120,7 @@ function waitCell(created: string): React.ReactNode {
 }
 
 export default function Notifications() {
+  const { message } = AntdApp.useApp(); // F-L4/T34：App context 化（禁静态 message）
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const box = searchParams.get("box") === "admin" ? "admin" : "parent";

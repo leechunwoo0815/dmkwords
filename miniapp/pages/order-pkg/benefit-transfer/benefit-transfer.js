@@ -19,14 +19,15 @@ Page({
   },
 
   async load() {
-    this.setData({ loading: true })
+    // F-L13/T34：三连 setData 合并（竞态序号守卫未做，LOW 留痕——响应乱序窗口极小）
     const children = session.getChildren()
-    this.setData({ children })
+    this.setData({ loading: true, children })
     try {
       const records = await api.myTransfers()
-      this.setData({ records: records || [] })
-    } catch (e) { /* 静默 */ }
-    this.setData({ loading: false })
+      this.setData({ records: records || [], loading: false })
+    } catch (e) {
+      this.setData({ loading: false })
+    }
   },
 
   onPickSource(e) {

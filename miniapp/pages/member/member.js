@@ -41,7 +41,7 @@ Page({
   },
 
   _expireLine(c) {
-    if (!c) return ''
+    if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return } // F-L17/T34 ''
     const fmt = (d) => {
       const dt = new Date(String(d).replace(/-/g, '/'))
       const m = String(dt.getMonth() + 1).padStart(2, '0')
@@ -70,7 +70,7 @@ Page({
 
   goCheckin() {
     const c = this.data.currentChild
-    if (!c) return
+    if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return } // F-L17/T34
     wx.navigateTo({ url: `/pages/member-pkg/checkin/checkin?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
 
@@ -80,7 +80,7 @@ Page({
 
   goRefund() {
     const c = this.data.currentChild
-    if (!c) return
+    if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return } // F-L17/T34
     wx.navigateTo({ url: `/pages/order-pkg/refund-apply/refund-apply?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
   goTransfer() {
@@ -88,33 +88,33 @@ Page({
   },
   goVocabulary() {
     const c = this.data.currentChild
-    if (!c) return
+    if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return } // F-L17/T34
     wx.navigateTo({ url: `/pages/reading-pkg/vocabulary/vocabulary?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
   goObservation() {
     const c = this.data.currentChild
-    if (!c) return
+    if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return } // F-L17/T34
     wx.navigateTo({ url: `/pages/member-pkg/observation-report/observation-report?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
   goLeaderboard() {
     const c = this.data.currentChild
-    if (!c) return
+    if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return } // F-L17/T34
     wx.navigateTo({ url: `/pages/member-pkg/leaderboard/leaderboard?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
   goPassport() {
     const c = this.data.currentChild
-    if (!c) return
+    if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return } // F-L17/T34
     wx.navigateTo({ url: `/pages/member-pkg/profile-card/profile-card?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
   goAchievement() {
     const c = this.data.currentChild
-    if (!c) return
+    if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return } // F-L17/T34
     wx.navigateTo({ url: `/pages/member-pkg/achievement/achievement?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
 
   goReport() {
     const c = this.data.currentChild
-    if (!c) return
+    if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return } // F-L17/T34
     wx.navigateTo({ url: `/pages/member-pkg/report/report?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
 
@@ -125,13 +125,13 @@ Page({
 
   goDeposit() {
     const c = this.data.currentChild
-    if (!c) return
+    if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return } // F-L17/T34
     wx.navigateTo({ url: `/pages/order-pkg/deposit/deposit?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}&member_status=${c.member_status || ''}` })
   },
 
   goReservation() {
     const c = this.data.currentChild
-    if (!c) return
+    if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return } // F-L17/T34
     wx.navigateTo({ url: `/pages/order-pkg/reservation/reservation?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
 

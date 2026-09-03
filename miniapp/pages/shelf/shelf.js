@@ -96,10 +96,15 @@ Page({
       confirmColor: '#FF6B35',
       success(res) {
         if (!res.confirm) return
-        api.cancelReservation(id, that.data.childId).then(function () {
-          wx.showToast({ title: '已取消', icon: 'none' })
-          that.load()
-        })
+        api.cancelReservation(id, that.data.childId)
+          .then(function () {
+            wx.showToast({ title: '已取消', icon: 'none' })
+            that.load()
+          })
+          .catch(function () {
+            // F-L11/T34：失败 toast 已由 request.js 统一弹，这里兜底刷新防状态漂移
+            that.load()
+          })
       },
     })
   },
