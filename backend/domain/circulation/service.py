@@ -550,8 +550,27 @@ class CirculationService:
             .order_by(BorrowRecord.due_at)
             .all()
         )
-        # 顺手把状态标成 overdue
-        for record, *_ in rows:
+        # E-11/T20：逐行条件 UPDATE 守卫（join 查询不宜整查询加锁，对齐 overdue_mark
+        # 先例）——并发还书（RETURNED）不被旧快照复活为逾期；rowcount=0 的行
+        # 从展示列表剔除（还了的书不应再出现在逾期催还名单）
+        from sqlalchemy import update as sa_update
+
+        kept: list[tuple[BorrowRecord, Child, Parent, Book]] = []
+        for row in rows:
+            record = row[0]
+            result = self.db.execute(
+                sa_update(BorrowRecord)
+                .where(
+                    BorrowRecord.id == record.id,
+                    BorrowRecord.status.in_(
+                        [BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]
+                    ),
+                )
+                .values(status=BorrowRecord.STATUS_OVERDUE)
+            )
+            if result.rowcount == 0:
+                continue  # 已被并发还书/推进，跳过且不在名单展示
             record.status = BorrowRecord.STATUS_OVERDUE
+            kept.append(row)
         self.db.commit()
-        return rows
+        return kept
