@@ -14,21 +14,9 @@ from backend.domain.growth.board_service import LeaderboardService, PassportServ
 from backend.domain.growth.report_service import ReportService
 from backend.domain.growth.service import GrowthService, QuizService
 from backend.domain.identity import guards
-from backend.domain.identity.models import Child
-from backend.domain.reading.miniapp_router import get_current_parent
+from backend.domain.identity.auth import _parent_from_token, child_of_parent, get_current_parent
 
 router = APIRouter(tags=["growth-miniapp"])
-
-
-def _child_of_parent(db: Session, parent_id: int, child_id: int) -> Child:
-    child = (
-        db.query(Child)
-        .filter(Child.id == child_id, Child.parent_id == parent_id, Child.is_deleted == 0)
-        .first()
-    )
-    if not child:
-        raise ValidationError("孩子不存在")
-    return child
 
 
 class QuizSubmitRequest(BaseSchema):
@@ -39,7 +27,7 @@ class QuizSubmitRequest(BaseSchema):
 @router.get("/quiz/{book_id}")
 def get_quiz(book_id: int, child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
-    child = _child_of_parent(db, parent.id, child_id)
+    child = child_of_parent(db, parent.id, child_id)
     guards.require_member_action(db, child, guards.QUIZ)
     return QuizService(db).get_quiz(child, book_id)
 
@@ -47,7 +35,7 @@ def get_quiz(book_id: int, child_id: int, auth: Any = Depends(get_current_parent
 @router.post("/quiz/{book_id}/submit")
 def submit_quiz(book_id: int, body: QuizSubmitRequest, auth: Any = Depends(get_current_parent)):
     parent, db = auth
-    child = _child_of_parent(db, parent.id, body.child_id)
+    child = child_of_parent(db, parent.id, body.child_id)
     guards.require_member_action(db, child, guards.QUIZ)
     return QuizService(db).submit(child, book_id, body.answers)
 
@@ -55,7 +43,7 @@ def submit_quiz(book_id: int, body: QuizSubmitRequest, auth: Any = Depends(get_c
 @router.get("/growth/summary")
 def growth_summary(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
-    child = _child_of_parent(db, parent.id, child_id)
+    child = child_of_parent(db, parent.id, child_id)
     guards.require_member_action(db, child, guards.PASSPORT_VIEW)
     return GrowthService(db).summary(child)
 
@@ -63,7 +51,7 @@ def growth_summary(child_id: int, auth: Any = Depends(get_current_parent)):
 @router.get("/points")
 def points_ledger(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
-    child = _child_of_parent(db, parent.id, child_id)
+    child = child_of_parent(db, parent.id, child_id)
     guards.require_member_action(db, child, guards.POINTS_VIEW)
     return GrowthService(db).points_list(child_id)
 
@@ -72,7 +60,7 @@ def points_ledger(child_id: int, auth: Any = Depends(get_current_parent)):
 def leaderboard(period: str = "week", child_id: int = 0, auth: Any = Depends(get_current_parent)):
     """五榜单（周期榜仅有效会员可见；总榜含历史学员）。"""
     parent, db = auth
-    viewer = _child_of_parent(db, parent.id, child_id)
+    viewer = child_of_parent(db, parent.id, child_id)
     if not viewer.is_active_member and period != "total":
         raise ValidationError("入会后可查看排行榜")
     return LeaderboardService(db).board(viewer, period)
@@ -81,7 +69,7 @@ def leaderboard(period: str = "week", child_id: int = 0, auth: Any = Depends(get
 @router.get("/passport")
 def passport(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
-    child = _child_of_parent(db, parent.id, child_id)
+    child = child_of_parent(db, parent.id, child_id)
     guards.require_member_action(db, child, guards.PASSPORT_VIEW)
     return PassportService(db).passport(child)
 
@@ -90,7 +78,7 @@ def passport(child_id: int, auth: Any = Depends(get_current_parent)):
 def report(kind: str, child_id: int, auth: Any = Depends(get_current_parent)):
     """周报/月报数据（家长预览）。R-313：未缴费禁；过期/退会只读。"""
     parent, db = auth
-    child = _child_of_parent(db, parent.id, child_id)
+    child = child_of_parent(db, parent.id, child_id)
     guards.require_member_action(db, child, guards.REPORT_VIEW)
     svc = ReportService(db)
     data = svc.report_data(child, kind)
@@ -101,16 +89,8 @@ def report(kind: str, child_id: int, auth: Any = Depends(get_current_parent)):
 @router.get("/reports/{kind}/image")
 def report_image(kind: str, child_id: int, token: str = "", db: Session = Depends(get_db)):
     """周报/月报图片（query token：图片组件无法带头）。"""
-    from backend.domain.reading.miniapp_router import _parent_from_token
-
     parent = _parent_from_token(token, db)
-    child = (
-        db.query(Child)
-        .filter(Child.id == child_id, Child.parent_id == parent.id, Child.is_deleted == 0)
-        .first()
-    )
-    if not child:
-        raise ValidationError("孩子不存在")
+    child = child_of_parent(db, parent.id, child_id)
     rel = ReportService(db).generate_image(child, kind)
     import os
 

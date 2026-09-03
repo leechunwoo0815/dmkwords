@@ -30,6 +30,9 @@ ROUTER_VIOLATIONS = [
     (re.compile(r"raise\s+HTTPException"), "Router 层抛 HTTPException（应在 Service）"),
 ]
 
+# A-1/T6：架构门禁扩 miniapp_router（原只扫 router.py，5 个 miniapp_router 执法真空）
+ROUTER_PIECES = ("router.py", "miniapp_router.py")
+
 MAX_FILE_LINES = 800
 
 
@@ -46,13 +49,32 @@ def check_four_pieces(errors: list[str]) -> None:
 
 def check_router_violations(errors: list[str]) -> None:
     for domain in DOMAINS:
-        router = BACKEND / "domain" / domain / "router.py"
-        if not router.is_file():
+        for piece in ROUTER_PIECES:
+            router = BACKEND / "domain" / domain / piece
+            if not router.is_file():
+                continue
+            text = router.read_text(encoding="utf-8")
+            for pattern, msg in ROUTER_VIOLATIONS:
+                if pattern.search(text):
+                    errors.append(f"{domain}/{piece}: {msg}")
+
+
+def check_lock_populate(errors: list[str]) -> None:
+    """B-16/T2 防复发：所有 with_for_update 必须链 populate_existing（identity map 陷阱）。
+    支持同行或下一行补链（reading 既有跨行先例）。"""
+    for py in BACKEND.rglob("service.py"):
+        if "__pycache__" in py.parts:
             continue
-        text = router.read_text(encoding="utf-8")
-        for pattern, msg in ROUTER_VIOLATIONS:
-            if pattern.search(text):
-                errors.append(f"{domain}/router.py: {msg}")
+        lines = py.read_text(encoding="utf-8").splitlines()
+        for i, line in enumerate(lines):
+            if ".with_for_update()" not in line:
+                continue
+            if ".populate_existing()" in line:
+                continue
+            nxt = lines[i + 1] if i + 1 < len(lines) else ""
+            if ".populate_existing()" not in nxt:
+                rel = py.relative_to(ROOT)
+                errors.append(f"{rel}:{i + 1}: with_for_update 未链 populate_existing（B-16）")
 
 
 def check_file_length(errors: list[str]) -> None:
@@ -98,6 +120,7 @@ def main() -> int:
     errors: list[str] = []
     check_four_pieces(errors)
     check_router_violations(errors)
+    check_lock_populate(errors)
     check_file_length(errors)
     check_sqlite_ban(errors)
     check_import_whitelist(errors)
@@ -107,7 +130,10 @@ def main() -> int:
         for e in errors:
             print(f"  ✗ {e}")
         return 1
-    print("架构关 PASS：四件套齐全 / Router 零违规 / 行数达标 / 无 sqlite / import 白名单通过")
+    print(
+        "架构关 PASS：四件套齐全 / Router 零违规（含 miniapp_router）/ 锁定读均链 populate_existing"
+        " / 行数达标 / 无 sqlite / import 白名单通过"
+    )
     return 0
 
 

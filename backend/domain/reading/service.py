@@ -222,6 +222,39 @@ class ReadingService:
             "reading_minutes": p.reading_minutes,
         }
 
+    def continue_listening(self, child: Child) -> dict | None:
+        """首页"继续听"卡：最近一次有进度但未读完（finished=0）的上一本（A-1/T6 下沉）。"""
+        row = (
+            self.db.query(ReadingProgress, Book, BorrowRecord)
+            .join(Book, ReadingProgress.book_id == Book.id)
+            .join(
+                BorrowRecord,
+                (BorrowRecord.child_id == ReadingProgress.child_id)
+                & (BorrowRecord.book_id == ReadingProgress.book_id),
+                isouter=True,
+            )
+            .filter(
+                ReadingProgress.child_id == child.id,
+                ReadingProgress.finished == 0,
+                ReadingProgress.last_report_at.isnot(None),
+                ReadingProgress.is_deleted == 0,
+                Book.is_deleted == 0,
+                Book.status == Book.STATUS_ON,
+            )
+            .order_by(ReadingProgress.last_report_at.desc())
+            .first()
+        )
+        if not row:
+            return None
+        p, book, br = row
+        in_borrow = bool(br and br.status in (BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE))
+        return {
+            "book": book,
+            "percent": round(p.coverage_seconds * 100 / p.total_seconds, 1) if p.total_seconds else 0,
+            "last_position": p.last_position,
+            "due_at": str(br.due_at) if in_borrow else None,
+        }
+
     def get_progress(self, child: Child, book_id: int) -> dict:
         p = (
             self.db.query(ReadingProgress)

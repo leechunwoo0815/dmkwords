@@ -171,3 +171,60 @@ class NotificationService:
             )
         except Exception as exc:
             logger.error("notification send failed for event=%s: %s", event.event_type, exc)
+
+    def list_mine(
+        self, parent_id: int, page: int = 1, page_size: int = 20, category: str | None = None
+    ) -> dict:
+        """家长端消息中心（A-1/T6 下沉）。"""
+        unread = (
+            self.db.query(func.count(Notification.id))
+            .filter(
+                Notification.parent_id == parent_id,
+                Notification.is_deleted == 0,
+                Notification.read_at.is_(None),
+            )
+            .scalar()
+            or 0
+        )
+        q = self.db.query(Notification).filter(
+            Notification.parent_id == parent_id, Notification.is_deleted == 0
+        )
+        if category:
+            q = q.filter(Notification.category == category)
+        total = q.count()
+        rows = (
+            q.order_by(Notification.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        )
+        return {
+            "unread": unread,
+            "total": total,
+            "items": [
+                {
+                    "id": n.id,
+                    "category": n.category,
+                    "scene": n.scene,
+                    "title": n.title,
+                    "content": n.content,
+                    "read": n.is_read,
+                    "created_at": n.create_time.strftime("%Y-%m-%d %H:%M") if n.create_time else "",
+                }
+                for n in rows
+            ],
+        }
+
+    def mark_read(self, parent_id: int, ids: list[int], all_: bool = False) -> int:
+        """标记已读（A-1/T6 下沉）：all 全读或按 ids；返回标记条数。"""
+        from datetime import datetime
+
+        q = self.db.query(Notification).filter(
+            Notification.parent_id == parent_id,
+            Notification.is_deleted == 0,
+            Notification.read_at.is_(None),
+        )
+        if not all_:
+            q = q.filter(Notification.id.in_(ids))
+        rows = q.all()
+        for n in rows:
+            n.read_at = datetime.now()
+        self.db.commit()
+        return len(rows)

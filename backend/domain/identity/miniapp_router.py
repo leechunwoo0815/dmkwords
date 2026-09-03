@@ -4,29 +4,14 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
-from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
-from backend.common.exceptions import ValidationError
-from backend.domain.identity.models import Child
+from backend.domain.identity.auth import child_of_parent, get_current_parent
 from backend.domain.identity.observation_service import ObservationReportService
 from backend.domain.identity.transfer_service import TransferService
 from backend.domain.identity.wm10_service import RefundService, WithdrawalService
-from backend.domain.reading.miniapp_router import get_current_parent
 
 router = APIRouter(tags=["identity-miniapp"])
-
-
-def _child_of_parent(db: Session, parent_id: int, child_id: int) -> Child:
-    child = (
-        db.query(Child)
-        .filter(Child.id == child_id, Child.parent_id == parent_id, Child.is_deleted == 0)
-        .first()
-    )
-    if not child:
-        raise ValidationError("孩子不存在")
-    return child
 
 
 class RefundApplyRequest(BaseSchema):
@@ -48,40 +33,12 @@ class TransferApplyRequest(BaseSchema):
 # ---------- 订单（家长视角，退款申请用） ----------
 @router.get("/orders")
 def my_orders(child_id: int, auth: Any = Depends(get_current_parent)):
+    """家长视角订单列表（A-1/T6 下沉：逻辑在 OrderService.my_orders）。"""
+    from backend.domain.identity.order_service import OrderService
+
     parent, db = auth
-    _child_of_parent(db, parent.id, child_id)
-    from sqlalchemy import or_
-
-    from backend.domain.identity.models import Order
-
-    # X7：or_ 查询——孩子名下单 ∪ 家长级单（child_id NULL；schema 注释
-    # 「活动费可能家长级」，漏查会丢 99 元首场活动费等家长级记录）
-    rows = (
-        db.query(Order)
-        .filter(
-            or_(
-                Order.child_id == child_id,
-                (Order.child_id.is_(None)) & (Order.parent_id == parent.id),
-            ),
-            Order.is_deleted == 0,
-        )
-        .order_by(Order.id.desc())
-        .limit(50)
-        .all()
-    )
-    return [
-        {
-            "id": r.id,
-            "order_no": r.order_no,
-            "order_type": r.order_type,
-            "amount": str(r.amount),
-            "status": r.status,
-            "refund_status": r.refund_status or "",
-            "created_at": str(r.create_time),
-            "paid_at": str(r.paid_at) if r.paid_at else None,
-        }
-        for r in rows
-    ]
+    child_of_parent(db, parent.id, child_id)
+    return OrderService(db).my_orders(child_id, parent.id)
 
 
 # ---------- WM11 消息中心（家长端站内消息） ----------
@@ -99,92 +56,37 @@ def my_notifications(
     category: str | None = Query(None),
     auth: Any = Depends(get_current_parent),
 ):
-    parent, db = auth
-    from backend.common.notification_models import Notification
+    """家长端消息中心（A-1/T6 下沉：逻辑在 NotificationService.list_mine）。"""
+    from backend.common.notifications import NotificationService
 
-    unread = (
-        db.query(func.count(Notification.id))
-        .filter(
-            Notification.parent_id == parent.id,
-            Notification.is_deleted == 0,
-            Notification.read_at.is_(None),
-        )
-        .scalar()
-        or 0
-    )
-    q = db.query(Notification).filter(
-        Notification.parent_id == parent.id, Notification.is_deleted == 0
-    )
-    if category:
-        q = q.filter(Notification.category == category)
-    total = q.count()
-    rows = q.order_by(Notification.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
-    return {
-        "unread": unread,
-        "total": total,
-        "items": [
-            {
-                "id": n.id,
-                "category": n.category,
-                "scene": n.scene,
-                "title": n.title,
-                "content": n.content,
-                "read": n.is_read,
-                "created_at": n.create_time.strftime("%Y-%m-%d %H:%M") if n.create_time else "",
-            }
-            for n in rows
-        ],
-    }
+    parent, db = auth
+    return NotificationService(db).list_mine(parent.id, page, page_size, category)
 
 
 @router.post("/notifications/read")
 def mark_notifications_read(
     body: ReadNotificationsRequest, auth: Any = Depends(get_current_parent)
 ):
+    """标记已读（A-1/T6 下沉：逻辑在 NotificationService.mark_read）。"""
+    from backend.common.notifications import NotificationService
+
     parent, db = auth
-    from datetime import datetime
-
-    from backend.common.notification_models import Notification
-
-    if body.all:
-        rows = (
-            db.query(Notification)
-            .filter(
-                Notification.parent_id == parent.id,
-                Notification.is_deleted == 0,
-                Notification.read_at.is_(None),
-            )
-            .all()
-        )
-    else:
-        rows = (
-            db.query(Notification)
-            .filter(
-                Notification.parent_id == parent.id,
-                Notification.id.in_(body.ids),
-                Notification.is_deleted == 0,
-            )
-            .all()
-        )
-    for n in rows:
-        if n.read_at is None:
-            n.read_at = datetime.now()
-    db.commit()
-    return {"ok": True, "marked": len(rows)}
+    marked = NotificationService(db).mark_read(parent.id, body.ids, body.all)
+    return {"ok": True, "marked": marked}
 
 
 # ---------- 退款 ----------
 @router.get("/refund-preview")
 def refund_preview(child_id: int, order_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
-    child = _child_of_parent(db, parent.id, child_id)
+    child = child_of_parent(db, parent.id, child_id)
     return RefundService(db).preview(child, order_id)
 
 
 @router.post("/refund-requests")
 def refund_apply(body: RefundApplyRequest, auth: Any = Depends(get_current_parent)):
     parent, db = auth
-    child = _child_of_parent(db, parent.id, body.child_id)
+    child = child_of_parent(db, parent.id, body.child_id)
     req = RefundService(db).apply(child, body.order_id, body.reason)
     return {"id": req.id, "status": req.status, "amount": str(req.amount)}
 
@@ -192,7 +94,7 @@ def refund_apply(body: RefundApplyRequest, auth: Any = Depends(get_current_paren
 @router.get("/refund-requests")
 def refund_list(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
-    child = _child_of_parent(db, parent.id, child_id)
+    child = child_of_parent(db, parent.id, child_id)
     return RefundService(db).my_list(child)
 
 
@@ -206,7 +108,7 @@ def refund_cancel(
 ):
     """家长撤销待审核退款申请（BDD：cancelled、订单恢复；联动撤销退会申请）。"""
     parent, db = auth
-    child = _child_of_parent(db, parent.id, body.child_id)
+    child = child_of_parent(db, parent.id, body.child_id)
     req = RefundService(db).cancel(child, request_id)
     return {"id": req.id, "status": req.status}
 
@@ -215,14 +117,14 @@ def refund_cancel(
 @router.post("/withdrawals")
 def withdrawal_apply(body: WithdrawalApplyRequest, auth: Any = Depends(get_current_parent)):
     parent, db = auth
-    child = _child_of_parent(db, parent.id, body.child_id)
+    child = child_of_parent(db, parent.id, body.child_id)
     return WithdrawalService(db).apply(child, body.reason)
 
 
 @router.get("/withdrawals")
 def withdrawal_list(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
-    child = _child_of_parent(db, parent.id, child_id)
+    child = child_of_parent(db, parent.id, child_id)
     return WithdrawalService(db).my_list(child)
 
 
@@ -236,7 +138,7 @@ def withdrawal_cancel(
 ):
     """家长撤销进行中的退会申请（applying → cancelled + 解锁）。"""
     parent, db = auth
-    child = _child_of_parent(db, parent.id, body.child_id)
+    child = child_of_parent(db, parent.id, body.child_id)
     req = WithdrawalService(db).cancel(child, request_id)
     return {"id": req.id, "status": req.status}
 
@@ -276,5 +178,5 @@ def transfer_cancel(transfer_id: int, auth: Any = Depends(get_current_parent)):
 @router.get("/observation-reports")
 def observation_reports(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
-    _child_of_parent(db, parent.id, child_id)
+    child_of_parent(db, parent.id, child_id)
     return ObservationReportService(db).list_for_child(child_id)

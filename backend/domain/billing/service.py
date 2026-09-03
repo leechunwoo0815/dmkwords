@@ -235,6 +235,47 @@ class DepositService:
             )
         return dep, ledgers
 
+    def my_deposit_view(self, child_id: int) -> dict:
+        """家长端押金页视图（A-1/T6 下沉；R-312 差额补缴口径）。"""
+        from decimal import Decimal
+
+        from backend.common.config_service import ConfigService
+
+        standard = Decimal(ConfigService(self.db).get_value("deposit_amount"))
+        dep, ledgers = self.get_by_child(child_id)
+        if not dep:
+            return {
+                "child_id": child_id,
+                "status": "unpaid",
+                "standard_amount": str(standard),
+                "available_amount": "0.00",
+                "deducted_amount": "0.00",
+                "unpaid_balance": "0.00",
+                "need_supplement": False,
+                "ledger": [],
+            }
+        return {
+            "child_id": child_id,
+            "status": dep.status,
+            "standard_amount": str(standard),
+            "available_amount": str(dep.available_amount),
+            "deducted_amount": str(dep.deducted_amount),
+            "unpaid_balance": str(dep.unpaid_balance or Decimal("0")),
+            "need_supplement": dep.status
+            in (Deposit.STATUS_PARTIALLY_DEDUCTED, Deposit.STATUS_FULLY_DEDUCTED)
+            and dep.available_amount < standard,
+            "ledger": [
+                {
+                    "entry_type": r.entry_type,
+                    "amount": str(r.amount),
+                    "balance_after": str(r.balance_after),
+                    "reason": r.reason,
+                    "created_at": str(r.create_time),
+                }
+                for r in ledgers[:20]
+            ],
+        }
+
     def list_deposits(self, page: int, page_size: int, status: str | None, keyword: str | None):
 
         q = (

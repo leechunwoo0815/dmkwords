@@ -29,6 +29,35 @@ class OrderService:
 
         return Decimal(ConfigService(self.db).get_value(key))
 
+    def my_orders(self, child_id: int, parent_id: int) -> list[dict]:
+        """家长视角订单列表（A-1/T6 下沉）：孩子名下单 ∪ 家长级单（child_id NULL）。"""
+        rows = (
+            self.db.query(Order)
+            .filter(
+                or_(
+                    Order.child_id == child_id,
+                    (Order.child_id.is_(None)) & (Order.parent_id == parent_id),
+                ),
+                Order.is_deleted == 0,
+            )
+            .order_by(Order.id.desc())
+            .limit(50)
+            .all()
+        )
+        return [
+            {
+                "id": r.id,
+                "order_no": r.order_no,
+                "order_type": r.order_type,
+                "amount": str(r.amount),
+                "status": r.status,
+                "refund_status": r.refund_status or "",
+                "created_at": str(r.create_time),
+                "paid_at": str(r.paid_at) if r.paid_at else None,
+            }
+            for r in rows
+        ]
+
     def create(self, admin, req) -> Order:
         child = self.db.query(Child).filter(Child.id == req.child_id, Child.is_deleted == 0).first()
         if not child:

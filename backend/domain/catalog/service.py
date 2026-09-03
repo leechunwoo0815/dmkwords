@@ -164,6 +164,55 @@ class BookService:
         copies = self.copy_repo.list_by_book(book_id)
         return book, copies
 
+    def list_miniapp_books(
+        self,
+        keyword: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+        grade: str | None = None,
+        topic: str | None = None,
+        ar_min: float | None = None,
+        ar_max: float | None = None,
+        has_audio: bool = False,
+        sort: str = "newest",
+    ) -> tuple[int, list[Book]]:
+        """书城列表（2000 本规模检索）：筛选/排序/分页（A-1/T6 下沉）。
+        ar_level 是字符串列，范围过滤/排序一律 CAST DECIMAL（非法值按 0 处理）。"""
+        from sqlalchemy.types import Numeric
+
+        q = self.db.query(Book).filter(Book.is_deleted == 0, Book.status == Book.STATUS_ON)
+        if keyword:
+            like = f"%{keyword}%"
+            q = q.filter(Book.title.like(like) | Book.author.like(like))
+        if grade:
+            q = q.filter(Book.grade == grade)
+        if topic:
+            q = q.filter(Book.topic == topic)
+        ar_expr = func.cast(Book.ar_level, Numeric(4, 1))
+        if ar_min is not None:
+            q = q.filter(ar_expr >= ar_min)
+        if ar_max is not None:
+            q = q.filter(ar_expr <= ar_max)
+        if has_audio:
+            q = q.filter(Book.audio_path.isnot(None))
+        order = {
+            "ar_asc": ar_expr.asc(),
+            "ar_desc": ar_expr.desc(),
+            "words_asc": Book.word_count.asc(),
+            "words_desc": Book.word_count.desc(),
+        }.get(sort, Book.id.desc())
+        total = q.count()
+        books = q.order_by(order).offset((page - 1) * page_size).limit(page_size).all()
+        return total, books
+
+    def get_book_public(self, book_id: int) -> Book | None:
+        """公开书目查询（详情/音频/封面共用，A-1/T6 下沉）。"""
+        return (
+            self.db.query(Book)
+            .filter(Book.id == book_id, Book.is_deleted == 0)
+            .first()
+        )
+
     def create_book(self, admin, req: BookCreateRequest) -> Book:
         isbn = clean_isbn(req.isbn)
         if isbn:
