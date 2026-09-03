@@ -39,7 +39,7 @@
 
 | ID | 名称 | 价值 | 优先级 | 依赖 | 验收标准 | Gherkin | 状态 |
 |---|---|---|---|---|---|---|---|
-| FEAT-015 | 订单模型与状态机 | 资金基石 | P0 | 004 | 5 类订单（first_activity/observation/formal/activity/deposit_supplement）× 7 态；非法流转拦截；状态变更留痕〔R-312, R-322〕 | order.feature | DRAFTED |
+| FEAT-015 | 订单模型与状态机 | 资金基石 | P0 | 004 | 6 类订单（first_activity/observation/formal/activity/deposit/deposit_supplement）× 5 态（pending_payment/pending_manual_confirm/paid/cancelled/refunded；域H L-3 对齐实测 2026-09-03）；非法流转拦截；状态变更留痕〔R-312, R-322〕 | order.feature | DRAFTED |
 | FEAT-016 | 微信线上支付 | 线上收款 | P0 | 015 | V3 下单；回调验签+金额校验+幂等（重复通知不重复入账）；三段式事务〔模式手册 P2/P3〕 | payment.feature | DRAFTED |
 | FEAT-017 | 人工收款确认 | 线下收款 | P0 | 015 | 待人工确认态；操作人+凭证留痕；确认后等同 paid；活动单确认时限 min(48h, 开始时间)〔R-320〕 | payment.feature | DRAFTED |
 | FEAT-018 | 线下收款登记 | 支付宝/刷卡/转账 | P1 | 017 | 登记收款方式+金额+凭证图；进人工确认流 | payment.feature | DRAFTED |

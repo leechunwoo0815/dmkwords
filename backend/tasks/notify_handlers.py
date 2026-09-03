@@ -32,6 +32,7 @@ from backend.common.notifications import (
     SCENE_READING_LEVEL_UP,
     SCENE_READING_MILESTONE,
     SCENE_READING_QUIZ_RESULT,
+    SCENE_RESERVATION_CREATED,
     SCENE_RESERVATION_EXPIRING,
     SCENE_RESERVATION_RELEASED,
     NotificationService,
@@ -215,7 +216,8 @@ def _on_reservation_created(event: ReservationCreatedEvent, db: Session) -> None
     NotificationService(db).send_event(
         event,
         parent_id=child.parent_id,
-        scene=SCENE_RESERVATION_EXPIRING,
+        # 域H L-8①（T29 处置）：原复用 expiring 场景（语义错位），改专用场景
+        scene=SCENE_RESERVATION_CREATED,
         title="预约成功",
         content=f"《{title}》预约成功，请及时到馆取书（72 小时内核销）。",
         category=Notification.CATEGORY_RESERVATION,

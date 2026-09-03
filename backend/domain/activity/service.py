@@ -673,7 +673,12 @@ class ActivityService:
         now = datetime.now()
         if a.start_at <= now:
             raise ValidationError("活动已开始，请线下与馆员协商处理")
-        if a.start_at - now < timedelta(hours=2):
+        # 域H M-6+M-1（T29 处置）：activity_refund_cutoff_hours 死配置接线
+        # （原硬编码 2h），配置默认 2 与 PRD §9.3 一致
+        from backend.common.config_service import ConfigService
+
+        cutoff_hours = int(ConfigService(self.db).get_value("activity_refund_cutoff_hours", "2"))
+        if a.start_at - now < timedelta(hours=cutoff_hours):
             raise ValidationError("距开始不足 2 小时，线上退款已关闭，请找馆员线下处理")
         e.status = ActivityEnrollment.STATUS_REFUND_PENDING
         e.cancel_reason = "家长申请退款（活动未开始）"
