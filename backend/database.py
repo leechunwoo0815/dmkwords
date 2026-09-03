@@ -15,6 +15,7 @@ class Base(DeclarativeBase):
 
 engine = create_engine(
     settings.database_url,
+    isolation_level="READ COMMITTED",  # E-00（外部审计 20260903）：RR 下锁内 COUNT/SUM 守卫读旧快照，并发失效；RC 每次语句读最新已提交
     pool_pre_ping=True,
     pool_recycle=3600,
     pool_size=10,
