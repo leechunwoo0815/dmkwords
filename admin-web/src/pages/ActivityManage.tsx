@@ -42,6 +42,7 @@ export default function ActivityManage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [enrollActivity, setEnrollActivity] = useState<ActivityItem | null>(null);
   const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
+  const [rejectRemark, setRejectRemark] = useState("");
   const [refunds, setRefunds] = useState<EnrollmentItem[]>([]);
   const [signinCode, setSigninCode] = useState("");
   const [form] = Form.useForm();
@@ -115,14 +116,33 @@ export default function ActivityManage() {
   };
 
   const onReview = (r: EnrollmentItem, approve: boolean) => {
+    setRejectRemark("");
     modal.confirm({
       title: approve ? "通过退款" : "拒绝退款",
-      content: `${r.child_name} · ${r.activity_title} · ￥${r.amount}${approve ? "（名额将释放，订单转已退款）" : "（报名恢复为已报名）"}`,
+      content: (
+        <div>
+          <p>
+            {r.child_name} · {r.activity_title} · ￥{r.amount}
+            {approve ? "（通过后进入退款执行，退款完成后名额释放）" : "（报名恢复为已报名）"}
+          </p>
+          {!approve && (
+            <Input.TextArea
+              placeholder="拒绝原因（必填，家长可见）"
+              value={rejectRemark}
+              onChange={(e) => setRejectRemark(e.target.value)}
+            />
+          )}
+        </div>
+      ),
       okText: approve ? "通过" : "拒绝",
       onOk: async () => {
+        if (!approve && !rejectRemark.trim()) {
+          message.warning("拒绝必须填写原因（家长可见）");
+          return Promise.reject(new Error("rejected-empty"));
+        }
         try {
-          await apiReviewActivityRefund(r.enrollment_id ?? r.id ?? 0, approve, "");
-          message.success("已处理");
+          await apiReviewActivityRefund(r.enrollment_id ?? r.id ?? 0, approve, rejectRemark);
+          message.success(approve ? "已通过，待执行退款" : "已拒绝");
           // WM13 L3：审核完成主动刷新待办徽标/待办卡
           window.dispatchEvent(new Event(TODO_REFRESH_EVENT));
           load();

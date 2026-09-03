@@ -127,7 +127,13 @@ class RefundService:
         return order
 
     # ---------- 家长申请 ----------
-    def apply(self, child: Child, order_id: int, reason: str) -> RefundRequest:
+    def apply(
+        self, child: Child, order_id: int, reason: str, skip_lock_check: bool = False
+    ) -> RefundRequest:
+        """创建统一退款申请（R-308 七态入口）。
+
+        skip_lock_check：馆员批量路径（T16 活动取消）传 True——活动取消是馆员操作，
+        孩子转让/退会锁定不应阻断退款台账创建（家长主动申请仍硬拦截）。"""
         if not reason or not reason.strip():
             raise ValidationError("必须填写退款原因")
         order = self._paid_order(child, order_id)
@@ -153,7 +159,8 @@ class RefundService:
         )
         if dup:
             raise ConflictError("该订单已有进行中的退款申请（同一时刻仅一个）")
-        _ensure_not_locked(child)
+        if not skip_lock_check:
+            _ensure_not_locked(child)
 
         withdrawal = None
         if order.order_type in (Order.TYPE_OBSERVATION, Order.TYPE_FORMAL):
@@ -407,7 +414,7 @@ class RefundService:
                     order.refund_status = Order.REFUND_STATUS_REFUNDED
                     # 活动订单 → 联动报名退款（同事务）
                     if order.order_type == Order.TYPE_ACTIVITY:
-                        self._refund_activity_enrollment(order)
+                        self._refund_activity_enrollment(order, admin)
                     # 会员费退款成功 → 联动退会（R-310：withdrawn + 自动发起押金退款）
                     if order.order_type in (Order.TYPE_OBSERVATION, Order.TYPE_FORMAL):
                         self._complete_refund_withdrawal(admin, req, order)
@@ -638,7 +645,7 @@ class RefundService:
             if child:
                 child.operation_locked = 0
 
-    def _refund_activity_enrollment(self, order: Order) -> None:
+    def _refund_activity_enrollment(self, order: Order, admin=None) -> None:
         from backend.domain.activity.models import ActivityEnrollment
 
         e = (
@@ -654,6 +661,38 @@ class RefundService:
             ActivityEnrollment.STATUS_REFUND_PENDING,
         ):
             e.status = ActivityEnrollment.STATUS_REFUNDED
+            # WM13 L2 回写（T16 随动微调）：execute 联动翻终态后，该活动已无
+            # refund_pending 报名 → 聚合待办回写（T16 前由 review_refund approve
+            # 即翻终态触发；approve≠终态后改由 execute 侧收口）
+            from backend.common.admin_notification_models import AdminNotification
+            from backend.common.admin_notifications import AdminNotifyService
+            from sqlalchemy import func as _func
+
+            remaining = (
+                self.db.query(_func.count(ActivityEnrollment.id))
+                .filter(
+                    ActivityEnrollment.activity_id == e.activity_id,
+                    ActivityEnrollment.status == ActivityEnrollment.STATUS_REFUND_PENDING,
+                    ActivityEnrollment.is_deleted == 0,
+                )
+                .scalar()
+                or 0
+            )
+            if (
+                remaining == 0
+                and self.db.query(AdminNotification)
+                .filter(
+                    AdminNotification.ref_type == AdminNotification.REF_ACTIVITY,
+                    AdminNotification.ref_id == str(e.activity_id),
+                    AdminNotification.is_deleted == 0,
+                )
+                .count()
+            ):
+                AdminNotifyService(self.db).mark_handled(
+                    ref_type=AdminNotification.REF_ACTIVITY,
+                    ref_id=str(e.activity_id),
+                    admin=None,
+                )
 
 
 # WithdrawalService 拆出至 wm10_withdrawal_service.py（god file 800 行限制）；

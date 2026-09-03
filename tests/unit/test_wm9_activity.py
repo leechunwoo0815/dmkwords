@@ -212,14 +212,26 @@ def test_refund_review_flow(client: TestClient):
     # 待审列表
     pend = client.get("/api/admin/activity-refunds", headers=h).json()
     assert len(pend) == 2
-    # 通过第一个 → 订单 refunded + 名额释放
+    # 通过第一个 → T16 新语义：approve 后报名保持 refund_pending（approve≠钱已退），
+    # 统一台账 rr→approved，execute 联动后才 refunded + 名额释放
     ok = client.post(
         f"/api/admin/activity-refunds/{e1['enrollment']['id']}/review",
         json={"approve": True, "remark": "同意"},
         headers=h,
     )
     assert ok.status_code == 200
-    assert ok.json()["status"] == "refunded"
+    assert ok.json()["status"] == "refund_pending"
+    rr_e1 = next(
+        r
+        for r in client.get("/api/admin/refund-requests", headers=h).json()
+        if r["order_id"] == e1["order_id"]
+    )
+    ok2 = client.post(
+        f"/api/admin/refund-requests/{rr_e1['id']}/execute",
+        json={"success": True, "remark": "原路退回"},
+        headers=h,
+    )
+    assert ok2.status_code == 200, ok2.text
     # 拒绝第二个 → 恢复已报名
     rej = client.post(
         f"/api/admin/activity-refunds/{e2['enrollment']['id']}/review",
@@ -253,13 +265,22 @@ def test_cancel_activity_batch_refund(client: TestClient):
     assert r.json()["refund_pending"] == 1
     pend = client.get("/api/admin/activity-refunds", headers=h).json()
     assert pend[0]["activity_id"] == act["id"]
-    # 审核通过
+    # 审核通过（T16 新语义：approve → refund_pending 保持，execute 联动后 refunded）
     ok = client.post(
         f"/api/admin/activity-refunds/{e1['enrollment']['id']}/review",
         json={"approve": True},
         headers=h,
     )
-    assert ok.json()["status"] == "refunded"
+    assert ok.json()["status"] == "refund_pending"
+    rr_id = client.get("/api/admin/refund-requests", headers=h).json()[0]["id"]
+    ok2 = client.post(
+        f"/api/admin/refund-requests/{rr_id}/execute",
+        json={"success": True, "remark": "活动取消批量退款"},
+        headers=h,
+    )
+    assert ok2.status_code == 200, ok2.text
+    mine = client.get(f"/api/miniapp/enrollments?child_id={c1['id']}", headers=m1).json()
+    assert mine[0]["status"] == "refunded"
 
 
 def test_member_only_activity(client: TestClient):

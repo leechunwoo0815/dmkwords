@@ -194,22 +194,38 @@ class ActivityService:
         )
         refund_cnt = cancel_cnt = 0
         refund_amounts: list[Decimal] = []
+        from backend.domain.identity.wm10_service import RefundService
+
+        refund_svc = RefundService(self.db)
         for e in enrollments:
             if e.status == ActivityEnrollment.STATUS_PENDING_PAYMENT:
                 e.status = ActivityEnrollment.STATUS_CANCELLED
                 e.cancel_reason = "活动取消"
                 cancel_cnt += 1
             elif e.status == ActivityEnrollment.STATUS_ENROLLED:
-                e.status = ActivityEnrollment.STATUS_REFUND_PENDING
-                e.cancel_reason = "活动取消，待退款审核"
-                refund_cnt += 1
-                # WM13 触发点4：累计待退金额（关联订单金额，Q6 裁定）
                 if e.order_id:
+                    # T16/B-9：付费报名 → 退款待审 + 统一台账 RefundRequest
+                    # （活动取消为馆员批量路径，skip_lock_check 不被转让/退会锁阻断）
+                    e.status = ActivityEnrollment.STATUS_REFUND_PENDING
+                    e.cancel_reason = "活动取消，待退款审核"
+                    refund_cnt += 1
+                    child = self.db.query(Child).filter(Child.id == e.child_id).first()
+                    if child:
+                        refund_svc.apply(
+                            child,
+                            e.order_id,
+                            f"活动《{a.title}》取消退款（馆员批量）",
+                            skip_lock_check=True,
+                        )
+                    # WM13 触发点4：累计待退金额（关联订单金额，Q6 裁定）
                     o = self.db.query(Order).filter(Order.id == e.order_id).first()
                     if o:
                         refund_amounts.append(Decimal(str(o.amount)))
                 else:
-                    refund_amounts.append(Decimal(str(a.fee)))
+                    # 免费报名无款可退：直接取消（与 T14/B-6 对称口径）
+                    e.status = ActivityEnrollment.STATUS_CANCELLED
+                    e.cancel_reason = "活动取消"
+                    cancel_cnt += 1
             # checked_in / refund_pending / refunded / cancelled 不动
         # WM11：活动取消通知已报名家庭（每家庭一条，去重）
         from backend.domain.identity.models import Parent
@@ -348,21 +364,35 @@ class ActivityService:
         return out
 
     def review_refund(self, admin, enrollment_id: int, approve: bool, remark: str) -> dict:
-        """超管逐单审核：通过 → 订单 refunded + 报名 refunded（名额释放）；拒绝 → 恢复已报名。"""
+        """超管逐单审核（B-9/T16 方案 A）：委托 RefundService.review 走统一七态台账。
+        行为变更：approve ≠ 钱已退——rr→approved、e 保持 refund_pending，
+        退款 execute 成功后联动翻 refunded（与订单退款语义对齐）；
+        reject：rr→rejected + e 恢复 enrolled。"""
+        from backend.domain.identity.models import RefundRequest
+        from backend.domain.identity.wm10_service import RefundService
+
         e = (
             self.db.query(ActivityEnrollment)
             .filter(ActivityEnrollment.id == enrollment_id, ActivityEnrollment.is_deleted == 0)
+            .with_for_update()
+            .populate_existing()  # E-3：锁定读，并发双审串行化
             .first()
         )
         if not e or e.status != ActivityEnrollment.STATUS_REFUND_PENDING:
             raise ValidationError("退款申请不存在或状态不可审")
-        if approve:
-            e.status = ActivityEnrollment.STATUS_REFUNDED
-            if e.order_id:
-                order = self.db.query(Order).filter(Order.id == e.order_id).first()
-                if order and order.status == Order.STATUS_PAID:
-                    order.status = Order.STATUS_REFUNDED
-        else:
+        rr = (
+            self.db.query(RefundRequest)
+            .filter(
+                RefundRequest.order_id == e.order_id,
+                RefundRequest.status == RefundRequest.STATUS_PENDING,
+                RefundRequest.is_deleted == 0,
+            )
+            .first()
+        )
+        if not rr:
+            raise ValidationError("未找到关联的统一退款申请（台账断链，请检查数据）")
+        RefundService(self.db).review(admin, rr.id, approve, remark)
+        if not approve:
             e.status = ActivityEnrollment.STATUS_ENROLLED
             e.cancel_reason = None
         publish_audit(
@@ -371,11 +401,12 @@ class ActivityService:
             action="activity.refund_review",
             target_type="enrollment",
             target_id=str(e.id),
-            detail={"approve": approve, "remark": remark},
-            reason=remark or ("退款通过" if approve else "退款拒绝"),
+            detail={"approve": approve, "remark": remark, "refund_request_id": rr.id},
+            reason=remark or ("退款通过，待执行" if approve else "退款拒绝"),
         )
         self.db.commit()
-        # WM13 L2 回写（批次五 #7）：该活动退款全部终态 → 汇总通知审计回写（A3 判定）
+        # WM13 L2 回写（批次五 #7）：该活动退款全部终态 → 汇总通知审计回写（A3 判定）。
+        # T16 后 approve 不减 refund_pending（等 execute 联动）；reject 恢复 enrolled 即减
         from backend.common.admin_notification_models import AdminNotification
         from backend.common.admin_notifications import AdminNotifyService
 
@@ -617,13 +648,17 @@ class ActivityService:
         return {"enrollment_id": e.id, "status": e.status}
 
     def apply_refund(self, child: Child, enrollment_id: int) -> dict:
-        """退款矩阵（V1.1 §9.3）：已签到不退；未开始未签到全额；前 2h 关线上；已开始线下。"""
+        """退款矩阵（V1.1 §9.3）：已签到不退；未开始未签到全额；前 2h 关线上；已开始线下。
+        B-9/T16：委托统一七态退款台账（RefundService.apply），金额 R-309 同源。"""
         e = self._my_enrollment(child, enrollment_id)
         if e.status == ActivityEnrollment.STATUS_CHECKED_IN:
             raise ValidationError("已签到，不能退款（人都来了，成本已发生）")
         if e.status != ActivityEnrollment.STATUS_ENROLLED:
             raise ValidationError(f"状态 {e.status} 不可申请退款")
         a = self._get(e.activity_id)
+        if (a.fee or 0) <= 0 or not e.order_id:
+            # 与 T14 对称：cancel 仅免费、refund 仅付费
+            raise ValidationError("免费活动无需退款，请取消报名")
         now = datetime.now()
         if a.start_at <= now:
             raise ValidationError("活动已开始，请线下与馆员协商处理")
@@ -631,6 +666,10 @@ class ActivityService:
             raise ValidationError("距开始不足 2 小时，线上退款已关闭，请找馆员线下处理")
         e.status = ActivityEnrollment.STATUS_REFUND_PENDING
         e.cancel_reason = "家长申请退款（活动未开始）"
+        # 统一台账：RefundRequest(pending) + order.refund_status=pending + 管理待办通知
+        from backend.domain.identity.wm10_service import RefundService
+
+        RefundService(self.db).apply(child, e.order_id, f"活动《{a.title}》报名退款")
         self.db.commit()
         return {"enrollment_id": e.id, "status": e.status, "amount_hint": "全额待审核"}
 
