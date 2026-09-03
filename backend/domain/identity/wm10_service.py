@@ -273,6 +273,7 @@ class RefundService:
             raise NotFoundError("退款申请不存在")
         if req.status != RefundRequest.STATUS_PENDING:
             raise ValidationError(f"申请状态 {req.status}，不可撤销")
+        req.assert_transition(RefundRequest.STATUS_CANCELLED)
         req.status = RefundRequest.STATUS_CANCELLED
         if req.order_id:
             order = self.db.query(Order).filter(Order.id == req.order_id).first()
@@ -288,6 +289,7 @@ class RefundService:
                 .first()
             )
             if w and w.status == WithdrawalRequest.STATUS_APPLYING:
+                w.assert_transition(WithdrawalRequest.STATUS_CANCELLED)
                 w.status = WithdrawalRequest.STATUS_CANCELLED
                 child.operation_locked = 0
             elif w and w.status in (
@@ -360,6 +362,7 @@ class RefundService:
         if not req or req.status != RefundRequest.STATUS_PENDING:
             raise ValidationError("退款申请不存在或已处理")
         if approve:
+            req.assert_transition(RefundRequest.STATUS_APPROVED)
             req.status = RefundRequest.STATUS_APPROVED
             if req.kind == RefundRequest.KIND_ORDER and req.order_id:
                 order = (
@@ -380,10 +383,12 @@ class RefundService:
                     .first()
                 )
                 if w and w.status == WithdrawalRequest.STATUS_APPLYING:
+                    w.assert_transition(WithdrawalRequest.STATUS_REFUNDING)
                     w.status = WithdrawalRequest.STATUS_REFUNDING
         else:
             if not remark or not remark.strip():
                 raise ValidationError("拒绝退款必须填写原因（家长可见）")
+            req.assert_transition(RefundRequest.STATUS_REJECTED)
             req.status = RefundRequest.STATUS_REJECTED
             if req.kind == RefundRequest.KIND_ORDER and req.order_id:
                 order = (
@@ -406,6 +411,7 @@ class RefundService:
                 )
                 child = self.db.query(Child).filter(Child.id == req.child_id).first()
                 if w and w.status == WithdrawalRequest.STATUS_APPLYING:
+                    w.assert_transition(WithdrawalRequest.STATUS_REJECTED)
                     w.status = WithdrawalRequest.STATUS_REJECTED
                     if child:
                         child.operation_locked = 0
@@ -453,10 +459,12 @@ class RefundService:
             RefundRequest.STATUS_FAILED,
         ):
             raise ValidationError("退款申请不存在或状态不可执行（需先审核通过）")
+        req.assert_transition(RefundRequest.STATUS_PROCESSING)
         req.status = RefundRequest.STATUS_PROCESSING
         self.db.flush()
 
         if success:
+            req.assert_transition(RefundRequest.STATUS_REFUNDED)
             req.status = RefundRequest.STATUS_REFUNDED
             if req.kind == RefundRequest.KIND_ORDER and req.order_id:
                 order = self.db.query(Order).filter(Order.id == req.order_id).first()
@@ -493,6 +501,7 @@ class RefundService:
         else:
             if not remark or not remark.strip():
                 raise ValidationError("执行失败必须填写原因（留痕）")
+            req.assert_transition(RefundRequest.STATUS_FAILED)
             req.status = RefundRequest.STATUS_FAILED
             if req.kind == RefundRequest.KIND_ORDER and req.order_id:
                 order = self.db.query(Order).filter(Order.id == req.order_id).first()
@@ -506,8 +515,8 @@ class RefundService:
                     .first()
                 )
                 if w and w.status == WithdrawalRequest.STATUS_REFUNDING:
+                    w.assert_transition(WithdrawalRequest.STATUS_PENDING_SETTLE)
                     w.status = WithdrawalRequest.STATUS_PENDING_SETTLE
-
         req.review_remark = remark or req.review_remark
         req.reviewed_by = admin.id
         req.reviewed_at = datetime.now()
@@ -650,6 +659,7 @@ class RefundService:
             .scalar()
         )
         if open_cnt == 0:
+            w.assert_transition(WithdrawalRequest.STATUS_COMPLETED)
             w.status = WithdrawalRequest.STATUS_COMPLETED
             child = self.db.query(Child).filter(Child.id == w.child_id).first()
             if child:
@@ -697,6 +707,7 @@ class RefundService:
         if refunded_cnt > 0:
             self._advance_withdrawal(req.id)  # completed（幂等）
         else:
+            w.assert_transition(WithdrawalRequest.STATUS_REJECTED)
             w.status = WithdrawalRequest.STATUS_REJECTED
             if child:
                 child.operation_locked = 0

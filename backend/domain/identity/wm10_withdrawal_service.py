@@ -180,6 +180,7 @@ class WithdrawalService:
             raise NotFoundError("退会申请不存在")
         if req.status != WithdrawalRequest.STATUS_APPLYING:
             raise ValidationError(f"申请状态 {req.status}，不可撤销")
+        req.assert_transition(WithdrawalRequest.STATUS_CANCELLED)
         req.status = WithdrawalRequest.STATUS_CANCELLED
         child.operation_locked = 0
         # WM13 L2 回写：家长撤销 → 该单管理待办审计标注来源（幂等）
@@ -343,6 +344,7 @@ class WithdrawalService:
             problems = self._preconditions(child)
             if problems:
                 raise ValidationError("审核时前提不满足：" + "；".join(problems))
+            req.assert_transition(WithdrawalRequest.STATUS_PENDING_SETTLE)
             req.status = WithdrawalRequest.STATUS_PENDING_SETTLE
             # ---- 结算：计算三类可退金额并生成退款单（R-311：观察期费/年费/押金）----
             refund_ids = []
@@ -376,8 +378,10 @@ class WithdrawalService:
                 refund_ids.append(rr.id)
             # 3) 有退款单 → refunding；无可退 → 直接 completed + withdrawn
             if refund_ids:
+                req.assert_transition(WithdrawalRequest.STATUS_REFUNDING)
                 req.status = WithdrawalRequest.STATUS_REFUNDING
             else:
+                req.assert_transition(WithdrawalRequest.STATUS_COMPLETED)
                 req.status = WithdrawalRequest.STATUS_COMPLETED
                 child.member_status = Child.MEMBER_WITHDRAWN
                 child.withdraw_reason = "user_withdrawal"
@@ -399,6 +403,7 @@ class WithdrawalService:
         else:
             if not remark or not remark.strip():
                 raise ValidationError("拒绝退会必须填写原因（家长可见）")
+            req.assert_transition(WithdrawalRequest.STATUS_REJECTED)
             req.status = WithdrawalRequest.STATUS_REJECTED
             child.operation_locked = 0
         req.review_remark = remark or None

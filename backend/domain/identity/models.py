@@ -172,6 +172,24 @@ class RefundRequest(BaseModel):
     STATUS_REJECTED = "rejected"  # 审核拒绝
     STATUS_CANCELLED = "cancelled"  # 家长撤销
 
+    # B-3/T33：R-308 七态显式转换矩阵（防御性声明，接入主链转换点）
+    ALLOWED_TRANSITIONS = {
+        STATUS_PENDING: {STATUS_APPROVED, STATUS_REJECTED, STATUS_CANCELLED},
+        STATUS_APPROVED: {STATUS_PROCESSING},
+        STATUS_PROCESSING: {STATUS_REFUNDED, STATUS_FAILED},
+        STATUS_FAILED: {STATUS_PROCESSING},  # 失败可重试
+        STATUS_REFUNDED: set(),  # 终态
+        STATUS_REJECTED: set(),  # 终态（重新申请 = 新单）
+        STATUS_CANCELLED: set(),  # 终态
+    }
+
+    def assert_transition(self, new_status: str) -> None:
+        """B-3/T33 状态机显式校验：非法跳转 ConflictError（防御性，主链转换点接入）。"""
+        if new_status not in self.ALLOWED_TRANSITIONS.get(self.status, set()):
+            from backend.common.exceptions import ConflictError
+
+            raise ConflictError(f"状态不允许从 {self.status} 变更为 {new_status}")
+
     kind = Column(String(10), nullable=False, comment="order/deposit")
     order_id = Column(Integer, nullable=True, comment="关联订单（order 类）")
     deposit_id = Column(Integer, nullable=True, comment="关联押金（deposit 类）")
@@ -197,6 +215,28 @@ class WithdrawalRequest(BaseModel):
     STATUS_COMPLETED = "completed"  # 全部退款完成，退会生效
     STATUS_REJECTED = "rejected"
     STATUS_CANCELLED = "cancelled"
+
+    # B-3/T33：R-311 六态显式转换矩阵（防御性声明，接入主链转换点）
+    ALLOWED_TRANSITIONS = {
+        STATUS_APPLYING: {
+            STATUS_PENDING_SETTLE,
+            STATUS_REFUNDING,
+            STATUS_REJECTED,
+            STATUS_CANCELLED,
+        },
+        STATUS_PENDING_SETTLE: {STATUS_REFUNDING, STATUS_COMPLETED, STATUS_REJECTED},
+        STATUS_REFUNDING: {STATUS_COMPLETED, STATUS_REJECTED, STATUS_PENDING_SETTLE},
+        STATUS_COMPLETED: set(),  # 终态（重新入会 = 新流程）
+        STATUS_REJECTED: set(),  # 终态（重新申请 = 新单）
+        STATUS_CANCELLED: set(),  # 终态
+    }
+
+    def assert_transition(self, new_status: str) -> None:
+        """B-3/T33 状态机显式校验：非法跳转 ConflictError（防御性，主链转换点接入）。"""
+        if new_status not in self.ALLOWED_TRANSITIONS.get(self.status, set()):
+            from backend.common.exceptions import ConflictError
+
+            raise ConflictError(f"状态不允许从 {self.status} 变更为 {new_status}")
 
     # 来源：主动退会 / 会员费退款联动（R-309）/ 权益转让联动（R-305）
     SOURCE_NORMAL = "normal"
