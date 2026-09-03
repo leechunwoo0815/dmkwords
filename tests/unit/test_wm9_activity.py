@@ -298,12 +298,29 @@ def test_first_activity_fee_chain(client: TestClient):
         headers=h,
     )
     assert dup.status_code == 409
-    # 退款成功（超管执行；家庭申请流程 WM10 退款中心补全）
+    # 退款走审核链（B-15 改造 20260903：超管代发起 → pending → review → execute 成功）
     rf = client.post(
         f"/api/admin/orders/{o1['id']}/refund", json={"remark": "未参加，全额退"}, headers=h
     )
     assert rf.status_code == 200
-    assert rf.json()["status"] == "refunded"
+    assert rf.json()["status"] == "pending", f"应返回 pending 审核链状态，实 {rf.json()}"
+    rid = rf.json()["id"]
+    assert (
+        client.post(
+            f"/api/admin/refund-requests/{rid}/review",
+            json={"approve": True, "remark": "同意"},
+            headers=h,
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"/api/admin/refund-requests/{rid}/execute",
+            json={"success": True, "remark": "线下打款"},
+            headers=h,
+        ).status_code
+        == 200
+    )
     # 资格恢复 → 可再购
     o2 = client.post(
         "/api/admin/orders",

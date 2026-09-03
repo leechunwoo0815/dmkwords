@@ -15,7 +15,7 @@ from backend.common.exceptions import ConflictError, NotFoundError, ValidationEr
 from backend.common.notification_models import Notification
 from backend.common.notifications import SCENE_MEMBER_EXPIRE_REMIND, NotificationService
 from backend.domain.catalog.audit_events import publish_audit
-from backend.domain.identity.models import Child, Order, Parent
+from backend.domain.identity.models import Child, Order, Parent, RefundRequest
 
 
 class OrderService:
@@ -165,26 +165,47 @@ class OrderService:
         )
         return order
 
-    def refund_order(self, admin, order_id: int, remark: str) -> Order:
-        """订单退款执行（超管审核通过后调用；99 元资格随 refunded 状态恢复）。"""
-        order = self.db.query(Order).filter(Order.id == order_id, Order.is_deleted == 0).first()
+    def refund_order(self, admin, order_id: int, remark: str) -> RefundRequest:
+        """超管代家长发起退款申请（B-15 改造 20260903）：原直接翻 REFUNDED 的旁路已废，
+        统一走 R-308 审核链——创建 pending 申请，后续 review→execute 与家长申请同链。"""
+        from backend.domain.identity.wm10_service import RefundService
+
+        order = (
+            self.db.query(Order)
+            .filter(Order.id == order_id, Order.is_deleted == 0)
+            .with_for_update().populate_existing()  # B-15：锁定读防并发旁路
+            .first()
+        )
         if not order:
             raise NotFoundError("订单不存在")
         if order.status != Order.STATUS_PAID:
             raise ValidationError(f"订单状态 {order.status} 不可退款")
-        order.status = Order.STATUS_REFUNDED
+        # 金额强制复用 _refundable_amount（X6 三形态同源计算，不得另写）
+        refundable = RefundService(self.db)._refundable_amount(order)
+        if refundable <= 0:
+            raise ValidationError("该订单当前无可退金额")
+        req = RefundRequest(
+            kind=RefundRequest.KIND_ORDER,
+            order_id=order.id,
+            child_id=order.child_id,
+            amount=refundable,
+            reason=remark or "超管代发起",
+            status=RefundRequest.STATUS_PENDING,
+        )
+        self.db.add(req)
         self.db.flush()
+        order.refund_status = Order.REFUND_STATUS_PENDING
         publish_audit(
             self.db,
             admin=admin,
-            action="order.refund",
+            action="order.refund_apply",
             target_type="order",
             target_id=order.order_no,
-            detail={"amount": str(order.amount), "child_id": order.child_id},
-            reason=remark or "退款审核通过",
+            detail={"amount": str(refundable), "child_id": order.child_id},
+            reason=remark or "超管代发起",
         )
         self.db.commit()
-        return order
+        return req
 
     ALLOWED_VOUCHER_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 

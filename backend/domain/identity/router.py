@@ -320,9 +320,16 @@ def refund_order(
     admin: Any = Depends(require_super_admin()),
     db: Session = Depends(get_db),
 ):
-    """订单退款执行（超管；审核路径的家庭申请流程见 WM10 退款中心）。"""
-    order = OrderService(db).refund_order(admin, order_id, body.remark)
-    return {"id": order.id, "order_no": order.order_no, "status": order.status}
+    """超管代家长发起退款申请（B-15 改造 20260903）：走 R-308 审核链，不再直接退款。
+    返回 RefundRequest 视图（pending），后续 review→execute 与家长申请同链。"""
+    req = OrderService(db).refund_order(admin, order_id, body.remark)
+    return {
+        "id": req.id,
+        "kind": req.kind,
+        "order_id": req.order_id,
+        "amount": str(req.amount),
+        "status": req.status,
+    }
 
 
 # ==================== WM10：退款 / 退会 / 转让 / 评估报告（管理端） ====================
