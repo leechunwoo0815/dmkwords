@@ -28,6 +28,12 @@ BDD_BIZ_TABLES = [
 def before_scenario(context, scenario):
     if "draft" in scenario.effective_tags:
         return
+    # I-3/T8 同族：RateLimiter 全局实例（内存）在 behave 进程内跨场景累积，
+    # admin login 第 6 次即 429（gate p0batch1 首轮 BDD 11 场景失败实证）——
+    # 对齐 tests/unit/conftest.py clean_db 的重置
+    from backend.middleware.rate_limit import _limiter as _rate_limiter
+
+    _rate_limiter._requests.clear()
     with engine.begin() as conn:
         for table in ADMIN_TABLES + BDD_BIZ_TABLES:
             conn.execute(text(f"TRUNCATE TABLE {table}"))
