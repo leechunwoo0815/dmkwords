@@ -351,6 +351,9 @@ class WithdrawalService:
 
             settle = self._settle_items(child)
             deposit_refund_id = None
+            # B-13（第二批 T11）：dep 仅在 settle 含押金项时赋值，无押金孩 approve
+            # 审计 detail 引用即 UnboundLocalError → 500；预置 None 保证分支完备
+            dep = None
             for it in settle:
                 rr = RefundRequest(
                     kind=it["kind"],
