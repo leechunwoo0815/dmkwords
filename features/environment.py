@@ -5,7 +5,6 @@ from sqlalchemy import text
 from backend.database import engine
 from backend.domain.admin.service import invalidate_config_cache
 from backend.main import app
-
 from tests.unit.conftest import ADMIN_TABLES
 
 # G-13/T34（域G）：清理清单对齐 conftest 单一事实源（原 13 表清单缺 refund/

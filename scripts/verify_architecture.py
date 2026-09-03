@@ -165,7 +165,9 @@ def check_mutation_count_flush() -> list[str]:
                     mutated = False
                 elif kind == "count" and mutated:
                     rel = py.relative_to(ROOT)
-                    alerts.append(f"{rel}:{fn.name}——状态赋值后 COUNT 未 flush（教训 41 模式，自查）")
+                    alerts.append(
+                        f"{rel}:{fn.name}——状态赋值后 COUNT 未 flush（教训 41 模式，自查）"
+                    )
                     break
     return alerts
 
@@ -190,7 +192,9 @@ def main() -> int:
     )
     alerts = check_mutation_count_flush()
     if alerts:
-        print(f"[T32 教训 41 防呆] 告警清单（不拦截，施工命中函数必须逐个自查+简报声明）{len(alerts)} 处：")
+        print(
+            f"[T32 教训 41 防呆] 告警清单（不拦截，施工命中函数必须逐个自查+简报声明）{len(alerts)} 处："
+        )
         for a in alerts:
             print(f"  ⚠ {a}")
     else:

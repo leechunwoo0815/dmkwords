@@ -63,14 +63,14 @@ def main() -> int:
         if snapshot == current:
             print("[T27] 契约快照一致 ✓")
             return 0
-        print("✗ OpenAPI 契约快照与代码不一致（破坏性变更必须两步显形：改代码 + 更新快照单独 commit）：")
+        print(
+            "✗ OpenAPI 契约快照与代码不一致（破坏性变更必须两步显形：改代码 + 更新快照单独 commit）："
+        )
         for line in diff_summary(snapshot, current):
             print(line)
         return 1
     SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
-    SNAPSHOT.write_text(
-        json.dumps(current, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
-    )
+    SNAPSHOT.write_text(json.dumps(current, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
     print(f"[T27] 契约快照已导出: {SNAPSHOT}")
     return 0
 

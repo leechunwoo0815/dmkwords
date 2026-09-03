@@ -12,7 +12,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
-
 def _scan(src: str) -> list[str]:
     """对样例源码跑扫描（借临时文件落盘路径）。"""
     import tempfile
@@ -32,26 +31,26 @@ def _scan(src: str) -> list[str]:
             va.ROOT = original
 
 
-HIT = '''
+HIT = """
 def bad_case(self):
     child.member_status = Child.MEMBER_EXPIRED
     n = self.db.query(func.count(Order.id)).filter(Order.id == 1).count()
     return n
-'''
+"""
 
-CLEAN_FLUSH = '''
+CLEAN_FLUSH = """
 def good_case(self):
     child.member_status = Child.MEMBER_EXPIRED
     self.db.flush()
     n = self.db.query(func.count(Order.id)).filter(Order.id == 1).count()
     return n
-'''
+"""
 
-CLEAN_NO_COUNT = '''
+CLEAN_NO_COUNT = """
 def also_good(self):
     child.member_status = Child.MEMBER_EXPIRED
     self.db.commit()
-'''
+"""
 
 
 def test_mutation_then_count_without_flush_hits():
