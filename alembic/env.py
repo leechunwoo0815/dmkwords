@@ -41,7 +41,14 @@ from backend.domain.identity.models import (  # noqa: E402, F401
     TransferRequest,
     WithdrawalRequest,
 )
-from backend.domain.reading.models import CheckIn, ReadingProgress, Reservation  # noqa: E402, F401
+from backend.domain.reading.models import (  # noqa: E402, F401
+    CheckIn,
+    DictionaryWord,
+    Favorite,
+    ReadingProgress,
+    Reservation,
+    Vocabulary,
+)
 
 # this is the Alembic Config object
 config = context.config
