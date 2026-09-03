@@ -48,7 +48,6 @@ def test_withdrawal_skip_settlement_blocked(client: TestClient):
     h = _h(client)
     p, c, mini = _family(client, h, "13981033001", "状态机孩")
     _pay(client, h, c["id"], "observation_fee")
-    from backend.domain.admin.models import AdminUser
     from backend.domain.identity.models import WithdrawalRequest
 
     with _db() as db:
@@ -64,7 +63,6 @@ def test_withdrawal_skip_settlement_blocked(client: TestClient):
         db.commit()
 
     with _db() as db:
-        admin = db.query(AdminUser).filter(AdminUser.username == "admin").first()
         w2 = db.query(WithdrawalRequest).filter(WithdrawalRequest.id == wid).first()
         with pytest.raises(ConflictError):
             w2.assert_transition(WithdrawalRequest.STATUS_COMPLETED)
