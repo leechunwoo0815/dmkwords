@@ -122,11 +122,17 @@ def main() -> None:
                 )
         print(f"[seed_demo] 书目 {len(books)} 本 × 2 副本 ✓")
 
+        # 演示家庭可能被用户演示时删除（编辑/删除功能）——None 防护跳过业务段
         demo_parent = db.query(Parent).filter(Parent.phone == "13800008888").first()
         demo_child = (
             db.query(Child)
-            .filter(Child.parent_id == demo_parent.id, Child.member_status == Child.MEMBER_FORMAL)
+            .filter(
+                Child.parent_id == demo_parent.id,
+                Child.member_status == Child.MEMBER_FORMAL,
+            )
             .first()
+            if demo_parent
+            else None
         )
         if demo_child and not db.query(Deposit).filter(Deposit.child_id == demo_child.id).first():
             dep = Deposit(
