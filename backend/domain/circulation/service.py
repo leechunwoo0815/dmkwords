@@ -213,10 +213,23 @@ class CirculationService:
             .filter(Deposit.child_id == child_id, Deposit.is_deleted == 0)
             .first()
         )
-        if not dep or dep.status == "unpaid":
+        if (
+            not dep
+            or dep.status == Deposit.STATUS_UNPAID
+            or dep.status == Deposit.STATUS_FULLY_DEDUCTED
+            or (dep.unpaid_balance or 0) > 0
+        ):
+            # B-12（第二批 T12）：押金扣光/有未结清赔偿款与未缴纳同险，同口径拦截；
+            # 人工放行通道保留（线下馆员 + 留痕）
+            if not dep or dep.status == Deposit.STATUS_UNPAID:
+                block_reason = "押金未缴纳"
+            elif dep.status == Deposit.STATUS_FULLY_DEDUCTED:
+                block_reason = "押金已扣光"
+            else:
+                block_reason = "有未结清赔偿款"
             if not override_reason:
-                raise ValidationError("押金未缴纳（可人工放行并填写原因）")
-            warnings.append("押金未缴纳")
+                raise ValidationError(f"{block_reason}（可人工放行并填写原因）")
+            warnings.append(f"{block_reason}，馆员放行")
 
         # 借阅上限：30 − 在借数（E-9 20260903：逾期已在 active 内，单次扣减；
         # 原公式 borrow_limit - overdue - active 逾期一本双扣）

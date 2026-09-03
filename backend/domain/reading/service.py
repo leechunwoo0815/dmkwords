@@ -326,8 +326,21 @@ class ReservationService:
             .filter(Deposit.child_id == child.id, Deposit.is_deleted == 0)
             .first()
         )
-        if not dep or dep.status == "unpaid":
-            raise ValidationError("押金未缴纳，不能预约")
+        if (
+            not dep
+            or dep.status == Deposit.STATUS_UNPAID
+            or dep.status == Deposit.STATUS_FULLY_DEDUCTED
+            or (dep.unpaid_balance or 0) > 0
+        ):
+            # B-12（第二批 T12）：押金扣光/有未结清赔偿款与未缴纳同险；预约为
+            # 线上自助操作，硬拦截无人工放行（宪法三类硬拦截例外）
+            if not dep or dep.status == Deposit.STATUS_UNPAID:
+                block_reason = "押金未缴纳"
+            elif dep.status == Deposit.STATUS_FULLY_DEDUCTED:
+                block_reason = "押金已扣光"
+            else:
+                block_reason = "有未结清赔偿款"
+            raise ValidationError(f"{block_reason}，不能预约")
         now = datetime.now()
         overdue = (
             self.db.query(func.count(BorrowRecord.id))
