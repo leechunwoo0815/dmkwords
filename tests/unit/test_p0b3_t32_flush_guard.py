@@ -6,13 +6,11 @@
 - 不命中：赋值与 COUNT 之间有 flush（修复后形态）/ 无赋值 / 无 COUNT
 """
 
-import ast
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from scripts.verify_architecture import check_mutation_count_flush  # noqa: E402
 
 
 def _scan(src: str) -> list[str]:

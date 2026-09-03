@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 
 from backend.common.exceptions import ConflictError
 from backend.domain.identity.models import RefundRequest, WithdrawalRequest
-
 from tests.unit.test_wm10_concurrency import _db, _family, _h, _pay
 
 
@@ -49,9 +48,8 @@ def test_withdrawal_skip_settlement_blocked(client: TestClient):
     h = _h(client)
     p, c, mini = _family(client, h, "13981033001", "状态机孩")
     _pay(client, h, c["id"], "observation_fee")
-    from backend.domain.identity.models import Child, WithdrawalRequest
-    from backend.domain.identity.wm10_withdrawal_service import WithdrawalService
     from backend.domain.admin.models import AdminUser
+    from backend.domain.identity.models import WithdrawalRequest
 
     with _db() as db:
         w = WithdrawalRequest(
