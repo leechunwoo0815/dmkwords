@@ -82,6 +82,13 @@ else
   skip "admin-web 未安装依赖（pnpm install 后启用）"
 fi
 
+step 8 "契约快照检查（T27：破坏性变更必须改代码+更新快照两步显形）"
+if [ -f "docs/api/openapi.json" ]; then
+  run python scripts/export_openapi.py --check
+else
+  skip "契约快照未导出（docs/api/openapi.json 不存在）"
+fi
+
 sleep 0.3  # E-20260901-04：等 tee 落盘再退出，防日志末行截断
 echo ""
 if [ "$FAILED" -eq 0 ]; then
