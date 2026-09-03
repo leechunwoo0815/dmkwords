@@ -3,7 +3,14 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
 from collections.abc import Generator
+
+# G-12/T34（域G）：测试上传隔离到临时目录—— uploads 与 dev 库同源共写
+# （pytest 与 dev 后端共库，TRUNCATE 清业务表；上传文件此前 311MB/4136 个
+# 孤儿文件永久残留）。须在首次 import backend 前设置环境变量。
+os.environ.setdefault("UPLOADS_DIR", tempfile.mkdtemp(prefix="dmk-test-uploads-"))
 
 import pytest
 from fastapi.testclient import TestClient

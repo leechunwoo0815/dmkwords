@@ -6,23 +6,12 @@ from backend.database import engine
 from backend.domain.admin.service import invalidate_config_cache
 from backend.main import app
 
-ADMIN_TABLES = ["audit_logs", "system_configs", "admin_users"]
-# F7：BDD 业务数据清理（对齐 conftest clean_db 全表清单；behave 写业务数据的
-# feature 自 WM3-B1 起，此前仅 admin 三表→跨场景唯一键残留 409）
-BDD_BIZ_TABLES = [
-    "orders",
-    "children",
-    "parents",
-    "observation_reports",
-    "borrow_records",
-    "reservations",
-    "deposit_ledgers",
-    "deposits",
-    "vocabularies",
-    "favorites",
-    "checkins",
-    "reading_progress",
-]
+from tests.unit.conftest import ADMIN_TABLES
+
+# G-13/T34（域G）：清理清单对齐 conftest 单一事实源（原 13 表清单缺 refund/
+# withdrawal/transfer/activities/notifications 等 23 表——横切批解封资金类
+# feature 时会踩跨场景残留；改清单须改 conftest 一处）
+BDD_TABLES = [t for t in ADMIN_TABLES if t not in ("audit_logs", "system_configs", "admin_users")]
 
 
 def before_scenario(context, scenario):
@@ -35,7 +24,7 @@ def before_scenario(context, scenario):
 
     _rate_limiter._requests.clear()
     with engine.begin() as conn:
-        for table in ADMIN_TABLES + BDD_BIZ_TABLES:
+        for table in ADMIN_TABLES + BDD_TABLES:
             conn.execute(text(f"TRUNCATE TABLE {table}"))
     from backend.seeds.seed_admin import seed as seed_admin
     from backend.seeds.seed_configs import seed as seed_configs

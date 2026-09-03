@@ -36,7 +36,9 @@ start() {
   echo "===== [2/4] 数据库迁移 + 种子（幂等） ====="
   .venv/bin/alembic upgrade head || exit 1
   .venv/bin/python -m backend.seeds.seed_admin
-  .venv/bin/python -m backend.seeds.seed_configs | head -1
+  .venv/bin/python -m backend.seeds.seed_configs
+  # T34：演示数据重建（幂等——书目存在即跳过；behave/gate 清业务表后一键恢复）
+  .venv/bin/python -m backend.seeds.seed_demo | head -1
 
   echo "===== [3/4] 后端 API（:8002） ====="
   # 端口防呆：8002 被"非 pid 文件管理"的进程占用时，新进程会绑定失败退出，
