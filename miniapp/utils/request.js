@@ -89,8 +89,13 @@ function doRequest(app, method, url, data, options, showLoading, resolve, reject
       if (res.statusCode >= 200 && res.statusCode < 300) {
         resolve(res.data)
       } else {
-        // MP-033: 统一错误消息
-        const msg = res.data?.detail || res.data?.message || `请求失败 (${res.statusCode})`
+        // MP-033 + F-M2/T26：FastAPI 422 校验错的 detail 是数组 [{loc,msg,type}]，
+        // 取首条 msg 显示（对齐 admin-web client.ts 同款修复），否则 toast 变 [object Object]
+        let detail = res.data?.detail ?? res.data?.message ?? null
+        if (Array.isArray(detail)) {
+          detail = detail[0]?.msg || detail[0]?.message || null
+        }
+        const msg = detail || `请求失败 (${res.statusCode})`
         if (showError) {
           wx.showToast({ title: msg, icon: 'none', duration: 2000 })
         }

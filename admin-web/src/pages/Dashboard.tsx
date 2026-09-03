@@ -135,7 +135,8 @@ export default function Dashboard() {
     setLoading(true);
     apiDashboardOverview()
       .then(setOverview)
-      .catch(() => undefined)
+      // F-M8 族/T26：仪表盘 fetch 失败必须报错——静默 = 管理员对着空看板误判经营数据
+      .catch((e: Error) => message.error(e.message))
       .finally(() => setLoading(false));
   };
 

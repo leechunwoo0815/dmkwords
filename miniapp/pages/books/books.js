@@ -41,6 +41,7 @@ Page({
     loading: false,
     loaded: false,
     noMore: false,
+    loadError: false,
   },
 
   onShow() {
@@ -123,7 +124,7 @@ Page({
   async reload() {
     const filters = this.currentFilters()
     this.syncChips(filters)
-    this.setData({ page: 1, loading: true, noMore: false })
+    this.setData({ page: 1, loading: true, noMore: false, loadError: false })
     try {
       const res = await api.listBooks({ keyword: this.data.keyword, page: 1, page_size: PAGE_SIZE, ...filters })
       this.setData({
@@ -133,10 +134,15 @@ Page({
         noMore: (res.items || []).length < PAGE_SIZE,
       })
     } catch (e) {
-      this.setData({ books: [], total: 0, loaded: true, noMore: true })
+      // F-M12/T26：fetch 失败进错误态（点击重试），不再静默置空渲染为合法空态（禁假 0）
+      this.setData({ loadError: true, books: [], total: 0, loaded: true, noMore: true })
     } finally {
       this.setData({ loading: false })
     }
+  },
+
+  onRetryLoad() {
+    this.reload()
   },
 
   async onReachBottom() {

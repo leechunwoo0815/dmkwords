@@ -66,9 +66,11 @@
     </view>
   </view>
 
-  <!-- 加载态 / 空态 -->
-  <view wx:if="{{loading}}" class="no-more">加载中…</view>
-  <view wx:elif="{{noMore && books.length}}" class="no-more">— 已经到底啦 —</view>
-  <empty-state wx:if="{{loaded && !books.length}}" icon="🔍" title="没有找到符合条件的书"
+  <!-- 加载态 / 错误态 / 空态（F-M12/T26：fetch 失败错误态+重试，替代静默空态） -->
+  <error-view wx:if="{{loadError}}" type="network" title="加载失败"
+    desc="网络开小差了，请重试" bind:onRetry="onRetryLoad" />
+  <view wx:if="{{loading && !loadError}}" class="no-more">加载中…</view>
+  <view wx:elif="{{noMore && books.length && !loadError}}" class="no-more">— 已经到底啦 —</view>
+  <empty-state wx:if="{{loaded && !books.length && !loadError}}" icon="🔍" title="没有找到符合条件的书"
     desc="换个关键词，或清除部分筛选再试试" />
 </view>

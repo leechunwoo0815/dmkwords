@@ -3,9 +3,12 @@
     {{childName}} 的生词本 · 听书时查过的词自动记录，配合原书语境复习
   </view>
 
-  <view wx:if="{{loading}}" class="loading">加载中…</view>
+  <view wx:if="{{loading && !loadError}}" class="loading">加载中…</view>
 
-  <view wx:if="{{!loading && !words.length}}" class="empty-state">
+  <error-view wx:if="{{loadError}}" type="network" title="加载失败"
+    desc="生词本加载失败，请重试" bind:onRetry="onRetryLoad" />
+
+  <view wx:if="{{!loading && !words.length && !loadError}}" class="empty-state">
     <view class="empty-icon">📖</view>
     <view style="color:var(--muted);">还没有生词，播放页下半屏查词会自动收录</view>
   </view>

@@ -47,7 +47,8 @@ export default function CirculationDesk() {
   const [overdue, setOverdue] = useState<OverdueItem[]>([]);
 
   const loadOverdue = useCallback(() => {
-    apiOverdueList().then(setOverdue).catch(() => undefined);
+    // F-M8/T26：逾期名单 fetch 失败必须报错——馆员误判无逾期（催还漏操作）
+    apiOverdueList().then(setOverdue).catch((e: Error) => { message.error(e.message); setOverdue([]); });
   }, []);
   useEffect(loadOverdue, [loadOverdue]);
 

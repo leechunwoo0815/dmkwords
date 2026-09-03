@@ -66,6 +66,8 @@ export default function AuditLogPage() {
         for (const c of configs) map[c.config_key] = c.display_name || c.description || c.config_key;
         setConfigNames(map);
       })
+      // T26 全量枚举处置：降级保留静默——失败时展示 config_key 原文（数据本体在），
+      // 仅 display_name 美化缺失，不构成"假 0 误判"
       .catch(() => undefined);
   }, []);
 

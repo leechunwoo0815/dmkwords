@@ -6,6 +6,7 @@ Page({
     childName: '',
     words: [],
     loading: true,
+    loadError: false,
   },
 
   onLoad(options) {
@@ -17,16 +18,19 @@ Page({
 
   async load() {
     if (!this._childId) return
-    this.setData({ loading: true })
+    this.setData({ loading: true, loadError: false })
     try {
       const words = await api.listVocabulary(this._childId)
       this.setData({ words: words || [] })
     } catch (e) {
-      this.setData({ words: [] })
+      // F-M12/T26：fetch 失败进错误态（点击重试），不再静默置空渲染为合法空态（禁假 0）
+      this.setData({ words: [], loadError: true })
     } finally {
       this.setData({ loading: false })
     }
   },
+
+  onRetryLoad() { this.load() },
 
   async onRemove(e) {
     const id = e.currentTarget.dataset.id

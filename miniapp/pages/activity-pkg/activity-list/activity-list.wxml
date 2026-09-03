@@ -6,9 +6,12 @@
     </view>
   </view>
 
-  <view wx:if="{{loading}}" class="loading-wrap">加载中…</view>
+  <view wx:if="{{loading && !loadError}}" class="loading-wrap">加载中…</view>
 
-  <block wx:if="{{!loading && tab === 'upcoming'}}">
+  <error-view wx:if="{{loadError}}" type="network" title="加载失败"
+    desc="活动列表加载失败，请重试" bind:onRetry="onRetryLoad" />
+
+  <block wx:if="{{!loading && !loadError && tab === 'upcoming'}}">
     <view wx:if="{{!activities.length}}" class="empty-state">
       <view class="empty-icon">🎪</view>
       <view class="empty-text">近期没有活动，敬请期待</view>
@@ -34,7 +37,7 @@
     </view>
   </block>
 
-  <block wx:if="{{!loading && tab === 'mine'}}">
+  <block wx:if="{{!loading && !loadError && tab === 'mine'}}">
     <view wx:if="{{!myEnrollments.length}}" class="empty-state">
       <view class="empty-icon">🎟️</view>
       <view class="empty-text">还没有报名，去「可报名」看看</view>

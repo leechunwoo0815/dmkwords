@@ -121,7 +121,8 @@ Page({
     } catch (e) { /* 静默 */ }
     try {
       const rs = await api.listReservations(childId)
-      const active = (rs || []).filter((r) => r.status === 'waiting' || r.status === 'ready')
+      // F-M1/T26：后端枚举是 active（waiting/ready 不存在，枚举错配同族第 4 案，徽标恒 0）
+      const active = (rs || []).filter((r) => r.status === 'active')
       this.setData({ reservationCount: active.length })
     } catch (e) { /* 静默 */ }
   },

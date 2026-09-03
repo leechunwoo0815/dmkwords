@@ -53,7 +53,8 @@ export default function ActivityManage() {
       .then(setActivities)
       .catch((e: Error) => message.error(e.message))
       .finally(() => setLoading(false));
-    apiListActivityRefunds().then(setRefunds).catch(() => setRefunds([]));
+    // F-M9/T26：退款审核列表 fetch 失败必须报错——静默置空=审核员误判无待审
+    apiListActivityRefunds().then(setRefunds).catch((e: Error) => { message.error(e.message); setRefunds([]); });
   }, [message]);
 
   useEffect(() => { load(); }, [load]);

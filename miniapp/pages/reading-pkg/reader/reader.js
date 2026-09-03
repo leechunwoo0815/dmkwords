@@ -60,7 +60,7 @@ Page({
       sliderMax: Math.max(1, Math.floor(duration)),
     })
     this._sessionStart = null
-    this._pendingSec = 0
+    this._lastBeatAt = 0
     this._audio = null
     this._resumeApplied = false
     this._initAudio()
@@ -141,7 +141,7 @@ Page({
           .then(() => this.loadProgress())
           .catch(() => {})
         this._sessionStart = endPos
-        this._pendingSec = 0
+        this._lastBeatAt = Date.now()
       }
       this.setData({ playing: false })
     })
@@ -161,16 +161,18 @@ Page({
         displayTime: fmt(cur),
         sliderValue: Math.floor(cur),
       })
-      this._pendingSec += 1
-      if (this._pendingSec >= HEARTBEAT_SEC) {
-        this._pendingSec = 0
+      // F-H5/T26：onTimeUpdate 实际触发频率 ~250ms 而非 1s，原计数法上报量 ~4×；
+      // 改墙钟差值判断（HEARTBEAT_SEC 秒真实间隔一次）
+      if (!this._lastBeatAt) this._lastBeatAt = Date.now()
+      if (Date.now() - this._lastBeatAt >= HEARTBEAT_SEC * 1000) {
+        this._lastBeatAt = Date.now()
         this._reportNow()
       }
     })
     audio.onSeeked(() => {
       // seek 后重置连续段起点：旧区间已在 onSliderChanging 前上报
       this._sessionStart = Math.floor(audio.currentTime || 0)
-      this._pendingSec = 0
+      this._lastBeatAt = Date.now()
     })
     this._audio = audio
   },
@@ -226,7 +228,7 @@ Page({
     if (position <= sessionStart) return
     // 上报后新会话段从当前位置继续累积
     this._sessionStart = position
-    this._pendingSec = 0
+    this._lastBeatAt = Date.now()
     const done = (res) => {
       if (!res) return
       this.setData({

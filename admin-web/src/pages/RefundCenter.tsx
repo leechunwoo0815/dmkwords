@@ -89,8 +89,9 @@ export default function RefundCenter() {
 
   const load = useCallback(() => {
     apiListRefunds().then(setRefunds).catch((e: Error) => message.error(e.message));
-    apiListWithdrawals().then(setWithdrawals).catch(() => setWithdrawals([]));
-    apiListTransfers().then(setTransfers).catch(() => setTransfers([]));
+    // F-H4/T26：资金域列表 fetch 失败必须报错——静默置空=管理员误判无待审（最高危）
+    apiListWithdrawals().then(setWithdrawals).catch((e: Error) => { message.error(e.message); setWithdrawals([]); });
+    apiListTransfers().then(setTransfers).catch((e: Error) => { message.error(e.message); setTransfers([]); });
   }, [message]);
 
   useEffect(() => { load(); }, [load]);

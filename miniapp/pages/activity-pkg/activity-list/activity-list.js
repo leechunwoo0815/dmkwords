@@ -14,6 +14,7 @@ Page({
     activities: [],
     myEnrollments: [],
     loading: true,
+    loadError: false,
   },
 
   onShow() {
@@ -27,16 +28,21 @@ Page({
   onTab(e) { this.setData({ tab: e.currentTarget.dataset.tab }) },
 
   async load() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, loadError: false })
     try {
       const [acts, mine] = await Promise.all([
         api.listActivities(this._childId),
         api.myEnrollments(this._childId),
       ])
       this.setData({ activities: acts || [], myEnrollments: mine || [] })
-    } catch (e) { /* toast 已弹 */ }
+    } catch (e) {
+      // F-M12/T26：fetch 失败进错误态（点击重试），不再静默空列表
+      this.setData({ loadError: true })
+    }
     finally { this.setData({ loading: false }) }
   },
+
+  onRetryLoad() { this.load() },
 
   goDetail(e) {
     const id = e.currentTarget.dataset.id

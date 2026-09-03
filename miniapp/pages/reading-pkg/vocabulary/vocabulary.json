@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "生词本"
+  "navigationBarTitleText": "生词本",
+  "usingComponents": {
+    "error-view": "/components/error-view/error-view"
+  }
 }
