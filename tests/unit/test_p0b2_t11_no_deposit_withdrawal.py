@@ -41,7 +41,8 @@ def test_withdrawal_approve_without_deposit_ok(client: TestClient):
     assert r.status_code == 200, f"无押金 approve 不应 500：{r.status_code} {r.text[:120]}"
 
     with _db() as db:
-        from backend.domain.identity.models import RefundRequest, WithdrawalRequest as W
+        from backend.domain.identity.models import RefundRequest
+        from backend.domain.identity.models import WithdrawalRequest as W
 
         w2 = db.query(W).filter(W.id == wid).first()
         assert w2.status == W.STATUS_REFUNDING

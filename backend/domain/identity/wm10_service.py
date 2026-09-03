@@ -664,9 +664,10 @@ class RefundService:
             # WM13 L2 回写（T16 随动微调）：execute 联动翻终态后，该活动已无
             # refund_pending 报名 → 聚合待办回写（T16 前由 review_refund approve
             # 即翻终态触发；approve≠终态后改由 execute 侧收口）
+            from sqlalchemy import func as _func
+
             from backend.common.admin_notification_models import AdminNotification
             from backend.common.admin_notifications import AdminNotifyService
-            from sqlalchemy import func as _func
 
             remaining = (
                 self.db.query(_func.count(ActivityEnrollment.id))
