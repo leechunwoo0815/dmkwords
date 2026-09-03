@@ -1,4 +1,5 @@
-# backend/domain/circulation/service.py — 借/还/续借/逾期扣减/人工放行
+# backend/domain/circulation/service.py — 借/还/续借/人工放行
+# （V1 无逾期费，2026-09-03 用户裁定：原文件头"逾期扣减"不实现，上线后视运营需要另立任务）
 """并发纪律（模式手册 P10/P11）：锁主体行（Child with_for_update）串行化同一孩子的借书；
 副本行锁 + 唯一索引双保险防同一副本并发借出。"""
 

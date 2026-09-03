@@ -80,7 +80,9 @@ Router (参数校验/HTTP状态码/依赖注入，🚫不含 try/except、不抛
 ```text
 backend/domain/identity/     家长账号、孩子档案、会员生命周期(6态)、同意记录、权益转让    ← F0,F3,F10
 backend/domain/catalog/      书目、副本(5态+reserved)、音频、题目、收藏夹               ← F1
-backend/domain/circulation/  借、还、续借、预约(72h锁定)、逾期扣减、人工放行留痕         ← F4
+backend/domain/circulation/  借、还、续借、预约(72h锁定)、人工放行留痕               ← F4
+                             （V1 无逾期费，2026-09-03 用户裁定：原"逾期扣减"
+                             不实现，上线后视运营需要另立任务）
 backend/domain/billing/      订单(5类7态)、支付(线上+人工确认)、退款、押金(状态机+补缴)、赔偿 ← F2,F3
 backend/domain/reading/      播放进度与防刷、打卡、Quiz、有效词数、生词本               ← F5,F6,F8
 backend/domain/growth/       A-Z等级、积分、五榜单、里程碑、护照、周报月报图片           ← F7,F8
