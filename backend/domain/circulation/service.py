@@ -399,6 +399,8 @@ class CirculationService:
         record = (
             self.db.query(BorrowRecord)
             .filter(BorrowRecord.id == record_id, BorrowRecord.is_deleted == 0)
+            .with_for_update()
+            .populate_existing()  # E-1/T21：锁定读，并发双续借防双延期双计数
             .first()
         )
         if not record:
