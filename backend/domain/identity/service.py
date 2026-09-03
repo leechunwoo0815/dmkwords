@@ -381,10 +381,19 @@ class ChildService:
                 Child.member_expire.isnot(None),
                 Child.member_expire < today,
             )
+            .with_for_update()
+            .populate_existing()  # E-10/T19：锁定读刷新快照，防并发续费被旧快照覆盖
             .all()
         )
         changed = 0
         for child in due:
+            # 锁后逐行复查谓词（RC 读最新已提交）：锁等待期间若已续费则不再推进
+            if not (
+                child.member_expire
+                and child.member_expire < today
+                and child.member_status in (Child.MEMBER_FORMAL, Child.MEMBER_OBSERVATION)
+            ):
+                continue
             if child.member_status == Child.MEMBER_FORMAL:
                 self._transition(child, Child.MEMBER_EXPIRED)
             elif child.member_status == Child.MEMBER_OBSERVATION:
