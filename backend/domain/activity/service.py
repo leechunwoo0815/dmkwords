@@ -180,7 +180,13 @@ class ActivityService:
 
     def cancel_activity(self, admin, activity_id: int) -> dict:
         """取消整场：已付未签到 → 退款待审（逐单人工审）；待支付 → 取消。"""
-        a = self._get(activity_id)
+        a = (
+            self.db.query(Activity)
+            .filter(Activity.id == activity_id, Activity.is_deleted == 0)
+            .with_for_update()
+            .populate_existing()  # E-5/T17：取消全程锁活动行，与 enroll 活动锁串行化
+            .first()
+        )
         if a.status != Activity.STATUS_PUBLISHED:
             raise ValidationError("活动状态不可取消")
         a.status = Activity.STATUS_CANCELLED
@@ -295,11 +301,13 @@ class ActivityService:
         return out
 
     def signin(self, admin, ticket_code: str) -> dict:
-        """扫码/手输入场券签到（记录时间 + 操作人）。"""
+        """扫码/手输入场券签到（记录时间 + 操作人）。E-2/T17：锁定读防并发双扫。"""
         code = (ticket_code or "").strip().upper()
         e = (
             self.db.query(ActivityEnrollment)
             .filter(ActivityEnrollment.ticket_code == code, ActivityEnrollment.is_deleted == 0)
+            .with_for_update()
+            .populate_existing()
             .first()
         )
         if not e:
@@ -448,6 +456,9 @@ class ActivityService:
             raise ValidationError("报名已截止")
         if a.member_only and not child.is_active_member:
             raise ValidationError("该活动仅限会员报名")
+        # E-8/T17：转让/退会冻结期不可报名（对齐借书/预约/测验先例）
+        if child.operation_locked:
+            raise ValidationError("孩子正在转让/退会审核流程中，报名已冻结")
         # 同活动同孩子唯一（活跃态）
         dup = (
             self.db.query(func.count(ActivityEnrollment.id))
