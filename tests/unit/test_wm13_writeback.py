@@ -201,13 +201,47 @@ def test_activity_last_review_marks_batch_handled(client: TestClient):
         f"/api/admin/orders/{e['order_id']}/confirm-payment", json={"pay_method": "scan"}, headers=h
     )
     assert client.post(f"/api/admin/activities/{act['id']}/cancel", headers=h).status_code == 200
-    # 逐单审核通过（最后一笔）
+    # 逐单审核通过（最后一笔）——T16 新语义：approve≠终态，e 保持 refund_pending，
+    # REF_ACTIVITY 回写不在此刻触发（收口移至 execute 联动）
     ok = client.post(
         f"/api/admin/activity-refunds/{e['enrollment']['id']}/review",
         json={"approve": True, "remark": "同意"},
         headers=h,
     )
     assert ok.status_code == 200, ok.text
+    with _db() as db:
+        from backend.common.admin_notification_models import AdminNotification
+
+        n = (
+            db.query(AdminNotification)
+            .filter(AdminNotification.ref_type == "activity", AdminNotification.is_deleted == 0)
+            .first()
+        )
+        assert n is not None
+        assert n.handled_at is None, "approve 后报名未终态，聚合待办不应回写（T16 行为变更）"
+
+    # execute 退款成功 → 联动 e→REFUNDED → 该活动无剩余 refund_pending → 回写
+    from backend.domain.identity.models import RefundRequest
+
+    with _db() as db:
+        rr = (
+            db.query(RefundRequest)
+            .filter(RefundRequest.order_id == e["order_id"], RefundRequest.is_deleted == 0)
+            .first()
+        )
+        assert rr is not None, "T16 后活动取消应同步创建统一退款申请"
+    rr_id = rr.id
+    client.post(
+        f"/api/admin/refund-requests/{rr_id}/review",
+        json={"approve": True, "remark": "同意"},
+        headers=h,
+    )
+    ex = client.post(
+        f"/api/admin/refund-requests/{rr_id}/execute",
+        json={"success": True, "remark": "活动取消退款"},
+        headers=h,
+    )
+    assert ex.status_code == 200, ex.text
     with _db() as db:
         from backend.common.admin_notification_models import AdminNotification
 

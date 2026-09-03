@@ -195,37 +195,22 @@ def book_audio(book_id: int, token: str = "", db: Session = Depends(get_db)):
 @router.get("/observation-images/{path:path}")
 def observation_image(path: str, token: str = "", db: Session = Depends(get_db)):
     """观察期评估报告图片（仅限 observation/ 目录；query token 鉴权 + 归属校验）。"""
-    import json
     import os
 
     from fastapi.responses import FileResponse
 
     from backend.config import get_settings
-    from backend.domain.identity.models import Child, ObservationReport
+    from backend.domain.identity.observation_service import ObservationReportService
 
     parent = _parent_from_token(token, db)
     root = os.path.abspath(get_settings().UPLOADS_DIR)
     full = os.path.abspath(os.path.join(root, "observation", path))
     if not full.startswith(os.path.join(root, "observation")) or not os.path.isfile(full):
         raise NotFoundError("图片不存在")
-    # C-12/T25（P0-F1 同族第五案）：数据归属校验——反查 ObservationReport，
-    # images JSON 数组精确匹配完整存储路径（observation/{path}，防子串误命中），
-    # 再经 Child 归属校验家长。查无归属一律 404（不区分不存在/无权，防枚举探测）
+    # C-12/T25（P0-F1 同族第五案）：数据归属校验下沉 Service（架构关 Router 零 ORM）
+    # images JSON 精确匹配 + 家长归属；查无归属一律 404（防枚举探测）
     stored_path = f"observation/{path}"
-    reports = (
-        db.query(ObservationReport, Child.parent_id)
-        .join(Child, ObservationReport.child_id == Child.id)
-        .filter(
-            ObservationReport.images.contains(path),
-            ObservationReport.is_deleted == 0,
-        )
-        .all()
-    )
-    owned = any(
-        path and stored_path in json.loads(report.images or "[]") and pid == parent.id
-        for report, pid in reports
-    )
-    if not owned:
+    if not ObservationReportService(db).image_owned_by(parent.id, stored_path, path):
         raise NotFoundError("图片不存在")
     return FileResponse(full, media_type="image/jpeg")
 

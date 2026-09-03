@@ -91,3 +91,23 @@ class ObservationReportService:
             }
             for r in rows
         ]
+
+    def image_owned_by(self, parent_id: int, stored_path: str, path_fragment: str) -> bool:
+        """C-12/T25（P0-F1 同族第五案）：报告图片归属校验。
+
+        images LIKE 候选过滤 + JSON 数组精确匹配完整存储路径（防子串误命中），
+        再校验报告所属孩子的 parent_id。查无归属返回 False——端点一律 404，
+        不区分"不存在"与"无权"（防枚举探测）。"""
+        reports = (
+            self.db.query(ObservationReport, Child.parent_id)
+            .join(Child, ObservationReport.child_id == Child.id)
+            .filter(
+                ObservationReport.images.contains(path_fragment),
+                ObservationReport.is_deleted == 0,
+            )
+            .all()
+        )
+        return any(
+            stored_path in json.loads(report.images or "[]") and pid == parent_id
+            for report, pid in reports
+        )

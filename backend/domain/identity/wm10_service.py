@@ -686,6 +686,9 @@ class RefundService:
             from backend.common.admin_notification_models import AdminNotification
             from backend.common.admin_notifications import AdminNotifyService
 
+            # 教训 41（E-20260901-01 同族）：session autoflush 关闭时，上面 e 的
+            # 翻转未落库，同事务 COUNT 会读到自身旧态（多算 1）——先 flush
+            self.db.flush()
             remaining = (
                 self.db.query(_func.count(ActivityEnrollment.id))
                 .filter(
@@ -696,20 +699,11 @@ class RefundService:
                 .scalar()
                 or 0
             )
-            if (
-                remaining == 0
-                and self.db.query(AdminNotification)
-                .filter(
-                    AdminNotification.ref_type == AdminNotification.REF_ACTIVITY,
-                    AdminNotification.ref_id == str(e.activity_id),
-                    AdminNotification.is_deleted == 0,
-                )
-                .count()
-            ):
+            if remaining == 0:
                 AdminNotifyService(self.db).mark_handled(
                     ref_type=AdminNotification.REF_ACTIVITY,
                     ref_id=str(e.activity_id),
-                    admin=None,
+                    admin=admin,
                 )
 
 
