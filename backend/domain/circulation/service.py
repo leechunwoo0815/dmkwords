@@ -231,8 +231,10 @@ class CirculationService:
                 raise ValidationError(f"{block_reason}（可人工放行并填写原因）")
             warnings.append(f"{block_reason}，馆员放行")
 
-        # 借阅上限：30 − 在借数（E-9 20260903：逾期已在 active 内，单次扣减；
-        # 原公式 borrow_limit - overdue - active 逾期一本双扣）
+        # 借阅上限：30 − 在借数 − active 预约数（E-9 单次扣减 + B-11/T13 预约占额度
+        # 双向执行：预约 create 已计入，borrow 侧同步计入，防 28 在借+2 预约仍可再借）
+        from backend.domain.reading.models import Reservation
+
         borrow_limit = int(ConfigService(self.db).get_value("borrow_limit"))
         now = datetime.now()
         active_count = (
@@ -244,23 +246,23 @@ class CirculationService:
             )
             .scalar()
         )
-        overdue_count = (
-            self.db.query(func.count(BorrowRecord.id))
+        reservation_count = (
+            self.db.query(func.count(Reservation.id))
             .filter(
-                BorrowRecord.child_id == child_id,
-                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
-                BorrowRecord.due_at < now,
-                BorrowRecord.is_deleted == 0,
+                Reservation.child_id == child_id,
+                Reservation.status == Reservation.STATUS_ACTIVE,
+                Reservation.is_deleted == 0,
             )
             .scalar()
         )
-        quota = borrow_limit - active_count
+        quota = borrow_limit - active_count - reservation_count
         if quota <= 0 and not override_reason:
             raise ValidationError(
-                f"可借上限已满（上限 {borrow_limit}，逾期 {overdue_count} 本，在借 {active_count} 本）"
+                f"可借上限已满（上限 {borrow_limit}，在借 {active_count} 本，"
+                f"预约占 {reservation_count} 本）"
             )
         if quota <= 0:
-            warnings.append(f"超上限放行（逾期 {overdue_count}，在借 {active_count}）")
+            warnings.append(f"超上限放行（在借 {active_count}，预约 {reservation_count}）")
 
         # 副本状态（C2：状态名中文化，禁止英文状态码泄漏给馆员）
         if copy.status != BookCopy.STATUS_AVAILABLE:

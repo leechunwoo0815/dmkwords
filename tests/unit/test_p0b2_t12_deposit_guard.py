@@ -22,9 +22,7 @@ def _set_deposit(child_id: int, **kw):
 
     with _db() as db:
         dep = (
-            db.query(Deposit)
-            .filter(Deposit.child_id == child_id, Deposit.is_deleted == 0)
-            .first()
+            db.query(Deposit).filter(Deposit.child_id == child_id, Deposit.is_deleted == 0).first()
         )
         assert dep is not None
         for k, v in kw.items():
