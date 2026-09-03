@@ -522,7 +522,10 @@ class RefundService:
                 reason_code = "user_withdrawal"
         child.member_status = Child.MEMBER_WITHDRAWN
         child.withdraw_reason = reason_code
-        child.operation_locked = 0
+        # B-2/T22：此处不再解锁——主动退会可能有两笔结算退款单（会员费+押金），
+        # 会员费 execute 成功即解锁会让押金单仍在途时孩子已解锁（状态语义不一致）。
+        # 解锁唯一出口 = _advance_withdrawal（全部退款单终态才 completed+解锁；
+        # T5 后 reject/cancel 也有出口，语义闭环）。refund_linked 单申请路径行为不变。
         # 自动发起押金退款申请（可用余额；已有进行中押金单则不重复发起）
         from backend.domain.billing.models import Deposit
 
