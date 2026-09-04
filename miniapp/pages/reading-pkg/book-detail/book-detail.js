@@ -2,6 +2,9 @@
 const api = require('../../../utils/api')
 const media = require('../../../utils/media')
 
+// 插修8/U1（FEAT-081）：通过测验的鼓励语，每次进详情随机一条
+const QUIZ_CHEERS = ['你太棒了！继续挑战下一本吧！', '阅读小达人就是你！', '向下一本书进发吧！']
+
 function durText(sec) {
   if (!sec || sec <= 0) return ''
   const m = Math.floor(sec / 60)
@@ -22,6 +25,14 @@ Page({
     borrowState: 'none',
     borrowStateText: '',
     dueText: '',
+    // 插修8/U1：测验三态徽章（locked/available/failed/passed，空=未加载不显示）
+    quizStatus: '',
+    quizBest: 0,
+    quizAttemptsUsed: 0,
+    quizAttemptsLeft: 0,
+    quizMaxAttempts: 3,
+    quizStars: 0,
+    cheerText: '',
   },
 
   onLoad(options) {
@@ -41,6 +52,7 @@ Page({
       this.loadProgress()
       this.checkFavorite()
       this.loadBorrowState()
+      this.loadQuizStatus()
     }
     this._inited = true
   },
@@ -54,6 +66,7 @@ Page({
         this.loadProgress()
         this.checkFavorite()
         this.loadBorrowState()
+        this.loadQuizStatus()
       }
     }
   },
@@ -86,6 +99,38 @@ Page({
       // B2（插修5）：精确比对 book_id——原 (b.id || b.book_id) 短路赌博，b.id 是收藏行自增 id，比对纯碰撞
       this.setData({ inFav: (list || []).some((b) => b.book_id === book.id) })
     } catch (e) { /* 静默（U10 同族假状态登记，修复归 F-M 家族追踪——不扩 scope） */ }
+  },
+
+  // 插修8/U1（FEAT-081）：测验三态徽章数据——getQuiz 现成字段，零后端改动。
+  // onShow 一并拉取：测完返回详情，徽章即时从"再挑战"切"🏆 通过"（闭环激励）
+  async loadQuizStatus() {
+    const { book, childId } = this.data
+    if (!childId) return
+    try {
+      const q = await api.getQuiz(book.id, childId)
+      this.setData({
+        quizStatus: q.status,
+        quizBest: q.best_score || 0,
+        quizAttemptsUsed: q.attempts_used || 0,
+        quizAttemptsLeft: q.attempts_left || 0,
+        quizMaxAttempts: q.max_attempts || 3,
+        quizStars: q.status === 'passed' ? this._starsOf(q.best_score || 0) : 0,
+        cheerText: q.status === 'passed' ? QUIZ_CHEERS[Math.floor(Math.random() * QUIZ_CHEERS.length)] : '',
+      })
+    } catch (e) { /* 静默：拉不到则徽章区隐藏（quizStatus 空） */ }
+  },
+
+  // 星级=最佳成绩档位：≥90 五星 / ≥80 四星 / ≥70 三星 / ≥60 两星 / 其余一星
+  _starsOf(score) {
+    return score >= 90 ? 5 : score >= 80 ? 4 : score >= 70 ? 3 : score >= 60 ? 2 : 1
+  },
+
+  // 金卡点击→成绩单（quiz-result 读 quiz 提交时写入的本地缓存成绩单，现有能力复用）
+  onQuizCard() {
+    const { childId, childName } = this.data
+    wx.navigateTo({
+      url: `/pages/reading-pkg/quiz-result/quiz-result?child_id=${childId}&child_name=${encodeURIComponent(childName)}`,
+    })
   },
 
   // 真实借阅状态：在借 > 已预约 > 可预约

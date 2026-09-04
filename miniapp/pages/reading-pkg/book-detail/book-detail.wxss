@@ -215,17 +215,100 @@
   color: var(--warning);
 }
 
-.quiz-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 8rpx;
-  padding: 8rpx 20rpx;
-  border-radius: 999rpx;
-  background: var(--warning-soft);
-  color: var(--warning);
-  font-size: 22rpx;
-  font-weight: 600;
+/* 插修8/U1（FEAT-081）测验成就三态徽章：金=通过 / 蓝=再挑战 / 灰=锁定或机会用尽 */
+.quiz-hero-card {
   margin-top: 16rpx;
+  border-radius: 20rpx;
+  padding: 28rpx 24rpx;
+  background: linear-gradient(135deg, #fcd34d, #ff8a5c);
+  color: #ffffff;
+  box-shadow: 0 6rpx 18rpx rgba(255, 138, 92, 0.35);
+}
+
+.qhc-title {
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.qhc-stars {
+  margin-top: 10rpx;
+  display: flex;
+  align-items: center;
+}
+
+.qhc-star {
+  font-size: 30rpx;
+}
+
+.qhc-best {
+  margin-left: 12rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.qhc-cheer {
+  margin-top: 8rpx;
+  font-size: 26rpx;
+}
+
+.qhc-tip {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  opacity: 0.9;
+}
+
+.quiz-challenge-card {
+  margin-top: 16rpx;
+  border-radius: 20rpx;
+  padding: 28rpx 24rpx;
+  background: #60a5fa;
+  color: #ffffff;
+  box-shadow: 0 6rpx 18rpx rgba(96, 165, 250, 0.35);
+}
+
+.qcc-title {
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.qcc-sub {
+  margin-top: 8rpx;
+  font-size: 26rpx;
+}
+
+.qcc-btn {
+  margin-top: 16rpx;
+  background: #ffffff;
+  color: #2563eb;
+  border: 3rpx solid #fcd34d;
+  border-radius: 999rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  line-height: 2.2;
+}
+
+.qcc-btn::after {
+  border: none;
+}
+
+.pulse-anim {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+.quiz-locked-hint {
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  color: var(--muted);
 }
 
 /* Inventory status bar */
