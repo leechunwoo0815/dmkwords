@@ -334,12 +334,14 @@ export default function MemberManage() {
   useEffect(() => { loadParents(childPg.page); }, [loadParents, childPg.page, tab]);
 
   // W3 订单 Tab 待确认计数（轻量单请求）；WM3-A1：页面挂载即拉，不设 tab 守卫
-  // （WM13-F4 同族漏网：守卫导致默认 tab 下计数恒 0；orderTotal 变化自动刷新）
-  useEffect(() => {
+  // B4（插修5）计数不刷新同族第四案（A1→F4→W3→B4）：状态变更点显式刷计数，
+  // 不靠派生依赖（orderTotal 不是计数的因——确认收款只翻状态不改总数）
+  const refreshOrderCounts = useCallback(() => {
     apiOrderCounts()
       .then((c) => setOrderCounts({ pending_manual_confirm: c.pending_manual_confirm, total: c.total }))
       .catch(() => { /* 静默：计数失败不阻塞列表 */ });
-  }, [tab, orderTotal]);
+  }, []);
+  useEffect(() => { refreshOrderCounts(); }, [refreshOrderCounts, tab]);
 
   return (
     <>
@@ -766,6 +768,7 @@ export default function MemberManage() {
             setConfirmOrder(null);
             setVoucherFile([]);
             loadOrders(orderPg.page);
+            refreshOrderCounts(); // B4：确认收款 → 待确认数即变（同点触发，不刷页面）
           } catch (e) {
             message.error(e instanceof Error ? e.message : "确认失败");
           }
