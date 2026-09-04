@@ -407,11 +407,7 @@ def _ensure_demo_quiz_journey(db: Session, child) -> None:
         ("Corduroy", False, 0, 0, 0),  # 灰态：读到 60%
     )
     for prefix, finished, score, total_q, passed in targets:
-        book = (
-            db.query(Book)
-            .filter(Book.is_deleted == 0, Book.title.like(f"{prefix}%"))
-            .first()
-        )
+        book = db.query(Book).filter(Book.is_deleted == 0, Book.title.like(f"{prefix}%")).first()
         if not book:
             continue
         total = int(book.audio_duration_seconds or 6)
