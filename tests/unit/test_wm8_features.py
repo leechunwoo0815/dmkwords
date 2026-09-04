@@ -297,3 +297,47 @@ def test_shelf_borrows(client: TestClient):
     )
     lst3 = client.get(f"/api/miniapp/borrows?child_id={c['id']}", headers=m).json()
     assert len(lst3) == 0
+
+
+def test_b5_refavorite_after_remove_revives_soft_deleted(client: TestClient):
+    """B5/D-4：取消收藏再收藏 → 200 且软删行复活（复加 INSERT 撞唯一索引 500 = RED）。"""
+    h = _h(client)
+    c, m = _mk_child(client, h, "13800000812", "复收藏孩", member=False, deposit=False)
+    book = _mk_book(client, h, "9788200000062")
+    assert (
+        client.post(
+            "/api/miniapp/favorites", json={"child_id": c["id"], "book_id": book["id"]}, headers=m
+        ).status_code
+        == 200
+    )
+    assert (
+        client.delete(
+            f"/api/miniapp/favorites/{book['id']}?child_id={c['id']}", headers=m
+        ).status_code
+        == 200
+    )
+    r = client.post(
+        "/api/miniapp/favorites", json={"child_id": c["id"], "book_id": book["id"]}, headers=m
+    )
+    assert r.status_code == 200, (
+        f"取消后再收藏应 200（软删行复活），实 {r.status_code} {r.text[:80]}（RED=撞唯一索引）"
+    )
+    lst = client.get(f"/api/miniapp/favorites?child_id={c['id']}", headers=m).json()
+    assert len(lst) == 1 and lst[0]["book_id"] == book["id"]
+
+
+def test_b5_double_add_still_409(client: TestClient):
+    """连续两次 add（无取消）→ 409 回归。"""
+    h = _h(client)
+    c, m = _mk_child(client, h, "13800000813", "双收藏孩", member=False, deposit=False)
+    book = _mk_book(client, h, "9788200000063")
+    assert (
+        client.post(
+            "/api/miniapp/favorites", json={"child_id": c["id"], "book_id": book["id"]}, headers=m
+        ).status_code
+        == 200
+    )
+    r = client.post(
+        "/api/miniapp/favorites", json={"child_id": c["id"], "book_id": book["id"]}, headers=m
+    )
+    assert r.status_code == 409, r.text

@@ -140,17 +140,20 @@ class FavoriteService:
         book = self.db.query(Book).filter(Book.id == book_id, Book.is_deleted == 0).first()
         if not book:
             raise NotFoundError("图书不存在")
-        dup = (
-            self.db.query(func.count(Favorite.id))
-            .filter(
-                Favorite.child_id == child.id,
-                Favorite.book_id == book_id,
-                Favorite.is_deleted == 0,
-            )
-            .scalar()
+        # B5/D-4（插修5）：uq_fav_child_book 唯一索引不含 is_deleted——软删行占索引，
+        # 复加 INSERT 撞索引 500。查含软删行：活跃行 409；软删行复活（对齐
+        # 同文件 VocabularyService 词本正解，D-4 登记债真实命中）
+        existing = (
+            self.db.query(Favorite)
+            .filter(Favorite.child_id == child.id, Favorite.book_id == book_id)
+            .first()
         )
-        if dup:
-            raise ConflictError("已收藏过这本书")
+        if existing:
+            if existing.is_deleted == 0:
+                raise ConflictError("已收藏过这本书")
+            existing.is_deleted = 0
+            self.db.commit()
+            return {"book_id": book_id, "title": book.title}
         self.db.add(Favorite(child_id=child.id, book_id=book_id))
         self.db.commit()
         return {"book_id": book_id, "title": book.title}
