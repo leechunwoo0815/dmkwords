@@ -125,11 +125,13 @@ Page({
     return score >= 90 ? 5 : score >= 80 ? 4 : score >= 70 ? 3 : score >= 60 ? 2 : 1
   },
 
-  // 金卡点击→成绩单（quiz-result 读 quiz 提交时写入的本地缓存成绩单，现有能力复用）
+  // 金卡点击→成绩单。R9（插修9）：带书参——quiz-result 按 per-book 缓存读，跨书不串
   onQuizCard() {
-    const { childId, childName } = this.data
+    const { book, childId, childName } = this.data
     wx.navigateTo({
-      url: `/pages/reading-pkg/quiz-result/quiz-result?child_id=${childId}&child_name=${encodeURIComponent(childName)}`,
+      url: `/pages/reading-pkg/quiz-result/quiz-result?child_id=${childId}&book_id=${book.id}` +
+        `&book_title=${encodeURIComponent(book.title || '')}` +
+        `&child_name=${encodeURIComponent(childName)}`,
     })
   },
 

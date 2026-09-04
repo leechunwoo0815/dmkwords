@@ -87,12 +87,16 @@ Page({
     const payload = questions.map((q, i) => q.options[answers[i]])
     try {
       const result = await api.submitQuiz(bookId, childId, payload)
-      wx.setStorageSync(`quiz_result_${childId}`, JSON.stringify({
-        ...result, book_title: this.data.bookTitle,
+      // R9（插修9）：缓存改 per-book——原单键 quiz_result_${childId} 只存最后一次
+      // 提交，点 A 书金卡会显示 B 书成绩（跨书污染实锤）；旧单键自然废弃不迁移
+      wx.setStorageSync(`quiz_result_${childId}:${bookId}`, JSON.stringify({
+        ...result, book_id: bookId, book_title: this.data.bookTitle,
         total: questions.length, attempts_left: result.attempts_left,
       }))
       wx.redirectTo({
-        url: `/pages/reading-pkg/quiz-result/quiz-result?child_id=${childId}&child_name=${encodeURIComponent(this.data.childName)}`,
+        url: `/pages/reading-pkg/quiz-result/quiz-result?child_id=${childId}&book_id=${bookId}` +
+          `&book_title=${encodeURIComponent(this.data.bookTitle)}` +
+          `&child_name=${encodeURIComponent(this.data.childName)}`,
       })
     } catch (e) { /* toast 已弹 */ } finally {
       this.setData({ submitting: false })

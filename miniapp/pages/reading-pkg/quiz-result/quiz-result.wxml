@@ -10,6 +10,7 @@
     <view class="result-title {{result.passed ? 'title-pass' : 'title-fail'}}">
       {{result.passed ? '测验通过' : '再试一次'}}
     </view>
+    <view class="result-sub" wx:if="{{result.from_server}}">本机无本次作答记录，显示服务端历史成绩</view>
     <view class="result-sub">{{result.book_title}} · 答对 {{result.score}} / {{result.total}} 题</view>
 
     <view class="score-circle {{result.passed ? 'ring-pass' : 'ring-fail'}}">
