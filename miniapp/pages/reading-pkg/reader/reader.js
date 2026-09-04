@@ -159,9 +159,10 @@ Page({
               const q = await api.getQuiz(this.data.bookId, this.data.childId)
               if (q.status !== 'available') return
               this._finishPrompted = true // 会话内防重复轰炸（跨会话 onLoad 重置，可再弹）
+              // U3（插修8）：文案与详情页徽章语气统一（儿童激励口径）
               wx.showModal({
                 title: '已读完！',
-                content: `是否立即测验？每本书共 3 次测验机会（剩余 ${q.attempts_left} 次）`,
+                content: `太棒了，读完啦！要不要挑战一下测验？还剩 ${q.attempts_left} 次机会`,
                 confirmText: '去测验',
                 success: (r) => {
                   if (r.confirm) {
