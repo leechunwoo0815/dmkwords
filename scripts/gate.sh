@@ -107,12 +107,21 @@ sleep 0.3  # E-20260901-04：等 tee 落盘再退出，防日志末行截断
 echo ""
 if [ "$FAILED" -eq 0 ]; then
   echo "===== 全量门禁 PASS（退出码 0） ====="
-  # E-20260903-04（二犯转防呆）：本地 gate 的 pytest/behave 与 dev 共库，TRUNCATE
-  # 会清空演示数据——恢复动作是 dev.sh start 内置双 seed。只提醒不自动跑：gate
-  # 保持纯验收语义（CI 独立库/专家复跑不应产生演示数据副作用），seed 耗时也不该拖门禁
-  # E-20260905-01：含后端改动的批次 start 会幂等跳过已运行进程=旧代码继续跑，
-  # 故提醒统一用 restart（stop+start，纯前端批也无害）
-  echo "⚠ 业务表已被门禁清空——演示/目视前请先执行: bash scripts/dev.sh restart （重启加载最新代码+双 seed 恢复）"
+  # E-20260903-04 三犯史：①漏恢复 ②加提醒行 ③提醒行仍漏（2026-09-05）——
+  # 证明"靠人记得"必败，裁量修正为全自动：检测到本地 dev 环境存活（8002 健康
+  # 或 .dev-logs 存在）即自动 dev.sh restart（重启加载最新代码+双 seed 恢复）；
+  # CI/无 dev 环境自动跳过，gate 纯验收语义保持。含后端改动批次由 restart 兜住
+  # （E-20260905-01：start 幂等跳过=旧代码继续跑）
+  if curl -sf -m 2 http://localhost:8002/health > /dev/null 2>&1 || [ -d ".dev-logs" ]; then
+    echo "----- 检测到本地 dev 环境，自动恢复现场（dev.sh restart：重启后端+双 seed） -----"
+    if bash scripts/dev.sh restart > /dev/null 2>&1; then
+      echo "----- 现场已自动恢复 ✓ -----"
+    else
+      echo "⚠ 自动恢复失败——请手动执行: bash scripts/dev.sh restart"
+    fi
+  else
+    echo "⚠ 业务表已被门禁清空——如需演示/目视请执行: bash scripts/dev.sh restart （重启加载最新代码+双 seed 恢复）"
+  fi
   exit 0
 else
   echo "===== 全量门禁 FAIL ====="
