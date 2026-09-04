@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from sqlalchemy import update
+from sqlalchemy import func, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.orm import Session
 
@@ -275,8 +275,9 @@ def _ensure_demo_borrow(db: Session, child) -> None:
 
 
 def _ensure_demo_growth(db: Session, child) -> None:
-    """演示成长数据（小程序 v5 首页任务台配套）：打卡 3 天 + 3 本书的词数/积分流水 +
-    在借书 40% 听读进度。幂等：WordsLedger 靠唯一索引，其余先查后插。"""
+    """演示成长数据（小程序 v5 首页任务台配套）：打卡 3 天 + 积分流水 + 在借书 40%
+    听读进度。词数入账不再单表直插（E-20260904-01：假 passed 曾致三表断链），
+    统一走 _ensure_demo_quiz_journey 真链路三态。幂等：先查后插/IGNORE。"""
     from backend.domain.catalog.models import Book
     from backend.domain.circulation.models import BorrowRecord
     from backend.domain.growth.models import ChildGrowthState, PointLedger, WordsLedger
@@ -292,18 +293,7 @@ def _ensure_demo_growth(db: Session, child) -> None:
     if not books:
         return
 
-    # 1) 词数流水（child×book 唯一，IGNORE 幂等）
-    for b in books:
-        stmt = mysql_insert(WordsLedger).values(
-            child_id=child.id,
-            book_id=b.id,
-            word_count=b.word_count,
-            source="quiz",
-            create_time=datetime.now() - timedelta(days=2),
-        )
-        db.execute(stmt.prefix_with("IGNORE"))
-
-    # 2) 积分流水（无唯一索引，先查后插）
+    # 1) 积分流水（无唯一索引，先查后插）
     if not db.query(PointLedger).filter(PointLedger.child_id == child.id).first():
         db.add(
             PointLedger(
@@ -324,7 +314,7 @@ def _ensure_demo_growth(db: Session, child) -> None:
             )
         )
 
-    # 3) 打卡近 3 天（先查后插）
+    # 2) 打卡近 3 天（先查后插）
     have = {
         c.checkin_date
         for c in db.query(CheckIn)
@@ -345,7 +335,7 @@ def _ensure_demo_growth(db: Session, child) -> None:
             )
         )
 
-    # 4) 在借书 40% 听读进度（先查后插）
+    # 3) 在借书 40% 听读进度（先查后插）
     borrow = (
         db.query(BorrowRecord)
         .filter(
@@ -380,8 +370,14 @@ def _ensure_demo_growth(db: Session, child) -> None:
             )
         )
 
-    # 5) ChildGrowthState 同步（等级由词数决定，演示量级保持 A）
-    words_total = sum(b.word_count for b in books)
+    # 4) ChildGrowthState 同步（等级由词数决定，演示量级保持 A）——
+    #    words_total 用真实入账口径（E-20260904-01：不再按书单求和）
+    words_total = (
+        db.query(func.sum(WordsLedger.word_count))
+        .filter(WordsLedger.child_id == child.id, WordsLedger.is_deleted == 0)
+        .scalar()
+        or 0
+    )
     state = db.query(ChildGrowthState).filter(ChildGrowthState.child_id == child.id).first()
     if not state:
         state = ChildGrowthState(child_id=child.id, level="A")
@@ -389,6 +385,106 @@ def _ensure_demo_growth(db: Session, child) -> None:
     state.words_total = words_total
     state.books_total = len(books)
     state.points_total = 10
+    db.flush()
+
+
+def _ensure_demo_quiz_journey(db: Session, child) -> None:
+    """插修9-R7（E-20260904-01）：演示测验旅程真链路三态——演示/测试数据禁止
+    只插单表造业务终态（假 passed 无 QuizAttempt/无进度曾致金卡 0 分、首进无卡、
+    弹窗被拦，用户实测三项全撞）。三表一致（ReadingProgress/QuizAttempt/
+    WordsLedger）且时间戳错开禁同秒（同秒批量即假数据特征）；按 title 稳定定位
+    防 id 漂移；只动演示孩的演示三书，其余数据（如 book 6 用户真实通过全链）
+    严禁触碰。幂等：progress 按 (child,book) upsert 对齐目标态，attempt 先查后插，
+    words 唯一索引 IGNORE。"""
+    from backend.domain.catalog.models import Book
+    from backend.domain.growth.models import QuizAttempt, WordsLedger
+    from backend.domain.reading.models import ReadingProgress
+
+    # (title 前缀, 是否读完, 答对数, 总题数, 是否通过)
+    targets = (
+        ("Brown Bear", True, 5, 5, 1),  # 金卡：best_score=100 → 五星
+        ("Chicka Chicka", True, 3, 5, 0),  # 蓝卡：测过未过，attempts_left=2
+        ("Corduroy", False, 0, 0, 0),  # 灰态：读到 60%
+    )
+    for prefix, finished, score, total_q, passed in targets:
+        book = (
+            db.query(Book)
+            .filter(Book.is_deleted == 0, Book.title.like(f"{prefix}%"))
+            .first()
+        )
+        if not book:
+            continue
+        total = int(book.audio_duration_seconds or 6)
+        cov = total if finished else max(1, int(total * 0.6))
+        now = datetime.now()
+
+        # 1) ReadingProgress：读完/读到一半（upsert 对齐目标态——旧演示行可能是
+        #    任意态，强制收敛到演示语义）
+        progress = (
+            db.query(ReadingProgress)
+            .filter(ReadingProgress.child_id == child.id, ReadingProgress.book_id == book.id)
+            .first()
+        )
+        finished_at = now - timedelta(days=3, hours=2) if finished else None
+        if progress:
+            progress.intervals = f"[[0,{cov}]]"
+            progress.coverage_seconds = cov
+            progress.total_seconds = total
+            progress.finished = 1 if finished else 0
+            progress.finished_at = finished_at
+            progress.last_position = cov
+            progress.last_report_at = now - timedelta(hours=1)
+        else:
+            db.add(
+                ReadingProgress(
+                    child_id=child.id,
+                    book_id=book.id,
+                    intervals=f"[[0,{cov}]]",
+                    coverage_seconds=cov,
+                    total_seconds=total,
+                    finished=1 if finished else 0,
+                    finished_at=finished_at,
+                    last_position=cov,
+                    last_report_at=now - timedelta(hours=1),
+                )
+            )
+        db.flush()
+        if not finished:
+            continue  # 未读完：不测验不入账（locked 灰态）
+
+        # 2) QuizAttempt（先查后插；submitted_at 与 words created_at 错开）
+        attempt = (
+            db.query(QuizAttempt)
+            .filter(QuizAttempt.child_id == child.id, QuizAttempt.book_id == book.id)
+            .first()
+        )
+        if not attempt:
+            db.add(
+                QuizAttempt(
+                    child_id=child.id,
+                    book_id=book.id,
+                    score=score,
+                    total_questions=total_q,
+                    passed=passed,
+                    snapshot="[]",
+                    submitted_at=now - timedelta(days=2, hours=5),
+                )
+            )
+            db.flush()
+
+        # 3) WordsLedger：仅通过书入账（get_quiz 的 passed_before 判定源）
+        if passed:
+            db.execute(
+                mysql_insert(WordsLedger)
+                .values(
+                    child_id=child.id,
+                    book_id=book.id,
+                    word_count=book.word_count,
+                    source="quiz",
+                    created_at=now - timedelta(days=2, hours=3),
+                )
+                .prefix_with("IGNORE")
+            )
     db.flush()
 
 
@@ -701,6 +797,7 @@ def seed() -> None:
             _ensure_demo_deposit(db, demo_child)
             _ensure_demo_borrow(db, demo_child)
             _ensure_demo_growth(db, demo_child)
+            _ensure_demo_quiz_journey(db, demo_child)
             _ensure_demo_fav_reservation(db, demo_child)
         _ensure_demo_wm3_states(db)
         _ensure_demo_wm13_states(db)
