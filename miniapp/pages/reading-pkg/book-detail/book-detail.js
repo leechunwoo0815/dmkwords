@@ -154,9 +154,9 @@ Page({
     }
     wx.navigateTo({
       // R1 同族 sweep：此入口原也漏 child_id（quiz 页解析 NaN → 422）
+      // R4（插修6 严审返工）：query 重复拼接残渣清理——统一用解构变量
       url: `/pages/reading-pkg/quiz/quiz?book_id=${book.id}&book_title=${encodeURIComponent(book.title)}` +
-        `&child_id=${this.data.childId || ''}&child_name=${encodeURIComponent(this.data.childName || '')}`
-        + `&child_id=${childId}&child_name=${encodeURIComponent(childName)}`,
+        `&child_id=${childId}&child_name=${encodeURIComponent(childName)}`,
     })
   },
 
