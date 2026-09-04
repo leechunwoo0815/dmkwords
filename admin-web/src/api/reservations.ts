@@ -42,9 +42,12 @@ export interface ChildReadingProfile {
   finished_books: FinishedBook[];
 }
 
-export function apiListReservations(status?: string): Promise<ReservationItem[]> {
-  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-  return request(`/api/admin/reservations${qs}`);
+export function apiListReservations(status?: string, keyword?: string): Promise<ReservationItem[]> {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (keyword) params.set("keyword", encodeURIComponent(keyword));
+  const qs = params.toString();
+  return request(`/api/admin/reservations${qs ? `?${qs}` : ""}`);
 }
 
 export function apiCheckoutReservation(reservationId: number): Promise<CheckOutResult> {

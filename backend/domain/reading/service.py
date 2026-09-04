@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from backend.common.config_service import ConfigService
@@ -578,8 +578,11 @@ class ReservationAdminService:
     def __init__(self, db: Session):
         self.db = db
 
-    def list_reservations(self, status: str | None = None) -> list[dict]:
-        """预约管理列表（默认全部；status=active 看锁定中）。"""
+    def list_reservations(
+        self, status: str | None = None, keyword: str | None = None
+    ) -> list[dict]:
+        """预约管理列表（默认全部；status=active 看锁定中；keyword 模糊匹配
+        孩子名/家长名/家长手机号——B7，订单 keyword A5 先例同款）。"""
         q = (
             self.db.query(Reservation, Child, Parent)
             .join(Child, Reservation.child_id == Child.id)
@@ -588,6 +591,9 @@ class ReservationAdminService:
         )
         if status:
             q = q.filter(Reservation.status == status)
+        if keyword and keyword.strip():
+            kw = f"%{keyword.strip()}%"
+            q = q.filter(or_(Child.name.ilike(kw), Parent.name.ilike(kw), Parent.phone.ilike(kw)))
         rows = q.order_by(Reservation.id.desc()).limit(200).all()
         book_ids = {r[0].book_id for r in rows}
         books = (

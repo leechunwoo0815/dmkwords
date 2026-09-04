@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
@@ -59,11 +59,12 @@ class ChildReadingProfileResponse(BaseSchema):
 @router.get("/reservations", response_model=list[ReservationItemResponse])
 def list_reservations(
     status: str | None = None,
+    keyword: str | None = Query(None),
     admin: Any = Depends(require_perm("borrow.operate")),
     db: Session = Depends(get_db),
 ):
-    """预约管理列表（默认全部；status=active 看锁定中）。"""
-    return ReservationAdminService(db).list_reservations(status)
+    """预约管理列表（默认全部；status=active 看锁定中；keyword 模糊搜索）。"""
+    return ReservationAdminService(db).list_reservations(status, keyword)
 
 
 @router.post("/reservations/{reservation_id}/checkout", response_model=CheckOutResponse)

@@ -1,6 +1,7 @@
 // 预约管理（WM6：列表 / 状态筛选 / 核销转借阅）
 import { useCallback, useEffect, useState } from "react";
-import { App as AntdApp, Button, Select, Space, Table, Tag, Typography } from "antd";
+import { useSearchParams } from "react-router-dom";
+import { App as AntdApp, Button, Input, Select, Space, Table, Tag, Typography } from "antd";
 import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
 
@@ -23,18 +24,22 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function Reservations() {
   const { message, modal } = AntdApp.useApp();
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState<ReservationItem[]>([]);
-  const [status, setStatus] = useState<string | undefined>();
+  const [status, setStatus] = useState("");
+  const [keyword, setKeyword] = useState(
+    searchParams.get("keyword") ? decodeURIComponent(searchParams.get("keyword")!) : ""
+  );
   const [loading, setLoading] = useState(true);
   const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination();
 
   const load = useCallback(() => {
     setLoading(true);
-    apiListReservations(status)
+    apiListReservations(status || undefined, keyword || undefined)
       .then((r) => setItems(r ?? []))
       .catch((e: Error) => message.error(e.message))
       .finally(() => setLoading(false));
-  }, [status, message]);
+  }, [status, keyword, message]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -59,10 +64,18 @@ export default function Reservations() {
   return (
     <div>
       <Space style={{ marginBottom: 12 }}>
+        <Input.Search
+          placeholder="搜孩子名 / 家长名 / 手机号" allowClear style={{ width: 240 }}
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          onSearch={(v) => { setKeyword(v); setPage(1); }}
+        />
         <Select
-          placeholder="预约状态" allowClear style={{ width: 140 }} value={status}
-          onChange={(v) => { setStatus(v); setPage(1); }}
-          options={Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))}
+          placeholder="预约状态" style={{ width: 140 }} value={status}
+          onChange={(v) => { setStatus(v ?? ""); setPage(1); }}
+          // B7（插修5）：头插「全部」空串口径（A4 订单页先例，替 allowClear）
+          options={[{ value: "", label: "全部" },
+            ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))]}
         />
         <Typography.Text type="secondary">
           家长在小程序发起预约后，副本锁定 72 小时；到店取书时在此核销转借阅。

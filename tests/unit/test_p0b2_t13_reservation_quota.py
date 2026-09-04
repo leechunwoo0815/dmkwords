@@ -90,3 +90,33 @@ def test_reservation_counts_toward_borrow_quota(client: TestClient):
     assert rb.status_code == 200, rb.text
     r4 = _borrow(client, h, c["id"], extra)
     assert r4.status_code == 200, f"还 1 本后 5 在借<6 应可借，实 {r4.status_code} {r4.text[:80]}"
+
+
+# ---- B7（插修5）：预约管理孩子/家长模糊搜索 + 状态"全部" ----
+
+
+def test_b7_reservation_keyword_search(client):
+    """keyword 模糊匹配孩子名/家长手机号；空/None 全量；status 空串不过滤。"""
+    h = _h(client)
+    p, c, mini = _family(client, h, "13981034001", "搜索特异孩")
+    _pay(client, h, c["id"], "observation_fee")
+    _pay_deposit(client, h, c["id"])
+    book = _book_with_copies(client, h, "搜索预约书", 1)
+    r = client.post(
+        "/api/miniapp/reservations", json={"child_id": c["id"], "book_id": book}, headers=mini
+    )
+    assert r.status_code == 200, r.text
+
+    # keyword=孩子名 → 命中
+    r1 = client.get("/api/admin/reservations?keyword=搜索特异", headers=h)
+    assert r1.status_code == 200, r1.text
+    assert any(row["child_name"] == "搜索特异孩" for row in r1.json())
+    # keyword=家长手机号 → 命中
+    r2 = client.get("/api/admin/reservations?keyword=13981034001", headers=h)
+    assert any(row["child_name"] == "搜索特异孩" for row in r2.json())
+    # keyword=不匹配 → 空
+    r3 = client.get("/api/admin/reservations?keyword=不存在的名字xyz", headers=h)
+    assert all(row["child_name"] != "搜索特异孩" for row in r3.json())
+    # 无 keyword → 全量回归
+    r4 = client.get("/api/admin/reservations", headers=h)
+    assert any(row["child_name"] == "搜索特异孩" for row in r4.json())
