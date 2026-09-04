@@ -223,8 +223,11 @@ class ChildService:
         # F7 守卫口径细化（用户拍板 2026-09-01）：身份字段（姓名/性别/生日）有订单
         # 禁改——学籍动态字段（英文名/年级/AR）放开（年级随学年变化，教学属性）。
         # 删除守卫不变（有订单禁删）；AR 只升不降逻辑保留。
+        # B6（插修5）：守卫判"值变更"而非"字段提交"——前端全量表单原样回传
+        # name/gender/birthday 时不得误拦（gender=0 合法值故保留 is not None 前置）。
         if self.has_orders(self.db, child_id) and any(
-            f is not None for f in (name, gender, birthday)
+            f is not None and f != cur
+            for f, cur in ((name, child.name), (gender, child.gender), (birthday, child.birthday))
         ):
             raise ConflictError("身份字段（姓名/性别/生日）已创建订单禁止修改，英文名/年级/AR 可改")
         changed = []

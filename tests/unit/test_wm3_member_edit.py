@@ -246,3 +246,52 @@ def test_f2_parents_page_includes_create_time(client: TestClient):
     row = lr.json()["items"][0]
     assert "create_time" in row, f"create_time 缺失: {row.keys()}"
     assert isinstance(row["create_time"], str) and len(row["create_time"]) >= 19
+
+
+# ---- B6（插修5）：守卫判"值变更"而非"字段提交"——全量表单原样回传不误拦 ----
+
+
+def test_b6_with_orders_same_name_plus_grade_ok(client: TestClient):
+    """有订单孩 PATCH name=原名 + grade=新值（全量表单场景）→ 200（当前 409 = RED）。"""
+    h = _h(client)
+    p = _parent(client, h, "13800003005")
+    c = _child(client, h, p["id"], "原样回传孩")
+    _order(client, h, c["id"])
+    r = client.put(
+        f"/api/admin/members/children/{c['id']}",
+        json={"name": "原样回传孩", "grade": "二年级"},
+        headers=h,
+    )
+    assert r.status_code == 200, (
+        f"身份字段原值回传+改学籍字段应 200，实 {r.status_code} {r.text[:80]}（RED=提交≠变更误拦）"
+    )
+    assert r.json()["grade"] == "二年级"
+
+
+def test_b6_with_orders_new_name_mixed_still_rejected(client: TestClient):
+    """有订单孩 PATCH name=新值 + grade → 409（真变更仍拦）。"""
+    h = _h(client)
+    p = _parent(client, h, "13800003006")
+    c = _child(client, h, p["id"], "真改名孩")
+    _order(client, h, c["id"])
+    r = client.put(
+        f"/api/admin/members/children/{c['id']}",
+        json={"name": "真的改了", "grade": "三年级"},
+        headers=h,
+    )
+    assert r.status_code == 409, r.text
+    assert "身份字段" in r.json()["detail"]
+
+
+def test_b6_without_orders_full_form_ok(client: TestClient):
+    """无订单孩全量表单（身份+学籍全提交）→ 200 回归。"""
+    h = _h(client)
+    p = _parent(client, h, "13800003007")
+    c = _child(client, h, p["id"], "全表单孩")
+    r = client.put(
+        f"/api/admin/members/children/{c['id']}",
+        json={"name": "全表单改名", "gender": 1, "birthday": "2021-06-01", "grade": "一年级"},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == "全表单改名"
