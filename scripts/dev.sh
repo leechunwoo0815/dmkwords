@@ -37,8 +37,11 @@ start() {
   .venv/bin/alembic upgrade head || exit 1
   .venv/bin/python -m backend.seeds.seed_admin
   .venv/bin/python -m backend.seeds.seed_configs
-  # T34：演示数据重建（幂等——书目存在即跳过；behave/gate 清业务表后一键恢复）
-  .venv/bin/python -m backend.seeds.seed_demo | head -1
+  # 演示数据双 seed（幂等；behave/gate 清业务表后一键恢复演示动线）——
+  # 用户指定标准动作（2026-09-04）：seed_demo_library（35 本+绘本封面+音频+5 题）
+  # + seed_wm11_demo（演示家庭/订单/待办四态）
+  .venv/bin/python scripts/seed_demo_library.py | tail -1
+  .venv/bin/python -m scripts.seed_wm11_demo | tail -1
 
   echo "===== [3/4] 后端 API（:8002） ====="
   # 端口防呆：8002 被"非 pid 文件管理"的进程占用时，新进程会绑定失败退出，
