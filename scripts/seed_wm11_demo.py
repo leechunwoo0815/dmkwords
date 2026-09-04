@@ -313,6 +313,19 @@ def _ensure_demo_growth(db: Session, child) -> None:
                 child_id=child.id, points=2, reason_type="words_convert", detail="演示：词数兑换"
             )
         )
+    # 插修10：演示积分补 related_id=book_id——真实链路三类入账积分都挂
+    # related_id（growth/service 入账处），get_quiz points_added 按 related_id
+    # 求和，缺失会让兜底成绩单显示 0 积分（E-20260904-01 真链路口径）
+    db.execute(
+        update(PointLedger)
+        .where(
+            PointLedger.child_id == child.id,
+            PointLedger.related_id.is_(None),
+            PointLedger.reason_type.in_(["quiz_first_pass", "quiz_full_marks", "words_convert"]),
+            PointLedger.detail.like("演示：%"),
+        )
+        .values(related_id=books[0].id)
+    )
 
     # 2) 打卡近 3 天（先查后插）
     have = {

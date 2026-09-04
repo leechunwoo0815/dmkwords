@@ -495,7 +495,48 @@ class QuizService:
         unlocked = bool(progress and progress.finished == 1)
         max_attempts = int(ConfigService(self.db).get_value("quiz_max_attempts"))
         used = self._attempts_used(child.id, book_id)
-        best = self._best_score(child.id, book_id)
+        # 插修10：best_score 是答对题数口径（前端金卡曾显示"最佳成绩 5 分"+一星），
+        # 补 best_percent 百分制口径；words_added/points_added 供 quiz-result 兜底
+        # 显示真实到账（原硬编码 0 与护照片矛盾）
+        best_attempt = (
+            self.db.query(QuizAttempt)
+            .filter(
+                QuizAttempt.child_id == child.id,
+                QuizAttempt.book_id == book_id,
+                QuizAttempt.is_deleted == 0,
+            )
+            .order_by(QuizAttempt.score.desc(), QuizAttempt.total_questions.asc())
+            .first()
+        )
+        best = int(best_attempt.score) if best_attempt else 0
+        best_percent = (
+            round(best * 100 / best_attempt.total_questions)
+            if best_attempt and best_attempt.total_questions
+            else 0
+        )
+        words_added = (
+            self.db.query(WordsLedger.word_count)
+            .filter(
+                WordsLedger.child_id == child.id,
+                WordsLedger.book_id == book_id,
+                WordsLedger.is_deleted == 0,
+            )
+            .scalar()
+            or 0
+        )
+        points_added = (
+            self.db.query(func.sum(PointLedger.points))
+            .filter(
+                PointLedger.child_id == child.id,
+                PointLedger.related_id == book_id,
+                PointLedger.reason_type.in_(
+                    ["words_convert", "quiz_first_pass", "quiz_full_marks"]
+                ),
+                PointLedger.is_deleted == 0,
+            )
+            .scalar()
+            or 0
+        )
         passed_before = (
             self.db.query(func.count(WordsLedger.id))
             .filter(
@@ -521,6 +562,9 @@ class QuizService:
             "attempts_used": used,
             "attempts_left": max(0, max_attempts - used),
             "best_score": best,
+            "best_percent": best_percent,
+            "words_added": int(words_added),
+            "points_added": int(points_added),
             "max_attempts": max_attempts,
             "questions": [
                 {
