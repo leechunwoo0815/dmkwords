@@ -225,18 +225,21 @@
   box-shadow: 0 6rpx 18rpx rgba(255, 138, 92, 0.35);
 }
 
-/* 插修9/R8：英文印章主视觉——盖章的歪斜感是灵魂，别改垂直 */
+/* 插修9/R8：英文印章主视觉——盖章的歪斜感是灵魂，别改垂直。
+   用户直接指令（2026-09-05）：通过=绿色印章的心智符号，白底垫层把绿章
+   从金橙渐变底上隔离出来，加大加粗更有视觉冲击 */
 .qhc-stamp {
   display: inline-block;
-  font-size: 64rpx;
+  font-size: 80rpx;
   font-weight: 900;
-  letter-spacing: 6rpx;
-  color: #ffffff;
-  text-shadow: 0 2rpx 8rpx rgba(180, 60, 0, 0.45);
-  border: 6rpx solid rgba(255, 255, 255, 0.95);
-  border-radius: 16rpx;
-  padding: 4rpx 28rpx;
-  transform: rotate(-6deg);
+  letter-spacing: 8rpx;
+  color: #15803d;
+  background: rgba(255, 255, 255, 0.94);
+  border: 8rpx solid #16a34a;
+  border-radius: 20rpx;
+  padding: 8rpx 36rpx;
+  transform: rotate(-8deg);
+  box-shadow: 0 6rpx 14rpx rgba(21, 128, 61, 0.25);
 }
 
 .qhc-title {
