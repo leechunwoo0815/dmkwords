@@ -111,6 +111,7 @@ class Order(BaseModel):
     TYPE_ACTIVITY = "activity_fee"
     TYPE_DEPOSIT = "deposit"  # 押金（WM4）
     TYPE_DEPOSIT_SUPPLEMENT = "deposit_supplement"  # 押金补缴（WM4，R-312）
+    TYPE_CUSTOM = "custom"  # 自定义单（FEAT-080：纯资金流水，不参与会员计算）
 
     STATUS_PENDING_PAYMENT = "pending_payment"  # 线上待支付（WM12）
     STATUS_PENDING_MANUAL = "pending_manual_confirm"  # 待人工确认收款

@@ -165,7 +165,7 @@
 | FEAT-077 | 退会审核预估结算（盲批→明批） | 资金安全 | P0 | F2 | GET /withdrawals/{id}/settle-preview（super_admin，仅 normal+applying；联动单 422）：明细行（kind/order_no/amount/rule）+押金余额+合计；审核弹窗展示；**preview 与 review 调同一份 _settle_items（同源，灵魂断言：preview total == review 实际退款单合计，防两套公式漂移——WM5 上限公式两套前车之鉴）**〔R-311 结算段〕 | —（X2 单测含一致性断言） | IMPLEMENTED |
 | FEAT-078 | 可退金额三形态展示 + 0 元拦截 | 资金可见性 | P1 | F2 | 小程序可退卡片三形态：proportional（实付 · 已用 N/总天 → 预计可退，比例退折算过程可见）/ full（全额徽标）/ zero（不可退+原因）；0 元禁提交三层守卫（后端 422「该订单当前无可退金额」/前端按钮置灰+提示/前置校验双保险）——0 元申请会联动建退会单+锁孩子，审核员误批即 withdrawn（真业务陷阱） | —（X6+R1 单测） | IMPLEMENTED |
 | FEAT-079 | 小程序退款申请撤销入口 | 用户自主权 | P1 | F2 | refund-apply 退款记录行 pending 态「撤销申请」按钮（wx.showModal 确认→cancelRefund→列表刷新）；后端 cancel 端点本就绪（仅 pending 可撤，撤后 cancelled+订单恢复）；管理端 todo 显示「已失效·家长已撤销」已有（WM13 S1 灵魂设计的前端断链修复） | refund.feature（存量 @draft）；R1/X5 pytest 兜底 | IMPLEMENTED |
-| FEAT-080 | 管理端订单类型扩展 | 需求登记 | P2 | 004,015 | 管理端创建订单四类：现有（观察期/年费/首场活动）+押金（读标准配置，激活押金模块）+活动（选活动带出金额）+自定义（自输说明+金额，纯资金流水不参与会员计算，可走退款链——§3.5.2 边界默认值待甲方过目）〔PRD §3.5.2〕 | order.feature（扩展场景） | REGISTERED |
+| FEAT-080 | 管理端订单类型扩展 | 资金动线 | P1 | 004,015 | 管理端创建订单六类：现有三类+押金（deposit_amount 配置，confirm 激活 Deposit+Ledger）+活动（activity_id 必填带出 fee，不联动报名——边界默认值）+自定义（说明+金额，纯资金流水不参与会员计算，可走退款链）〔PRD §3.5.2〕 | order_types.feature（四场景 16 steps） | IMPLEMENTED |
 
 随修项（bugfix/小缺口，不单开 FEAT，WM3 插修 1）：A1 计数懒加载守卫（WM13-F4 同族）、
 A2 创建时间字段错配、A3 refunded 标签、A4 筛选「全部」、A5 订单关键字搜索、
@@ -219,39 +219,3 @@ checkout Reservation 锁定读补 populate_existing（P1 遗留）、vite host �
 ## 变更流程
 
 需求变更 → 本清单登记（Feature 增/改/删）→ rg 冲突检查（同口径全库）→ Gherkin 局部更新 → 台账记录。清单与 Gherkin 的状态字段同步更新，禁止跳过清单直接改场景。
-
-### 附录：FEAT-080 Gherkin 场景（D8 登记；实现=第四批时移入 features/order_types.feature 接线）
-
-> 位置说明：behave 对无步骤定义的 .feature 报 error（炸 gate），故登记态存附录；
-> 任务卡预警条款适用（"若 gate BDD 解析受限"）。
-
-```gherkin
-功能: 管理端订单类型扩展
-  作为馆员
-  我可以在管理端创建押金单/活动单/自定义单
-  以便线下收款动线全部系统留痕
-
-  背景:
-    假如 系统中已存在家长账号 "扩展家长" 且名下有正式会员孩子
-
-  场景: 创建押金单激活押金模块
-    当 馆员为孩子创建押金订单 金额读押金标准配置
-    那么 订单类型为 "deposit" 且金额等于配置标准
-    而且 押金流水新增一笔待缴记录
-
-  场景: 创建活动单带出活动金额
-    假如 馆员已发布一场收费活动
-    当 馆员为孩子创建活动订单并选择该活动
-    那么 订单类型为 "activity_fee" 且金额等于活动费用
-
-  场景: 创建自定义单作为线下兜底
-    当 馆员为孩子创建自定义订单 说明 "春季材料费" 金额 88 元
-    那么 订单类型为 "custom" 且金额为 88 元
-    而且 订单备注含类型说明原文
-
-  场景: 自定义单不影响会员资格
-    假如 孩子当前为正式会员
-    当 馆员为孩子创建自定义订单并确认收款
-    那么 孩子会员状态与到期日保持不变
-    而且 该订单可走退款链（申请/审核/执行）
-```

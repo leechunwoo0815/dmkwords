@@ -6,6 +6,7 @@ import {
   Drawer,
   Form,
   Input,
+  InputNumber,
   List,
   Modal,
   Popconfirm,
@@ -30,6 +31,7 @@ import {
   type ChildReadingProfile,
 } from "../api/reservations";
 import { apiUploadObservation } from "../api/observation";
+import { apiListActivities } from "../api/activities";
 import {
   apiCancelOrder,
   apiRefundOrder,
@@ -69,7 +71,7 @@ const MEMBER_COLOR: Record<string, string> = {
 const ORDER_TYPE_LABEL: Record<string, string> = {
   first_activity_fee: "首场亲子活动", observation_fee: "观察期会员费",
   formal_fee: "正式年费", activity_fee: "活动费",
-  deposit: "押金", deposit_supplement: "押金补缴",
+  deposit: "押金", deposit_supplement: "押金补缴", custom: "自定义",
 };
 const ORDER_STATUS_LABEL: Record<string, string> = {
   pending_payment: "待支付", pending_manual_confirm: "待人工确认",
@@ -182,6 +184,8 @@ export default function MemberManage() {
   const [readingProfile, setReadingProfile] = useState<ChildReadingProfile | null>(null);
   const [readingLoading, setReadingLoading] = useState(false);
   const [orderForm] = Form.useForm();
+  // R3/FEAT-080：活动单下拉数据源（创建订单弹窗打开时拉一次）
+  const [activityOptions, setActivityOptions] = useState<{ value: number; label: string }[]>([]);
   const [confirmForm] = Form.useForm();
   const [editChild, setEditChild] = useState<Child | null>(null);
   const [editForm] = Form.useForm();
@@ -453,6 +457,13 @@ export default function MemberManage() {
                       orderForm.setFieldsValue({ child_id: r.id, order_type: r.member_status === "none" ? "observation_fee" : "formal_fee" });
                       setSelectedOrderChild(r);
                       setOrderOpen(true);
+                      // R3：活动单下拉数据源（打开弹窗时拉一次；失败静默降级）
+                      apiListActivities()
+                        .then((acts) => setActivityOptions(
+                          acts.filter((a) => a.status === "published")
+                            .map((a) => ({ value: a.id, label: `${a.title}（￥${a.fee}）` }))
+                        ))
+                        .catch(() => setActivityOptions([]));
                     }}>创建订单</Button>
                     {r.member_status === "observation" && (
                       <Button type="link" size="small" onClick={() => onMarkPendingEvaluation(r)}>标记待评估</Button>
@@ -717,7 +728,11 @@ export default function MemberManage() {
         onOk={async () => {
           const v = await orderForm.validateFields();
           try {
-            const order = await apiCreateOrder({ child_id: v.child_id, order_type: v.order_type, remark: v.remark ?? "" });
+            const order = await apiCreateOrder({
+              child_id: v.child_id, order_type: v.order_type, remark: v.remark ?? "",
+              ...(v.order_type === "activity_fee" ? { activity_id: v.activity_id } : {}),
+              ...(v.order_type === "custom" ? { amount: v.custom_amount } : {}),
+            });
             message.success(`订单已创建（金额 ￥${Number(order.amount).toLocaleString()}），请到「订单」页确认收款`);
             setOrderOpen(false);
             setTab("orders");
@@ -740,8 +755,36 @@ export default function MemberManage() {
               { value: "observation_fee", label: "观察期会员费（500 元/月）" },
               { value: "formal_fee", label: "正式年费（6000 元，二孩自动 5400）" },
               { value: "first_activity_fee", label: "首场亲子活动（99 元，每账号一次）" },
+              { value: "deposit", label: "押金（1200 元，标准配置）" },
+              { value: "activity_fee", label: "活动费（选活动带出金额）" },
+              { value: "custom", label: "自定义（自输说明与金额）" },
             ]} />
           </Form.Item>
+          <Form.Item noStyle shouldUpdate={(a, b) => a.order_type !== b.order_type}>
+            {({ getFieldValue }) =>
+              getFieldValue("order_type") === "activity_fee" ? (
+                <Form.Item name="activity_id" label="选择活动" rules={[{ required: true, message: "请选择活动" }]}>
+                  <Select
+                    placeholder="选择活动（金额带出）" showSearch optionFilterProp="label"
+                    options={activityOptions}
+                  />
+                </Form.Item>
+              ) : getFieldValue("order_type") === "custom" ? (
+                <>
+                  <Form.Item name="custom_amount" label="金额（元）"
+                    rules={[{ required: true, message: "请输入金额" },
+                      { pattern: /^\d+(\.\d{1,2})?$/, message: "最多两位小数" }]}>
+                    <InputNumber style={{ width: "100%" }} min={0.01} max={99999} step={0.01} />
+                  </Form.Item>
+                  <Form.Item name="remark" label="类型说明（必填）"
+                    rules={[{ required: true, message: "自定义单必须填写类型说明" }]}>
+                    <Input placeholder="如：春季材料费" maxLength={100} />
+                  </Form.Item>
+                </>
+              ) : getFieldValue("order_type") === "deposit" ? (
+                <Typography.Text type="secondary">押金金额按标准配置（1200 元），确认收款后自动激活押金账户。</Typography.Text>
+              ) : null}
+            </Form.Item>
           <Form.Item name="remark" label="备注">
             <Input.TextArea rows={2} />
           </Form.Item>

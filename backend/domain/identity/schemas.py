@@ -1,5 +1,6 @@
 # backend/domain/identity/schemas.py
 from datetime import date, datetime
+from decimal import Decimal
 
 from pydantic import Field, field_validator
 
@@ -77,9 +78,15 @@ class ParentWithStatsResponse(BaseSchema):
 
 
 class OrderCreateRequest(BaseSchema):
-    order_type: str = Field(..., pattern="^(first_activity_fee|observation_fee|formal_fee)$")
+    # R3/FEAT-080（插修6）：扩展六类——押金（金额读配置不可自输）/活动（activity_id
+    # 必填带出 fee）/自定义（remark 必填作类型说明 + amount 自输）
+    order_type: str = Field(
+        ..., pattern="^(first_activity_fee|observation_fee|formal_fee|deposit|activity_fee|custom)$"
+    )
     child_id: int
     remark: str = Field("", max_length=200)
+    activity_id: int | None = None
+    amount: Decimal | None = Field(None, ge=Decimal("0.01"), le=Decimal("99999"))
 
 
 class OrderConfirmRequest(BaseSchema):

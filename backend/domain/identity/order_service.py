@@ -108,6 +108,38 @@ class OrderService:
                 if siblings_active
                 else base
             )
+        elif req.order_type == Order.TYPE_DEPOSIT:
+            # R3/FEAT-080：押金单激活押金模块——金额读标准配置不可自输；
+            # 确认收款时联动建 Deposit+Ledger（create 仅建单，confirm 落押金账）
+            amount = self._config_decimal(
+                "deposit_amount"
+            )  # 押金标准配置（billing confirm 联动激活 Deposit+Ledger）
+        elif req.order_type == Order.TYPE_ACTIVITY:
+            # 管理端活动单收线下到场家长的钱——不联动报名（边界默认值，简报声明）
+            if not req.activity_id:
+                raise ValidationError("活动订单必须选择活动")
+            from backend.domain.activity.models import Activity
+
+            a = (
+                self.db.query(Activity)
+                .filter(Activity.id == req.activity_id, Activity.is_deleted == 0)
+                .first()
+            )
+            if not a:
+                raise NotFoundError("活动不存在")
+            if a.status != Activity.STATUS_PUBLISHED:
+                raise ValidationError("活动已取消或结束，不能创建活动订单")
+            if a.start_at <= datetime.now():
+                raise ValidationError("活动已开始，不能创建活动订单")
+            amount = a.fee
+        elif req.order_type == Order.TYPE_CUSTOM:
+            # 自定义单：纯资金流水（不参与会员资格/到期日计算——PRD §3.5.2 边界），
+            # 可走退款链（_refundable_amount 兜底返全额）
+            if not req.remark or not req.remark.strip():
+                raise ValidationError("自定义订单必须填写类型说明")
+            if req.amount is None or req.amount <= 0:
+                raise ValidationError("自定义订单必须填写金额")
+            amount = req.amount
         else:
             raise ValidationError("订单类型不正确")
 
