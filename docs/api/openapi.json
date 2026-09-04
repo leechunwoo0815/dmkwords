@@ -7818,7 +7818,7 @@
     },
     "/api/admin/reservations": {
       "get": {
-        "description": "预约管理列表（默认全部；status=active 看锁定中）。",
+        "description": "预约管理列表（默认全部；status=active 看锁定中；keyword 模糊搜索）。",
         "operationId": "list_reservations_api_admin_reservations_get",
         "parameters": [
           {
@@ -7835,6 +7835,22 @@
                 }
               ],
               "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "keyword",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Keyword"
             }
           }
         ],
