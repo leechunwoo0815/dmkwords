@@ -215,19 +215,35 @@
   color: var(--warning);
 }
 
-/* 插修8/U1（FEAT-081）测验成就三态徽章：金=通过 / 蓝=再挑战 / 灰=锁定或机会用尽 */
+/* 插修8/U1+插修9/R8（FEAT-081）测验成就三态徽章：金=通过 / 蓝=再挑战 / 灰=锁定或机会用尽 */
 .quiz-hero-card {
-  margin-top: 16rpx;
+  margin: 0 32rpx 20rpx;
   border-radius: 20rpx;
-  padding: 28rpx 24rpx;
+  padding: 32rpx 28rpx;
   background: linear-gradient(135deg, #fcd34d, #ff8a5c);
   color: #ffffff;
   box-shadow: 0 6rpx 18rpx rgba(255, 138, 92, 0.35);
 }
 
+/* 插修9/R8：英文印章主视觉——盖章的歪斜感是灵魂，别改垂直 */
+.qhc-stamp {
+  display: inline-block;
+  font-size: 64rpx;
+  font-weight: 900;
+  letter-spacing: 6rpx;
+  color: #ffffff;
+  text-shadow: 0 2rpx 8rpx rgba(180, 60, 0, 0.45);
+  border: 6rpx solid rgba(255, 255, 255, 0.95);
+  border-radius: 16rpx;
+  padding: 4rpx 28rpx;
+  transform: rotate(-6deg);
+}
+
 .qhc-title {
-  font-size: 34rpx;
+  margin-top: 16rpx;
+  font-size: 32rpx;
   font-weight: 700;
+  color: #6b4a12;
 }
 
 .qhc-stars {
@@ -237,43 +253,46 @@
 }
 
 .qhc-star {
-  font-size: 30rpx;
+  font-size: 40rpx;
 }
 
 .qhc-best {
   margin-left: 12rpx;
-  font-size: 26rpx;
+  font-size: 30rpx;
   font-weight: 600;
+  color: #6b4a12;
 }
 
 .qhc-cheer {
   margin-top: 8rpx;
-  font-size: 26rpx;
+  font-size: 28rpx;
+  color: #6b4a12;
 }
 
 .qhc-tip {
   margin-top: 6rpx;
-  font-size: 22rpx;
-  opacity: 0.9;
+  font-size: 28rpx;
+  color: #6b4a12;
+  opacity: 0.85;
 }
 
 .quiz-challenge-card {
-  margin-top: 16rpx;
+  margin: 0 32rpx 20rpx;
   border-radius: 20rpx;
-  padding: 28rpx 24rpx;
+  padding: 32rpx 28rpx;
   background: #60a5fa;
   color: #ffffff;
   box-shadow: 0 6rpx 18rpx rgba(96, 165, 250, 0.35);
 }
 
 .qcc-title {
-  font-size: 34rpx;
+  font-size: 32rpx;
   font-weight: 700;
 }
 
 .qcc-sub {
   margin-top: 8rpx;
-  font-size: 26rpx;
+  font-size: 28rpx;
 }
 
 .qcc-btn {
@@ -306,8 +325,9 @@
 }
 
 .quiz-locked-hint {
-  margin-top: 16rpx;
-  font-size: 24rpx;
+  margin: 0 32rpx 20rpx;
+  padding: 8rpx 4rpx;
+  font-size: 28rpx;
   color: var(--muted);
 }
 

@@ -44,26 +44,31 @@
         <text wx:if="{{progress.finished}}">已读完 100%</text>
         <text wx:else>已听 {{progress.displayPercent}}%</text>
       </view>
-      <view wx:if="{{quizStatus === 'passed'}}" class="quiz-hero-card" bindtap="onQuizCard">
-        <view class="qhc-title">🏆 测验通过！</view>
-        <view class="qhc-stars">
-          <text wx:for="{{[1, 2, 3, 4, 5]}}" wx:key="*this" class="qhc-star">{{item <= quizStars ? '⭐' : '☆'}}</text>
-          <text class="qhc-best">最佳成绩 {{quizBest}} 分</text>
-        </view>
-        <view class="qhc-cheer">{{cheerText}}</view>
-        <view class="qhc-tip">点卡片看成绩单 ›</view>
-      </view>
-      <view wx:elif="{{quizStatus === 'available'}}" class="quiz-challenge-card">
-        <view class="qcc-title">{{quizAttemptsUsed > 0 ? '💪 差一点点就过啦！' : '🎯 轮到你挑战啦！'}}</view>
-        <view class="qcc-sub">{{quizAttemptsUsed > 0 ? '还剩 ' + quizAttemptsLeft + ' 次机会 · 最佳 ' + quizBest + ' 分' : '共 ' + quizMaxAttempts + ' 次机会，证明你读懂了这本书'}}</view>
-        <button class="qcc-btn pulse-anim" bindtap="onQuiz">{{quizAttemptsUsed > 0 ? '再挑战一次！' : '开始挑战！'}}</button>
-      </view>
-      <view wx:elif="{{quizStatus === 'locked' || quizStatus === 'failed'}}" class="quiz-locked-hint">
-        {{quizStatus === 'failed' ? '🔒 机会用完了，请老师帮忙重置后再来吧' : '🔒 听完音频就能解锁挑战哦～（已听 ' + progress.displayPercent + '%）'}}
-      </view>
     </view>
     <view wx:else class="muted-line">还没开始听，从第一秒开始吧</view>
   </view>
+
+  <!-- 插修9/R8：徽章区外提独立于进度卡——首进即显示（passed 不再依赖 progress 存在） -->
+  <block wx:if="{{quizStatus}}">
+    <view wx:if="{{quizStatus === 'passed'}}" class="quiz-hero-card" bindtap="onQuizCard">
+      <view class="qhc-stamp">PASSED</view>
+      <view class="qhc-title">测验通过！</view>
+      <view class="qhc-stars">
+        <text wx:for="{{[1, 2, 3, 4, 5]}}" wx:key="*this" class="qhc-star">{{item <= quizStars ? '⭐' : '☆'}}</text>
+        <text class="qhc-best">最佳成绩 {{quizBest}} 分</text>
+      </view>
+      <view class="qhc-cheer">{{cheerText}}</view>
+      <view class="qhc-tip">点卡片看成绩单 ›</view>
+    </view>
+    <view wx:elif="{{quizStatus === 'available'}}" class="quiz-challenge-card">
+      <view class="qcc-title">{{quizAttemptsUsed > 0 ? '💪 差一点点就过啦！' : '🎯 轮到你挑战啦！'}}</view>
+      <view class="qcc-sub">{{quizAttemptsUsed > 0 ? '还剩 ' + quizAttemptsLeft + ' 次机会 · 最佳 ' + quizBest + ' 分' : '共 ' + quizMaxAttempts + ' 次机会，证明你读懂了这本书'}}</view>
+      <button class="qcc-btn pulse-anim" bindtap="onQuiz">{{quizAttemptsUsed > 0 ? '再挑战一次！' : '开始挑战！'}}</button>
+    </view>
+    <view wx:elif="{{quizStatus === 'locked' || quizStatus === 'failed'}}" class="quiz-locked-hint">
+      {{quizStatus === 'failed' ? '🔒 机会用完了，请老师帮忙重置后再来吧' : (progress ? '🔒 听完音频就能解锁挑战哦～（已听 ' + progress.displayPercent + '%）' : '🔒 听完音频就能解锁挑战哦～')}}
+    </view>
+  </block>
 
   <!-- 简介 -->
   <view class="section-card" wx:if="{{book.description}}">
