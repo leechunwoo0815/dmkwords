@@ -22,6 +22,8 @@ Page({
       // 显示该书历史最佳，不带本次作答明细；拿不到才回退"没有测验记录"
       try {
         const q = await api.getQuiz(bookId, childId)
+        // 插修10：words_added/points_added 用服务端真实到账（护照片同源）——
+        // 原硬编码 0 与实际入账矛盾（用户目视实锤）
         result = {
           from_server: true,
           passed: q.status === 'passed',
@@ -31,8 +33,8 @@ Page({
           total: (q.questions && q.questions.length) || 5,
           attempts_left: q.attempts_left || 0,
           best_score: q.best_score || 0,
-          words_added: 0,
-          points_detail: [],
+          words_added: q.words_added || 0,
+          points_detail: q.points_added ? [{ points: q.points_added }] : [],
           wrong: [],
         }
       } catch (e) { /* 落"没有测验记录"分支 */ }

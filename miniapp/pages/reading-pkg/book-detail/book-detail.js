@@ -108,13 +108,18 @@ Page({
     if (!childId) return
     try {
       const q = await api.getQuiz(book.id, childId)
+      // 插修10：best_score 是答对题数口径，金卡分/星级按 best_percent 百分制
+      // （后端插修10 新字段；旧响应容错换算）
+      const totalQ = (q.questions && q.questions.length) || 5
+      const bestPercent =
+        q.best_percent != null ? q.best_percent : Math.round(((q.best_score || 0) * 100) / totalQ)
       this.setData({
         quizStatus: q.status,
-        quizBest: q.best_score || 0,
+        quizBest: bestPercent,
         quizAttemptsUsed: q.attempts_used || 0,
         quizAttemptsLeft: q.attempts_left || 0,
         quizMaxAttempts: q.max_attempts || 3,
-        quizStars: q.status === 'passed' ? this._starsOf(q.best_score || 0) : 0,
+        quizStars: q.status === 'passed' ? this._starsOf(bestPercent) : 0,
         cheerText: q.status === 'passed' ? QUIZ_CHEERS[Math.floor(Math.random() * QUIZ_CHEERS.length)] : '',
       })
     } catch (e) { /* 静默：拉不到则徽章区隐藏（quizStatus 空） */ }
