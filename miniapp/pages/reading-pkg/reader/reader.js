@@ -120,7 +120,10 @@ Page({
       this._applyResume()
     })
     audio.onPlay(() => {
-      if (this._sessionStart === null) this._sessionStart = Math.floor(audio.currentTime || 0)
+      // R5（插修7）：无条件重设——ended 后再 play 微信从头播（currentTime=0），
+      // 若沿用 onEnded 尾部推进的 _sessionStart=旧endPos，则再播完
+      // endPos>sessionStart 恒 false，上报+测验引导弹窗链整体跳过（再读不弹根因）
+      this._sessionStart = Math.floor(audio.currentTime || 0)
       this.setData({ playing: true })
     })
     audio.onPause(() => {
