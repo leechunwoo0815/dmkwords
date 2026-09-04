@@ -166,6 +166,7 @@
 | FEAT-078 | 可退金额三形态展示 + 0 元拦截 | 资金可见性 | P1 | F2 | 小程序可退卡片三形态：proportional（实付 · 已用 N/总天 → 预计可退，比例退折算过程可见）/ full（全额徽标）/ zero（不可退+原因）；0 元禁提交三层守卫（后端 422「该订单当前无可退金额」/前端按钮置灰+提示/前置校验双保险）——0 元申请会联动建退会单+锁孩子，审核员误批即 withdrawn（真业务陷阱） | —（X6+R1 单测） | IMPLEMENTED |
 | FEAT-079 | 小程序退款申请撤销入口 | 用户自主权 | P1 | F2 | refund-apply 退款记录行 pending 态「撤销申请」按钮（wx.showModal 确认→cancelRefund→列表刷新）；后端 cancel 端点本就绪（仅 pending 可撤，撤后 cancelled+订单恢复）；管理端 todo 显示「已失效·家长已撤销」已有（WM13 S1 灵魂设计的前端断链修复） | refund.feature（存量 @draft）；R1/X5 pytest 兜底 | IMPLEMENTED |
 | FEAT-080 | 管理端订单类型扩展 | 资金动线 | P1 | 004,015 | 管理端创建订单六类：现有三类+押金（deposit_amount 配置，confirm 激活 Deposit+Ledger）+活动（activity_id 必填带出 fee，不联动报名——边界默认值）+自定义（说明+金额，纯资金流水不参与会员计算，可走退款链）〔PRD §3.5.2〕 | order_types.feature（四场景 16 steps） | IMPLEMENTED |
+| FEAT-081 | 儿童测验成就徽章（详情页三态） | 儿童激励 | P2 | 17 号插修8 | book-detail 测验区三态徽章：金卡 PASSED（🏆+金橙渐变+星级档位+最佳成绩+鼓励语随机，点击→quiz-result 成绩单）/蓝卡再挑战（剩余次数+最佳分+脉冲按钮，attempts_used=0 文案自适应"开始挑战"）/灰态锁定引导（locked 含已听百分比、failed 提示找老师重置）；数据源 getQuiz 现成字段零后端改动，onLoad/onShow 双接线（测完返回徽章即时切换）；书架🏆角标需后端批量接口挂第四批；reader 完播弹窗文案同批统一 | 纯 miniapp 前端（node --check+C 级 gate 基线持平）；真机目视 | IMPLEMENTED |
 
 随修项（bugfix/小缺口，不单开 FEAT，WM3 插修 1）：A1 计数懒加载守卫（WM13-F4 同族）、
 A2 创建时间字段错配、A3 refunded 标签、A4 筛选「全部」、A5 订单关键字搜索、
