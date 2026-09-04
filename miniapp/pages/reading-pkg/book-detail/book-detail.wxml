@@ -40,8 +40,9 @@
     <view class="section-card-title">{{childName}} 的听读进度</view>
     <view wx:if="{{progress && progress.coverage_seconds > 0}}" class="progress-section">
       <view class="reading-progress">
-        <view class="rp-bar"><view class="rp-fill" style="width: {{progress.coverage_percent}}%"></view></view>
-        <text>已听 {{progress.coverage_percent}}%</text>
+        <view class="rp-bar"><view class="rp-fill" style="width: {{progress.displayPercent}}%"></view></view>
+        <text wx:if="{{progress.finished}}">已读完 100%</text>
+        <text wx:else>已听 {{progress.displayPercent}}%</text>
       </view>
       <view wx:if="{{progress.finished}}" class="quiz-tag">✅ 已读完 · 测验已解锁</view>
     </view>

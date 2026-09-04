@@ -61,6 +61,7 @@ Page({
     })
     this._sessionStart = null
     this._lastBeatAt = 0
+    this._finishPrompted = false // B1：同一次会话只弹一次完播引导（onLoad 重置）
     this._audio = null
     this._resumeApplied = false
     this._initAudio()
@@ -139,6 +140,26 @@ Page({
         api
           .reportProgress(this.data.childId, this.data.bookId, endPos, this._sessionStart)
           .then(() => this.loadProgress())
+          .then(() => {
+            // B1（插修5）：完播即时引导测验——以 loadProgress 后的 finished 为准
+            //（心跳跨阈值时 finished 已置 1，onEnded 只是常见触发点之一；
+            // report 响应的 just_finished 只在跃迁那次返回，不消费它以覆盖全路径）
+            if (this.data.finished && !this._finishPrompted) {
+              this._finishPrompted = true
+              wx.showModal({
+                title: '已读完！',
+                content: '是否立即测验？每本书共 3 次测验机会',
+                confirmText: '去测验',
+                success: (r) => {
+                  if (r.confirm) {
+                    wx.navigateTo({
+                      url: `/pages/reading-pkg/quiz/quiz?book_id=${this.data.bookId}&book_title=${encodeURIComponent(this.data.book.title || '')}`,
+                    })
+                  }
+                },
+              })
+            }
+          })
           .catch(() => {})
         this._sessionStart = endPos
         this._lastBeatAt = Date.now()

@@ -42,6 +42,20 @@ Page({
       this.checkFavorite()
       this.loadBorrowState()
     }
+    this._inited = true
+  },
+
+  onShow() {
+    // B1（插修5）：从 reader/quiz 返回即刷新三态（onLoad 只在首次进入触发——
+    // "退出重进 2 次才显示已读完"根因即 onLoad-only 拉取）
+    if (this._inited) {
+      const childId = this.data.childId
+      if (childId) {
+        this.loadProgress()
+        this.checkFavorite()
+        this.loadBorrowState()
+      }
+    }
   },
 
   async loadDetail() {
@@ -57,6 +71,9 @@ Page({
     if (!childId) return
     try {
       const p = await api.getProgress(book.id, childId)
+      // B3（插修5）：coverage 是防刷口径（95% 阈值即判 finished），显示层以
+      // finished 为权威态——读完的书进度条满格 100%（后端防刷口径不动）
+      p.displayPercent = p.finished ? 100 : p.coverage_percent
       this.setData({ progress: p })
     } catch (e) { /* 静默 */ }
   },
@@ -66,8 +83,9 @@ Page({
     if (!childId) return
     try {
       const list = await api.listFavorites(childId)
-      this.setData({ inFav: (list || []).some((b) => (b.id || b.book_id) === book.id) })
-    } catch (e) { /* 静默 */ }
+      // B2（插修5）：精确比对 book_id——原 (b.id || b.book_id) 短路赌博，b.id 是收藏行自增 id，比对纯碰撞
+      this.setData({ inFav: (list || []).some((b) => b.book_id === book.id) })
+    } catch (e) { /* 静默（U10 同族假状态登记，修复归 F-M 家族追踪——不扩 scope） */ }
   },
 
   // 真实借阅状态：在借 > 已预约 > 可预约
@@ -76,7 +94,8 @@ Page({
     if (!childId) return
     try {
       const borrows = await api.currentBorrows(childId)
-      const mine = (borrows || []).find((b) => (b.book_id || b.id) === book.id)
+      // B2 同族：current_borrows 恒返 book_id（原 || 碰巧正确），精确化消除赌博
+      const mine = (borrows || []).find((b) => b.book_id === book.id)
       if (mine) {
         const days = Math.ceil((new Date(String(mine.due_at).replace(/-/g, '/')) - new Date()) / 86400000)
         const due = days < 0 ? `已逾期 ${-days} 天` : days === 0 ? '今天到期' : `${days} 天后到期`
