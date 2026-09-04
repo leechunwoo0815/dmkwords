@@ -1954,12 +1954,40 @@
       "OrderCreateRequest": {
         "additionalProperties": false,
         "properties": {
+          "activity_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity Id"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "maximum": 99999.0,
+                "minimum": 0.01,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
           "child_id": {
             "title": "Child Id",
             "type": "integer"
           },
           "order_type": {
-            "pattern": "^(first_activity_fee|observation_fee|formal_fee)$",
+            "pattern": "^(first_activity_fee|observation_fee|formal_fee|deposit|activity_fee|custom)$",
             "title": "Order Type",
             "type": "string"
           },
