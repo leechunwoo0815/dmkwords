@@ -110,7 +110,9 @@ if [ "$FAILED" -eq 0 ]; then
   # E-20260903-04（二犯转防呆）：本地 gate 的 pytest/behave 与 dev 共库，TRUNCATE
   # 会清空演示数据——恢复动作是 dev.sh start 内置双 seed。只提醒不自动跑：gate
   # 保持纯验收语义（CI 独立库/专家复跑不应产生演示数据副作用），seed 耗时也不该拖门禁
-  echo "⚠ 业务表已被门禁清空——演示/目视前请先执行: bash scripts/dev.sh start （内置双 seed 恢复）"
+  # E-20260905-01：含后端改动的批次 start 会幂等跳过已运行进程=旧代码继续跑，
+  # 故提醒统一用 restart（stop+start，纯前端批也无害）
+  echo "⚠ 业务表已被门禁清空——演示/目视前请先执行: bash scripts/dev.sh restart （重启加载最新代码+双 seed 恢复）"
   exit 0
 else
   echo "===== 全量门禁 FAIL ====="
