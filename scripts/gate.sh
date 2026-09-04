@@ -89,6 +89,18 @@ else
   skip "契约快照未导出（docs/api/openapi.json 不存在）"
 fi
 
+step 9 "交付完整性检查（E-20260903-03：引用文件必须入库——missing files 惯犯第 3 次防呆）"
+# 仅本地有效（CI checkout 工作区天然干净）；外部专家意见/docs/error_list 下出现
+# untracked 文件 = LEDGER/文档引用与文件本体分离，硬失败（机械可判定，防呆原则）
+UNTRACKED_DOCS=$(git status --porcelain | grep '^??' | grep -E '外部专家意见/|docs/|error_list/' || true)
+if [ -n "$UNTRACKED_DOCS" ]; then
+  echo "✗ 应入库目录下存在 untracked 文件（LEDGER/文档引用的文件必须同刀或后刀入库）："
+  echo "$UNTRACKED_DOCS"
+  FAILED=1
+else
+  echo "交付完整性 PASS：引用目录零 untracked ✓"
+fi
+
 sleep 0.3  # E-20260901-04：等 tee 落盘再退出，防日志末行截断
 echo ""
 if [ "$FAILED" -eq 0 ]; then
