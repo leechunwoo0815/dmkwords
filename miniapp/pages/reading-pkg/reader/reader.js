@@ -96,8 +96,10 @@ Page({
 
   _applyResume() {
     // 有历史进度则从 last_position 续播（onCanplay 与 loadProgress 双保险，防基础库不触发）
-    const { lastPosition } = this.data
-    if (lastPosition > 0 && this._audio && !this._resumeApplied) {
+    // R6（插修7）：已读完的书不续播——last_position≈99% 时点播放只剩几秒
+    // "一闪而过伪音"，还需二次点击才从头；"再次阅读"应从头开始，续播仅服务未读完的书
+    const { lastPosition, finished } = this.data
+    if (lastPosition > 0 && !finished && this._audio && !this._resumeApplied) {
       this._audio.seek(lastPosition)
       this._resumeApplied = true
     }
