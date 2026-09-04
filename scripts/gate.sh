@@ -92,7 +92,9 @@ fi
 step 9 "交付完整性检查（E-20260903-03：引用文件必须入库——missing files 惯犯第 3 次防呆）"
 # 仅本地有效（CI checkout 工作区天然干净）；外部专家意见/docs/error_list 下出现
 # untracked 文件 = LEDGER/文档引用与文件本体分离，硬失败（机械可判定，防呆原则）
-UNTRACKED_DOCS=$(git status --porcelain | grep '^??' | grep -E '外部专家意见/|docs/|error_list/' || true)
+# quotepath 假阴性防呆：git 默认对中文路径输出八进制转义（E-20260903-03 同款坑，
+# 专家三批复核时实测中招）——关闭 quotepath 转义后中文路径才可匹配
+UNTRACKED_DOCS=$(git -c core.quotepath=false status --porcelain | grep '^??' | grep -E '外部专家意见/|docs/|error_list/' || true)
 if [ -n "$UNTRACKED_DOCS" ]; then
   echo "✗ 应入库目录下存在 untracked 文件（LEDGER/文档引用的文件必须同刀或后刀入库）："
   echo "$UNTRACKED_DOCS"
