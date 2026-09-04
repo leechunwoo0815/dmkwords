@@ -140,25 +140,39 @@ Page({
         api
           .reportProgress(this.data.childId, this.data.bookId, endPos, this._sessionStart)
           .then(() => this.loadProgress())
-          .then(() => {
+          .then(async () => {
             // B1（插修5）：完播即时引导测验——以 loadProgress 后的 finished 为准
             //（心跳跨阈值时 finished 已置 1，onEnded 只是常见触发点之一；
             // report 响应的 just_finished 只在跃迁那次返回，不消费它以覆盖全路径）
-            if (this.data.finished && !this._finishPrompted) {
-              this._finishPrompted = true
+            if (!this.data.finished || this._finishPrompted) return
+            // R2（插修6）测验状态门控（用户裁定 2026-09-04）："测验没通过、次数
+            // 小于 3 次，读完就应该弹提示引导"。后端语义实测（growth/service.py
+            // get_quiz）：locked=未读完 / passed=已通过（WordsLedger 入账）/
+            // failed=次数已用尽 / available=可测——仅 available 弹；
+            // passed 不弹（孩子已过关）、failed 不弹（无意义）
+            try {
+              const q = await api.getQuiz(this.data.bookId, this.data.childId)
+              if (q.status !== 'available') return
+              this._finishPrompted = true // 会话内防重复轰炸（跨会话 onLoad 重置，可再弹）
               wx.showModal({
                 title: '已读完！',
-                content: '是否立即测验？每本书共 3 次测验机会',
+                content: `是否立即测验？每本书共 3 次测验机会（剩余 ${q.attempts_left} 次）`,
                 confirmText: '去测验',
                 success: (r) => {
                   if (r.confirm) {
+                    // R1（插修6）：补 child_id/child_name——原 URL 漏参导致
+                    // quiz 页 Number(options.child_id)=NaN → 接口 422
                     wx.navigateTo({
-                      url: `/pages/reading-pkg/quiz/quiz?book_id=${this.data.bookId}&book_title=${encodeURIComponent(this.data.book.title || '')}`,
+                      url:
+                        `/pages/reading-pkg/quiz/quiz?book_id=${this.data.bookId}` +
+                        `&book_title=${encodeURIComponent(this.data.book.title || '')}` +
+                        `&child_id=${this.data.childId}` +
+                        `&child_name=${encodeURIComponent(this.data.childName || '')}`,
                     })
                   }
                 },
               })
-            }
+            } catch (e) { /* getQuiz 失败不阻塞阅读体验 */ }
           })
           .catch(() => {})
         this._sessionStart = endPos

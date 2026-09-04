@@ -153,7 +153,9 @@ Page({
       wx.showToast({ title: '需先听完音频（95%）才解锁测验', icon: 'none' }); return
     }
     wx.navigateTo({
-      url: `/pages/reading-pkg/quiz/quiz?book_id=${book.id}&book_title=${encodeURIComponent(book.title)}`
+      // R1 同族 sweep：此入口原也漏 child_id（quiz 页解析 NaN → 422）
+      url: `/pages/reading-pkg/quiz/quiz?book_id=${book.id}&book_title=${encodeURIComponent(book.title)}` +
+        `&child_id=${this.data.childId || ''}&child_name=${encodeURIComponent(this.data.childName || '')}`
         + `&child_id=${childId}&child_name=${encodeURIComponent(childName)}`,
     })
   },
