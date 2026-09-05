@@ -293,29 +293,46 @@ def _ensure_demo_growth(db: Session, child) -> None:
     if not books:
         return
 
-    # 1) 积分流水（无唯一索引，先查后插）
+    # 1) 积分流水（无唯一索引，先查后插）。19 号 T-B：创建时直挂 related_id——
+    # 原先插后补（UPDATE WHERE related_id IS NULL）在 SessionLocal autoflush=False
+    # 下单次运行必扑空（教训 41 同族第三犯，用户目视 +0 积分实锤），
+    # 直挂即真链路入账口径（E-20260904-01）。
+    # 锚点与 journey 同款 title 定位（Brown Bear）——books[0] 在脏库（测试残留
+    # 书占前位）下会与 journey 演示三书错位，get_quiz points_added 挂空。
+    points_anchor = (
+        db.query(Book).filter(Book.is_deleted == 0, Book.title.like("Brown Bear%")).first()
+        or books[0]
+    )
     if not db.query(PointLedger).filter(PointLedger.child_id == child.id).first():
         db.add(
             PointLedger(
                 child_id=child.id,
                 points=5,
                 reason_type="quiz_first_pass",
+                related_id=points_anchor.id,
                 detail="演示：首次通过测验",
             )
         )
         db.add(
             PointLedger(
-                child_id=child.id, points=3, reason_type="quiz_full_marks", detail="演示：测验满分"
+                child_id=child.id,
+                points=3,
+                reason_type="quiz_full_marks",
+                related_id=points_anchor.id,
+                detail="演示：测验满分",
             )
         )
         db.add(
             PointLedger(
-                child_id=child.id, points=2, reason_type="words_convert", detail="演示：词数兑换"
+                child_id=child.id,
+                points=2,
+                reason_type="words_convert",
+                related_id=points_anchor.id,
+                detail="演示：词数兑换",
             )
         )
-    # 插修10：演示积分补 related_id=book_id——真实链路三类入账积分都挂
-    # related_id（growth/service 入账处），get_quiz points_added 按 related_id
-    # 求和，缺失会让兜底成绩单显示 0 积分（E-20260904-01 真链路口径）
+    # 存量自愈（19 号 T-B 择 a 保留）：补挂历史版本留下的 related_id=NULL 行——
+    # 行已在库（跨事务），execute 能命中；全体有值后本段天然空转 0 行，保留无害
     db.execute(
         update(PointLedger)
         .where(
@@ -324,7 +341,7 @@ def _ensure_demo_growth(db: Session, child) -> None:
             PointLedger.reason_type.in_(["quiz_first_pass", "quiz_full_marks", "words_convert"]),
             PointLedger.detail.like("演示：%"),
         )
-        .values(related_id=books[0].id)
+        .values(related_id=points_anchor.id)
     )
 
     # 2) 打卡近 3 天（先查后插）
@@ -419,13 +436,15 @@ def _ensure_demo_quiz_journey(db: Session, child) -> None:
         ("Chicka Chicka", True, 3, 5, 0),  # 蓝卡：测过未过，attempts_left=2
         ("Corduroy", False, 0, 0, 0),  # 灰态：读到 60%
     )
-    for prefix, finished, score, total_q, passed in targets:
+    # 19 号 T-C：同表循环同秒也是假数据特征（book1/2 submitted_at 曾同秒）——
+    # 逐书递增 3 小时，跨表+同表全错开
+    for idx, (prefix, finished, score, total_q, passed) in enumerate(targets):
         book = db.query(Book).filter(Book.is_deleted == 0, Book.title.like(f"{prefix}%")).first()
         if not book:
             continue
         total = int(book.audio_duration_seconds or 6)
         cov = total if finished else max(1, int(total * 0.6))
-        now = datetime.now()
+        now = datetime.now() - timedelta(hours=idx * 3)
 
         # 1) ReadingProgress：读完/读到一半（upsert 对齐目标态——旧演示行可能是
         #    任意态，强制收敛到演示语义）
