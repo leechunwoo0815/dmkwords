@@ -69,7 +69,12 @@ class AdminTodoService:
                 else:
                     result[n.id] = self._decide_refund(status)
             elif n.ref_type == "withdrawal_request":
-                result[n.id] = self._decide_withdrawal(withdrawal_states.get(n.ref_id))
+                st = withdrawal_states.get(n.ref_id)
+                if st is None:
+                    result[n.id] = self._decide_withdrawal(None)
+                else:
+                    status, source = st
+                    result[n.id] = self._decide_withdrawal(status, source)
             elif n.ref_type == "transfer":
                 result[n.id] = self._decide_transfer(transfer_states.get(n.ref_id))
             elif n.ref_type == "activity":
@@ -116,14 +121,31 @@ class AdminTodoService:
         return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
 
     @staticmethod
-    def _decide_withdrawal(status: str | None) -> dict:
+    def _decide_withdrawal(status: str | None, source: str | None = None) -> dict:
+        # T20d（#6）：联动退会单（退款/转让驱动，source != normal）在活跃态显示
+        # 灰态"联动处理中"——运营无需操作（execute 成功→withdrawn→completed 链
+        # 已有）；不入 pending 计数；直接退会单（normal）保持待处理+操作按钮
+        if (source or "normal") != "normal" and status in (
+            "applying",
+            "pending_settle",
+            "refunding",
+        ):
+            return {
+                "effective_status": ST_DONE,
+                "status_text": "联动处理中·随退款自动推进",
+                "linkage": True,
+            }
         if status is None:
-            return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
+            return {"effective_status": ST_DONE, "status_text": TEXT_DONE, "linkage": False}
         if status == "applying":
-            return {"effective_status": ST_PENDING, "status_text": TEXT_PENDING}
+            return {"effective_status": ST_PENDING, "status_text": TEXT_PENDING, "linkage": False}
         if status == "cancelled":
-            return {"effective_status": ST_INVALID, "status_text": TEXT_INVALID_CANCELLED}
-        return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
+            return {
+                "effective_status": ST_INVALID,
+                "status_text": TEXT_INVALID_CANCELLED,
+                "linkage": False,
+            }
+        return {"effective_status": ST_DONE, "status_text": TEXT_DONE, "linkage": False}
 
     @staticmethod
     def _decide_transfer(status: str | None) -> dict:
@@ -168,12 +190,14 @@ class AdminTodoService:
     def _withdrawal_states(self):
         from backend.domain.identity.models import WithdrawalRequest
 
-        def q(ids: list[str]) -> dict[str, str]:
-            rows = self.db.query(WithdrawalRequest.id, WithdrawalRequest.status).filter(
+        def q(ids: list[str]) -> dict[str, tuple[str, str]]:
+            rows = self.db.query(
+                WithdrawalRequest.id, WithdrawalRequest.status, WithdrawalRequest.source
+            ).filter(
                 WithdrawalRequest.id.in_([int(i) for i in ids]),
                 WithdrawalRequest.is_deleted == 0,
             )
-            return {str(r.id): r.status for r in rows}
+            return {str(r.id): (r.status, r.source) for r in rows}
 
         return q
 
@@ -290,6 +314,7 @@ class AdminTodoService:
                 "handled_by_name": names.get(n.handled_by) if n.handled_by else None,
                 "effective_status": eff["effective_status"],
                 "status_text": eff["status_text"],
+                "linkage": eff.get("linkage", False),
             }
             for n, eff in page_rows
         ]

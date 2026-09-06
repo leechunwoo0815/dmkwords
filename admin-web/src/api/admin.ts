@@ -142,6 +142,7 @@ export interface AdminInboxItem {
   handled_by_name: string | null;
   effective_status: "pending" | "done" | "invalid";
   status_text: string;
+  linkage?: boolean; // T20d：联动单灰态（退款/转让驱动，随退款自动推进，无操作按钮）
 }
 
 export function apiListAdminInbox(params: {

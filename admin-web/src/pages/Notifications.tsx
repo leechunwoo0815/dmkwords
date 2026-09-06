@@ -355,6 +355,8 @@ export default function Notifications() {
       render: (v: string, r: AdminInboxItem) =>
         r.effective_status === "pending" ? (
           <Tag color="orange">{v}</Tag>
+        ) : r.linkage ? (
+          <Tag color="default" bordered={false}>{v}</Tag> // T20d：联动单灰态
         ) : (
           <span style={{ color: "rgba(0,0,0,0.45)" }}>
             {v}
@@ -541,6 +543,7 @@ export default function Notifications() {
         pagination={false}
         onRow={(r) => {
           if (r.effective_status === "pending") return { style: { background: "#fff7e6" } };
+          if (r.linkage) return { style: { background: "#fafafa" } }; // T20d：联动单灰行
           if (r.effective_status === "invalid") return { style: { background: "#fafafa" } };
           return {};
         }}
