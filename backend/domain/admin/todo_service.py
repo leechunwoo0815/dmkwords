@@ -248,14 +248,9 @@ class AdminTodoService:
         status_filter: pending=待处理 / finished=已审结+已失效 / None=全部。
         排序：待处理优先，组内 created_at 升序（等待最久的排前——运营处理优先级）。
         """
-        if not viewer_is_super:
-            return {
-                "items": [],
-                "total": 0,
-                "pending_count": 0,
-                "page": page,
-                "page_size": page_size,
-            }
+        # T20g（#8 产品决策）：staff 可见只读——返回全量数据 + read_only 标记
+        #（看记录+超管处理结果；handle 端点权限矩阵不动仍仅超管；todo-counts 对
+        # staff 保持现状只含 member.manage 相关——徽标语义是"你能处理的"）
 
         q = self.db.query(AdminNotification).filter(AdminNotification.is_deleted == 0)
         if scene:
@@ -322,6 +317,7 @@ class AdminTodoService:
             "items": items,
             "total": total,
             "pending_count": pending_count,
+            "read_only": not viewer_is_super,
             "page": page,
             "page_size": page_size,
         }

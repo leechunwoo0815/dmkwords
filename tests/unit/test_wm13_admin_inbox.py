@@ -110,17 +110,18 @@ def test_list_inbox_status_filter(client: TestClient):
     assert all(i["effective_status"] != "pending" for i in data2["items"])
 
 
-def test_s2_staff_sees_empty_not_403(client: TestClient):
-    """S2：staff 调列表 → 200 空数据（不 403 不空转）；staff 调 handle → 403。"""
+def test_s2_staff_sees_read_only_not_403(client: TestClient):
+    """S2（T20g 20260906 改写：原"空数据"口径被产品决策取代）：staff 调列表 →
+    200 全量只读（read_only=true，看记录+超管结果，无操作权限）；staff 调 handle → 403。"""
     hs = _h(client, "staff01")
     with _db() as db:
         _seed_mixed(db)
         db.commit()
-    r = hs and client.get("/api/admin/admin-notifications", headers=hs)
+    r = client.get("/api/admin/admin-notifications", headers=hs)
     assert r.status_code == 200, r.text
     data = r.json()
-    assert data["items"] == []
-    assert data["pending_count"] == 0
+    assert data["read_only"] is True, f"staff 视角应 read_only=true，实 {data.get('read_only')}"
+    assert len(data["items"]) >= 1, f"staff 应看到全量记录，实 {len(data['items'])}"
     r2 = client.post("/api/admin/admin-notifications/1/handle", json={"reason": "x"}, headers=hs)
     assert r2.status_code == 403
 

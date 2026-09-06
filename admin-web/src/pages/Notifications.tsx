@@ -148,6 +148,7 @@ export default function Notifications() {
   // 管理待办（WM13）
   const [inbox, setInbox] = useState<AdminInboxItem[]>([]);
   const [inboxTotal, setInboxTotal] = useState(0);
+  const [inboxReadOnly, setInboxReadOnly] = useState(false); // T20g：staff 可见只读
   const { counts: todoCounts, failed: todoFailed } = useTodoCounts();  // WM13-F4：与徽标同源
   const [inboxLoading, setInboxLoading] = useState(false);
   const [handleTarget, setHandleTarget] = useState<AdminInboxItem | null>(null);
@@ -203,6 +204,7 @@ export default function Notifications() {
       });
       setInbox(data.items);
       setInboxTotal(data.total);
+      setInboxReadOnly(Boolean(data.read_only)); // T20g
     } catch (e) {
       message.error((e as Error).message);
     } finally {
@@ -383,14 +385,16 @@ export default function Notifications() {
             ? `${meta.path}?tab=${meta.tab}&highlight=${r.ref_id}`
             : meta.path
           : undefined;
+        // T20g：staff 只读视角——去处理改"查看"、隐藏"标记已处理"（权限矩阵后端不动）
+        const readOnly = inboxReadOnly;
         return (
           <span style={{ display: "inline-flex", gap: 8 }}>
             {route && (
               <Button size="small" type="link" icon={<LinkOutlined />} onClick={() => navigate(route)}>
-                {r.effective_status === "pending" ? "去处理" : "查看"}
+                {r.effective_status === "pending" && !readOnly ? "去处理" : "查看"}
               </Button>
             )}
-            {r.effective_status === "pending" && (
+            {r.effective_status === "pending" && !readOnly && (
               <Button
                 size="small"
                 onClick={() => {
@@ -548,6 +552,21 @@ export default function Notifications() {
           }}
         />
       </div>
+      {inboxReadOnly && (
+        <div
+          style={{
+            background: "#fffbe6",
+            border: "1px solid #ffe58f",
+            borderRadius: 6,
+            padding: "6px 12px",
+            marginBottom: 12,
+          }}
+        >
+          <Typography.Text type="warning">
+            仅超级管理员可操作，您可查看处理进展
+          </Typography.Text>
+        </div>
+      )}
       <Table<AdminInboxItem>
         rowKey="id"
         size="small"

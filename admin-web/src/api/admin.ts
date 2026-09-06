@@ -151,7 +151,7 @@ export function apiListAdminInbox(params: {
   status_filter?: string;
   scene?: string;
   keyword?: string;
-}): Promise<{ items: AdminInboxItem[]; total: number; pending_count: number; page: number; page_size: number }> {
+}): Promise<{ items: AdminInboxItem[]; total: number; pending_count: number; read_only?: boolean; page: number; page_size: number }> {
   const query = new URLSearchParams({ page: String(params.page), page_size: String(params.page_size) });
   if (params.status_filter) query.set("status_filter", params.status_filter);
   if (params.scene) query.set("scene", params.scene);
