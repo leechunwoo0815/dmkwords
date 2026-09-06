@@ -12,6 +12,7 @@ import {
   apiListEnrollments, apiReviewActivityRefund, apiSignin,
   type ActivityItem, type EnrollmentItem,
 } from "../api/activities";
+import { hasPermission, useAuth } from "../auth";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { TODO_REFRESH_EVENT } from "../hooks/useTodoCounts";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
@@ -36,6 +37,8 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function ActivityManage() {
   const { message, modal } = AntdApp.useApp();
+  const { permissions } = useAuth();
+  const isSuper = hasPermission(permissions, "audit.view"); // T20b：退款审核=超管专属，staff 视角不发该请求
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const activityPg = usePaintPagination();
@@ -54,8 +57,11 @@ export default function ActivityManage() {
       .catch((e: Error) => message.error(e.message))
       .finally(() => setLoading(false));
     // F-M9/T26：退款审核列表 fetch 失败必须报错——静默置空=审核员误判无待审
-    apiListActivityRefunds().then(setRefunds).catch((e: Error) => { message.error(e.message); setRefunds([]); });
-  }, [message]);
+    // T20b：仅超管视角请求退款审核列表（staff 不发该请求，从源头消除 403 toast）
+    if (isSuper) {
+      apiListActivityRefunds().then(setRefunds).catch((e: Error) => { message.error(e.message); setRefunds([]); });
+    }
+  }, [message, isSuper]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -213,7 +219,7 @@ export default function ActivityManage() {
               </>
             ),
           },
-          {
+          ...(isSuper ? [{
             key: "refunds", label: `退款待审（${refunds.length}）`,
             children: (
               <>
@@ -240,8 +246,9 @@ export default function ActivityManage() {
           </>
           ),
           },
-        ]}
-      />
+          ] : []),
+          ]}
+        />
 
       <Drawer
         title={enrollActivity ? `《${enrollActivity.title}》报名名单` : ""}
