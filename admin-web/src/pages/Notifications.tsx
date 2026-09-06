@@ -73,9 +73,10 @@ const REF_META: Record<string, { label: string; route?: (r: AdminNotification) =
   activity: { label: "活动", route: () => "/activities" },
   report: { label: "报告", route: (r) => (r.child_id ? `/growth?child_id=${r.child_id}` : "/growth") },
   reservation: { label: "预约", route: () => "/reservations" },
-  transfer: { label: "权益转让", route: () => "/refund-center" },
-  withdrawal_request: { label: "退会申请", route: () => "/refund-center" },
-  refund_request: { label: "退款申请", route: () => "/refund-center" },
+  // T20f：与管理待办操作列同款 URL（tab+highlight），两入口最终一致
+  transfer: { label: "权益转让", route: (r) => `/refund-center?tab=transfers&highlight=${r.ref_id}` },
+  withdrawal_request: { label: "退会申请", route: (r) => `/refund-center?tab=withdrawals&highlight=${r.ref_id}` },
+  refund_request: { label: "退款申请", route: (r) => `/refund-center?tab=refunds&highlight=${r.ref_id}` },
   deposit: { label: "押金", route: () => "/deposits" },
   child: { label: "孩子", route: () => "/members" },
   borrow_record: { label: "借阅记录（详情见上）" },
