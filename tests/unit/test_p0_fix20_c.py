@@ -13,7 +13,7 @@ from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
-from tests.unit.test_wm13_admin_inbox import _h, _db, _send
+from tests.unit.test_wm13_admin_inbox import _db, _h, _send
 
 
 def test_manual_handle_overrides_display_state(client: TestClient):
@@ -56,7 +56,9 @@ def test_manual_handle_overrides_display_state(client: TestClient):
     )
     item = next((i for i in rf.json()["items"] if i["id"] == nid), None)
     assert item is not None, "手动标记后未出现在 finished"
-    assert item["status_text"] == "已处理·手动标记", f"文案应'已处理·手动标记'，实 {item['status_text']}"
+    assert item["status_text"] == "已处理·手动标记", (
+        f"文案应'已处理·手动标记'，实 {item['status_text']}"
+    )
 
     # todo-counts admin_total 同步 -1（标记后不再计入待处理）
     rc = client.get("/api/admin/todo-counts", headers=h)

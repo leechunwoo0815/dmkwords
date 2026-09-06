@@ -89,7 +89,9 @@ def list_enrollments(
 @router.post("/activity-signin")
 def signin(
     body: SigninRequest,
-    admin: Any = Depends(require_perm("borrow.operate")),  # T20b（Q1 裁 A）：签到=馆员现场操作（PRD §9.2 语义对齐；原 member.manage，staff 两权皆有，行为零变化）
+    admin: Any = Depends(
+        require_perm("borrow.operate")
+    ),  # T20b（Q1 裁 A）：签到=馆员现场操作（PRD §9.2 语义对齐；原 member.manage，staff 两权皆有，行为零变化）
     db: Session = Depends(get_db),
 ):
     """扫入场券签到（记录时间 + 操作人）。"""

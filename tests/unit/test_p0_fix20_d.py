@@ -10,7 +10,7 @@
 
 from fastapi.testclient import TestClient
 
-from tests.unit.test_wm13_admin_inbox import _h, _db, _send
+from tests.unit.test_wm13_admin_inbox import _db, _h, _send
 
 
 def test_linkage_withdrawal_grey_state(client: TestClient):

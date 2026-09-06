@@ -8,7 +8,6 @@
 
 from fastapi.testclient import TestClient
 
-from tests.unit.test_wm9_activity import _mk_activity
 from tests.unit.test_wm10_concurrency import _h
 
 

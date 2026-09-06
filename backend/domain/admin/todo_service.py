@@ -249,7 +249,7 @@ class AdminTodoService:
         排序：待处理优先，组内 created_at 升序（等待最久的排前——运营处理优先级）。
         """
         # T20g（#8 产品决策）：staff 可见只读——返回全量数据 + read_only 标记
-        #（看记录+超管处理结果；handle 端点权限矩阵不动仍仅超管；todo-counts 对
+        # （看记录+超管处理结果；handle 端点权限矩阵不动仍仅超管；todo-counts 对
         # staff 保持现状只含 member.manage 相关——徽标语义是"你能处理的"）
 
         q = self.db.query(AdminNotification).filter(AdminNotification.is_deleted == 0)

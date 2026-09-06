@@ -26,9 +26,7 @@ def test_activity_create_with_aware_datetime(client: TestClient):
         },
         headers=h,
     )
-    assert r.status_code == 200, (
-        f"aware 时间应剥时区后创建成功，实 {r.status_code} {r.text[:120]}"
-    )
+    assert r.status_code == 200, f"aware 时间应剥时区后创建成功，实 {r.status_code} {r.text[:120]}"
 
     r2 = client.post(
         "/api/admin/activities",

@@ -57,7 +57,9 @@ class AdminNotification(BaseModel):
     )
     amount = Column(Numeric(10, 2), nullable=True, comment="涉及金额（可空）")
     dedup_key = Column(String(64), nullable=False, default="1", comment="去重键（固定1）")
-    handled_at = Column(DateTime, nullable=True, comment="人工标记处理时间（T20c：优先于机器推导显示态）")
+    handled_at = Column(
+        DateTime, nullable=True, comment="人工标记处理时间（T20c：优先于机器推导显示态）"
+    )
     handled_by = Column(
         BigInteger, nullable=True, comment="审计：处理管理员ID（展示时 JOIN AdminUser 取名）"
     )
