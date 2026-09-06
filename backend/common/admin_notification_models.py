@@ -6,7 +6,8 @@
 - B10 模式：被 identity/activity 等业务域写入、被 admin 域查询——归 common 层；
 - 显示态实时算、审计态事件写（任务包 v2 灵魂）：
   "待处理/已审结/已失效"不落库，查询时 StatusResolver 实时 JOIN 业务表判定；
-  handled_at/handled_by 只作审计展示，不参与显示态判定；
+  handled_at/handled_by 优先于机器推导（T20c 20260906 推翻 WM13 原口径：
+  "不参与显示态"在实测中被证伪——人工标记意图应优先，标记后不再入待处理）；
 - 幂等：唯一索引 (scene, ref_type, ref_id, dedup_key, is_deleted)（B11 模式，
   is_deleted 入唯一索引软删后可重建）；无 recipient 字段——全局待办墙，按查看者权限过滤（v2）。
 """
@@ -56,7 +57,7 @@ class AdminNotification(BaseModel):
     )
     amount = Column(Numeric(10, 2), nullable=True, comment="涉及金额（可空）")
     dedup_key = Column(String(64), nullable=False, default="1", comment="去重键（固定1）")
-    handled_at = Column(DateTime, nullable=True, comment="审计：处理时间（不参与显示态）")
+    handled_at = Column(DateTime, nullable=True, comment="人工标记处理时间（T20c：优先于机器推导显示态）")
     handled_by = Column(
         BigInteger, nullable=True, comment="审计：处理管理员ID（展示时 JOIN AdminUser 取名）"
     )

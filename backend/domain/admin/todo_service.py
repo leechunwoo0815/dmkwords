@@ -76,6 +76,16 @@ class AdminTodoService:
                 result[n.id] = self._decide_activity(activity_states.get(n.ref_id, False))
             else:
                 result[n.id] = {"effective_status": ST_DONE, "status_text": TEXT_DONE}
+            # T20c（#5）：人工标记意图优先于机器推导——但仅覆盖"待处理"推导。
+            # mark_handled（家长撤销/审核终态 L2 回写）也写 handled_at，若无条件
+            # 前置会把"已失效·家长已撤销"等终态推导错误覆盖为手动标记；
+            # 故只在机器推导为 pending 且有人工标记时覆盖（业务单据真实推进
+            # 不受影响——通知只是感知层）。
+            if n.handled_at is not None and result[n.id]["effective_status"] == ST_PENDING:
+                result[n.id] = {
+                    "effective_status": ST_DONE,
+                    "status_text": "已处理·手动标记",
+                }
         return result
 
     def resolve_one(self, notification) -> dict:
