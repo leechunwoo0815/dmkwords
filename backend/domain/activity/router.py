@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from pydantic import Field
+from pydantic import Field, field_validator
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
@@ -28,6 +28,15 @@ class ActivityCreateRequest(BaseSchema):
     description: str | None = Field(None, max_length=2000)
     member_only: bool = False
     enroll_deadline: datetime | None = None
+
+    @field_validator("start_at", "enroll_deadline", mode="after")
+    @classmethod
+    def _strip_tz(cls, v: datetime | None) -> datetime | None:
+        """T20a：前端 toISOString 发 aware 时间，服务端全 naive——统一剥时区
+        （astimezone 转本地时区后剥 tzinfo；本地时区语义，docker-compose TZ=Asia/Shanghai）。"""
+        if v is not None and v.tzinfo is not None:
+            return v.astimezone().replace(tzinfo=None)
+        return v
 
 
 class SigninRequest(BaseSchema):
