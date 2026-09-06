@@ -123,7 +123,8 @@ export default function Notifications() {
   const { message } = AntdApp.useApp(); // F-L4/T34：App context 化（禁静态 message）
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const box = searchParams.get("box") === "admin" ? "admin" : "parent";
+  // T20e #1：默认落管理待办（运营主工作面）；URL 显式 box=parent 时尊重（分享链接不破坏）
+  const box = searchParams.get("box") === "parent" ? "parent" : "admin";
   const { page, setPage, pageSize, setPageSize } = usePaintPagination(
     20,
     Number(searchParams.get("page")) || 1
@@ -407,8 +408,26 @@ export default function Notifications() {
 
   // WM13-F4：tab 标题与徽标同源（admin_total）；失败/未拉到 → 不显数字（U10 禁假 0）
   const todoTabCount = todoFailed || !todoCounts ? null : todoCounts.admin_total;
-  const adminTabLabel =
-    todoTabCount === null ? "管理待办" : `管理待办（${todoTabCount} 待处理）`;
+  // T20e #2：红底白字胶囊（MemberManage 订单 tab D1 同款：M>0 胶囊，M=0/未知原样）
+  const adminTabLabel = (
+    <>
+      管理待办
+      {todoTabCount !== null && todoTabCount > 0 && (
+        <span
+          style={{
+            background: "#ff4d4f",
+            color: "#fff",
+            borderRadius: 10,
+            padding: "0 6px",
+            marginLeft: 6,
+            fontSize: 12,
+          }}
+        >
+          {todoTabCount}
+        </span>
+      )}
+    </>
+  );
 
   const parentPanel = (
     <>

@@ -35,6 +35,7 @@ export default function Layout() {
   // 徽标计数 = 管理待办全部待处理（与通知中心管理待办 tab 同口径）；
   // 拉取失败或未拉到 → 不渲染徽标（U10 禁假 0），count=0 时 Badge 自动隐藏
   const badgeCount = failed || !counts ? 0 : counts.admin_total;
+  const memberBadge = failed || !counts ? 0 : (counts.order_pending_manual ?? 0); // T20e #3
 
   const iconBgMap: Record<string, string> = {
     "/": "#FCD34D",
@@ -73,7 +74,20 @@ export default function Layout() {
   const items = [
     { key: "/", icon: <DashboardOutlined />, label: "仪表盘", perm: "dashboard.view" },
     { key: "/books", icon: <BookOutlined />, label: "图书管理", perm: "book.manage" },
-    { key: "/members", icon: <TeamOutlined />, label: "会员管理", perm: "member.manage" },
+    {
+      key: "/members",
+      icon: <TeamOutlined />,
+      // T20e #3：会员管理侧边栏徽标（order_pending_manual，样式同通知中心 Badge）
+      label:
+        memberBadge > 0 ? (
+          <Badge count={memberBadge} size="small" offset={[10, 0]}>
+            会员管理
+          </Badge>
+        ) : (
+          "会员管理"
+        ),
+      perm: "member.manage",
+    },
     { key: "/deposits", icon: <WalletOutlined />, label: "押金与赔偿", perm: "member.manage" },
     { key: "/circulation", icon: <SwapOutlined />, label: "借阅操作台", perm: "borrow.operate" },
     { key: "/reservations", icon: <PushpinOutlined />, label: "预约管理", perm: "borrow.operate" },
