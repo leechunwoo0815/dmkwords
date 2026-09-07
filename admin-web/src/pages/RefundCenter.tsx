@@ -4,7 +4,7 @@ import PaintPagination from "../components/PaintPagination";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  App as AntdApp, Button, Input, Modal, Radio, Space, Table, Tabs, Tag, Tooltip, Typography,
+  App as AntdApp, Button, Card, Input, Modal, Radio, Space, Table, Tabs, Tag, Tooltip, Typography,
 } from "antd";
 
 import {
@@ -13,6 +13,7 @@ import {
   apiSettlePreview, type SettlePreview,
   type RefundRequestItem, type TransferItem, type WithdrawalItem,
 } from "../api/refunds";
+import { hasPermission, useAuth } from "../auth";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { TODO_REFRESH_EVENT } from "../hooks/useTodoCounts";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
@@ -46,6 +47,10 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function RefundCenter() {
   const { message } = AntdApp.useApp();
+  // R3（#5）403 风暴根治：退款中心=资金审核域（audit.view 超管专属）——
+  // 无权限直接渲染提示页且不发任何请求（从源头杜绝直输 URL 的 6 连 toast）
+  const { permissions } = useAuth();
+  const isSuper = hasPermission(permissions, "audit.view");
   // WM13 跳转最后一公里（只读解析）：?tab=refunds|withdrawals|transfers（pending 兼容映射 refunds）
   // + ?highlight={id} 行高亮 3 秒——从通知跳过来直接看到那一单
   const [searchParams] = useSearchParams();
@@ -94,7 +99,10 @@ export default function RefundCenter() {
     apiListTransfers().then(setTransfers).catch((e: Error) => { message.error(e.message); setTransfers([]); });
   }, [message]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!isSuper) return; // R3：无权限不发请求
+    load();
+  }, [load, isSuper]);
 
   const askReview = (
     kind: "refund" | "withdrawal" | "transfer", id: number, approve: boolean,
@@ -174,6 +182,14 @@ export default function RefundCenter() {
       message.error((e as Error).message);
     }
   };
+
+  if (!isSuper) {
+    return (
+      <Card>
+        <PaintEmpty message="仅超级管理员可访问退款中心（资金审核域）" />
+      </Card>
+    );
+  }
 
   return (
     <div>

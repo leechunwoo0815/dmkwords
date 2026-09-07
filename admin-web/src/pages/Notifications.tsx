@@ -149,6 +149,8 @@ export default function Notifications() {
   const [inbox, setInbox] = useState<AdminInboxItem[]>([]);
   const [inboxTotal, setInboxTotal] = useState(0);
   const [inboxReadOnly, setInboxReadOnly] = useState(false); // T20g：staff 可见只读
+  // R3（#5）：staff 待办"查看"=行展开详情（不跨页）——expandedRowKeys 受控
+  const [inboxExpanded, setInboxExpanded] = useState<React.Key[]>([]);
   const { counts: todoCounts, failed: todoFailed } = useTodoCounts();  // WM13-F4：与徽标同源
   const [inboxLoading, setInboxLoading] = useState(false);
   const [handleTarget, setHandleTarget] = useState<AdminInboxItem | null>(null);
@@ -313,6 +315,29 @@ export default function Notifications() {
     }
   }, [handleTarget, handleReason, loadInbox]);
 
+  // R3：管理待办行展开——完整内容+关联对象+超管处理结果（staff 只读视角的"查看"目标）
+  const adminExpandContent = (r: AdminInboxItem) => {
+    const meta = ADMIN_REF_ROUTE[r.ref_type];
+    const label = meta ? { refund_request: "退款申请", withdrawal_request: "退会申请", transfer: "权益转让", activity: "活动" }[r.ref_type] ?? r.ref_type : r.ref_type;
+    return (
+      <div style={{ padding: "4px 8px 8px" }}>
+        <div style={{ color: "rgba(0,0,0,0.75)" }}>
+          <Typography.Text>完整内容：{r.content}</Typography.Text>
+        </div>
+        <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
+          <Tag color="blue">{label}#{r.ref_id}</Tag>
+          <span style={{ color: "rgba(0,0,0,0.45)" }}>
+            {r.effective_status === "done" && r.handled_by_name
+              ? `超管 ${r.handled_by_name} 已处理`
+              : r.effective_status === "invalid"
+                ? r.status_text
+                : "待超管处理"}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   const expandContent = useMemo(
     () => (r: AdminNotification) => {
       const meta = REF_META[r.ref_type];
@@ -389,12 +414,28 @@ export default function Notifications() {
             : meta.path
           : undefined;
         // T20g：staff 只读视角——去处理改"查看"、隐藏"标记已处理"（权限矩阵后端不动）
+        // R3（#5）：staff"查看"=行展开详情（不跳退款中心——staff 无 audit.view，
+        // 跨页即 403 风暴）；超管"查看"保持跳退款中心
         const readOnly = inboxReadOnly;
         return (
           <span style={{ display: "inline-flex", gap: 8 }}>
-            {route && (
+            {route && !readOnly && (
               <Button size="small" type="link" icon={<LinkOutlined />} onClick={() => navigate(route)}>
-                {r.effective_status === "pending" && !readOnly ? "去处理" : "查看"}
+                {r.effective_status === "pending" ? "去处理" : "查看"}
+              </Button>
+            )}
+            {readOnly && (
+              <Button
+                size="small"
+                type="link"
+                icon={<LinkOutlined />}
+                onClick={() =>
+                  setInboxExpanded((prev) =>
+                    prev.includes(r.id) ? prev.filter((k) => k !== r.id) : [...prev, r.id]
+                  )
+                }
+              >
+                {inboxExpanded.includes(r.id) ? "收起" : "查看"}
               </Button>
             )}
             {r.effective_status === "pending" && !readOnly && (
@@ -583,6 +624,11 @@ export default function Notifications() {
           ),
         }}
         pagination={false}
+        expandable={{
+          expandedRowRender: adminExpandContent,
+          expandedRowKeys: inboxExpanded,
+          onExpandedRowsChange: (keys) => setInboxExpanded([...keys]),
+        }}
         onRow={(r) => {
           if (r.effective_status === "pending") return { style: { background: "#fff7e6" } };
           if (r.linkage) return { style: { background: "#fafafa" } }; // T20d：联动单灰行
