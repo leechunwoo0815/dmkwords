@@ -177,6 +177,8 @@ export interface TodoCounts {
   activity_batch_refund: number;
   order_pending_manual: number;
   admin_total: number;
+  /** T1：全体家长通知未读数（胶囊兜底全局源，与视角无关） */
+  parent_unread: number;
 }
 
 export function apiTodoCounts(): Promise<TodoCounts> {

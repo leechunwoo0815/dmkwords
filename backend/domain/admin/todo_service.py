@@ -367,7 +367,19 @@ class AdminTodoService:
             "activity_batch_refund": 0,
             "order_pending_manual": 0,
             "admin_total": 0,
+            # T1（计数同源第 6 案）：家长通知未读全量数——胶囊兜底数据源，
+            # 与视角无关（家长 tab loadParent 的筛选口径落地后本地覆盖，双源同值）
+            "parent_unread": 0,
         }
+        # 家长未读数对所有能进通知中心的角色开放（导航感知，不挂权限分支）
+        from backend.common.notification_models import Notification
+
+        counts["parent_unread"] = (
+            self.db.query(func.count(Notification.id))
+            .filter(Notification.read_at.is_(None), Notification.is_deleted == 0)
+            .scalar()
+            or 0
+        )
         if admin.role == AdminUser.ROLE_SUPER_ADMIN:
             all_rows = (
                 self.db.query(AdminNotification).filter(AdminNotification.is_deleted == 0).all()

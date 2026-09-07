@@ -143,6 +143,10 @@ export default function Notifications() {
   const [items, setItems] = useState<AdminNotification[]>([]);
   const [total, setTotal] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
+  // T1（计数同源第 6 案）：loadParent 仅 box=parent 时跑——默认 admin 视角下
+  // unreadCount 恒 0（假 0 违 U10）。胶囊兜底用 todo-counts 的 parent_unread
+  // 全局数（与视角无关）；loadParent 落地后本地覆盖（筛选口径优先，双源同值）
+  const [parentLoaded, setParentLoaded] = useState(false);
   const [allCount, setAllCount] = useState(0);
   const [loading, setLoading] = useState(false);
   // 管理待办（WM13）
@@ -189,6 +193,7 @@ export default function Notifications() {
       setItems(data.items);
       setTotal(data.total);
       setUnreadCount(data.unread);
+      setParentLoaded(true);
       setAllCount(data.all_count);
     } catch (e) {
       message.error((e as Error).message);
@@ -668,7 +673,7 @@ export default function Notifications() {
             label: (
               <>
                 家长通知（未读{" "}
-                {unreadCount > 0 ? (
+                {(parentLoaded ? unreadCount : (todoCounts?.parent_unread ?? 0)) > 0 ? (
                   <span
                     style={{
                       background: "#ff4d4f",
@@ -677,10 +682,10 @@ export default function Notifications() {
                       padding: "0 6px",
                     }}
                   >
-                    {unreadCount}
+                    {parentLoaded ? unreadCount : (todoCounts?.parent_unread ?? 0)}
                   </span>
                 ) : (
-                  unreadCount
+                  parentLoaded ? unreadCount : (todoCounts?.parent_unread ?? 0)
                 )}
                 ）
               </>
