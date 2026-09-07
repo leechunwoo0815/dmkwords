@@ -88,9 +88,11 @@ export default function DepositManage() {
           onSearch={(v) => { setKeyword(v); setPage(1); }}
         />
         <Select
-          placeholder="押金状态" allowClear style={{ width: 130 }} value={status}
+          placeholder="押金状态" style={{ width: 130 }} value={status}
           onChange={(v) => { setStatus(v); setPage(1); }}
-          options={Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))}
+          // R9 sweep：押金状态筛选补显式「全部」（A4 口径，替 allowClear）
+          options={[{ value: "", label: "全部" },
+            ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))]}
         />
       </Space>
 

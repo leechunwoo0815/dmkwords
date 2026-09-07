@@ -23,6 +23,15 @@ const TYPE_OPTIONS = [
   { value: "parent_child", label: "亲子活动" },
 ];
 
+// R9（A4 第三犯修正）：筛选用途与表单用途分离——筛选头插「全部」空串选项
+// （A4/B7 显式口径，替 allowClear）；表单创建必选真实类型不动
+const TYPE_FILTER_OPTIONS = [{ value: "", label: "全部" }, ...TYPE_OPTIONS];
+const STATUS_FILTER_OPTIONS = [
+  { value: "", label: "全部" },
+  { value: "published", label: "已发布" },
+  { value: "cancelled", label: "已取消" },
+];
+
 const STATUS_LABEL: Record<string, string> = {
   pending_payment: "待收款", enrolled: "已报名", checked_in: "已签到",
   cancelled: "已取消", refund_pending: "退款待审", refunded: "已退款",
@@ -132,17 +141,14 @@ export default function ActivityManage() {
           placeholder="按活动标题搜索" style={{ width: 220 }} allowClear
           onSearch={(v) => setKeyword(v)}
         />
+        {/* R9：显式「全部」选项（A4/B7 口径），替 allowClear */}
         <Select
-          placeholder="全部类型" style={{ width: 140 }} allowClear value={filterType || undefined}
-          onChange={(v) => setFilterType(v ?? "")} options={TYPE_OPTIONS}
+          style={{ width: 140 }} value={filterType}
+          onChange={(v) => { setFilterType(v); activityPg.setPage(1); }} options={TYPE_FILTER_OPTIONS}
         />
         <Select
-          placeholder="全部状态" style={{ width: 120 }} allowClear value={filterStatus || undefined}
-          onChange={(v) => setFilterStatus(v ?? "")}
-          options={[
-            { value: "published", label: "已发布" },
-            { value: "cancelled", label: "已取消" },
-          ]}
+          style={{ width: 120 }} value={filterStatus}
+          onChange={(v) => { setFilterStatus(v); activityPg.setPage(1); }} options={STATUS_FILTER_OPTIONS}
         />
       </Space>
 
