@@ -58,8 +58,13 @@
       </button>
     </block>
     <block wx:elif="{{activity.my_enrollment.status === 'enrolled'}}">
-      <button class="btn-outline" bindtap="onCancel">取消报名</button>
-      <button class="btn-primary" bindtap="onRefund" wx:if="{{activity.fee !== '0.00'}}">申请退款</button>
+      <!-- T5（UX）：一屏一主操作，按 fee 二分——付费走退款链（按钮文案=用户语义
+           原话"取消报名并申请退款"），免费直接取消；后端不变（两链已有）。
+           refund_pending 态由 T4 枚举块显示"退款审核中" disabled -->
+      <button class="btn-primary" bindtap="onRefund" wx:if="{{activity.fee !== '0.00'}}">
+        取消报名并申请退款
+      </button>
+      <button class="btn-outline" bindtap="onCancel" wx:else>取消报名</button>
     </block>
     <block wx:elif="{{activity.my_enrollment.status === 'pending_payment'}}">
       <button class="btn-primary" disabled>待馆员确认收款（名额已保留）</button>
