@@ -807,7 +807,17 @@ export default function MemberManage() {
               await apiUploadVoucher(confirmOrder.id, fd);
             }
             await apiConfirmPayment(confirmOrder.id, { pay_method: v.pay_method, remark: v.remark ?? "" });
-            message.success("收款确认成功，会员权益已开通");
+            // S2（#2）：toast 按 order_type 分文案——"会员权益已开通"仅适用会员费单
+            const CONFIRM_TOAST: Record<string, string> = {
+              observation_fee: "收款确认成功，观察期会员权益已开通",
+              formal_fee: "收款确认成功，年费会员权益已开通",
+              first_activity_fee: "收款确认成功，首场活动费已确认",
+              deposit: "收款确认成功，押金已入账",
+              deposit_supplement: "收款确认成功，押金补缴已入账",
+              activity_fee: "收款确认成功，活动费已确认",
+              custom: "收款确认成功，款项已确认",
+            };
+            message.success(CONFIRM_TOAST[confirmOrder.order_type] ?? "收款确认成功");
             setConfirmOrder(null);
             setVoucherFile([]);
             loadOrders(orderPg.page);

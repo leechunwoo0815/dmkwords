@@ -34,6 +34,8 @@ export default function Layout() {
   }, [location.pathname]);
   // 徽标计数 = 管理待办全部待处理（与通知中心管理待办 tab 同口径）；
   // 拉取失败或未拉到 → 不渲染徽标（U10 禁假 0），count=0 时 Badge 自动隐藏
+  // S1 分工表（计数同源第 5 案）：侧边栏"通知中心"徽标=管理待办数（要干活的活），
+  // 家长通知未读在通知中心家长 tab 胶囊展示——两数语义各归各，本徽标不含未读
   const badgeCount = failed || !counts ? 0 : counts.admin_total;
   const memberBadge = failed || !counts ? 0 : (counts.order_pending_manual ?? 0); // T20e #3
   // R6（#4）：退款中心徽标=退款待审+转让待审（退会不计——用户口径 20260907）

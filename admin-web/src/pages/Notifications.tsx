@@ -660,7 +660,33 @@ export default function Notifications() {
         activeKey={box}
         onChange={changeBox}
         items={[
-          { key: "parent", label: `家长通知（未读 ${unreadCount}）`, children: parentPanel },
+          {
+            key: "parent",
+            // S1（计数同源第 5 案·分工表）：侧边栏徽标=管理待办（干活优先级）｜
+            // tab 胶囊=各自域内计数（本 tab=家长未读，管理待办 tab=待处理数）——
+            // 两个真实数各归各，禁止互相冒充（教训 E-20260901-03 第 5 案）
+            label: (
+              <>
+                家长通知（未读{" "}
+                {unreadCount > 0 ? (
+                  <span
+                    style={{
+                      background: "#ff4d4f",
+                      color: "#fff",
+                      borderRadius: 10,
+                      padding: "0 6px",
+                    }}
+                  >
+                    {unreadCount}
+                  </span>
+                ) : (
+                  unreadCount
+                )}
+                ）
+              </>
+            ),
+            children: parentPanel,
+          },
           { key: "admin", label: adminTabLabel, children: adminPanel },
         ]}
       />
