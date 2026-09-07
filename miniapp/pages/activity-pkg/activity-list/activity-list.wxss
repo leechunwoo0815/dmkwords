@@ -239,3 +239,11 @@
 .tab.active::after {
   display: none;
 }
+
+/* T45：活动卡片封面图（banner 区有 cover_url 时显图） */
+.activity-banner-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}

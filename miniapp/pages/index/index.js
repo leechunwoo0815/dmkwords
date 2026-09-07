@@ -27,6 +27,8 @@ Page({
     reservationCount: 0,
     // 今日推荐（真实书目，横滑）
     recommend: [],
+    // T45（FEAT-082）：活动轮播位（有封面未开始 ≤5）
+    carousel: [],
   },
 
   onShow() {
@@ -59,6 +61,23 @@ Page({
     this.loadContinue(child.id)
     this.loadBadges(child.id)
     this.loadRecommend()
+    this.loadCarousel()
+  },
+
+  goActivityDetail(e) {
+    const id = e.currentTarget.dataset.id
+    const c = session.getCurrentChild()
+    if (id) {
+      const childParam = c ? `&child_id=${c.id}` : ''
+      wx.navigateTo({ url: `/pages/activity-pkg/activity-detail/activity-detail?id=${id}${childParam}` })
+    }
+  },
+
+  async loadCarousel() {
+    try {
+      const res = await api.activityCarousel()
+      this.setData({ carousel: res.items || [] })
+    } catch (e) { /* 轮播失败静默（非关键路径） */ }
   },
 
   async loadCheckin(childId) {

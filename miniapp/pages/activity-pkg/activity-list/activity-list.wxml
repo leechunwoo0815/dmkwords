@@ -19,6 +19,8 @@
     <view class="activity-list">
       <view wx:for="{{activities}}" wx:key="id" class="activity-card" data-id="{{item.id}}" bindtap="goDetail">
         <view class="activity-banner banner-{{index % 3}}">
+          <!-- T45：有封面显封面图，无封面保持渐变占位 -->
+          <image wx:if="{{item.cover_url}}" src="{{item.cover_url}}" mode="aspectFill" class="activity-banner-img" />
           <text class="activity-banner-text">{{item.fee_display}}</text>
         </view>
         <view class="activity-body">

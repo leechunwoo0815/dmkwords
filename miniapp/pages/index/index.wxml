@@ -18,6 +18,20 @@
     <text>🏠 还没有孩子档案，请到店建档</text>
   </view>
 
+  <!-- T45（FEAT-082）：活动轮播位（有封面且未开始的活动，点击进活动中心） -->
+  <swiper wx:if="{{carousel.length}}" class="activity-carousel" autoplay interval="4000" circular
+    indicator-dots indicator-color="rgba(255,255,255,0.4)" indicator-active-color="#ffffff">
+    <swiper-item wx:for="{{carousel}}" wx:key="id">
+      <view class="carousel-item" data-id="{{item.id}}" bindtap="goActivityDetail">
+        <image src="{{item.cover_url}}" mode="aspectFill" class="carousel-img" />
+        <view class="carousel-caption">
+          <text class="carousel-title">{{item.title}}</text>
+          <text class="carousel-sub">{{item.start_at}}</text>
+        </view>
+      </view>
+    </swiper-item>
+  </swiper>
+
   <!-- 多孩切换 -->
   <view wx:if="{{children.length > 1}}" class="child-chips">
     <view wx:for="{{children}}" wx:key="id"
