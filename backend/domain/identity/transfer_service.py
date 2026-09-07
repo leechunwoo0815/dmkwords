@@ -39,7 +39,13 @@ class TransferService:
         target: Child,
         exclude_transfer_id: int | None = None,
     ) -> list[dict]:
-        """16 项前置条件；exclude_transfer_id 用于审核二次校验（排除本单自身造成的状态）。"""
+        """转让前置条件（R-303）。
+
+        T42 对照实况：R-303 概括的 14 个语义项合并实现为 12 检查（无借阅/逾期
+        合"图书已全部归还"；遗失/损坏/赔偿合"无未结清赔偿款"；进行中退会/退款/
+        转让合"没有进行中的申请"）+ 2 项加固（同家长前提/无进行中预约）——
+        原注释自称 16 项系虚标，已修正；对照表见任务包目录 27-M2 对照表。
+        exclude_transfer_id 用于审核二次校验（排除本单自身造成的状态）。"""
         skip_lock_checks = exclude_transfer_id is not None
         checks: list[tuple[str, bool]] = []
 
