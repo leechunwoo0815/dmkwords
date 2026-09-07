@@ -36,9 +36,15 @@ Page({
   },
 
   onLoad(options) {
+    // F-L19：入口改传 book_id（整对象进 URL 长描述白屏风险）——旧 ?book= 对象
+    // 参数保留兼容（渐进：无本地数据时骨架态，loadDetail 拉到即渲染）
     let book = {}
-    try { book = JSON.parse(decodeURIComponent(options.book || '{}')) } catch (e) { /* ignore */ }
-    if (!book.id && book.book_id) book.id = Number(book.book_id)
+    if (options.book_id) {
+      book = { id: Number(options.book_id) }
+    } else {
+      try { book = JSON.parse(decodeURIComponent(options.book || '{}')) } catch (e) { /* ignore */ }
+      if (!book.id && book.book_id) book.id = Number(book.book_id)
+    }
     book = media.formatBook(book)
     const childId = options.child_id ? Number(options.child_id) : null
     this.setData({

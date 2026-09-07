@@ -156,8 +156,9 @@ Page({
     const book = e.currentTarget.dataset.book
     const c = this.data.currentChild
     if (!book) return
+    // F-L19：整对象进 URL 改传 id
     wx.navigateTo({
-      url: `/pages/reading-pkg/book-detail/book-detail?book=${encodeURIComponent(JSON.stringify(book))}${c ? `&child_id=${c.id}` : ''}`,
+      url: `/pages/reading-pkg/book-detail/book-detail?book_id=${book.book_id ?? book.id}${c ? `&child_id=${c.id}` : ''}`,
     })
   },
   goMoreBooks() { wx.switchTab({ url: '/pages/books/books' }) },

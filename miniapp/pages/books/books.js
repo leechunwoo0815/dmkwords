@@ -166,8 +166,9 @@ Page({
     const book = e.currentTarget.dataset.book
     const child = session.getCurrentChild()
     const childParam = child ? `&child_id=${child.id}&child_name=${encodeURIComponent(child.name)}` : ''
+    // F-L19：整对象进 URL 改传 id（长描述 encodeURIComponent 超长→白屏风险）
     wx.navigateTo({
-      url: `/pages/reading-pkg/book-detail/book-detail?book=${encodeURIComponent(JSON.stringify(book))}${childParam}`,
+      url: `/pages/reading-pkg/book-detail/book-detail?book_id=${book.book_id ?? book.id}${childParam}`,
     })
   },
 })

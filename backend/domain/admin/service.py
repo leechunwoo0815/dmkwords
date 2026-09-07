@@ -39,7 +39,8 @@ STAFF_PERMISSIONS = [
     "book.manage",
     "borrow.operate",
     "member.manage",
-    "activity.manage",
+    # F-L9：activity.manage 死码移除（活动端点实挂 member.manage——R2/T3 沿用；
+    # 本码自建库起从未被任何 require_perm 检查，rg 全库零命中）
     "quiz.manage",
     "audio.manage",
     "dashboard.view",

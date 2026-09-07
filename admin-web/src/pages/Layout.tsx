@@ -141,7 +141,9 @@ export default function Layout() {
       perm: "dashboard.view",
     },
     { key: "/tasks", icon: <ScheduleOutlined />, label: "任务看板", perm: "dashboard.view" },
-    { key: "/staff", icon: <UserOutlined />, label: "员工管理", perm: "staff.manage" },
+    // F-L9：staff.manage 是后端权限目录不存在的幽灵码——员工管理=超管专属，
+    // 换既有超管专属码 audit.view（STAFF_PERMISSIONS 无此码=staff 永远隐藏，语义不变）
+    { key: "/staff", icon: <UserOutlined />, label: "员工管理", perm: "audit.view" },
     { key: "/configs", icon: <SettingOutlined />, label: "系统配置", perm: "config.view" },
     { key: "/audit-logs", icon: <AuditOutlined />, label: "审计日志", perm: "audit.view" },
   ]
