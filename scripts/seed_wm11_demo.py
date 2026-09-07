@@ -721,6 +721,55 @@ def _ensure_demo_wm3_states(db: Session) -> None:
     print("c WM3 异常态演示：观察/待评估/过期孩 + 待确认订单", flush=True)
 
 
+def _ensure_demo_activity(db: Session) -> None:
+    """T47-2（gate p0batch4 核验首战命中）：活动演示造数——此前 seed 从不含活动，
+    基线 1 系 WM13 验收时手动创建，T40 BDD 清库后永久丢失。补幂等造数：
+    付费活动（PUBLISHED 未开始，演示家长孩子可报名动线）+ 免费（轮播无封面占位）。"""
+    from backend.domain.activity.models import Activity
+
+    now = datetime.now()
+    start = now + timedelta(days=3)
+    a1 = (
+        db.query(Activity)
+        .filter(Activity.title == "周末英文绘本读书会（演示）", Activity.is_deleted == 0)
+        .first()
+    )
+    if not a1:
+        db.add(
+            Activity(
+                title="周末英文绘本读书会（演示）",
+                activity_type="book_club",
+                start_at=start,
+                location="馆内一层阅读区",
+                max_quota=20,
+                fee=Decimal("50"),
+                description="WM13 演示动线：报名→收款确认→签到→退款全链可复验。",
+                member_only=False,
+                status=Activity.STATUS_PUBLISHED,
+            )
+        )
+    a2 = (
+        db.query(Activity)
+        .filter(Activity.title == "亲子共读体验课（演示）", Activity.is_deleted == 0)
+        .first()
+    )
+    if not a2:
+        db.add(
+            Activity(
+                title="亲子共读体验课（演示）",
+                activity_type="parent_child",
+                start_at=start + timedelta(days=1),
+                location="馆内二层活动室",
+                max_quota=15,
+                fee=Decimal("0"),
+                description="免费活动演示（家长端直接报名，无收款单）。",
+                member_only=False,
+                status=Activity.STATUS_PUBLISHED,
+            )
+        )
+    db.flush()
+
+
 def _ensure_demo_wm13_states(db: Session) -> None:
     """WM13 演示数据（幂等）：1 待审退款 + 1 待审转让——走真实 service 链路（禁直改 DB）。
 
@@ -827,6 +876,7 @@ def seed() -> None:
             _ensure_demo_growth(db, demo_child)
             _ensure_demo_quiz_journey(db, demo_child)
             _ensure_demo_fav_reservation(db, demo_child)
+        _ensure_demo_activity(db)
         _ensure_demo_wm3_states(db)
         _ensure_demo_wm13_states(db)
         now = datetime.now()
