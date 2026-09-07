@@ -162,6 +162,11 @@ module.exports = {
   removeFavorite(bookId, childId) {
     return req.del(`/api/miniapp/favorites/${bookId}`, null, { params: { child_id: childId } })
   },
+  // T43（U2）：书架角标批量状态（3 次 IN 查询禁 N+1）
+  quizStatusBatch(childId, bookIds) {
+    return req.get('/api/miniapp/quiz/status-batch', null, { params: { child_id: childId, book_ids: bookIds.join(',') } })
+  },
+
   currentBorrows(childId) {
     return req.get('/api/miniapp/borrows', null, { params: { child_id: childId } })
   },

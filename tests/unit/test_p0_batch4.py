@@ -215,3 +215,52 @@ def test_t41_deposit_checked(client: TestClient):
         headers=h,
     )
     assert r.status_code == 422, f"押金退款未还书应 422，实 {r.status_code} {r.text[:120]} = RED"
+
+
+# ---------- T43：书架角标批量接口（U2——一次 IN 查询禁 N+1） ----------
+
+
+def test_t43_quiz_status_batch(client: TestClient):
+    """修复前：接口不存在 = RED。3 书三态一次返回（行为断言）。"""
+    from datetime import datetime
+
+    from backend.database import get_session
+    from backend.domain.catalog.models import Book
+    from backend.domain.growth.models import QuizAttempt, WordsLedger
+    from backend.domain.reading.models import ReadingProgress
+
+    h = _h(client)
+    p, c, mini = _family(client, h, "13981060001", "角标孩")
+    with get_session() as db:
+        books = []
+        for i in range(3):
+            b = Book(title=f"角标书{i}", isbn=f"97810980000{i:02d}", is_deleted=0)
+            db.add(b)
+            books.append(b)
+        db.flush()
+        b1, b2, b3 = [b.id for b in books]
+        # b1：passed（finished+词账）；b2：available（finished 无词账）；b3：locked
+        db.add(ReadingProgress(child_id=c["id"], book_id=b1, finished=1))
+        db.add(ReadingProgress(child_id=c["id"], book_id=b2, finished=1))
+        db.add(WordsLedger(child_id=c["id"], book_id=b1, word_count=10))
+        db.add(
+            QuizAttempt(
+                child_id=c["id"],
+                book_id=b1,
+                score=9,
+                total_questions=10,
+            )
+        )
+        db.commit()
+
+    r = client.get(
+        "/api/miniapp/quiz/status-batch",
+        params={"child_id": c["id"], "book_ids": f"{b1},{b2},{b3}"},
+        headers=mini,
+    )
+    assert r.status_code == 200, r.text
+    data = {x["book_id"]: x for x in r.json()["items"]}
+    assert data[b1]["status"] == "passed", f"实 {data}"
+    assert data[b1]["best_percent"] == 90
+    assert data[b2]["status"] == "available"
+    assert data[b3]["status"] == "locked"

@@ -136,3 +136,21 @@
   padding: 14rpx 48rpx;
 }
 .loading-tip { text-align: center; color: var(--muted); font-size: 24rpx; padding: 40rpx 0; }
+
+/* T43（U2）：passed 金色 🏆 角标 */
+.asset-cover-wrap {
+  position: relative;
+}
+.trophy-badge {
+  position: absolute;
+  top: 6rpx;
+  right: 6rpx;
+  width: 44rpx;
+  height: 44rpx;
+  line-height: 44rpx;
+  text-align: center;
+  font-size: 28rpx;
+  background: rgba(255, 215, 0, 0.92);
+  border-radius: 50%;
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.25);
+}

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import Field
 from sqlalchemy.orm import Session
 
@@ -22,6 +22,21 @@ router = APIRouter(tags=["growth-miniapp"])
 class QuizSubmitRequest(BaseSchema):
     child_id: int
     answers: list[str] = Field(..., min_length=1)
+
+
+@router.get("/quiz/status-batch")
+def quiz_status_batch(
+    child_id: int,
+    book_ids: str,
+    auth: Any = Depends(get_current_parent),
+):
+    """T43（U2）：书架角标批量状态（3 次 IN 查询禁 N+1；book_ids 逗号分隔≤50）。"""
+    parent, db = auth
+    child = child_of_parent(db, parent.id, child_id)
+    ids = [int(x) for x in book_ids.split(",") if x.strip().isdigit()]
+    if not ids or len(ids) > 50:
+        raise HTTPException(status_code=422, detail="book_ids 非法（1-50 个数字）")
+    return {"items": QuizService(db).quiz_status_batch(child, ids)}
 
 
 @router.get("/quiz/{book_id}")

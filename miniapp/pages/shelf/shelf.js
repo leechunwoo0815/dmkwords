@@ -48,15 +48,29 @@ Page({
         api.listFavorites(this.data.childId).catch(() => []),
         api.listReservations(this.data.childId).catch(() => []),
       ])
+      // T43（U2）：在借+收藏书批量拉测验状态——passed 挂金色 🏆 角标
+      let passedIds = []
+      const shelfBooks = [...(borrows || []), ...(favorites || [])]
+      const bidList = [...new Set(shelfBooks.map((b) => b.book_id).filter(Boolean))]
+      if (bidList.length) {
+        const batch = await api
+          .quizStatusBatch(this.data.childId, bidList)
+          .catch(() => ({ items: [] }))
+        passedIds = (batch.items || []).filter((x) => x.status === 'passed').map((x) => x.book_id)
+      }
       this.setData({
         borrows: (borrows || []).map((b) => ({
           ...media.formatBook(b),
           record_id: b.record_id,
           dueText: this.dueText(b),
           overdue: !!b.overdue,
+          passed: passedIds.includes(b.book_id),
         })),
         borrowCount: (borrows || []).length,
-        favorites: media.formatBooks(favorites || []),
+        favorites: media.formatBooks(favorites || []).map((b) => ({
+          ...b,
+          passed: passedIds.includes(b.book_id),
+        })),
         favCount: (favorites || []).length,
         reservations: (reservations || []).map((r) => ({
           ...media.formatBook(r),

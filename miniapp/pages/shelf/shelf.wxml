@@ -15,8 +15,12 @@
   <!-- 在借中 -->
   <block wx:if="{{tab === 'borrows'}}">
     <view wx:for="{{borrows}}" wx:key="record_id" class="asset-card">
-      <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
-      <view wx:else class="asset-cover asset-cover-fb">📕</view>
+      <view class="asset-cover-wrap">
+        <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
+        <view wx:else class="asset-cover asset-cover-fb">📕</view>
+        <!-- T43（U2）：passed 金色 🏆 角标 -->
+        <view wx:if="{{item.passed}}" class="trophy-badge">🏆</view>
+      </view>
       <view class="asset-info">
         <view class="asset-title">{{item.title}}</view>
         <view class="asset-meta">{{item.author}}</view>
@@ -36,8 +40,12 @@
   <!-- 收藏 -->
   <block wx:if="{{tab === 'favorites'}}">
     <view wx:for="{{favorites}}" wx:key="id" class="asset-card">
-      <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
-      <view wx:else class="asset-cover asset-cover-fb">📕</view>
+      <view class="asset-cover-wrap">
+        <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
+        <view wx:else class="asset-cover asset-cover-fb">📕</view>
+        <!-- T43（U2）：passed 金色 🏆 角标 -->
+        <view wx:if="{{item.passed}}" class="trophy-badge">🏆</view>
+      </view>
       <view class="asset-info">
         <view class="asset-title">{{item.title}}</view>
         <view class="asset-meta">{{item.author}}</view>
@@ -60,8 +68,12 @@
   <!-- 预约中 -->
   <block wx:if="{{tab === 'reservations'}}">
     <view wx:for="{{reservations}}" wx:key="id" class="asset-card">
-      <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
-      <view wx:else class="asset-cover asset-cover-fb">📕</view>
+      <view class="asset-cover-wrap">
+        <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
+        <view wx:else class="asset-cover asset-cover-fb">📕</view>
+        <!-- T43（U2）：passed 金色 🏆 角标 -->
+        <view wx:if="{{item.passed}}" class="trophy-badge">🏆</view>
+      </view>
       <view class="asset-info">
         <view class="asset-title">{{item.title}}</view>
         <view class="asset-meta">{{item.author}}</view>
