@@ -34,7 +34,9 @@ def quiz_status_batch(
     parent, db = auth
     child = child_of_parent(db, parent.id, child_id)
     ids = [int(x) for x in book_ids.split(",") if x.strip().isdigit()]
-    return {"items": QuizService(db).quiz_status_batch(child, ids)}
+    from backend.domain.growth.quiz_batch import quiz_status_batch
+
+    return {"items": quiz_status_batch(db, child, ids)}
 
 
 @router.get("/quiz/{book_id}")

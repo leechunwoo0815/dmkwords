@@ -122,7 +122,7 @@ def step_given_two_enrolled(ctx):
         ctx.h = _h(ctx.client)
         ctx.activity = _mk_activity(ctx)
     ctx.families = []
-    for i, name in enumerate(("甲孩", "乙孩")):
+    for name in ("甲孩", "乙孩"):
         p, c, mini = _family(ctx.client, ctx.h, _next_phone(), name=name)
         ctx.mini = mini  # _enroll 读 ctx.mini
         r = _enroll(ctx, c["id"], ctx.activity["id"])

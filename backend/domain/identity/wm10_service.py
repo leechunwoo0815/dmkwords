@@ -465,8 +465,7 @@ class RefundService:
         # 且不翻状态（保持 approved，处理完可再执行——M2 裁定：校验失败不流转）。
         # 豁免：remark 含「人工放行:」冒号前缀 + 超管（Q5 批复——裸四字可能出现在
         # 正常描述里如"家长要求人工放行被拒"），审计记 manual_override 布尔字段。
-        from backend.domain.admin.models import AdminUser
-
+        # 超管判定用字面量（"业务域不反向依赖 admin"架构纪律——AdminUser 常量在 admin 域）
         needs_check = False
         if req.kind == RefundRequest.KIND_ORDER and req.order_id:
             _o = self.db.query(Order).filter(Order.id == req.order_id).first()
@@ -474,9 +473,7 @@ class RefundService:
         elif req.kind == RefundRequest.KIND_DEPOSIT and req.deposit_id:
             needs_check = True
         manual_override = bool(
-            needs_check
-            and "人工放行:" in (remark or "")
-            and admin.role == AdminUser.ROLE_SUPER_ADMIN
+            needs_check and "人工放行:" in (remark or "") and admin.role == "superadmin"
         )
         if needs_check and not manual_override:
             from backend.domain.identity.wm10_withdrawal_service import outstanding_obligations
