@@ -64,8 +64,16 @@
     <block wx:elif="{{activity.my_enrollment.status === 'pending_payment'}}">
       <button class="btn-primary" disabled>待馆员确认收款（名额已保留）</button>
     </block>
+    <!-- T4（枚举错配老毛病）：refund_pending/cancelled 原落 wx:else 兜底裸输出
+         英文 status——枚举补齐+兜底防御文案（与 js STATUS_TEXT 表对齐） -->
+    <block wx:elif="{{activity.my_enrollment.status === 'refund_pending'}}">
+      <button class="btn-primary" disabled>退款审核中，请耐心等待</button>
+    </block>
+    <block wx:elif="{{activity.my_enrollment.status === 'cancelled'}}">
+      <button class="btn-primary" disabled>已取消</button>
+    </block>
     <block wx:else>
-      <button class="btn-primary" disabled>状态：{{activity.my_enrollment.status}}</button>
+      <button class="btn-primary" disabled>状态更新中</button>
     </block>
   </view>
 </view>

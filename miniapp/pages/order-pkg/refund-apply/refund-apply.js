@@ -34,7 +34,18 @@ Page({
         api.myRefunds(this._childId),
       ])
       this.setData({
-        orders: (orders || []).map((o) => ({ ...o, typeText: TYPE_TEXT[o.order_type] || o.order_type })),
+        // T4 sweep：订单状态兜底裸输出（wxml else 分支）→ statusText 全枚举映射
+        orders: (orders || []).map((o) => ({
+          ...o,
+          typeText: TYPE_TEXT[o.order_type] || o.order_type,
+          statusText:
+            o.status === 'paid' ? '可申请'
+            : o.status === 'refunded' ? '已退款'
+            : o.status === 'pending_payment' ? '待支付'
+            : o.status === 'pending_manual' ? '待确认'
+            : o.status === 'cancelled' ? '已取消'
+            : '状态更新中',
+        })),
         refunds: refunds || [],
         selected: null, preview: null,
       })

@@ -15,7 +15,7 @@
       <view class="info-label">{{item.typeText}}</view>
       <view class="info-value">￥{{item.amount}}</view>
       <view style="font-size:22rpx;color:{{item.status === 'paid' ? 'var(--success)' : 'var(--muted)'}};">
-        {{item.status === 'paid' ? '可申请' : item.status === 'refunded' ? '已退款' : item.status}}
+        {{item.statusText}}
       </view>
     </view>
   </view>
