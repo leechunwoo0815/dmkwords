@@ -227,6 +227,7 @@ class WithdrawalService:
                     "member_status": child.member_status if child else "",
                     "reason": r.reason,
                     "status": r.status,
+                    "source": r.source,
                     "review_remark": r.review_remark,
                     "created_at": str(r.created_at),
                 }

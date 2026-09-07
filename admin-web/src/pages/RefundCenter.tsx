@@ -79,6 +79,10 @@ export default function RefundCenter() {
   } | null>(null);
   const [settlePreview, setSettlePreview] = useState<SettlePreview | null>(null);
   const [settlePreviewError, setSettlePreviewError] = useState(false);
+  // R4（#2）：联动退会单超管"查看详情"——settle-preview 只读复用（X2 数据源）
+  const [linkTarget, setLinkTarget] = useState<WithdrawalItem | null>(null);
+  const [linkSettle, setLinkSettle] = useState<SettlePreview | null>(null);
+  const [linkSettleErr, setLinkSettleErr] = useState(false);
   const [execTarget, setExecTarget] = useState<{
     id: number;
     childName: string;
@@ -300,8 +304,28 @@ export default function RefundCenter() {
                   { title: "审核备注", dataIndex: "review_remark", width: 150, render: (v) => v ?? "—" },
                   { title: "申请时间", dataIndex: "created_at", width: 165, render: (v) => v.replace("T", " ").slice(0, 19) },
                   {
-                    title: "操作", key: "op", width: 260, render: (_, r) => (
-                      r.status === "applying" ? (
+                    title: "操作", key: "op", width: 260, render: (_, r) => {
+                      if (r.status !== "applying") return <span>—</span>;
+                      // R4：联动退会单（退款/转让驱动）灰态语义——超管仅"查看详情"
+                      //（settle-preview 只读，无通过/拒绝）；直接退会单保持审核按钮
+                      if (r.source && r.source !== "normal") {
+                        return (
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              setLinkTarget(r);
+                              setLinkSettle(null);
+                              setLinkSettleErr(false);
+                              apiSettlePreview(r.id)
+                                .then(setLinkSettle)
+                                .catch(() => setLinkSettleErr(true));
+                            }}
+                          >
+                            查看详情
+                          </Button>
+                        );
+                      }
+                      return (
                         <Space>
                           <Button type="primary" size="small" onClick={() => askReview("withdrawal", r.id, true,
                             "通过退会",
@@ -310,8 +334,8 @@ export default function RefundCenter() {
                             "拒绝退会",
                             `${r.child_name}：拒绝后解锁，家长可再次申请`)}>拒绝</Button>
                         </Space>
-                      ) : <span>—</span>
-                    ),
+                      );
+                    },
                   },
                 ]}
                scroll={{ x: "max-content" }}/>
@@ -393,6 +417,38 @@ export default function RefundCenter() {
           rows={2} value={remark} onChange={(e) => setRemark(e.target.value)}
           placeholder={remarkTarget?.approve ? "备注（可选）" : "拒绝原因（必填，家长可见）"}
         />
+      </Modal>
+
+      <Modal
+        title={linkTarget ? `${linkTarget.child_name}·联动退会（随退款自动推进）` : ""}
+        open={!!linkTarget}
+        footer={null}
+        onCancel={() => setLinkTarget(null)}
+      >
+        <Typography.Paragraph type="secondary">
+          该单由退款/转让流程驱动创建，随退款自动推进（无需审核操作）。
+        </Typography.Paragraph>
+        {linkSettleErr ? (
+          <Typography.Text type="warning">结算明细获取失败（该单可能无可退项）</Typography.Text>
+        ) : !linkSettle ? (
+          <Typography.Text type="secondary">结算明细计算中…</Typography.Text>
+        ) : (
+          <div>
+            {linkSettle.items.map((it, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <span>{it.kind === "deposit" ? "押金退款" : `订单 ${it.order_no ?? ""}`}</span>
+                <span style={{ color: "#888" }}>{it.rule}</span>
+                <Typography.Text strong>￥{Number(it.amount).toLocaleString()}</Typography.Text>
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #eee", marginTop: 6, paddingTop: 6 }}>
+              <Typography.Text strong>预估退款合计</Typography.Text>
+              <Typography.Text strong style={{ color: "#cf1322", fontSize: 16 }}>
+                ￥{Number(linkSettle.total).toLocaleString()}
+              </Typography.Text>
+            </div>
+          </div>
+        )}
       </Modal>
 
       <Modal

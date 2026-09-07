@@ -24,6 +24,7 @@ export interface WithdrawalItem {
   member_status: string;
   reason: string;
   status: string;
+  source?: string; // R4：联动判定（refund_linked/transfer_linked≠normal）
   review_remark: string | null;
   created_at: string;
 }
