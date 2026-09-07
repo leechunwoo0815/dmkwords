@@ -216,7 +216,14 @@ export default function RefundCenter() {
             key: "refunds",
             label: (
               <>
-                退款（待审 {pendingRefunds.length}
+                退款（待审{" "}
+                {pendingRefunds.length > 0 ? (
+                  <span style={{ background: "#ff4d4f", color: "#fff", borderRadius: 10, padding: "0 6px" }}>
+                    {pendingRefunds.length}
+                  </span>
+                ) : (
+                  pendingRefunds.length
+                )}
                 {refundExecutable > 0 && (
                   <span style={{ color: "#cf1322", fontWeight: 700 }}>
                     {" · 待执行 "}
@@ -353,7 +360,19 @@ export default function RefundCenter() {
           },
           {
             key: "transfers",
-            label: `转让（待审 ${pendingTransfers.length}）`,
+            label: (
+              <>
+                转让（待审{" "}
+                {pendingTransfers.length > 0 ? (
+              <span style={{ background: "#ff4d4f", color: "#fff", borderRadius: 10, padding: "0 6px" }}>
+                {pendingTransfers.length}
+              </span>
+            ) : (
+              pendingTransfers.length
+            )}
+                ）
+              </>
+            ),
             children: (<>
               <Table<TransferItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
                 rowKey="id"

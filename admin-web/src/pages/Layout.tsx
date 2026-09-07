@@ -36,6 +36,8 @@ export default function Layout() {
   // 拉取失败或未拉到 → 不渲染徽标（U10 禁假 0），count=0 时 Badge 自动隐藏
   const badgeCount = failed || !counts ? 0 : counts.admin_total;
   const memberBadge = failed || !counts ? 0 : (counts.order_pending_manual ?? 0); // T20e #3
+  // R6（#4）：退款中心徽标=退款待审+转让待审（退会不计——用户口径 20260907）
+  const refundCenterBadge = failed || !counts ? 0 : (counts.refund_pending ?? 0) + (counts.transfer_pending ?? 0);
 
   const iconBgMap: Record<string, string> = {
     "/": "#FCD34D",
@@ -93,7 +95,20 @@ export default function Layout() {
     { key: "/reservations", icon: <PushpinOutlined />, label: "预约管理", perm: "borrow.operate" },
     { key: "/growth", icon: <TrophyOutlined />, label: "成长与测验", perm: "member.manage" },
     { key: "/activities", icon: <CalendarOutlined />, label: "线下活动", perm: "member.manage" },
-    { key: "/refund-center", icon: <SafetyCertificateOutlined />, label: "退款中心", perm: "audit.view" },
+    {
+      key: "/refund-center",
+      icon: <SafetyCertificateOutlined />,
+      // R6（#4）：退款中心侧边栏徽标（退款+转让待审之和）
+      label:
+        refundCenterBadge > 0 ? (
+          <Badge count={refundCenterBadge} size="small" offset={[10, 0]}>
+            退款中心
+          </Badge>
+        ) : (
+          "退款中心"
+        ),
+      perm: "audit.view",
+    },
     {
       key: "/notifications",
       icon: <NotificationOutlined />,
