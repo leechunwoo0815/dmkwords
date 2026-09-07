@@ -61,7 +61,9 @@ def test_admin_activity_order_confirm_without_enrollment(client: TestClient):
 
 
 def test_admin_activity_order_free_confirm(client: TestClient):
-    """免费活动单（fee=0）同款分流：confirm 200 纯入账。"""
+    """免费活动单（插修 14 R7 防呆改写：原"免费可造单 confirm 纯入账"前提被
+    产品决策推翻——免费活动无收款单语义，管理端造单 422 防呆硬拦，
+    免费报名走家长端 enroll 即可）。"""
     h = _h(client)
     act = client.post(
         "/api/admin/activities",
@@ -75,15 +77,12 @@ def test_admin_activity_order_free_confirm(client: TestClient):
         headers=h,
     ).json()
     p, c, mini = _family(client, h, "13900030002", "免费活动孩")
-    o = client.post(
+    r = client.post(
         "/api/admin/orders",
         json={"child_id": c["id"], "order_type": "activity_fee", "activity_id": act["id"]},
         headers=h,
-    ).json()
-    r = client.post(
-        f"/api/admin/orders/{o['id']}/confirm-payment", json={"pay_method": "scan"}, headers=h
     )
-    assert r.status_code == 200, f"免费活动单 confirm 应 200，实 {r.status_code} {r.text[:120]}"
+    assert r.status_code == 422, f"免费活动造单应 422 防呆，实 {r.status_code} {r.text[:120]}"
 
 
 def test_parent_enrollment_link_regression(client: TestClient):

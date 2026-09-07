@@ -155,8 +155,7 @@ class OrderService:
             )
             if dup:
                 raise ValidationError(
-                    "该孩子已有此活动的有效报名（待收款/已报名/退款待审），"
-                    "不可重复创建费用订单"
+                    "该孩子已有此活动的有效报名（待收款/已报名/退款待审），不可重复创建费用订单"
                 )
             amount = a.fee
         elif req.order_type == Order.TYPE_CUSTOM:
