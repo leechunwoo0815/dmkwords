@@ -1528,7 +1528,7 @@ export interface paths {
         };
         /**
          * Observation Image
-         * @description 观察期评估报告图片（仅限 observation/ 目录；query token 鉴权）。
+         * @description 观察期评估报告图片（仅限 observation/ 目录；query token 鉴权 + 归属校验）。
          */
         get: operations["observation_image_api_miniapp_observation_images__path__get"];
         put?: never;
@@ -2442,7 +2442,7 @@ export interface paths {
         };
         /**
          * List Reservations
-         * @description 预约管理列表（默认全部；status=active 看锁定中）。
+         * @description 预约管理列表（默认全部；status=active 看锁定中；keyword 模糊搜索）。
          */
         get: operations["list_reservations_api_admin_reservations_get"];
         put?: never;
@@ -2522,7 +2522,7 @@ export interface components {
              * Fee
              * @default 0
              */
-            fee: number;
+            fee: number | string;
             /** Description */
             description?: string | null;
             /**
@@ -3327,6 +3327,10 @@ export interface components {
              * @default
              */
             remark: string;
+            /** Activity Id */
+            activity_id?: number | null;
+            /** Amount */
+            amount?: number | string | null;
         };
         /** OrderRefundRequest */
         OrderRefundRequest: {
@@ -3370,6 +3374,8 @@ export interface components {
             child_name?: string | null;
             /** Parent Name */
             parent_name?: string | null;
+            /** Enrollment Id */
+            enrollment_id?: number | null;
         };
         /** OverdueItemResponse */
         OverdueItemResponse: {
@@ -7343,6 +7349,8 @@ export interface operations {
         parameters: {
             query?: {
                 status?: string | null;
+                keyword?: string | null;
+                activity_type?: string | null;
             };
             header?: never;
             path?: never;
@@ -8808,6 +8816,7 @@ export interface operations {
         parameters: {
             query?: {
                 status?: string | null;
+                keyword?: string | null;
             };
             header?: never;
             path?: never;

@@ -115,6 +115,23 @@ export default function MemberManage() {
   const [loading, setLoading] = useState(false);
   // 订单列表
   const [orders, setOrders] = useState<Order[]>([]);
+  // R10b（插修 14 目视补刀）：通知"去处理"跳订单 tab 行高亮 3 秒——
+  // 锚点=订单行响应的 enrollment_id（通知 ref_id）；时序从数据到达起算
+  // （R5 教训：挂载即起算接口返回前窗口已烧掉）
+  const [orderHighlightId, setOrderHighlightId] = useState<number | null>(
+    () => (readUrl().get("tab") === "orders" && readUrl().get("highlight")
+      ? Number(readUrl().get("highlight"))
+      : null)
+  );
+  const [orderHlArmed, setOrderHlArmed] = useState(false);
+  useEffect(() => {
+    if (!orderHlArmed && tab === "orders" && orders.length) setOrderHlArmed(true);
+  }, [tab, orders, orderHlArmed]);
+  useEffect(() => {
+    if (orderHighlightId === null || !orderHlArmed) return;
+    const t = setTimeout(() => setOrderHighlightId(null), 3000);
+    return () => clearTimeout(t);
+  }, [orderHighlightId, orderHlArmed]);
   const [orderTotal, setOrderTotal] = useState(0);
   const [orderStatus, setOrderStatus] = useState<string | undefined>();
   const [orderKeyword, setOrderKeyword] = useState<string>(() => readUrl().get("okeyword") ?? ""); // WM3-A5
@@ -528,6 +545,7 @@ export default function MemberManage() {
           </Space>
           <Table<Order> locale={{ emptyText: <PaintEmpty character="star" /> }}
             rowKey="id" dataSource={orders} size="middle" loading={orderLoading}
+            rowClassName={(r) => (r.enrollment_id != null && r.enrollment_id === orderHighlightId ? "wm13-highlight-row" : "")}
             pagination={false}
             onChange={(_p, _f, sorter) => {
               const sort = Array.isArray(sorter) ? sorter[0] : sorter;
