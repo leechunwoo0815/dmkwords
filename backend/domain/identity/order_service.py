@@ -131,6 +131,11 @@ class OrderService:
                 raise ValidationError("活动已取消或结束，不能创建活动订单")
             if a.start_at <= datetime.now():
                 raise ValidationError("活动已开始，不能创建活动订单")
+            # T2（20260907）：名额校验前置——管理端造单即占位，满员不可造单（422）
+            from backend.domain.activity.service import ActivityService
+
+            if ActivityService(self.db)._quota_used(a.id) >= a.max_quota:
+                raise ValidationError("活动名额已满，不能创建活动订单")
             amount = a.fee
         elif req.order_type == Order.TYPE_CUSTOM:
             # 自定义单：纯资金流水（不参与会员资格/到期日计算——PRD §3.5.2 边界），
@@ -154,6 +159,24 @@ class OrderService:
         )
         self.db.add(order)
         self.db.flush()
+        if order.order_type == Order.TYPE_ACTIVITY and req.activity_id:
+            # T2（用户裁定推翻插修 11 R2"无报名跳过联动"）：管理端活动单=报名代客创建
+            # ——造单即占位（PENDING_PAYMENT 占名额+入场券），与家长端报名殊途同归：
+            # 确认收款→ENROLLED 转正（on_activity_order_paid 按 order_id 命中）；
+            # 取消→联动释放名额；小程序详情 my_enrollment 即见待收款报名
+            from backend.domain.activity.models import ActivityEnrollment
+            from backend.domain.activity.service import _ticket_code
+
+            self.db.add(
+                ActivityEnrollment(
+                    activity_id=req.activity_id,
+                    child_id=child.id,
+                    order_id=order.id,
+                    ticket_code=_ticket_code(req.activity_id, child.id),
+                    status=ActivityEnrollment.STATUS_PENDING_PAYMENT,
+                )
+            )
+            self.db.flush()
         publish_audit(
             self.db,
             admin=admin,
@@ -478,6 +501,11 @@ class OrderService:
             raise ValidationError(f"订单状态 {order.status} 不可取消")
         order.status = Order.STATUS_CANCELLED
         self.db.flush()
+        # T2：活动单取消联动报名取消+名额回补（此前仅 timeout 清理链联动，手动 cancel 漏）
+        if order.order_type == Order.TYPE_ACTIVITY:
+            from backend.domain.activity.service import ActivityService
+
+            ActivityService(self.db).cancel_enrollment_by_order(order)
         publish_audit(
             self.db,
             admin=admin,
