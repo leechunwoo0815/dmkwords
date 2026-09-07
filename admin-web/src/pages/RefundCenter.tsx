@@ -61,14 +61,21 @@ export default function RefundCenter() {
   const [highlightId, setHighlightId] = useState<number | null>(
     searchParams.get("highlight") ? Number(searchParams.get("highlight")) : null
   );
-  useEffect(() => {
-    if (highlightId === null) return;
-    const t = setTimeout(() => setHighlightId(null), 3000);
-    return () => clearTimeout(t);
-  }, [highlightId]);
+
   const [refunds, setRefunds] = useState<RefundRequestItem[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalItem[]>([]);
   const [transfers, setTransfers] = useState<TransferItem[]>([]);
+  // R5（#3）时序加固：3 秒清除窗口从列表数据到达起算——原实现挂载即起算，
+  // 接口返回前窗口已烧掉，行渲染时 highlightId 已被清（高亮不出现真凶嫌疑）
+  const [hlArmed, setHlArmed] = useState(false);
+  useEffect(() => {
+    if (!hlArmed && (refunds.length || withdrawals.length || transfers.length)) setHlArmed(true);
+  }, [refunds, withdrawals, transfers, hlArmed]);
+  useEffect(() => {
+    if (highlightId === null || !hlArmed) return;
+    const t = setTimeout(() => setHighlightId(null), 3000);
+    return () => clearTimeout(t);
+  }, [highlightId, hlArmed]);
   const [remark, setRemark] = useState("");
   const [remarkTarget, setRemarkTarget] = useState<{
     kind: "refund" | "withdrawal" | "transfer";

@@ -544,8 +544,14 @@ h1, h2, h3, h4, h5, h6,
   animation: paint-float 2.5s ease-in-out infinite;
 }
 
-/* WM13 跳转最后一公里：从通知跳转定位的行高亮（3 秒淡出） */
-.wm13-highlight-row > td {
+/* WM13 跳转最后一公里：从通知跳转定位的行高亮（3 秒淡出）
+   R5 加固：显式对抗 antd hover/斑马纹深层选择器（同 !important 下
+   特异度竞争），并加内描边让高亮即使背景被覆盖也有可见信号 */
+.wm13-highlight-row > td,
+.ant-table-tbody > tr.wm13-highlight-row > td,
+.ant-table-tbody > tr.wm13-highlight-row:hover > td {
   background: #ffe58f !important;
+  background-color: #ffe58f !important;
+  box-shadow: inset 3px 0 0 #faad14;
   transition: background 1.2s ease;
 }
