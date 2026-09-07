@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import Field, field_validator
 from sqlalchemy.orm import Session
 
@@ -51,10 +51,12 @@ class RefundReviewRequest(BaseSchema):
 @router.get("/activities")
 def list_activities(
     status: str | None = None,
+    keyword: str | None = Query(None, max_length=50),
+    activity_type: str | None = None,
     admin: Any = Depends(require_perm("member.manage")),
     db: Session = Depends(get_db),
 ):
-    return ActivityService(db).list_admin(status)
+    return ActivityService(db).list_admin(status, keyword, activity_type)
 
 
 @router.post("/activities")

@@ -35,6 +35,10 @@ const STATUS_COLOR: Record<string, string> = {
 export default function ActivityManage() {
   const { message, modal } = AntdApp.useApp();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
+  // T3：列表三件套——搜索 + 类型/状态筛选（用户泛化纪律：列表清单逻辑全项目一致）
+  const [keyword, setKeyword] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const activityPg = usePaintPagination();
   const [createOpen, setCreateOpen] = useState(false);
@@ -45,11 +49,15 @@ export default function ActivityManage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    apiListActivities()
+    apiListActivities({
+      status: filterStatus || undefined,
+      keyword: keyword.trim() || undefined,
+      activity_type: filterType || undefined,
+    })
       .then(setActivities)
       .catch((e: Error) => message.error(e.message))
       .finally(() => setLoading(false));
-  }, [message]);
+  }, [message, keyword, filterType, filterStatus]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -112,12 +120,29 @@ export default function ActivityManage() {
 
   return (
     <div>
-      <Space style={{ marginBottom: 12 }}>
+      <Space style={{ marginBottom: 12 }} wrap>
         <Button type="primary" onClick={() => setCreateOpen(true)}>发布活动</Button>
         <Input.Search
           placeholder="输入入场券码签到" style={{ width: 260 }} value={signinCode}
           onChange={(e) => setSigninCode(e.target.value)} onSearch={onSignin}
           enterButton="签到"
+        />
+        {/* T3：活动列表三件套——搜索+类型/状态筛选（B7 预约先例同款） */}
+        <Input.Search
+          placeholder="按活动标题搜索" style={{ width: 220 }} allowClear
+          onSearch={(v) => setKeyword(v)}
+        />
+        <Select
+          placeholder="全部类型" style={{ width: 140 }} allowClear value={filterType || undefined}
+          onChange={(v) => setFilterType(v ?? "")} options={TYPE_OPTIONS}
+        />
+        <Select
+          placeholder="全部状态" style={{ width: 120 }} allowClear value={filterStatus || undefined}
+          onChange={(v) => setFilterStatus(v ?? "")}
+          options={[
+            { value: "published", label: "已发布" },
+            { value: "cancelled", label: "已取消" },
+          ]}
         />
       </Space>
 

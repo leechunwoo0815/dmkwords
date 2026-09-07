@@ -170,3 +170,62 @@ def test_t2_full_quota_rejects_422(client: TestClient):
         headers=h,
     )
     assert r2.status_code == 422, f"满员造单应 422，实 {r2.status_code} {r2.text[:100]} = RED"
+
+
+# ---------- T3：活动列表搜索 + 类型/状态筛选（列表三件套泛化纪律） ----------
+
+
+def _mk_activity_typed(client, h, title, activity_type, fee=0, quota=5):
+    from datetime import timedelta
+
+    r = client.post(
+        "/api/admin/activities",
+        json={
+            "title": title,
+            "activity_type": activity_type,
+            "start_at": (datetime.now() + timedelta(hours=72)).isoformat(),
+            "location": "馆内一层",
+            "max_quota": quota,
+            "fee": fee,
+            "description": "T3 筛选测试",
+            "member_only": False,
+        },
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_t3_activity_list_filters(client: TestClient):
+    """修复前：keyword/activity_type 参数被忽略（全量返回）= RED。"""
+    h = _h(client)
+    a1 = _mk_activity_typed(client, h, "绘本共读读书会", "book_club")
+    a2 = _mk_activity_typed(client, h, "亲子户外日", "parent_child")
+    a3 = _mk_activity_typed(client, h, "读书会取消专场", "book_club")
+    rc = client.post(f"/api/admin/activities/{a3['id']}/cancel", headers=h)
+    assert rc.status_code == 200, rc.text
+
+    titles_of = lambda r: [x["title"] for x in r.json()]
+    # keyword 模糊
+    r = client.get("/api/admin/activities", params={"keyword": "亲子"}, headers=h)
+    assert r.status_code == 200, r.text
+    ts = titles_of(r)
+    assert "亲子户外日" in ts and "绘本共读读书会" not in ts, f"keyword 过滤失效：{ts} = RED"
+    # 类型过滤
+    r = client.get("/api/admin/activities", params={"activity_type": "parent_child"}, headers=h)
+    ts = titles_of(r)
+    assert "亲子户外日" in ts and "绘本共读读书会" not in ts, f"类型过滤失效：{ts} = RED"
+    # 状态过滤（cancelled）
+    r = client.get("/api/admin/activities", params={"status": "cancelled"}, headers=h)
+    ts = titles_of(r)
+    assert "读书会取消专场" in ts and "绘本共读读书会" not in ts, f"状态过滤失效：{ts} = RED"
+    # 组合查询回归
+    r = client.get(
+        "/api/admin/activities",
+        params={"keyword": "读书会", "activity_type": "book_club", "status": "published"},
+        headers=h,
+    )
+    ts = titles_of(r)
+    assert "绘本共读读书会" in ts and "亲子户外日" not in ts and "读书会取消专场" not in ts, (
+        f"组合查询失效：{ts} = RED"
+    )

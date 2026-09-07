@@ -38,10 +38,21 @@ class ActivityService:
         self.db = db
 
     # ---------- 查询 ----------
-    def list_admin(self, status: str | None = None) -> list[dict]:
+    def list_admin(
+        self,
+        status: str | None = None,
+        keyword: str | None = None,
+        activity_type: str | None = None,
+    ) -> list[dict]:
+        """T3（20260907）：列表三件套——keyword 标题模糊 + activity_type + status
+        （B7 预约搜索先例同款；组合查询互为 AND）。"""
         q = self.db.query(Activity).filter(Activity.is_deleted == 0)
         if status:
             q = q.filter(Activity.status == status)
+        if keyword:
+            q = q.filter(Activity.title.like(f"%{keyword}%"))
+        if activity_type:
+            q = q.filter(Activity.activity_type == activity_type)
         rows = q.order_by(Activity.start_at.desc()).limit(200).all()
         return [self._activity_view(a, with_quota=True) for a in rows]
 

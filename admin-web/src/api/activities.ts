@@ -46,9 +46,17 @@ export interface CreateActivityBody {
   enroll_deadline?: string;
 }
 
-export function apiListActivities(status?: string): Promise<ActivityItem[]> {
-  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-  return request(`/api/admin/activities${qs}`);
+export function apiListActivities(params?: {
+  status?: string;
+  keyword?: string;
+  activity_type?: string;
+}): Promise<ActivityItem[]> {
+  const ps = new URLSearchParams();
+  if (params?.status) ps.set("status", params.status);
+  if (params?.keyword) ps.set("keyword", params.keyword);
+  if (params?.activity_type) ps.set("activity_type", params.activity_type);
+  const qs = ps.toString();
+  return request(`/api/admin/activities${qs ? `?${qs}` : ""}`);
 }
 
 export function apiCreateActivity(body: CreateActivityBody): Promise<{ id: number }> {
