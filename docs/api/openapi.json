@@ -2053,6 +2053,17 @@
             "title": "Create Time",
             "type": "string"
           },
+          "enrollment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enrollment Id"
+          },
           "id": {
             "title": "Id",
             "type": "integer"

@@ -170,3 +170,35 @@ def test_r10_admin_total_includes_enroll_manual(client: TestClient):
         assert data["admin_total"] == pending, (
             f"admin_total {data['admin_total']} 应=tab pending_count {pending} = RED"
         )
+
+
+# ---------- R10b（目视补刀）：订单 tab 高亮——订单行响应补 enrollment_id ----------
+
+
+def test_r10b_order_list_carries_enrollment_id(client: TestClient):
+    """修复前：订单行无 enrollment_id——通知跳订单 tab 无法高亮对应行 = RED。"""
+    h = _h(client)
+    act = _mk_activity(client, h, quota=5, fee=60, hours_later=72, title="高亮锚点活动")
+    p, c, mini = _family(client, h, "13900043006", "高亮孩")
+    r1 = client.post(
+        ADMIN_ORDER_URL,
+        json={"order_type": "activity_fee", "child_id": c["id"], "activity_id": act["id"]},
+        headers=h,
+    )
+    assert r1.status_code == 200, r1.text
+    activity_order_id = r1.json()["id"]
+    # 对照：会员单（无 enrollment）
+    r2 = client.post(
+        ADMIN_ORDER_URL,
+        json={"order_type": "observation_fee", "child_id": c["id"], "remark": "高亮对照"},
+        headers=h,
+    )
+    assert r2.status_code == 200, r2.text
+
+    rl = client.get("/api/admin/orders", params={"page_size": 50}, headers=h)
+    assert rl.status_code == 200, rl.text
+    rows = {x["id"]: x for x in rl.json()["items"]}
+    assert rows[activity_order_id].get("enrollment_id") is not None, (
+        f"活动单行应带 enrollment_id（高亮锚点），实 {rows[activity_order_id]} = RED"
+    )
+    assert rows[r2.json()["id"]].get("enrollment_id") is None, "非活动单应 None"

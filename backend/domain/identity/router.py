@@ -218,13 +218,16 @@ def list_orders(
     admin: Any = Depends(require_perm("member.manage")),
     db: Session = Depends(get_db),
 ):
-    rows, total = OrderService(db).list_orders(page, page_size, status, keyword, order_by)
+    rows, total, enrollment_map = OrderService(db).list_orders(
+        page, page_size, status, keyword, order_by
+    )
     items = []
     for order, child_name, parent_name in rows:
         item = OrderResponse.model_validate(order)
         item.amount = str(order.amount)
         item.child_name = child_name
         item.parent_name = parent_name
+        item.enrollment_id = enrollment_map.get(order.id)
         items.append(item)
     return PaginatedResponse[OrderResponse].create(
         items=items, total=total, page=page, page_size=page_size

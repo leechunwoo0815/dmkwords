@@ -117,6 +117,9 @@ class OrderResponse(BaseSchema):
     created_at: datetime = Field(alias="create_time")
     child_name: str | None = None
     parent_name: str | None = None
+    # R10b（插修 14 目视补刀）：活动报名高亮锚点——订单行带关联报名 id，
+    # 通知"去处理"跳订单 tab 后按此匹配高亮行（非活动单 None）
+    enrollment_id: int | None = None
 
     @field_validator("amount", mode="before")
     @classmethod

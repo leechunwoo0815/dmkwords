@@ -534,7 +534,22 @@ class OrderService:
             )
             parent = self.db.query(Parent).filter(Parent.id == o.parent_id).first()
             out.append((o, child.name if child else None, parent.name if parent else None))
-        return out, total
+        # R10b：活动报名高亮锚点（批量一次查映射，零 N+1）
+        order_ids = [o.id for o in orders]
+        enrollment_map: dict[int, int] = {}
+        if order_ids:
+            from backend.domain.activity.models import ActivityEnrollment
+
+            erows = (
+                self.db.query(ActivityEnrollment.order_id, ActivityEnrollment.id)
+                .filter(
+                    ActivityEnrollment.order_id.in_(order_ids),
+                    ActivityEnrollment.is_deleted == 0,
+                )
+                .all()
+            )
+            enrollment_map = {oid: eid for oid, eid in erows}
+        return out, total, enrollment_map
 
     def counts(self) -> dict:
         """订单各状态计数（W3/UI 待确认待办；WM13 待办聚合复用，键名语义化不可改）。"""
