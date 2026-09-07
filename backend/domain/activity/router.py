@@ -99,6 +99,8 @@ def signin(
 
 
 @router.get("/activity-refunds")
+# S3（20260907）deprecated：T16 后活动退款走统一台账（refund-requests 链），
+# 退款中心为唯一审核入口——本端点已无前端调用（死代码留契约兼容，勿新增调用）
 def list_refund_pending(
     admin: Any = Depends(require_super_admin()),
     db: Session = Depends(get_db),
@@ -108,6 +110,7 @@ def list_refund_pending(
 
 
 @router.post("/activity-refunds/{enrollment_id}/review")
+# S3 deprecated：同上——审核唯一入口=退款中心统一链（本端点委托 RefundService.review 语义不变，测试造数仍可用）
 def review_refund(
     enrollment_id: int,
     body: RefundReviewRequest,

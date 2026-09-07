@@ -8,13 +8,10 @@ import {
 } from "antd";
 
 import {
-  apiCancelActivity, apiCreateActivity, apiListActivities, apiListActivityRefunds,
-  apiListEnrollments, apiReviewActivityRefund, apiSignin,
+  apiCancelActivity, apiCreateActivity, apiListActivities, apiListEnrollments, apiSignin,
   type ActivityItem, type EnrollmentItem,
 } from "../api/activities";
-import { hasPermission, useAuth } from "../auth";
 import { usePaintPagination } from "../hooks/usePaintPagination";
-import { TODO_REFRESH_EVENT } from "../hooks/useTodoCounts";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
 
 const TYPE_OPTIONS = [
@@ -37,16 +34,12 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function ActivityManage() {
   const { message, modal } = AntdApp.useApp();
-  const { permissions } = useAuth();
-  const isSuper = hasPermission(permissions, "audit.view"); // T20b：退款审核=超管专属，staff 视角不发该请求
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const activityPg = usePaintPagination();
   const [createOpen, setCreateOpen] = useState(false);
   const [enrollActivity, setEnrollActivity] = useState<ActivityItem | null>(null);
   const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
-  const [rejectRemark, setRejectRemark] = useState("");
-  const [refunds, setRefunds] = useState<EnrollmentItem[]>([]);
   const [signinCode, setSigninCode] = useState("");
   const [form] = Form.useForm();
 
@@ -56,12 +49,7 @@ export default function ActivityManage() {
       .then(setActivities)
       .catch((e: Error) => message.error(e.message))
       .finally(() => setLoading(false));
-    // F-M9/T26：退款审核列表 fetch 失败必须报错——静默置空=审核员误判无待审
-    // T20b：仅超管视角请求退款审核列表（staff 不发该请求，从源头消除 403 toast）
-    if (isSuper) {
-      apiListActivityRefunds().then(setRefunds).catch((e: Error) => { message.error(e.message); setRefunds([]); });
-    }
-  }, [message, isSuper]);
+  }, [message]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -122,45 +110,6 @@ export default function ActivityManage() {
     }
   };
 
-  const onReview = (r: EnrollmentItem, approve: boolean) => {
-    setRejectRemark("");
-    modal.confirm({
-      title: approve ? "通过退款" : "拒绝退款",
-      content: (
-        <div>
-          <p>
-            {r.child_name} · {r.activity_title} · ￥{r.amount}
-            {approve ? "（通过后进入退款执行，退款完成后名额释放）" : "（报名恢复为已报名）"}
-          </p>
-          {!approve && (
-            <Input.TextArea
-              placeholder="拒绝原因（必填，家长可见）"
-              value={rejectRemark}
-              onChange={(e) => setRejectRemark(e.target.value)}
-            />
-          )}
-        </div>
-      ),
-      okText: approve ? "通过" : "拒绝",
-      onOk: async () => {
-        if (!approve && !rejectRemark.trim()) {
-          message.warning("拒绝必须填写原因（家长可见）");
-          return Promise.reject(new Error("rejected-empty"));
-        }
-        try {
-          await apiReviewActivityRefund(r.enrollment_id ?? r.id ?? 0, approve, rejectRemark);
-          message.success(approve ? "已通过，待执行退款" : "已拒绝");
-          // WM13 L3：审核完成主动刷新待办徽标/待办卡
-          window.dispatchEvent(new Event(TODO_REFRESH_EVENT));
-          load();
-          if (enrollActivity) openEnrollments(enrollActivity);
-        } catch (e) {
-          message.error((e as Error).message);
-        }
-      },
-    });
-  };
-
   return (
     <div>
       <Space style={{ marginBottom: 12 }}>
@@ -219,34 +168,7 @@ export default function ActivityManage() {
               </>
             ),
           },
-          ...(isSuper ? [{
-            key: "refunds", label: `退款待审（${refunds.length}）`,
-            children: (
-              <>
-              <Table<EnrollmentItem> locale={{ emptyText: <PaintEmpty character="star" /> }}
-                rowKey={(r) => String(r.enrollment_id ?? r.id)} dataSource={refunds} size="middle"
-                pagination={false}
-                columns={[
-                  { title: "活动", dataIndex: "activity_title", width: 180 },
-                  { title: "孩子", dataIndex: "child_name", width: 90 },
-                  { title: "金额", dataIndex: "amount", width: 90, render: (v) => `￥${v}` },
-                  { title: "原因", dataIndex: "reason" },
-                  { title: "申请时间", dataIndex: "created_at", width: 170, render: (v) => v.replace("T", " ").slice(0, 19) },
-                  {
-                    title: "操作", key: "op", width: 150, render: (_, r) => (
-                      <Space>
-                        <Button type="primary" size="small" onClick={() => onReview(r, true)}>通过</Button>
-                        <Button size="small" onClick={() => onReview(r, false)}>拒绝</Button>
-                      </Space>
-                    ),
-                  },
-                ]}
-               scroll={{ x: "max-content" }}/>
-          <PaintHScrollbar auto />
-          </>
-          ),
-          },
-          ] : []),
+
           ]}
         />
 
