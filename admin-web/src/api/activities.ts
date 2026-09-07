@@ -2,6 +2,7 @@
 import { request } from "./client";
 
 export interface ActivityItem {
+  cover_url?: string | null;
   id: number;
   title: string;
   activity_type: string;
@@ -89,4 +90,31 @@ export function apiReviewActivityRefund(
   return request(`/api/admin/activity-refunds/${enrollmentId}/review`, {
     method: "POST", body: JSON.stringify({ approve, remark }),
   });
+}
+
+// T45（FEAT-082）：详情/编辑/封面上传
+export function apiGetActivityDetail(id: number): Promise<ActivityItem & {
+  enrolled_count: number; pending_count: number; checked_in_count: number;
+}> {
+  return request(`/api/admin/activities/${id}`);
+}
+
+export function apiUpdateActivity(
+  id: number,
+  body: Partial<{
+    title: string; start_at: string; location: string; max_quota: number;
+    fee: number; description: string; member_only: boolean; enroll_deadline?: string;
+  }>,
+): Promise<{ id: number; title: string; status: string }> {
+  return request(`/api/admin/activities/${id}`, { method: "PUT", body: JSON.stringify(body) });
+}
+
+export function apiUploadActivityCover(id: number, file: File): Promise<{ cover_path: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  return request(`/api/admin/activities/${id}/cover`, { method: "POST", body: fd });
+}
+
+export function activityCoverUrl(id: number): string {
+  return `/api/admin/activities/${id}/cover-media`;
 }

@@ -1,14 +1,16 @@
+import { UploadOutlined } from "@ant-design/icons";
 import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
 // 活动管理（WM9：发布/取消/报名/签到/退款审核）
 import { useCallback, useEffect, useState } from "react";
 import {
   App as AntdApp, Button, DatePicker, Drawer, Form, Input, InputNumber,
-  Modal, Select, Space, Switch, Table, Tabs, Tag, Typography,
+  Modal, Select, Space, Switch, Table, Tabs, Tag, Typography, Upload,
 } from "antd";
 
 import {
-  apiCancelActivity, apiCreateActivity, apiListActivities, apiListEnrollments, apiSignin,
+  activityCoverUrl, apiCancelActivity, apiCreateActivity, apiGetActivityDetail,
+  apiListActivities, apiListEnrollments, apiSignin, apiUpdateActivity, apiUploadActivityCover,
   type ActivityItem, type EnrollmentItem,
 } from "../api/activities";
 import { usePaintPagination } from "../hooks/usePaintPagination";
@@ -82,6 +84,58 @@ export default function ActivityManage() {
       });
       message.success("活动已发布");
       setCreateOpen(false);
+      form.resetFields();
+      load();
+    } catch (e) {
+      message.error((e as Error).message);
+    }
+  };
+
+  // T45（FEAT-082）：编辑（复用创建表单；activity_type 禁改 disabled——Q8 批复）
+  const [editTarget, setEditTarget] = useState<ActivityItem | null>(null);
+  const [editCover, setEditCover] = useState<string | null>(null);
+  const openEdit = async (a: ActivityItem) => {
+    try {
+      const d = await apiGetActivityDetail(a.id);
+      setEditTarget(d);
+      setEditCover(d.cover_url ? activityCoverUrl(a.id) : null);
+      form.setFieldsValue({
+        title: d.title, start_at: d.start_at ? new Date(d.start_at) : undefined,
+        location: d.location, max_quota: d.max_quota, fee: Number(d.fee),
+        description: d.description, member_only: d.member_only,
+        enroll_deadline: d.enroll_deadline ? new Date(d.enroll_deadline) : undefined,
+      });
+      setCreateOpen(true);
+    } catch (e) {
+      message.error((e as Error).message);
+    }
+  };
+
+  const onCoverUpload = async (file: File) => {
+    if (!editTarget) return false;
+    try {
+      await apiUploadActivityCover(editTarget.id, file);
+      setEditCover(activityCoverUrl(editTarget.id) + `?t=${Date.now()}`);
+      message.success("封面已上传");
+    } catch (e) {
+      message.error((e as Error).message);
+    }
+    return false;
+  };
+
+  const onEditSave = async () => {
+    if (!editTarget) return;
+    const v = await form.validateFields();
+    try {
+      await apiUpdateActivity(editTarget.id, {
+        title: v.title, start_at: v.start_at.toISOString(), location: v.location,
+        max_quota: v.max_quota, fee: v.fee ?? 0, description: v.description,
+        member_only: v.member_only ?? false,
+        enroll_deadline: v.enroll_deadline ? v.enroll_deadline.toISOString() : undefined,
+      });
+      message.success(editTarget.status === "draft" ? "活动已更新" : "活动已更新（member_only/fee 仅影响新报名）");
+      setCreateOpen(false);
+      setEditTarget(null);
       form.resetFields();
       load();
     } catch (e) {
@@ -185,6 +239,7 @@ export default function ActivityManage() {
                     {
                       title: "操作", key: "op", width: 180, render: (_, r) => (
                         <Space>
+                          <Button type="link" size="small" onClick={() => openEdit(r)}>编辑</Button>
                           <Button type="link" size="small" onClick={() => openEnrollments(r)}>报名名单</Button>
                           {r.status === "published" && (
                             <Button type="link" size="small" danger onClick={() => onCancelActivity(r)}>取消活动</Button>
@@ -222,16 +277,30 @@ export default function ActivityManage() {
       </Drawer>
 
       <Modal
-        title="发布活动" open={createOpen} okText="发布" cancelText="取消" destroyOnClose
-        onOk={onCreate} onCancel={() => setCreateOpen(false)} width={560}
+        title={editTarget ? "编辑活动" : "发布活动"} open={createOpen}
+        okText={editTarget ? "保存" : "发布"} cancelText="取消" destroyOnClose
+        onOk={editTarget ? onEditSave : onCreate}
+        onCancel={() => { setCreateOpen(false); setEditTarget(null); }} width={560}
       >
+        {editTarget && (
+          <div style={{ marginBottom: 12 }}>
+            {/* T45：封面上传/预览（Q8 批复编辑白名单内） */}
+            {editCover && (
+              <img src={editCover} alt="封面" style={{ width: 120, height: 68, objectFit: "cover", marginRight: 12, borderRadius: 4 }} />
+            )}
+            <Upload accept="image/*" showUploadList={false} beforeUpload={onCoverUpload}>
+              <Button icon={<UploadOutlined />}>上传封面</Button>
+            </Upload>
+          </div>
+        )}
         <Form form={form} layout="vertical" initialValues={{ activity_type: "book_club", fee: 0, member_only: false }}>
           <Form.Item name="title" label="活动名称" rules={[{ required: true }]}>
             <Input placeholder="如：周六英文绘本读书会" />
           </Form.Item>
           <Space size="middle">
-            <Form.Item name="activity_type" label="类型" rules={[{ required: true }]}>
-              <Select options={TYPE_OPTIONS} style={{ width: 150 }} />
+            <Form.Item name="activity_type" label="类型" rules={[{ required: true }]}
+              extra={editTarget ? "类型创建后不可修改（Q8 批复）" : undefined}>
+              <Select options={TYPE_OPTIONS} style={{ width: 150 }} disabled={!!editTarget} />
             </Form.Item>
             <Form.Item name="start_at" label="开始时间" rules={[{ required: true }]}>
               <DatePicker showTime style={{ width: 200 }} />
