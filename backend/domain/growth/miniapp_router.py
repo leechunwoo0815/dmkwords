@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import Field
 from sqlalchemy.orm import Session
 
@@ -34,8 +34,6 @@ def quiz_status_batch(
     parent, db = auth
     child = child_of_parent(db, parent.id, child_id)
     ids = [int(x) for x in book_ids.split(",") if x.strip().isdigit()]
-    if not ids or len(ids) > 50:
-        raise HTTPException(status_code=422, detail="book_ids 非法（1-50 个数字）")
     return {"items": QuizService(db).quiz_status_batch(child, ids)}
 
 

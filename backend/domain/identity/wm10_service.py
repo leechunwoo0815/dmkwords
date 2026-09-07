@@ -470,13 +470,13 @@ class RefundService:
         needs_check = False
         if req.kind == RefundRequest.KIND_ORDER and req.order_id:
             _o = self.db.query(Order).filter(Order.id == req.order_id).first()
-            needs_check = bool(
-                _o and _o.order_type in (Order.TYPE_OBSERVATION, Order.TYPE_FORMAL)
-            )
+            needs_check = bool(_o and _o.order_type in (Order.TYPE_OBSERVATION, Order.TYPE_FORMAL))
         elif req.kind == RefundRequest.KIND_DEPOSIT and req.deposit_id:
             needs_check = True
         manual_override = bool(
-            needs_check and "人工放行:" in (remark or "") and admin.role == AdminUser.ROLE_SUPER_ADMIN
+            needs_check
+            and "人工放行:" in (remark or "")
+            and admin.role == AdminUser.ROLE_SUPER_ADMIN
         )
         if needs_check and not manual_override:
             from backend.domain.identity.wm10_withdrawal_service import outstanding_obligations

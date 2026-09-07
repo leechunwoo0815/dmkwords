@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
 from backend.database import get_db
-from backend.domain.activity.models import Activity
+from backend.domain.activity.admin_service import AdminActivityService
 from backend.domain.activity.service import ActivityService
 from backend.middleware.admin_rbac import require_perm, require_super_admin
 
@@ -89,7 +89,7 @@ def get_activity_detail(
     db: Session = Depends(get_db),
 ):
     """T45：活动详情（含报名统计）。"""
-    return ActivityService(db).get_detail(activity_id)
+    return AdminActivityService(db).get_detail(activity_id)
 
 
 @router.put("/activities/{activity_id}")
@@ -100,7 +100,7 @@ def update_activity(
     db: Session = Depends(get_db),
 ):
     """T45：活动编辑（仅 PUBLISHED 且未开始；Q7 名额下限/Q8 白名单）。"""
-    a = ActivityService(db).update(admin, activity_id, body)
+    a = AdminActivityService(db).update(admin, activity_id, body)
     return {"id": a.id, "title": a.title, "status": a.status}
 
 
@@ -113,7 +113,7 @@ async def upload_activity_cover(
 ):
     """T45：封面上传（R-316 同款通道统一转 JPG；Router 零异常处理纪律）。"""
     data = await file.read()
-    a = ActivityService(db).upload_cover(admin, activity_id, data, file.filename or "")
+    a = AdminActivityService(db).upload_cover(admin, activity_id, data, file.filename or "")
     return {"id": a.id, "cover_path": a.cover_path}
 
 
@@ -131,8 +131,7 @@ def activity_cover_media(
     from backend.domain.catalog.media_auth import authorize_media
 
     authorize_media(request, token, db)
-    a = ActivityService(db).get_detail(activity_id)  # NotFound 校验复用
-    rel = db.query(Activity.cover_path).filter(Activity.id == activity_id).scalar()
+    rel = AdminActivityService(db).get_cover_path(activity_id)
     if not rel:
         from backend.common.exceptions import NotFoundError
 

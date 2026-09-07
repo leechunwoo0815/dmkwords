@@ -4,10 +4,11 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header
+from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
 from backend.database import get_db
-from backend.domain.activity.models import Activity
+from backend.domain.activity.admin_service import AdminActivityService
 from backend.domain.activity.service import ActivityService
 from backend.domain.identity.auth import child_of_parent, get_current_parent
 
@@ -28,7 +29,7 @@ def activity_carousel():
     from backend.database import get_session
 
     with get_session() as db:
-        return {"items": ActivityService(db).carousel()}
+        return {"items": AdminActivityService(db).carousel()}
 
 
 @router.get("/activities/{activity_id}/cover")
@@ -50,7 +51,7 @@ def activity_cover(
 
     effective_token = token or (authorization or "").replace("Bearer ", "").strip()
     _parent_from_token(effective_token, db)
-    rel = db.query(Activity.cover_path).filter(Activity.id == activity_id).scalar()
+    rel = AdminActivityService(db).get_cover_path(activity_id)
     if not rel:
         from backend.common.exceptions import NotFoundError
 

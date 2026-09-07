@@ -25,6 +25,9 @@ from backend.domain.identity.models import (
     WithdrawalRequest,
 )
 from backend.domain.identity.wm10_service import _ensure_not_locked
+from backend.domain.identity.wm_notify import (
+    notify_withdrawal_reviewed,
+)
 
 
 def outstanding_obligations(db, child: Child) -> list[str]:
@@ -60,11 +63,7 @@ def outstanding_obligations(db, child: Child) -> list[str]:
         problems.append(f"有 {overdue} 本图书逾期未还")
     from backend.domain.billing.models import Deposit
 
-    dep = (
-        db.query(Deposit)
-        .filter(Deposit.child_id == child.id, Deposit.is_deleted == 0)
-        .first()
-    )
+    dep = db.query(Deposit).filter(Deposit.child_id == child.id, Deposit.is_deleted == 0).first()
     if dep and dep.unpaid_balance and dep.unpaid_balance > 0:
         problems.append(f"有未结清赔偿款 {dep.unpaid_balance} 元")
     # 进行中转让（WM10-07）
@@ -81,10 +80,6 @@ def outstanding_obligations(db, child: Child) -> list[str]:
     if pending_transfer:
         problems.append("有进行中的权益转让申请")
     return problems
-
-from backend.domain.identity.wm_notify import (
-    notify_withdrawal_reviewed,
-)
 
 
 class WithdrawalService:

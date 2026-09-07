@@ -483,8 +483,11 @@ class QuizService:
         口径与 get_quiz 严格一致：locked（未完播）/passed（词账有记录）/
         failed（次数用尽）/available；best_percent 顺带供详情页复用。
         """
+        from backend.common.exceptions import ValidationError
         from backend.domain.reading.models import ReadingProgress
 
+        if not book_ids or len(book_ids) > 50:
+            raise ValidationError("book_ids 非法（1-50 个）")
         max_attempts = int(ConfigService(self.db).get_value("quiz_max_attempts"))
         finished_ids = {
             r[0]

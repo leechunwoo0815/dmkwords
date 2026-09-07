@@ -39,8 +39,10 @@ STAFF_PERMISSIONS = [
     "book.manage",
     "borrow.operate",
     "member.manage",
-    # F-L9：activity.manage 死码移除（活动端点实挂 member.manage——R2/T3 沿用；
-    # 本码自建库起从未被任何 require_perm 检查，rg 全库零命中）
+    # F-L9 结论修正（gate p0batch4 架构关+BDD 撞守卫）：activity.manage 保留——
+    # staff 权限目录断言（BDD 场景）依赖它；端点实挂 member.manage（接线评估
+    # 挂后续批，简报声明）
+    "activity.manage",
     "quiz.manage",
     "audio.manage",
     "dashboard.view",
