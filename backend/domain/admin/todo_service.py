@@ -166,7 +166,6 @@ class AdminTodoService:
         return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
 
     @staticmethod
-    @staticmethod
     def _decide_enroll(status: str | None) -> dict:
         """T6：activity_enroll_manual 显示态（enrollment 状态实时推导）。"""
         if status is None:
@@ -188,6 +187,7 @@ class AdminTodoService:
         )
         return {str(i): s for i, s in rows}
 
+    @staticmethod
     def _decide_activity(has_refund_pending: bool) -> dict:
         """activity_batch_refund：仍有 REFUND_PENDING→待处理；全部终态→已审结（A3 裁定）。"""
         if has_refund_pending:

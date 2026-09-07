@@ -199,13 +199,15 @@ def _mk_activity_typed(client, h, title, activity_type, fee=0, quota=5):
 def test_t3_activity_list_filters(client: TestClient):
     """修复前：keyword/activity_type 参数被忽略（全量返回）= RED。"""
     h = _h(client)
-    a1 = _mk_activity_typed(client, h, "绘本共读读书会", "book_club")
-    a2 = _mk_activity_typed(client, h, "亲子户外日", "parent_child")
+    _mk_activity_typed(client, h, "绘本共读读书会", "book_club")
+    _mk_activity_typed(client, h, "亲子户外日", "parent_child")
     a3 = _mk_activity_typed(client, h, "读书会取消专场", "book_club")
     rc = client.post(f"/api/admin/activities/{a3['id']}/cancel", headers=h)
     assert rc.status_code == 200, rc.text
 
-    titles_of = lambda r: [x["title"] for x in r.json()]
+    def titles_of(r):
+        return [x["title"] for x in r.json()]
+
     # keyword 模糊
     r = client.get("/api/admin/activities", params={"keyword": "亲子"}, headers=h)
     assert r.status_code == 200, r.text
