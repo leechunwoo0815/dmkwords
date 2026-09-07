@@ -8,7 +8,7 @@
 
 from fastapi.testclient import TestClient
 
-from tests.unit.test_wm10_concurrency import _h, _family
+from tests.unit.test_wm10_concurrency import _family, _h
 
 
 def _db():
@@ -100,7 +100,11 @@ def test_parent_enrollment_link_regression(client: TestClient):
     from backend.domain.activity.models import ActivityEnrollment
 
     with _db() as db:
-        row = db.query(ActivityEnrollment).filter(ActivityEnrollment.id == e["enrollment"]["id"]).first()
+        row = (
+            db.query(ActivityEnrollment)
+            .filter(ActivityEnrollment.id == e["enrollment"]["id"])
+            .first()
+        )
         assert row.status == ActivityEnrollment.STATUS_ENROLLED, (
             f"家长报名链 confirm 应转 ENROLLED（回归），实 {row.status}"
         )
