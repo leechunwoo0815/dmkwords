@@ -76,10 +76,15 @@ class ActivityService:
         return v
 
     def _my_enrollment_map(self, child_id: int) -> dict:
+        # S4（#5）：仅活跃态（ACTIVE_STATUSES）入 map——refunded/cancelled 终态
+        # 记录不占报名入口位（前端 wx:if={{!my_enrollment}} 才显示"立即报名"）；
+        # 历史全量在"我的活动"列表仍可见（my_enrollments 不动）；
+        # enroll 判定本就正确（refunded 不在 ACTIVE_STATUSES=允许重报）
         rows = (
             self.db.query(ActivityEnrollment)
             .filter(
                 ActivityEnrollment.child_id == child_id,
+                ActivityEnrollment.status.in_(ActivityEnrollment.ACTIVE_STATUSES),
                 ActivityEnrollment.is_deleted == 0,
             )
             .all()

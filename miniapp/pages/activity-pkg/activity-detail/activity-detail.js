@@ -25,6 +25,12 @@ Page({
     this.setData({ loading: true })
     try {
       const a = await api.activityDetail(this._activityId, this._childId)
+      // S4 双保险：终态记录（refunded/cancelled）不占报名入口位——后端 map 已仅回
+      // 活跃态，此处防御对齐（终态置 null → "立即报名"入口恢复）
+      const ACTIVE = ['pending_payment', 'enrolled', 'checked_in', 'refund_pending']
+      if (a.my_enrollment && ACTIVE.indexOf(a.my_enrollment.status) === -1) {
+        a.my_enrollment = null
+      }
       this.setData({ activity: a })
     } catch (e) { /* toast 已弹 */ }
     finally { this.setData({ loading: false }) }
