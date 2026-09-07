@@ -158,7 +158,10 @@ export default function Notifications() {
   const mirrorUrl = useCallback(
     (next: { box: string; tab: string; page: number; keyword: string; scene?: string }) => {
       const params: Record<string, string> = {};
-      if (next.box !== "parent") params.box = next.box;
+      // R1（#6）：box 显式写不再省略——T20e 默认值反转（parent→admin）后，
+      // "省略=parent"的旧假设失效：点家长 tab 省略 box → URL 读回 admin → 弹回。
+      // URL 已存在的旧链接（无 box）落 admin 属新默认，不迁移。
+      if (next.box) params.box = next.box;
       const tabDefault = next.box === "admin" ? "todo" : "all";
       if (next.tab !== tabDefault) params.tab = next.tab;
       if (next.page > 1) params.page = String(next.page);

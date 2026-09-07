@@ -355,11 +355,24 @@ class OrderService:
                 from backend.domain.billing.service import DepositService
 
                 DepositService(self.db).on_deposit_order_paid(admin, order)
-            # 活动费订单 → 报名转正（activity 域；同一事务）
+            # 活动费订单 → 按有无报名分流（R2 插修 11）：
+            # 家长端报名链（报名→订单→收款→报名转正）联动转正；管理端直建活动单
+            # （FEAT-080 §3.5.2 线下收钱语义，从不创建报名）→ 无联动纯资金入账
             if order.order_type == Order.TYPE_ACTIVITY:
-                from backend.domain.activity.service import ActivityService
+                from backend.domain.activity.models import ActivityEnrollment
 
-                ActivityService(self.db).on_activity_order_paid(order)
+                has_enrollment = (
+                    self.db.query(func.count(ActivityEnrollment.id))
+                    .filter(
+                        ActivityEnrollment.order_id == order.id,
+                        ActivityEnrollment.is_deleted == 0,
+                    )
+                    .scalar()
+                ) > 0
+                if has_enrollment:
+                    from backend.domain.activity.service import ActivityService
+
+                    ActivityService(self.db).on_activity_order_paid(order)
 
         publish_audit(
             self.db,
