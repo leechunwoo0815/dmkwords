@@ -132,10 +132,32 @@ class OrderService:
             if a.start_at <= datetime.now():
                 raise ValidationError("活动已开始，不能创建活动订单")
             # T2（20260907）：名额校验前置——管理端造单即占位，满员不可造单（422）
+            # R7：免费活动无收款单语义——防呆硬拦 422（家长端报名即可，无需造单）
+            # R8：防重复报名（双倍收费风险）——dup 检查抄家长端 enroll 同款
             from backend.domain.activity.service import ActivityService
 
-            if ActivityService(self.db)._quota_used(a.id) >= a.max_quota:
+            svc = ActivityService(self.db)
+            if a.fee is None or a.fee <= 0:
+                raise ValidationError("免费活动无需创建订单，请走家长端报名")
+            if svc._quota_used(a.id) >= a.max_quota:
                 raise ValidationError("活动名额已满，不能创建活动订单")
+            from backend.domain.activity.models import ActivityEnrollment
+
+            dup = (
+                self.db.query(func.count(ActivityEnrollment.id))
+                .filter(
+                    ActivityEnrollment.activity_id == req.activity_id,
+                    ActivityEnrollment.child_id == child.id,
+                    ActivityEnrollment.status.in_(ActivityEnrollment.ACTIVE_STATUSES),
+                    ActivityEnrollment.is_deleted == 0,
+                )
+                .scalar()
+            )
+            if dup:
+                raise ValidationError(
+                    "该孩子已有此活动的有效报名（待收款/已报名/退款待审），"
+                    "不可重复创建费用订单"
+                )
             amount = a.fee
         elif req.order_type == Order.TYPE_CUSTOM:
             # 自定义单：纯资金流水（不参与会员资格/到期日计算——PRD §3.5.2 边界），
@@ -167,16 +189,19 @@ class OrderService:
             from backend.domain.activity.models import ActivityEnrollment
             from backend.domain.activity.service import _ticket_code
 
-            self.db.add(
-                ActivityEnrollment(
-                    activity_id=req.activity_id,
-                    child_id=child.id,
-                    order_id=order.id,
-                    ticket_code=_ticket_code(req.activity_id, child.id),
-                    status=ActivityEnrollment.STATUS_PENDING_PAYMENT,
-                )
+            e = ActivityEnrollment(
+                activity_id=req.activity_id,
+                child_id=child.id,
+                order_id=order.id,
+                ticket_code=_ticket_code(req.activity_id, child.id),
+                status=ActivityEnrollment.STATUS_PENDING_PAYMENT,
             )
+            self.db.add(e)
             self.db.flush()
+            # R7（插修 14）：管理端造单同发【活动报名待确认】（T6 发送点抽方法双链）
+            from backend.domain.activity.service import ActivityService
+
+            ActivityService(self.db)._notify_enroll_manual(child, a, e, amount)
         publish_audit(
             self.db,
             admin=admin,
