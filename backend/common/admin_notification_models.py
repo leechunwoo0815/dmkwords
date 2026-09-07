@@ -39,6 +39,8 @@ class AdminNotification(BaseModel):
     SCENE_WITHDRAWAL_APPLY = "admin.withdrawal_apply"
     SCENE_TRANSFER_APPLY = "admin.transfer_apply"
     SCENE_ACTIVITY_BATCH_REFUND = "admin.activity_batch_refund"
+    # T6（插修 13）：活动报名待确认（fee>0 报名→待人工收款确认，运营动作入口）
+    SCENE_ACTIVITY_ENROLL_MANUAL = "admin.activity_enroll_manual"
     SCENE_TRANSFER_EXPIRING = "admin.transfer_expiring"
 
     # ref_type 取值

@@ -229,3 +229,74 @@ def test_t3_activity_list_filters(client: TestClient):
     assert "绘本共读读书会" in ts and "亲子户外日" not in ts and "读书会取消专场" not in ts, (
         f"组合查询失效：{ts} = RED"
     )
+
+
+# ---------- T6：活动报名（fee>0）进管理待办（新场景+单独计数口径） ----------
+
+
+def test_t6_activity_enroll_admin_todo(client: TestClient):
+    """修复前：报名只发家长通知，管理端零感知（todo-counts 无 activity_enroll_pending）= RED。"""
+    from backend.common.admin_notification_models import AdminNotification
+
+    h = _h(client)
+    hs = _h(client, "staff01")
+    act = _mk_activity(client, h, quota=5, fee=50, hours_later=72, title="待确认报名活动")
+    act_free = _mk_activity(client, h, quota=5, fee=0, hours_later=72, title="免费对照活动")
+    p, c, mini = _family(client, h, "13900042001", "待确认孩")
+
+    base = client.get("/api/admin/todo-counts", headers=h).json().get("activity_enroll_pending", 0)
+
+    # 免费报名 → 不发管理待办（无需运营动作）
+    rf = client.post(
+        f"/api/miniapp/activities/{act_free['id']}/enroll", json={"child_id": c["id"]}, headers=mini
+    )
+    assert rf.status_code == 200, rf.text
+    rc1 = client.get("/api/admin/todo-counts", headers=h).json()
+    assert rc1["activity_enroll_pending"] == base, f"免费报名不应发管理待办，实 {rc1} = RED"
+
+    # 付费报名 → 管理待办 +1（新字段）
+    re_ = client.post(
+        f"/api/miniapp/activities/{act['id']}/enroll", json={"child_id": c["id"]}, headers=mini
+    )
+    assert re_.status_code == 200, re_.text
+    eid = re_.json()["enrollment"]["id"]
+    order_id = re_.json()["order_id"]
+    rc2 = client.get("/api/admin/todo-counts", headers=h).json()
+    assert rc2["activity_enroll_pending"] == base + 1, f"付费报名应进管理待办，实 {rc2} = RED"
+
+    # staff（member.manage）可见
+    rcs = client.get("/api/admin/todo-counts", headers=hs).json()
+    assert rcs["activity_enroll_pending"] == base + 1, f"staff 应可见，实 {rcs} = RED"
+
+    # 收件箱出现该场景通知（content 含孩子/活动/金额）
+    rl = client.get(
+        "/api/admin/admin-notifications",
+        params={"scene": "admin.activity_enroll_manual"},
+        headers=h,
+    )
+    assert rl.status_code == 200, rl.text
+    items = rl.json()["items"]
+    assert any("待确认孩" in i["content"] and "待确认报名活动" in i["content"] for i in items), (
+        f"列表应含【活动报名待确认】通知 = RED：{[i['content'] for i in items][:2]}"
+    )
+
+    # 确认收款 → mark_handled + 计数归零
+    rcp = client.post(
+        f"/api/admin/orders/{order_id}/confirm-payment", json={"pay_method": "scan"}, headers=h
+    )
+    assert rcp.status_code == 200, rcp.text
+    rc3 = client.get("/api/admin/todo-counts", headers=h).json()
+    assert rc3["activity_enroll_pending"] == base, f"确认后计数应归零，实 {rc3} = RED"
+    with _db() as db:
+        n = (
+            db.query(AdminNotification)
+            .filter(
+                AdminNotification.scene == "admin.activity_enroll_manual",
+                AdminNotification.ref_type == "activity_enrollment",
+                AdminNotification.ref_id == str(eid),
+                AdminNotification.is_deleted == 0,
+            )
+            .first()
+        )
+        assert n is not None, "管理待办通知应存在"
+        assert n.handled_at is not None, "确认收款应回写 handled_at = RED"

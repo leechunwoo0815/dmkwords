@@ -25,6 +25,7 @@ from backend.common.admin_notifications import (
     TEXT_PENDING,
 )
 from backend.common.exceptions import NotFoundError, ValidationError
+from backend.domain.activity.models import ActivityEnrollment
 from backend.domain.admin.models import AdminUser
 from backend.domain.admin.service import role_has_permission
 from backend.domain.catalog.audit_events import publish_audit
@@ -60,6 +61,7 @@ class AdminTodoService:
         )
         transfer_states = self._state_map("transfer", by_type, self._transfer_states())
         activity_states = self._activity_states(by_type.get("activity", []))
+        enroll_states = self._enroll_states(by_type.get("activity_enrollment", []))
 
         for n in notifications:
             if n.ref_type == "refund_request":
@@ -79,6 +81,10 @@ class AdminTodoService:
                 result[n.id] = self._decide_transfer(transfer_states.get(n.ref_id))
             elif n.ref_type == "activity":
                 result[n.id] = self._decide_activity(activity_states.get(n.ref_id, False))
+            elif n.ref_type == "activity_enrollment":
+                # T6：报名待确认——pending_payment→待处理；enrolled/checked_in/
+                # refund_pending→已审结（收款/流转完成）；cancelled→已失效
+                result[n.id] = self._decide_enroll(enroll_states.get(n.ref_id))
             else:
                 result[n.id] = {"effective_status": ST_DONE, "status_text": TEXT_DONE}
             # T20c（#5）：人工标记意图优先于机器推导——但仅覆盖"待处理"推导。
@@ -160,6 +166,28 @@ class AdminTodoService:
         return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
 
     @staticmethod
+    @staticmethod
+    def _decide_enroll(status: str | None) -> dict:
+        """T6：activity_enroll_manual 显示态（enrollment 状态实时推导）。"""
+        if status is None:
+            return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
+        if status == ActivityEnrollment.STATUS_PENDING_PAYMENT:
+            return {"effective_status": ST_PENDING, "status_text": TEXT_PENDING}
+        if status == ActivityEnrollment.STATUS_CANCELLED:
+            return {"effective_status": ST_INVALID, "status_text": TEXT_INVALID_CANCELLED}
+        return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
+
+    def _enroll_states(self, notifications: list) -> dict[str, str]:
+        """T6：{enrollment_id: status}（ref_type=activity_enrollment 批量查）。"""
+        if not notifications:
+            return {}
+        ids = [int(n.ref_id) for n in notifications]
+        rows = self.db.query(ActivityEnrollment.id, ActivityEnrollment.status).filter(
+            ActivityEnrollment.id.in_(ids),
+            ActivityEnrollment.is_deleted == 0,
+        )
+        return {str(i): s for i, s in rows}
+
     def _decide_activity(has_refund_pending: bool) -> dict:
         """activity_batch_refund：仍有 REFUND_PENDING→待处理；全部终态→已审结（A3 裁定）。"""
         if has_refund_pending:
@@ -370,6 +398,8 @@ class AdminTodoService:
             # T1（计数同源第 6 案）：家长通知未读全量数——胶囊兜底数据源，
             # 与视角无关（家长 tab loadParent 的筛选口径落地后本地覆盖，双源同值）
             "parent_unread": 0,
+            # T6：活动报名待确认（单独口径不进 admin_total——admin_total=审核五类）
+            "activity_enroll_pending": 0,
         }
         # 家长未读数对所有能进通知中心的角色开放（导航感知，不挂权限分支）
         from backend.common.notification_models import Notification
@@ -417,5 +447,20 @@ class AdminTodoService:
                 .filter(Order.status == Order.STATUS_PENDING_MANUAL, Order.is_deleted == 0)
                 .scalar()
                 or 0
+            )
+            # T6：活动报名待确认（与收件箱同 resolver 口径：显示态 pending 数；
+            # 手动标记 handled_at 覆盖同款生效）
+            enroll_rows = (
+                self.db.query(AdminNotification)
+                .filter(
+                    AdminNotification.scene == AdminNotification.SCENE_ACTIVITY_ENROLL_MANUAL,
+                    AdminNotification.is_deleted == 0,
+                )
+                .all()
+            )
+            counts["activity_enroll_pending"] = sum(
+                1
+                for n in enroll_rows
+                if self.resolve_many([n])[n.id]["effective_status"] == ST_PENDING
             )
         return counts

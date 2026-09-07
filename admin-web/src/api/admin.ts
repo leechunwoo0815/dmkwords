@@ -179,6 +179,8 @@ export interface TodoCounts {
   admin_total: number;
   /** T1：全体家长通知未读数（胶囊兜底全局源，与视角无关） */
   parent_unread: number;
+  /** T6：活动报名待确认（单独口径不进 admin_total，侧边栏活动徽标用） */
+  activity_enroll_pending: number;
 }
 
 export function apiTodoCounts(): Promise<TodoCounts> {

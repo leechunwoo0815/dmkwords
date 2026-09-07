@@ -527,6 +527,28 @@ class ActivityService:
         )
         self.db.add(e)
         self.db.flush()
+        # T6（插修 13）：付费报名（待人工收款确认）→ 管理待办【活动报名待确认】
+        # （独立 ref_type=activity_enrollment，ref_id=enrollment_id——防与
+        # activity_batch_refund 的 ref_id=activity_id 语义在 resolver 混流；
+        # 免费报名不发，无需运营动作）
+        if order is not None:
+            from backend.common.admin_notifications import AdminNotifyService
+
+            parent_name = (
+                self.db.query(Parent.name).filter(Parent.id == child.parent_id).scalar()
+                or f"#{child.parent_id}"
+            )
+            AdminNotifyService(self.db).send(
+                scene="admin.activity_enroll_manual",
+                title="【活动报名待确认】",
+                content=f"{parent_name} 为 {child.name} 报名《{a.title}》，费用 ￥{fee}，"
+                "待到店收款确认。",
+                ref_type="activity_enrollment",
+                ref_id=e.id,
+                applicant_name=parent_name,
+                amount=fee,
+                dedup_key=str(e.id),
+            )
         # WM11：报名成功通知家长
         NotificationService(self.db).send(
             parent_id=child.parent_id,

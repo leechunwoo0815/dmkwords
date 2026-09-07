@@ -40,6 +40,9 @@ export default function Layout() {
   const memberBadge = failed || !counts ? 0 : (counts.order_pending_manual ?? 0); // T20e #3
   // R6（#4）：退款中心徽标=退款待审+转让待审（退会不计——用户口径 20260907）
   const refundCenterBadge = failed || !counts ? 0 : (counts.refund_pending ?? 0) + (counts.transfer_pending ?? 0);
+  // T6：线下活动侧边栏徽标（活动报名待确认，单独口径不进 admin_total——
+  // admin_total=审核五类不污染；样式同 R6 先例）
+  const activityBadge = failed || !counts ? 0 : (counts.activity_enroll_pending ?? 0);
 
   const iconBgMap: Record<string, string> = {
     "/": "#FCD34D",
@@ -96,7 +99,20 @@ export default function Layout() {
     { key: "/circulation", icon: <SwapOutlined />, label: "借阅操作台", perm: "borrow.operate" },
     { key: "/reservations", icon: <PushpinOutlined />, label: "预约管理", perm: "borrow.operate" },
     { key: "/growth", icon: <TrophyOutlined />, label: "成长与测验", perm: "member.manage" },
-    { key: "/activities", icon: <CalendarOutlined />, label: "线下活动", perm: "member.manage" },
+    {
+      key: "/activities",
+      icon: <CalendarOutlined />,
+      perm: "member.manage",
+      // T6：活动报名待确认徽标
+      label:
+        activityBadge > 0 ? (
+          <Badge count={activityBadge} size="small" offset={[10, 0]}>
+            线下活动
+          </Badge>
+        ) : (
+          "线下活动"
+        ),
+    },
     {
       key: "/refund-center",
       icon: <SafetyCertificateOutlined />,

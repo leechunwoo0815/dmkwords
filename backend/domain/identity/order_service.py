@@ -395,7 +395,42 @@ class OrderService:
                 if has_enrollment:
                     from backend.domain.activity.service import ActivityService
 
-                    ActivityService(self.db).on_activity_order_paid(order)
+                    e = ActivityService(self.db).on_activity_order_paid(order)
+                    # T6：管理待办审计回写（L2 幂等）+ 家长"报名确认+入场券码"通知
+                    from backend.common.admin_notifications import AdminNotifyService
+                    from backend.common.notification_models import Notification
+                    from backend.common.notifications import (
+                        SCENE_ACTIVITY_ENROLL,
+                        NotificationService,
+                    )
+
+                    AdminNotifyService(self.db).mark_handled(
+                        ref_type="activity_enrollment",
+                        ref_id=e.id,
+                        admin=admin,
+                        note="confirm_payment",
+                    )
+                    if e.status == ActivityEnrollment.STATUS_ENROLLED:
+                        from backend.domain.activity.models import Activity
+
+                        act_title = (
+                            self.db.query(Activity.title)
+                            .filter(Activity.id == e.activity_id)
+                            .scalar()
+                            or "活动"
+                        )
+                        NotificationService(self.db).send(
+                            parent_id=order.parent_id,
+                            scene=SCENE_ACTIVITY_ENROLL,
+                            title="报名确认成功",
+                            content=f"《{act_title}》收款已确认，报名成功！入场券码 {e.ticket_code}，"
+                            "活动当天出示即可。",
+                            category=Notification.CATEGORY_ACTIVITY,
+                            child_id=order.child_id,
+                            ref_type="activity",
+                            ref_id=str(e.activity_id),
+                            dedup_key=f"paid-{e.id}",
+                        )
 
         publish_audit(
             self.db,
