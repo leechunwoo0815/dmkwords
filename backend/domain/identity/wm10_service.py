@@ -459,6 +459,32 @@ class RefundService:
             RefundRequest.STATUS_FAILED,
         ):
             raise ValidationError("退款申请不存在或状态不可执行（需先审核通过）")
+        # T41（H-1·R-310 机器化）：退款执行六项复核——会员资格类（observation/
+        # formal）与押金单（担保语义：未还书退押金=担保落空，Q4 批复）触发；
+        # 活动费/自定义单不触发（退款不动会员态）。不过 → 422 列出未清项
+        # 且不翻状态（保持 approved，处理完可再执行——M2 裁定：校验失败不流转）。
+        # 豁免：remark 含「人工放行:」冒号前缀 + 超管（Q5 批复——裸四字可能出现在
+        # 正常描述里如"家长要求人工放行被拒"），审计记 manual_override 布尔字段。
+        from backend.domain.admin.models import AdminUser
+
+        needs_check = False
+        if req.kind == RefundRequest.KIND_ORDER and req.order_id:
+            _o = self.db.query(Order).filter(Order.id == req.order_id).first()
+            needs_check = bool(
+                _o and _o.order_type in (Order.TYPE_OBSERVATION, Order.TYPE_FORMAL)
+            )
+        elif req.kind == RefundRequest.KIND_DEPOSIT and req.deposit_id:
+            needs_check = True
+        manual_override = bool(
+            needs_check and "人工放行:" in (remark or "") and admin.role == AdminUser.ROLE_SUPER_ADMIN
+        )
+        if needs_check and not manual_override:
+            from backend.domain.identity.wm10_withdrawal_service import outstanding_obligations
+
+            _c = self.db.query(Child).filter(Child.id == req.child_id).first()
+            problems = outstanding_obligations(self.db, _c) if _c else []
+            if problems:
+                raise ValidationError("退款执行前需处理：" + "；".join(problems))
         req.assert_transition(RefundRequest.STATUS_PROCESSING)
         req.status = RefundRequest.STATUS_PROCESSING
         self.db.flush()
@@ -526,7 +552,12 @@ class RefundService:
             action="refund.execute",
             target_type="refund_request",
             target_id=str(request_id),
-            detail={"success": success, "amount": str(req.amount), "kind": req.kind},
+            detail={
+                "success": success,
+                "amount": str(req.amount),
+                "kind": req.kind,
+                "manual_override": manual_override,
+            },
             reason=remark or ("退款执行成功" if success else "退款执行失败"),
         )
         # WM11：退款到账 / 退款失败通知家长

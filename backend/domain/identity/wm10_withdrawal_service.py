@@ -25,6 +25,63 @@ from backend.domain.identity.models import (
     WithdrawalRequest,
 )
 from backend.domain.identity.wm10_service import _ensure_not_locked
+
+
+def outstanding_obligations(db, child: Child) -> list[str]:
+    """R-310 六项公共段（T41 抽共享——退会复核与退款执行复核同源）。
+
+    遗失/损坏赔偿并入"未结清赔偿"口径（unpaid_balance，与退会同款）。
+    返回未清项列表（空=可放行）。
+    """
+    problems: list[str] = []
+    active = (
+        db.query(func.count(BorrowRecord.id))
+        .filter(
+            BorrowRecord.child_id == child.id,
+            BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
+            BorrowRecord.is_deleted == 0,
+        )
+        .scalar()
+    )
+    if active:
+        problems.append(f"还有 {active} 本图书未归还")
+    now = datetime.now()
+    overdue = (
+        db.query(func.count(BorrowRecord.id))
+        .filter(
+            BorrowRecord.child_id == child.id,
+            BorrowRecord.status == BorrowRecord.STATUS_ACTIVE,
+            BorrowRecord.due_at < now,
+            BorrowRecord.is_deleted == 0,
+        )
+        .scalar()
+    )
+    if overdue:
+        problems.append(f"有 {overdue} 本图书逾期未还")
+    from backend.domain.billing.models import Deposit
+
+    dep = (
+        db.query(Deposit)
+        .filter(Deposit.child_id == child.id, Deposit.is_deleted == 0)
+        .first()
+    )
+    if dep and dep.unpaid_balance and dep.unpaid_balance > 0:
+        problems.append(f"有未结清赔偿款 {dep.unpaid_balance} 元")
+    # 进行中转让（WM10-07）
+    pending_transfer = (
+        db.query(func.count(TransferRequest.id))
+        .filter(
+            TransferRequest.status == TransferRequest.STATUS_PENDING,
+            (TransferRequest.source_child_id == child.id)
+            | (TransferRequest.target_child_id == child.id),
+            TransferRequest.is_deleted == 0,
+        )
+        .scalar()
+    )
+    if pending_transfer:
+        problems.append("有进行中的权益转让申请")
+    return problems
+
 from backend.domain.identity.wm_notify import (
     notify_withdrawal_reviewed,
 )
@@ -36,55 +93,13 @@ class WithdrawalService:
 
     def _preconditions(self, child: Child) -> list[str]:
         """退会 7 项前提（R-311/V1.1 §3.5）：返回不满足项（空=可退）。
-        遗失/损坏赔偿归入"未结清赔偿"口径（押金 unpaid_balance）。"""
-        problems = []
-        active = (
-            self.db.query(func.count(BorrowRecord.id))
-            .filter(
-                BorrowRecord.child_id == child.id,
-                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
-                BorrowRecord.is_deleted == 0,
-            )
-            .scalar()
-        )
-        if active:
-            problems.append(f"还有 {active} 本图书未归还")
-        now = datetime.now()
-        overdue = (
-            self.db.query(func.count(BorrowRecord.id))
-            .filter(
-                BorrowRecord.child_id == child.id,
-                BorrowRecord.status == BorrowRecord.STATUS_ACTIVE,
-                BorrowRecord.due_at < now,
-                BorrowRecord.is_deleted == 0,
-            )
-            .scalar()
-        )
-        if overdue:
-            problems.append(f"有 {overdue} 本图书逾期未还")
-        from backend.domain.billing.models import Deposit
+        遗失/损坏赔偿归入"未结清赔偿"口径（押金 unpaid_balance）。
 
-        dep = (
-            self.db.query(Deposit)
-            .filter(Deposit.child_id == child.id, Deposit.is_deleted == 0)
-            .first()
-        )
-        if dep and dep.unpaid_balance and dep.unpaid_balance > 0:
-            problems.append(f"有未结清赔偿款 {dep.unpaid_balance} 元")
-        # 进行中转让（WM10-07）
-        pending_transfer = (
-            self.db.query(func.count(TransferRequest.id))
-            .filter(
-                TransferRequest.status == TransferRequest.STATUS_PENDING,
-                (TransferRequest.source_child_id == child.id)
-                | (TransferRequest.target_child_id == child.id),
-                TransferRequest.is_deleted == 0,
-            )
-            .scalar()
-        )
-        if pending_transfer:
-            problems.append("有进行中的权益转让申请")
-        # 进行中会员费退款（WM10-07）
+        T41（H-1）：六项公共段抽 `_outstanding_obligations`（R-310 退款执行
+        复核同源消费）——退会侧在此之上追加退会专属项（进行中会员费退款）。
+        """
+        problems = outstanding_obligations(self.db, child)
+        # 进行中会员费退款（WM10-07；退会专属——R-310 六项不含）
         pending_member_refund = (
             self.db.query(func.count(RefundRequest.id))
             .join(Order, RefundRequest.order_id == Order.id)
