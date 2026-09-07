@@ -78,6 +78,7 @@ const REF_META: Record<string, { label: string; route?: (r: AdminNotification) =
   withdrawal_request: { label: "退会申请", route: (r) => `/refund-center?tab=withdrawals&highlight=${r.ref_id}` },
   refund_request: { label: "退款申请", route: (r) => `/refund-center?tab=refunds&highlight=${r.ref_id}` },
   deposit: { label: "押金", route: () => "/deposits" },
+  activity_enrollment: { label: "活动报名", route: () => "/members?tab=orders" },
   child: { label: "孩子", route: () => "/members" },
   borrow_record: { label: "借阅记录（详情见上）" },
   parent: { label: "家长" },
@@ -89,6 +90,9 @@ const ADMIN_REF_ROUTE: Record<string, { path: string; tab: string }> = {
   withdrawal_request: { path: "/refund-center", tab: "withdrawals" },
   transfer: { path: "/refund-center", tab: "transfers" },
   activity: { path: "/activities", tab: "" },
+  // R10：活动报名待确认——"处理"=确认收款（/members 订单 tab 为 confirm-payment
+  // 唯一入口；活动中心报名名单区无收款动作，故跳订单 tab。简报声明选择）
+  activity_enrollment: { path: "/members", tab: "orders" },
 };
 
 function wechatTag(status: string): React.ReactNode {
@@ -323,7 +327,7 @@ export default function Notifications() {
   // R3：管理待办行展开——完整内容+关联对象+超管处理结果（staff 只读视角的"查看"目标）
   const adminExpandContent = (r: AdminInboxItem) => {
     const meta = ADMIN_REF_ROUTE[r.ref_type];
-    const label = meta ? { refund_request: "退款申请", withdrawal_request: "退会申请", transfer: "权益转让", activity: "活动" }[r.ref_type] ?? r.ref_type : r.ref_type;
+    const label = meta ? { refund_request: "退款申请", withdrawal_request: "退会申请", transfer: "权益转让", activity: "活动", activity_enrollment: "活动报名" }[r.ref_type] ?? r.ref_type : r.ref_type;
     return (
       <div style={{ padding: "4px 8px 8px" }}>
         <div style={{ color: "rgba(0,0,0,0.75)" }}>

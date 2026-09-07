@@ -398,7 +398,7 @@ class AdminTodoService:
             # T1（计数同源第 6 案）：家长通知未读全量数——胶囊兜底数据源，
             # 与视角无关（家长 tab loadParent 的筛选口径落地后本地覆盖，双源同值）
             "parent_unread": 0,
-            # T6：活动报名待确认（单独口径不进 admin_total——admin_total=审核五类）
+            # T6：活动报名待确认（R10 裁定后 admin_total 也含——细分值仍供活动徽标）
             "activity_enroll_pending": 0,
         }
         # 家长未读数对所有能进通知中心的角色开放（导航感知，不挂权限分支）
@@ -463,4 +463,9 @@ class AdminTodoService:
                 for n in enroll_rows
                 if self.resolve_many([n])[n.id]["effective_status"] == ST_PENDING
             )
+            # R10（计数同源第 7 案，20260907 用户裁定）：活动报名待确认统一进
+            # admin_total——运营视角一个数=全部要干的活（"审核五类"历史口径
+            # 废弃；T6 旧裁定"单独口径不进 admin_total"推翻）；tab 数字
+            # （list_inbox.pending_count 全场景）与徽标自此严格同源
+            counts["admin_total"] += counts["activity_enroll_pending"]
         return counts

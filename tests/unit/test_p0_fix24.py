@@ -137,3 +137,36 @@ def test_r8_refunded_child_can_reorder(client: TestClient):
         headers=h,
     )
     assert r2.status_code == 200, f"refunded 孩重造单应 200，实 {r2.status_code} {r2.text[:120]}"
+
+
+# ---------- R10：admin_total 口径统一（计数同源第 7 案，用户裁定） ----------
+
+
+def test_r10_admin_total_includes_enroll_manual(client: TestClient):
+    """修复前：admin_total 排除活动报名待确认（tab 数字含、徽标不含=口径分叉）= RED。"""
+    h = _h(client)
+    act = _mk_activity(client, h, quota=5, fee=60, hours_later=72, title="口径统一活动")
+    p, c, mini = _family(client, h, "13900043005", "口径孩")
+
+    base_total = client.get("/api/admin/todo-counts", headers=h).json()["admin_total"]
+
+    r = client.post(
+        ADMIN_ORDER_URL,
+        json={"order_type": "activity_fee", "child_id": c["id"], "activity_id": act["id"]},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+
+    data = client.get("/api/admin/todo-counts", headers=h).json()
+    # admin_total 应含活动报名待确认（运营视角一个数=全部要干的活）
+    assert data["admin_total"] == base_total + 1, f"admin_total 应含活动报名待确认，实 {data} = RED"
+    # 与收件箱 pending_count 严格一致（口径声明变事实）
+    rl = client.get(
+        "/api/admin/admin-notifications", params={"status_filter": "pending"}, headers=h
+    )
+    assert rl.status_code == 200, rl.text
+    pending = rl.json().get("pending_count")
+    if pending is not None:
+        assert data["admin_total"] == pending, (
+            f"admin_total {data['admin_total']} 应=tab pending_count {pending} = RED"
+        )
