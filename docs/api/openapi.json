@@ -84,6 +84,115 @@
         "title": "ActivityCreateRequest",
         "type": "object"
       },
+      "ActivityUpdateRequest": {
+        "additionalProperties": false,
+        "description": "T45（FEAT-082·Q8 批复）：编辑白名单 9 字段——activity_type 禁改\n（BaseSchema extra=forbid：传入即 422 显式拒绝）。",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "enroll_deadline": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enroll Deadline"
+          },
+          "fee": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "max_quota": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Quota"
+          },
+          "member_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Member Only"
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "ActivityUpdateRequest",
+        "type": "object"
+      },
       "AdjustPointsRequest": {
         "additionalProperties": false,
         "properties": {
@@ -272,6 +381,20 @@
           "file"
         ],
         "title": "Body_import_books_excel_api_admin_books_import_post",
+        "type": "object"
+      },
+      "Body_upload_activity_cover_api_admin_activities__activity_id__cover_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_activity_cover_api_admin_activities__activity_id__cover_post",
         "type": "object"
       },
       "Body_upload_audio_api_admin_books__book_id__audio_post": {
@@ -3521,6 +3644,106 @@
         ]
       }
     },
+    "/api/admin/activities/{activity_id}": {
+      "get": {
+        "description": "T45：活动详情（含报名统计）。",
+        "operationId": "get_activity_detail_api_admin_activities__activity_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "activity_id",
+            "required": true,
+            "schema": {
+              "title": "Activity Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Activity Detail",
+        "tags": [
+          "activity-admin"
+        ]
+      },
+      "put": {
+        "description": "T45：活动编辑（仅 PUBLISHED 且未开始；Q7 名额下限/Q8 白名单）。",
+        "operationId": "update_activity_api_admin_activities__activity_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "activity_id",
+            "required": true,
+            "schema": {
+              "title": "Activity Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivityUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Activity",
+        "tags": [
+          "activity-admin"
+        ]
+      }
+    },
     "/api/admin/activities/{activity_id}/cancel": {
       "post": {
         "description": "取消整场活动（已付未签到批量转退款待审）。",
@@ -3562,6 +3785,113 @@
           }
         ],
         "summary": "Cancel Activity",
+        "tags": [
+          "activity-admin"
+        ]
+      }
+    },
+    "/api/admin/activities/{activity_id}/cover": {
+      "post": {
+        "description": "T45：封面上传（R-316 同款通道统一转 JPG；Router 零异常处理纪律）。",
+        "operationId": "upload_activity_cover_api_admin_activities__activity_id__cover_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "activity_id",
+            "required": true,
+            "schema": {
+              "title": "Activity Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_activity_cover_api_admin_activities__activity_id__cover_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Upload Activity Cover",
+        "tags": [
+          "activity-admin"
+        ]
+      }
+    },
+    "/api/admin/activities/{activity_id}/cover-media": {
+      "get": {
+        "description": "T45：封面查看（管理端 <img> 用；query token 双通道——照书目 cover-media 先例）。",
+        "operationId": "activity_cover_media_api_admin_activities__activity_id__cover_media_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "activity_id",
+            "required": true,
+            "schema": {
+              "title": "Activity Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activity Cover Media",
         "tags": [
           "activity-admin"
         ]
@@ -8755,6 +9085,26 @@
         ]
       }
     },
+    "/api/miniapp/activities/carousel": {
+      "get": {
+        "description": "T45（FEAT-082）：首页轮播位（有封面+PUBLISHED+未开始，≤5 条；公开端点——\n活动信息家长可见，无需 child 上下文）。",
+        "operationId": "activity_carousel_api_miniapp_activities_carousel_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Activity Carousel",
+        "tags": [
+          "activity-miniapp"
+        ]
+      }
+    },
     "/api/miniapp/activities/{activity_id}": {
       "get": {
         "operationId": "activity_detail_api_miniapp_activities__activity_id__get",
@@ -8808,6 +9158,73 @@
           }
         },
         "summary": "Activity Detail",
+        "tags": [
+          "activity-miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/activities/{activity_id}/cover": {
+      "get": {
+        "description": "T45：活动封面（query token 双通道——照书目 covers 先例；封面公开给家长端）。",
+        "operationId": "activity_cover_api_miniapp_activities__activity_id__cover_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "activity_id",
+            "required": true,
+            "schema": {
+              "title": "Activity Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activity Cover",
         "tags": [
           "activity-miniapp"
         ]
