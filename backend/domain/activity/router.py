@@ -1,20 +1,43 @@
 # backend/domain/activity/router.py — 管理端活动 API（/api/admin）
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from pydantic import Field, field_validator
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
 from backend.database import get_db
+from backend.domain.activity.models import Activity
 from backend.domain.activity.service import ActivityService
 from backend.middleware.admin_rbac import require_perm, require_super_admin
 
 router = APIRouter(tags=["activity-admin"])
+
+
+class ActivityUpdateRequest(BaseSchema):
+    """T45（FEAT-082·Q8 批复）：编辑白名单 9 字段——activity_type 禁改
+    （BaseSchema extra=forbid：传入即 422 显式拒绝）。"""
+
+    title: str | None = Field(None, min_length=1, max_length=120)
+    start_at: datetime | None = None
+    location: str | None = Field(None, max_length=200)
+    max_quota: int | None = Field(None, gt=0, le=1000)
+    fee: Decimal | None = Field(None, ge=0)
+    description: str | None = Field(None, max_length=2000)
+    member_only: bool | None = None
+    enroll_deadline: datetime | None = None
+
+    @field_validator("start_at", "enroll_deadline", mode="after")
+    @classmethod
+    def _strip_tz(cls, v: datetime | None) -> datetime | None:
+        if v is not None and v.tzinfo is not None:
+            return v.astimezone().replace(tzinfo=None)
+        return v
 
 
 class ActivityCreateRequest(BaseSchema):
@@ -57,6 +80,68 @@ def list_activities(
     db: Session = Depends(get_db),
 ):
     return ActivityService(db).list_admin(status, keyword, activity_type)
+
+
+@router.get("/activities/{activity_id}")
+def get_activity_detail(
+    activity_id: int,
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """T45：活动详情（含报名统计）。"""
+    return ActivityService(db).get_detail(activity_id)
+
+
+@router.put("/activities/{activity_id}")
+def update_activity(
+    activity_id: int,
+    body: ActivityUpdateRequest,
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """T45：活动编辑（仅 PUBLISHED 且未开始；Q7 名额下限/Q8 白名单）。"""
+    a = ActivityService(db).update(admin, activity_id, body)
+    return {"id": a.id, "title": a.title, "status": a.status}
+
+
+@router.post("/activities/{activity_id}/cover")
+async def upload_activity_cover(
+    activity_id: int,
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+    file: UploadFile = File(...),
+):
+    """T45：封面上传（R-316 同款通道统一转 JPG；Router 零异常处理纪律）。"""
+    data = await file.read()
+    a = ActivityService(db).upload_cover(admin, activity_id, data, file.filename or "")
+    return {"id": a.id, "cover_path": a.cover_path}
+
+
+@router.get("/activities/{activity_id}/cover-media")
+def activity_cover_media(
+    activity_id: int,
+    request: Request,
+    token: str = "",
+    db: Session = Depends(get_db),
+):
+    """T45：封面查看（管理端 <img> 用；query token 双通道——照书目 cover-media 先例）。"""
+    from fastapi.responses import FileResponse
+
+    from backend.config import get_settings
+    from backend.domain.catalog.media_auth import authorize_media
+
+    authorize_media(request, token, db)
+    a = ActivityService(db).get_detail(activity_id)  # NotFound 校验复用
+    rel = db.query(Activity.cover_path).filter(Activity.id == activity_id).scalar()
+    if not rel:
+        from backend.common.exceptions import NotFoundError
+
+        raise NotFoundError("封面不存在")
+    root = get_settings().UPLOADS_DIR
+    full = os.path.abspath(os.path.join(root, rel))
+    if not full.startswith(os.path.abspath(root)):
+        raise NotFoundError("封面文件不存在")
+    return FileResponse(full, media_type="image/jpeg")
 
 
 @router.post("/activities")

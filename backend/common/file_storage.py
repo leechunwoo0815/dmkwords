@@ -63,6 +63,33 @@ def save_cover_jpg(book, data: bytes, ext: str) -> str:
     return rel.replace(os.sep, "/")
 
 
+def save_activity_cover_jpg(activity_id: int, data: bytes, ext: str) -> str:
+    """T45（FEAT-082）：活动封面存储——统一转 JPG（Pillow）；路径 cover/activity/{id}_{hex}.jpg
+    （R-316 同款通道，参照书目封面先例）。"""
+    ext = ext.lower()
+    if ext and ext not in ALLOWED_COVER_EXTS:
+        from backend.common.exceptions import ValidationError
+
+        raise ValidationError(f"封面格式仅支持 JPG/JPEG/PNG/WebP: {ext}")
+    from io import BytesIO
+
+    from PIL import Image
+
+    try:
+        img = Image.open(BytesIO(data))
+        img = img.convert("RGB")
+    except Exception as e:  # noqa: BLE001 — Pillow 异常类型多，统一转业务异常
+        from backend.common.exceptions import ValidationError
+
+        raise ValidationError("封面文件无法解析为图片") from e
+
+    rel = os.path.join("cover", "activity", f"{activity_id}_{secrets.token_hex(6)}.jpg")
+    abs_path = os.path.join(_uploads_root(), rel)
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+    img.save(abs_path, "JPEG", quality=85)
+    return rel.replace(os.sep, "/")
+
+
 def save_voucher_jpg(order_no: str, data: bytes, ext: str) -> str:
     """收款凭证存储（WM3-B2）：统一转 JPG（Pillow 对齐封面口径）；
     路径 voucher/{order_no}_{token}.jpg（订单号便于归档追溯）。"""

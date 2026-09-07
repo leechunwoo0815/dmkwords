@@ -222,7 +222,6 @@ def test_t41_deposit_checked(client: TestClient):
 
 def test_t43_quiz_status_batch(client: TestClient):
     """修复前：接口不存在 = RED。3 书三态一次返回（行为断言）。"""
-    from datetime import datetime
 
     from backend.database import get_session
     from backend.domain.catalog.models import Book
@@ -264,3 +263,123 @@ def test_t43_quiz_status_batch(client: TestClient):
     assert data[b1]["best_percent"] == 90
     assert data[b2]["status"] == "available"
     assert data[b3]["status"] == "locked"
+
+
+# ---------- T45：FEAT-082 活动封面+详情/编辑+轮播 ----------
+
+
+def _png_bytes():
+    """最小 PNG（1x1）。"""
+    import struct
+    import zlib
+
+    def chunk(typ, data):
+        c = struct.pack(">I", len(data)) + typ + data
+        return c + struct.pack(">I", zlib.crc32(typ + data) & 0xFFFFFFFF)
+
+    ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+    idat = zlib.compress(b"\x00\xff\x00\x00")
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", idat) + chunk(b"IEND", b"")
+
+
+def test_t45_activity_detail_and_update(client: TestClient):
+    """修复前：详情/编辑端点不存在 = RED。规则：PUBLISHED+未开始可编辑；
+    activity_type 禁改（schema forbid=422）；名额下限 Q7（低于活跃报名数 422，等于放行）。"""
+    from datetime import timedelta
+
+    h = _h(client)
+    p, c, mini = _family(client, h, "13981070001", "编辑孩")
+    act = client.post(
+        "/api/admin/activities",
+        json={
+            "title": "编辑前活动",
+            "activity_type": "book_club",
+            "start_at": (datetime.now() + timedelta(hours=72)).isoformat(),
+            "location": "馆内一层",
+            "max_quota": 5,
+            "fee": 60,
+            "description": "T45",
+            "member_only": False,
+        },
+        headers=h,
+    ).json()
+    e = client.post(
+        f"/api/miniapp/activities/{act['id']}/enroll", json={"child_id": c["id"]}, headers=mini
+    ).json()
+    client.post(
+        f"/api/admin/orders/{e['order_id']}/confirm-payment", json={"pay_method": "scan"}, headers=h
+    )
+
+    # 详情（含报名统计）
+    d = client.get(f"/api/admin/activities/{act['id']}", headers=h)
+    assert d.status_code == 200, f"详情端点应 200，实 {d.status_code} = RED"
+    assert d.json()["enrolled_count"] == 1, f"报名统计应 1，实 {d.json()}"
+
+    # 正常编辑（title/location/max_quota 等于活跃数=1 放行）
+    u = client.put(
+        f"/api/admin/activities/{act['id']}",
+        json={"title": "编辑后活动", "location": "馆内二层", "max_quota": 1},
+        headers=h,
+    )
+    assert u.status_code == 200, f"编辑应 200，实 {u.status_code} {u.text[:120]} = RED"
+    assert (
+        client.get(f"/api/admin/activities/{act['id']}", headers=h).json()["title"] == "编辑后活动"
+    )
+
+    # activity_type 禁改（extra=forbid → 422）
+    u2 = client.put(
+        f"/api/admin/activities/{act['id']}",
+        json={"title": "x", "activity_type": "parent_child"},
+        headers=h,
+    )
+    assert u2.status_code == 422, f"activity_type 禁改应 422，实 {u2.status_code} = RED"
+
+    # 名额下限（缩到低于活跃报名数）
+    u3 = client.put(f"/api/admin/activities/{act['id']}", json={"max_quota": 0}, headers=h)
+    assert u3.status_code == 422, f"名额低于已报名应 422，实 {u3.status_code} = RED"
+
+
+def test_t45_cover_upload_and_carousel(client: TestClient):
+    """封面上传→cover-media→miniapp 封面/轮播全链。"""
+    from datetime import timedelta
+
+    h = _h(client)
+    p, c, mini = _family(client, h, "13981070002", "轮播孩")
+    act = client.post(
+        "/api/admin/activities",
+        json={
+            "title": "轮播活动",
+            "activity_type": "book_club",
+            "start_at": (datetime.now() + timedelta(hours=72)).isoformat(),
+            "location": "馆内",
+            "max_quota": 5,
+            "fee": 0,
+            "description": "轮播",
+            "member_only": False,
+        },
+        headers=h,
+    ).json()
+    up = client.post(
+        f"/api/admin/activities/{act['id']}/cover",
+        files={"file": ("c.png", _png_bytes(), "image/png")},
+        headers=h,
+    )
+    assert up.status_code == 200, f"封面上传应 200，实 {up.status_code} {up.text[:120]} = RED"
+    from backend.database import get_session
+    from backend.domain.activity.models import Activity
+
+    with get_session() as db:
+        a = db.query(Activity).filter(Activity.id == act["id"]).first()
+        assert a.cover_path, "cover_path 应落库 = RED"
+    # 管理端查看（Bearer）
+    m = client.get(f"/api/admin/activities/{act['id']}/cover-media", headers=h)
+    assert m.status_code == 200, f"cover-media 应 200，实 {m.status_code} = RED"
+    # miniapp 轮播（有封面 PUBLISHED 未开始 ≤5）
+    cr = client.get("/api/miniapp/activities/carousel", headers=mini)
+    assert cr.status_code == 200, f"轮播端点应 200，实 {cr.status_code} = RED"
+    items = cr.json()["items"]
+    assert any(x["id"] == act["id"] for x in items), f"轮播应含封面活动，实 {items} = RED"
+    assert all(x.get("cover_url") for x in items), "轮播项应带 cover_url"
+    # miniapp 封面公开端点
+    cv = client.get(f"/api/miniapp/activities/{act['id']}/cover", headers=mini)
+    assert cv.status_code == 200, f"miniapp 封面应 200，实 {cv.status_code} = RED"
