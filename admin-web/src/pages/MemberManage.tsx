@@ -231,6 +231,22 @@ export default function MemberManage() {
 
   useEffect(() => { if (tab === "children") loadChildren(childPg.page); }, [loadChildren, childPg.page, tab]);
 
+  // R10c（计数同源第 8 案·假 0，20260907 目视）：URL 直跳 orders tab 时
+  // children 懒加载守卫（tab==="children"）不触发——label「孩子档案（0）」假 0
+  // （违 U10），切进去才变真数（"里外不一致"）。orders tab 的 W3 counts 先例
+  // 同款兜底：挂载无条件拉一次轻量 total（page_size=1）；parents 挂载即拉
+  // （F1 已修）无此病，兜底拉取冗余无害（prev===0 守卫防覆盖）双保险。
+  useEffect(() => {
+    apiListChildren({ page: 1, page_size: 1 })
+      .then((r) => setChildTotal((prev) => (prev === 0 ? r.total : prev)))
+      .catch(() => undefined);
+    apiListParentsPage({ page: 1, page_size: 1 })
+      .then((r) => setParentTotal((prev) => (prev === 0 ? r.total : prev)))
+      .catch(() => undefined);
+    // 仅挂载一次（懒加载落地后 total 由其维护——不重复拉）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const onRefundOrder = (o: Order) => {
     let remarkInput = "";
     Modal.confirm({
