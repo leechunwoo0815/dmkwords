@@ -9,7 +9,7 @@ enroll 判定本就正确（refunded 不在 ACTIVE_STATUSES=可重报）。"""
 from fastapi.testclient import TestClient
 
 from tests.unit.test_wm9_activity import _mk_activity
-from tests.unit.test_wm10_concurrency import _h, _family
+from tests.unit.test_wm10_concurrency import _family, _h
 
 
 def _refunded_flow(client, h, mini, c, act):
@@ -29,7 +29,9 @@ def _refunded_flow(client, h, mini, c, act):
     eid = e["enrollment"]["id"]
     # 超管审核通过（rr→approved，e 保持 refund_pending）
     ra = client.post(
-        f"/api/admin/activity-refunds/{eid}/review", json={"approve": True, "remark": "同意"}, headers=h
+        f"/api/admin/activity-refunds/{eid}/review",
+        json={"approve": True, "remark": "同意"},
+        headers=h,
     )
     assert ra.status_code == 200, ra.text
     # 拿统一台账 RefundRequest（kind=order + order_id）execute 成功 → e 翻 refunded
@@ -47,7 +49,9 @@ def _refunded_flow(client, h, mini, c, act):
         )
         rid = rr.id
     re_ = client.post(
-        f"/api/admin/refund-requests/{rid}/execute", json={"success": True, "remark": "线下打款"}, headers=h
+        f"/api/admin/refund-requests/{rid}/execute",
+        json={"success": True, "remark": "线下打款"},
+        headers=h,
     )
     assert re_.status_code == 200, re_.text
     return eid
@@ -68,7 +72,9 @@ def test_refunded_enrollment_releases_entry(client: TestClient):
         assert e_db.status == ActivityEnrollment.STATUS_REFUNDED, f"应 refunded，实 {e_db.status}"
 
     # 详情接口：my_enrollment 应 None（活跃态过滤）——当前返回 refunded 记录 = RED
-    d = client.get(f"/api/miniapp/activities/{act['id']}", params={"child_id": c["id"]}, headers=mini)
+    d = client.get(
+        f"/api/miniapp/activities/{act['id']}", params={"child_id": c["id"]}, headers=mini
+    )
     assert d.status_code == 200, d.text
     assert d.json().get("my_enrollment") is None, (
         f"refunded 死记录不应占报名入口位，实 {d.json().get('my_enrollment')}"
