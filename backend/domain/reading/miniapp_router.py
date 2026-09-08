@@ -95,7 +95,7 @@ def report_progress(body: ProgressReportRequest, auth: Any = Depends(get_current
     parent, db = auth
     child = child_of_parent(db, parent.id, body.child_id)  # P0-F1 归属校验
     # R2/C-13：播放心跳同受 AUDIO 门禁（与 audio 流同口径，防直链后心跳续听）
-    from backend.domain.identity.guards import require_member_action, AUDIO
+    from backend.domain.identity.guards import AUDIO, require_member_action
 
     require_member_action(db, child, AUDIO, book_id=body.book_id)
     return ReadingService(db).report_progress(
@@ -193,7 +193,7 @@ def book_audio(
     from backend.config import get_settings
     from backend.domain.catalog.service import BookService
     from backend.domain.identity.auth import child_of_parent
-    from backend.domain.identity.guards import require_member_action, AUDIO
+    from backend.domain.identity.guards import AUDIO, require_member_action
 
     parent = _parent_from_token(token, db)  # 401 语义先行（child_id 可选——防 FastAPI 参数校验抢跑）
     from backend.common.exceptions import ForbiddenError
