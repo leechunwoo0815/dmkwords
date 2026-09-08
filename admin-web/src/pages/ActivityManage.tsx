@@ -1,3 +1,4 @@
+import dayjs from "dayjs";
 import { UploadOutlined } from "@ant-design/icons";
 import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
@@ -100,10 +101,10 @@ export default function ActivityManage() {
       setEditTarget(d);
       setEditCover(d.cover_url ? activityCoverUrl(a.id) : null);
       form.setFieldsValue({
-        title: d.title, start_at: d.start_at ? new Date(d.start_at) : undefined,
+        title: d.title, start_at: d.start_at ? dayjs(d.start_at) : undefined,
         location: d.location, max_quota: d.max_quota, fee: Number(d.fee),
         description: d.description, member_only: d.member_only,
-        enroll_deadline: d.enroll_deadline ? new Date(d.enroll_deadline) : undefined,
+        enroll_deadline: d.enroll_deadline ? dayjs(d.enroll_deadline) : undefined,
       });
       setCreateOpen(true);
     } catch (e) {
