@@ -173,7 +173,8 @@ def test_expired_formal_audio_only_holding(client: TestClient, db):
 
     assert _report(held["id"]).status_code == 200
     denied = _report(other["id"])
-    assert denied.status_code == 422
+    # R2（插修 15）：进度上报收口 guards.AUDIO——403 语义统一（原散落判定 422）
+    assert denied.status_code == 403
     assert "在借" in denied.json()["detail"]
 
 

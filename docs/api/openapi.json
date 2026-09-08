@@ -9502,7 +9502,7 @@
     },
     "/api/miniapp/books/{book_id}/audio": {
       "get": {
-        "description": "音频流（query token：innerAudioContext 无法携带 Authorization 头）。",
+        "description": "音频流（query token：innerAudioContext 无法携带 Authorization 头）。\n\nR2/C-13：child_id+会员守卫（guards.AUDIO 403）——此前只验家长 token，\n未缴费/退会持有效 token 可直链听书（WM12 前置清单提前命中）。",
         "operationId": "book_audio_api_miniapp_books__book_id__audio_get",
         "parameters": [
           {
@@ -9512,6 +9512,22 @@
             "schema": {
               "title": "Book Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "child_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Child Id"
             }
           },
           {

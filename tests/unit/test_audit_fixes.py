@@ -66,7 +66,8 @@ def test_audio_stream_endpoint(client: TestClient):
     """音频流：query token 鉴权 + audio/mpeg（此前端点缺失 → 播放器 404）。"""
     h = _h(client)
     c, book, mini, token = _mk_child_with_audio_book(client, h, "13800002002", "9782000000002")
-    url = f"/api/miniapp/books/{book['id']}/audio?token={token}"
+    # R2（插修 15）：audio 端点加 child_id+会员守卫——在册会员语境照常 200
+    url = f"/api/miniapp/books/{book['id']}/audio?token={token}&child_id={c['id']}"
     r = client.get(url)
     assert r.status_code == 200, r.text
     assert r.headers["content-type"].startswith("audio/mpeg")

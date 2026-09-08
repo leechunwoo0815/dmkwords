@@ -94,6 +94,10 @@ def get_progress(book_id: int, child_id: int, auth: Any = Depends(get_current_pa
 def report_progress(body: ProgressReportRequest, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child = child_of_parent(db, parent.id, body.child_id)  # P0-F1 归属校验
+    # R2/C-13：播放心跳同受 AUDIO 门禁（与 audio 流同口径，防直链后心跳续听）
+    from backend.domain.identity.guards import require_member_action, AUDIO
+
+    require_member_action(db, child, AUDIO, book_id=body.book_id)
     return ReadingService(db).report_progress(
         child, body.book_id, body.position, body.session_start
     )
@@ -172,16 +176,32 @@ def book_detail(book_id: int, auth: Any = Depends(get_current_parent)):
 
 
 @router.get("/books/{book_id}/audio")
-def book_audio(book_id: int, token: str = "", db: Session = Depends(get_db)):
-    """音频流（query token：innerAudioContext 无法携带 Authorization 头）。"""
+def book_audio(
+    book_id: int,
+    child_id: int | None = None,
+    token: str = "",
+    db: Session = Depends(get_db),
+):
+    """音频流（query token：innerAudioContext 无法携带 Authorization 头）。
+
+    R2/C-13：child_id+会员守卫（guards.AUDIO 403）——此前只验家长 token，
+    未缴费/退会持有效 token 可直链听书（WM12 前置清单提前命中）。"""
     import os
 
     from fastapi.responses import FileResponse
 
     from backend.config import get_settings
     from backend.domain.catalog.service import BookService
+    from backend.domain.identity.auth import child_of_parent
+    from backend.domain.identity.guards import require_member_action, AUDIO
 
-    _parent_from_token(token, db)
+    parent = _parent_from_token(token, db)  # 401 语义先行（child_id 可选——防 FastAPI 参数校验抢跑）
+    from backend.common.exceptions import ForbiddenError
+
+    if child_id is None:
+        raise ForbiddenError("缺少 child_id（音频流需孩子上下文做会员门禁）")
+    child = child_of_parent(db, parent.id, child_id)
+    require_member_action(db, child, AUDIO, book_id=book_id)
     book = BookService(db).get_book_public(book_id)
     if not book or not book.audio_path:
         raise NotFoundError("音频不存在")

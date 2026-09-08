@@ -35,6 +35,7 @@ PASSPORT_VIEW = "passport_view"
 POINTS_VIEW = "points_view"
 REPORT_VIEW = "report_view"
 DEPOSIT_SUPPLEMENT = "deposit_supplement"
+AUDIO = "audio"  # R2（插修 15/C-13）：音频流会员门禁——403 语义（ForbiddenError）
 
 
 def _member_state(child: Child) -> str:
@@ -95,6 +96,23 @@ def require_member_action(
         # 过期：仅音频场景内（书在借）
         if not _holding_book(db, child.id, book_id):
             raise ValidationError("会员已过期，仅可在播放已借图书时查词")
+        return
+
+    if action == AUDIO:
+        # R2/C-13：未缴费禁（直链可绕的洞）；过期仅手头在借书允（复用 _holding_book）；
+        # 退会禁。403 语义（ForbiddenError）——innerAudioContext 直链失败即 onError。
+        if state == "unpaid":
+            from backend.common.exceptions import ForbiddenError
+
+            raise ForbiddenError("需入会后才能收听音频（请到店咨询）")
+        if state == "withdrawn":
+            from backend.common.exceptions import ForbiddenError
+
+            raise ForbiddenError("已退会，无法收听音频")
+        if state == "expired" and not _holding_book(db, child.id, book_id):
+            from backend.common.exceptions import ForbiddenError
+
+            raise ForbiddenError("会员已过期，只能收听手中在借的图书音频")
         return
 
     if action in (VOCAB_WRITE, QUIZ, DEPOSIT_SUPPLEMENT):

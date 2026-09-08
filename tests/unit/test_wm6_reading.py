@@ -253,7 +253,8 @@ def test_member_permission_for_playback(client: TestClient):
     r = client.post("/api/miniapp/login", json={"phone": "13800000607", "code": "1234"})
     mini = {"Authorization": f"Bearer {r.json()['token']}"}
     resp = _report(client, mini, c["id"], book["id"], 10, 0)
-    assert resp.status_code == 422
+    # R2（插修 15）：进度上报收口 guards.AUDIO——403（ForbiddenError）语义统一
+    assert resp.status_code == 403
     assert "入会" in resp.json()["detail"]
 
     # 有效会员 + 押金 + 在借一本书 → 过期后：在借书可播、其他书被拒
@@ -275,7 +276,7 @@ def test_member_permission_for_playback(client: TestClient):
     assert ok.status_code == 200
     other = _setup_book_with_audio(client, h, "9789999999999", "Other Book")
     denied = _report(client, mini2, c2["id"], other["id"], 10, 0)
-    assert denied.status_code == 422
+    assert denied.status_code == 403
     assert "在借" in denied.json()["detail"]
 
 

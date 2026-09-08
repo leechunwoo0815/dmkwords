@@ -91,25 +91,8 @@ class ReadingService:
             raise NotFoundError("图书不存在或已下架")
         if not book.audio_path or not book.audio_duration_seconds:
             raise ValidationError("该书暂无音频")
-        # 会员权限（FEAT-038：有效会员全馆在架；过期仅在手；未入会/退会无）
-        if not child.is_active_member:
-            if child.is_expired_member:
-                holding = (
-                    self.db.query(func.count(BorrowRecord.id))
-                    .filter(
-                        BorrowRecord.child_id == child.id,
-                        BorrowRecord.book_id == book_id,
-                        BorrowRecord.status.in_(
-                            [BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]
-                        ),
-                        BorrowRecord.is_deleted == 0,
-                    )
-                    .scalar()
-                )
-                if not holding:
-                    raise ValidationError("会员已过期，只能收听手中在借的图书")
-            else:
-                raise ValidationError("需入会后才能收听（请到店咨询）")
+        # 会员权限已收口 guards.AUDIO（R2/C-13——Router 层统一守卫，此处删除
+        # 散落判定防两处漂移；Router 已 require_member_action(AUDIO) 403）
         total = book.audio_duration_seconds
         if position < 0 or position > total + 5:
             raise ValidationError(f"播放位置异常（0-{total}）")

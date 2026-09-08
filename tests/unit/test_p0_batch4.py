@@ -4,8 +4,9 @@
 manual_override 布尔字段（Q5 批复）。会员资格类（observation/formal）与押金
 （KIND_DEPOSIT·担保语义 Q4 批复）触发；活动费/自定义不触发。"""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -383,3 +384,151 @@ def test_t45_cover_upload_and_carousel(client: TestClient):
     # miniapp 封面公开端点
     cv = client.get(f"/api/miniapp/activities/{act['id']}/cover", headers=mini)
     assert cv.status_code == 200, f"miniapp 封面应 200，实 {cv.status_code} = RED"
+
+
+# ---------- 插修 15 R2：C-13 音频会员门禁（guards AUDIO·403） ----------
+
+
+def _set_member_state(child_id: int, status: str, expire_offset_days: int | None = None):
+    from datetime import timedelta
+
+    from backend.database import get_session
+    from backend.domain.identity.models import Child
+
+    with get_session() as db:
+        c = db.query(Child).filter(Child.id == child_id).first()
+        c.member_status = status
+        c.member_expire = (
+            date.today() + timedelta(days=expire_offset_days)
+            if expire_offset_days is not None
+            else None
+        )
+        db.commit()
+
+
+def _mk_audio_file(rel: str):
+    """造真实音频文件（audio 端点 isfile 校验需要）。"""
+    import os
+
+    from backend.config import get_settings
+
+    full = os.path.join(get_settings().UPLOADS_DIR, rel)
+    os.makedirs(os.path.dirname(full), exist_ok=True)
+    if not os.path.isfile(full):
+        Path(full).write_bytes(b"ID3fake-mp3")
+
+
+def _mk_borrow_holding(child_id: int, book_id: int):
+    from datetime import datetime, timedelta
+
+    from backend.database import get_session
+    from backend.domain.circulation.models import BorrowRecord
+
+    with get_session() as db:
+        db.add(
+            BorrowRecord(
+                child_id=child_id,
+                book_id=book_id,
+                copy_id=0,
+                status=BorrowRecord.STATUS_ACTIVE,
+                borrowed_at=datetime.now(),
+                due_at=datetime.now() + timedelta(days=14),
+            )
+        )
+        db.commit()
+
+
+def test_r2_audio_membership_guard(client: TestClient):
+    """修复前：audio 端点只验家长 token 无会员守卫——退会/未缴费直链可听 = RED。"""
+
+    h = _h(client)
+    # 演示家庭（formal）+ 音频书（seed_demo_library 的 Brown Bear 有音频——直造一本书带音频）
+    p, c, mini = _family(client, h, "13981080001", "音频孩")
+    from backend.database import get_session
+    from backend.domain.catalog.models import Book
+
+    with get_session() as db:
+        b = Book(
+            title="音频测试书",
+            isbn="9781099000001",
+            is_deleted=0,
+            audio_path="audio/test.mp3",
+            audio_duration_seconds=100,
+            status=1,
+        )
+        db.add(b)
+        db.flush()
+        bid = b.id
+        db.commit()
+    _mk_audio_file("audio/test.mp3")
+    _set_member_state(c["id"], "formal", 30)
+    _mk_borrow_holding(c["id"], bid)
+
+    base = f"/api/miniapp/books/{bid}/audio"
+    # 在册 → 200
+    _set_member_state(c["id"], "formal", 30)
+    r = client.get(base, params={"token": mini["Authorization"].split(" ")[1], "child_id": c["id"]})
+    assert r.status_code == 200, f"在册应 200，实 {r.status_code} {r.text[:120]}"
+    # 未缴费 → 403
+    _set_member_state(c["id"], "none")
+    r = client.get(base, params={"token": mini["Authorization"].split(" ")[1], "child_id": c["id"]})
+    assert r.status_code == 403, f"未缴费应 403，实 {r.status_code} = RED"
+    # 退会 → 403
+    _set_member_state(c["id"], "withdrawn")
+    r = client.get(base, params={"token": mini["Authorization"].split(" ")[1], "child_id": c["id"]})
+    assert r.status_code == 403, f"退会应 403，实 {r.status_code} = RED"
+    # 过期+非在借（换一本没借的书）→ 403
+    _set_member_state(c["id"], "formal", -3)
+    with get_session() as db:
+        b2 = Book(
+            title="音频对照书",
+            isbn="9781099000002",
+            is_deleted=0,
+            audio_path="audio/test2.mp3",
+            audio_duration_seconds=100,
+            status=1,
+        )
+        db.add(b2)
+        db.flush()
+        bid2 = b2.id
+        db.commit()
+    _mk_audio_file("audio/test2.mp3")
+    r = client.get(
+        f"/api/miniapp/books/{bid2}/audio",
+        params={"token": mini["Authorization"].split(" ")[1], "child_id": c["id"]},
+    )
+    assert r.status_code == 403, f"过期+非在借应 403，实 {r.status_code} = RED"
+    # 过期+在借该书 → 200
+    r = client.get(base, params={"token": mini["Authorization"].split(" ")[1], "child_id": c["id"]})
+    assert r.status_code == 200, f"过期+在借应 200（仅手头在借允），实 {r.status_code}"
+
+
+def test_r2_report_progress_guard_regression(client: TestClient):
+    """report_progress 收口 guards（散落判定删除防漂移）：退会 → 403。"""
+
+    h = _h(client)
+    p, c, mini = _family(client, h, "13981080002", "进度孩")
+    from backend.database import get_session
+    from backend.domain.catalog.models import Book
+
+    with get_session() as db:
+        b = Book(
+            title="进度测试书",
+            isbn="9781099000003",
+            is_deleted=0,
+            audio_path="audio/t3.mp3",
+            audio_duration_seconds=100,
+            status=1,
+        )
+        db.add(b)
+        db.flush()
+        bid = b.id
+        db.commit()
+    _mk_audio_file("audio/t3.mp3")
+    _set_member_state(c["id"], "withdrawn")
+    r = client.post(
+        "/api/miniapp/reading/progress",
+        json={"child_id": c["id"], "book_id": bid, "position": 5},
+        headers=mini,
+    )
+    assert r.status_code == 403, f"退会上报应 403，实 {r.status_code} {r.text[:120]}"
