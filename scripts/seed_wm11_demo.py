@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -721,6 +722,101 @@ def _ensure_demo_wm3_states(db: Session) -> None:
     print("c WM3 异常态演示：观察/待评估/过期孩 + 待确认订单", flush=True)
 
 
+def _ensure_demo_t41_data(db: Session, child) -> None:
+    """R3（插修 15）：T41 六项复核/押金动线演示数据——此前 seed 无逾期书与
+    独立押金孩，目视无法复验复核拦截。真实链路造数（E-20260904-01 铁律）：
+    ① 演示孩 1 本逾期借阅（BorrowRecord OVERDUE + due_at 过去 3 天 + copy borrowed）
+    ② 独立押金孩（WM3 异常态家长名下 formal + _ensure_demo_deposit 复用）。"""
+    from backend.domain.catalog.models import Book, BookCopy
+    from backend.domain.circulation.models import BorrowRecord
+    from backend.domain.identity.models import Child
+
+    # ① 逾期书（title 定位演示书——19 号 T-B 教训：不占 id 前位）
+    overdue_exists = (
+        db.query(BorrowRecord)
+        .filter(
+            BorrowRecord.child_id == child.id,
+            BorrowRecord.status == BorrowRecord.STATUS_OVERDUE,
+            BorrowRecord.is_deleted == 0,
+        )
+        .first()
+    )
+    if not overdue_exists:
+        book = (
+            db.query(Book)
+            .filter(Book.is_deleted == 0, Book.status == Book.STATUS_ON)
+            .order_by(Book.id.desc())
+            .first()
+        )
+        if book:
+            copy = (
+                db.query(BookCopy)
+                .filter(BookCopy.book_id == book.id, BookCopy.is_deleted == 0)
+                .first()
+            )
+            if not copy:
+                copy = BookCopy(
+                    book_id=book.id,
+                    copy_code=f"DEMO-OVERDUE-{book.id}",
+                    status=BookCopy.STATUS_AVAILABLE,
+                )
+                db.add(copy)
+                db.flush()
+            copy.status = BookCopy.STATUS_BORROWED
+            db.add(
+                BorrowRecord(
+                    child_id=child.id,
+                    copy_id=copy.id,
+                    book_id=book.id,
+                    status=BorrowRecord.STATUS_OVERDUE,
+                    borrowed_at=datetime.now() - timedelta(days=17),
+                    due_at=datetime.now() - timedelta(days=3),
+                )
+            )
+            db.flush()
+
+    # ② 押金孩（formal + 演示押金——T41 待结清/押金退款动线可目视）
+    wm3_parent = (
+        db.query(Parent).filter(Parent.phone == "13800007777", Parent.is_deleted == 0).first()
+    )
+    if wm3_parent:
+        dep_kid = (
+            db.query(Child)
+            .filter(Child.parent_id == wm3_parent.id, Child.name == "押金孩", Child.is_deleted == 0)
+            .first()
+        )
+        if not dep_kid:
+            dep_kid = Child(
+                parent_id=wm3_parent.id,
+                name="押金孩",
+                member_status=Child.MEMBER_FORMAL,
+                member_expire=datetime.now().date() + timedelta(days=365),
+            )
+            db.add(dep_kid)
+            db.flush()
+        _ensure_demo_deposit(db, dep_kid)
+
+
+def _ensure_activity_covers(db: Session) -> None:
+    """R4（插修 15）：双演示活动补绘本风封面（gen_cover 同款；幂等——
+    cover_path 非空跳过）。轮播 cover_path.isnot(None) 命中→首页有真数据。"""
+    import secrets
+
+    from backend.common.file_storage import _uploads_root
+    from backend.domain.activity.models import Activity
+    from scripts.seed_demo_library import gen_cover
+
+    acts = db.query(Activity).filter(Activity.is_deleted == 0, Activity.cover_path.is_(None)).all()
+    os.makedirs(os.path.join(_uploads_root(), "cover", "activity"), exist_ok=True)
+    for i, a in enumerate(acts):
+        data = gen_cover(a.title, "DmkWords 演示", i, "线下活动")
+        rel = f"cover/activity/{a.id}_{secrets.token_hex(6)}.jpg"
+        with open(os.path.join(_uploads_root(), rel), "wb") as f:
+            f.write(data)
+        a.cover_path = rel
+        db.flush()
+
+
 def _ensure_demo_activity(db: Session) -> None:
     """T47-2（gate p0batch4 核验首战命中）：活动演示造数——此前 seed 从不含活动，
     基线 1 系 WM13 验收时手动创建，T40 BDD 清库后永久丢失。补幂等造数：
@@ -878,6 +974,10 @@ def seed() -> None:
             _ensure_demo_fav_reservation(db, demo_child)
         _ensure_demo_activity(db)
         _ensure_demo_wm3_states(db)
+        # 逾期借阅依赖演示孩（if 块内造）；押金孩依赖 WM3 家长（wm3_states 造）——
+        # 故 t41_data 必须在两者之后（R3 顺序教训：跨段依赖按建序排）
+        _ensure_demo_t41_data(db, demo_child)
+        _ensure_activity_covers(db)
         _ensure_demo_wm13_states(db)
         now = datetime.now()
         _upsert_notification(
