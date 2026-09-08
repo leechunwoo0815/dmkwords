@@ -1,5 +1,6 @@
 // pages/activity-pkg/activity-list/activity-list.js — 活动列表（WM9）
 const api = require('../../../utils/api')
+const media = require('../../../utils/media')
 const session = require('../../../utils/session')
 
 const TYPE_TEXT = {
@@ -34,7 +35,12 @@ Page({
         api.listActivities(this._childId),
         api.myEnrollments(this._childId),
       ])
-      this.setData({ activities: acts || [], myEnrollments: mine || [] })
+      // R2（插修 16）：卡片封面拼 token（书封面正解同款）
+      const activities = (acts || []).map((a) => ({
+        ...a,
+        cover_url: a.cover_url ? media.fullUrl(a.cover_url, true) : '',
+      }))
+      this.setData({ activities, myEnrollments: mine || [] })
     } catch (e) {
       // F-M12/T26：fetch 失败进错误态（点击重试），不再静默空列表
       this.setData({ loadError: true })

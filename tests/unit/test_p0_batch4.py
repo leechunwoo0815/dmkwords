@@ -532,3 +532,52 @@ def test_r2_report_progress_guard_regression(client: TestClient):
         headers=mini,
     )
     assert r.status_code == 403, f"退会上报应 403，实 {r.status_code} {r.text[:120]}"
+
+
+# ---------- 插修 16 R3：播放入口前置拦截（audio-permission 端点） ----------
+
+
+def test_r3_audio_permission_endpoint(client: TestClient):
+    """修复前：端点不存在 = RED。五态断言对齐 guards.AUDIO 矩阵（禁两端点漂移）。"""
+
+    from backend.database import get_session
+    from backend.domain.catalog.models import Book
+
+    h = _h(client)
+    p, c, mini = _family(client, h, "13981090001", "预检孩")
+    with get_session() as db:
+        b = Book(
+            title="预检书",
+            isbn="9781099500001",
+            is_deleted=0,
+            audio_path="audio/pre.mp3",
+            audio_duration_seconds=100,
+            status=1,
+        )
+        db.add(b)
+        db.flush()
+        bid = b.id
+        db.commit()
+
+    url = f"/api/miniapp/books/{bid}/audio-permission"
+    # 在册 → allowed
+    _set_member_state(c["id"], "formal", 30)
+    r = client.get(url, params={"child_id": c["id"]}, headers=mini)
+    assert r.status_code == 200, r.text
+    assert r.json()["allowed"] is True and r.json()["reason"] == "ok", r.json()
+    # 未缴费 → 禁（reason=unpaid）
+    _set_member_state(c["id"], "none")
+    r = client.get(url, params={"child_id": c["id"]}, headers=mini)
+    assert r.json()["allowed"] is False and r.json()["reason"] == "unpaid", r.json()
+    # 退会 → 禁（reason=withdrawn）
+    _set_member_state(c["id"], "withdrawn")
+    r = client.get(url, params={"child_id": c["id"]}, headers=mini)
+    assert r.json()["allowed"] is False and r.json()["reason"] == "withdrawn", r.json()
+    # 过期+非在借 → 禁（reason=expired）
+    _set_member_state(c["id"], "formal", -3)
+    r = client.get(url, params={"child_id": c["id"]}, headers=mini)
+    assert r.json()["allowed"] is False and r.json()["reason"] == "expired", r.json()
+    # 过期+在借该书 → 允
+    _mk_borrow_holding(c["id"], bid)
+    r = client.get(url, params={"child_id": c["id"]}, headers=mini)
+    assert r.json()["allowed"] is True and r.json()["reason"] == "ok", r.json()

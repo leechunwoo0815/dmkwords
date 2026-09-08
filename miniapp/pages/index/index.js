@@ -76,7 +76,14 @@ Page({
   async loadCarousel() {
     try {
       const res = await api.activityCarousel()
-      this.setData({ carousel: res.items || [] })
+      // R2（插修 16）：封面 URL 走 fullUrl 拼 token（书封面正解同款——
+      // <image> 相对路径无 token=401 裂图）；start_at ISO 串顺带格式化
+      const carousel = (res.items || []).map((a) => ({
+        ...a,
+        cover_url: a.cover_url ? media.fullUrl(a.cover_url, true) : '',
+        start_at: (a.start_at || '').slice(0, 16).replace('T', ' '),
+      }))
+      this.setData({ carousel })
     } catch (e) { /* 轮播失败静默（非关键路径） */ }
   },
 

@@ -175,6 +175,17 @@ def book_detail(book_id: int, auth: Any = Depends(get_current_parent)):
     return _book_view(book)
 
 
+@router.get("/books/{book_id}/audio-permission")
+def audio_permission(book_id: int, child_id: int, auth: Any = Depends(get_current_parent)):
+    """R3（插修 16）：播放入口前置预检——book-detail onPlay 先查此端点，
+    allowed=false 不进播放页（按 reason 分流引导文案）；判定与 audio 流同源
+    （guards.check_audio——禁两端点漂移）。"""
+    parent, db = auth
+    child = child_of_parent(db, parent.id, child_id)
+    reason = guards.check_audio(db, child, book_id)
+    return {"allowed": reason == "ok", "reason": reason}
+
+
 @router.get("/books/{book_id}/audio")
 def book_audio(
     book_id: int,

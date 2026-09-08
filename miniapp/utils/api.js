@@ -162,6 +162,11 @@ module.exports = {
   removeFavorite(bookId, childId) {
     return req.del(`/api/miniapp/favorites/${bookId}`, null, { params: { child_id: childId } })
   },
+  // R3（插修 16）：播放入口前置预检（book-detail onPlay）
+  audioPermission(childId, bookId) {
+    return req.get('/api/miniapp/books/' + bookId + '/audio-permission', null, { params: { child_id: childId } })
+  },
+
   // T45（FEAT-082）：首页轮播位（有封面 PUBLISHED 未开始 ≤5）
   activityCarousel() {
     return req.get('/api/miniapp/activities/carousel')

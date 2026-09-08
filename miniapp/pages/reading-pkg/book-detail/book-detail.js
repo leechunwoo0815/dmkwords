@@ -218,12 +218,37 @@ Page({
     })
   },
 
-  onPlay() {
+  async onPlay() {
     const { book, childId, childName } = this.data
     if (!childId) { wx.showToast({ title: '请先选择孩子', icon: 'none' }); return }
     if (!book.has_audio) { wx.showToast({ title: '该书暂无音频', icon: 'none' }); return }
+    // R3（插修 16）：播放入口前置预检——allowed=false 不进播放页，按 reason
+    // 分流引导文案（R-301：退会可重新入会→"重新入会"文案；购买界面未上线
+    // TODO 占位跳转，上线后替换目标）
+    try {
+      const perm = await api.audioPermission(childId, book.id)
+      if (!perm.allowed) {
+        const guide = {
+          unpaid: { title: '收听音频需要入会', btn: '了解入会' },
+          withdrawn: { title: '会员已退会，重新入会请到店咨询', btn: '知道了' },
+          expired: { title: '会员已过期，续费请到店咨询', btn: '知道了' },
+        }[perm.reason] || { title: '暂无收听权限', btn: '知道了' }
+        wx.showModal({
+          title: '提示',
+          content: guide.title,
+          confirmText: guide.btn,
+          showCancel: false,
+          success: () => {
+            // TODO（FEAT 会员购买动线）：购买/续费界面上线后替换为跳购买页
+            wx.navigateTo({ url: '/pages/member/member' })
+          },
+        })
+        return
+      }
+    } catch (e) { /* 预检失败放行进 reader（audio 流端点兜底 403） */ }
+    // F-L19 同款：detail→reader 改传 id（整对象进 URL 白屏风险收口）
     wx.navigateTo({
-      url: `/pages/reading-pkg/reader/reader?book=${encodeURIComponent(JSON.stringify(book))}`
+      url: `/pages/reading-pkg/reader/reader?book_id=${book.book_id ?? book.id}`
         + `&child_id=${childId}&child_name=${encodeURIComponent(childName)}`,
     })
   },

@@ -67,6 +67,32 @@ def _holding_book(db: Session, child_id: int, book_id: int | None) -> bool:
     )
 
 
+# R3：AUDIO 拒因简码（audio-permission 端点返回给前端做引导文案分流）
+AUDIO_REASON_TEXT = {
+    "unpaid": "需入会后才能收听音频（请到店咨询）",
+    "withdrawn": "已退会，无法收听音频",
+    "expired": "会员已过期，只能收听手中在借的图书音频",
+}
+
+
+def check_audio(db: Session, child: Child, book_id: int | None) -> str:
+    """R3：音频收听资格判定（R-313 AUDIO 行）——返回简码 ok/unpaid/withdrawn/expired。
+
+    require_member_action(AUDIO) 与 audio-permission 预检端点同源消费（禁漂移）。
+    """
+    state = _member_state(child)
+    if state == "active":
+        return "ok"
+    if state == "unpaid":
+        return "unpaid"
+    if state == "withdrawn":
+        return "withdrawn"
+    # expired：仅手头在借书允
+    if not _holding_book(db, child.id, book_id):
+        return "expired"
+    return "ok"
+
+
 def require_member_action(
     db: Session, child: Child, action: str, book_id: int | None = None
 ) -> None:
@@ -101,18 +127,12 @@ def require_member_action(
     if action == AUDIO:
         # R2/C-13：未缴费禁（直链可绕的洞）；过期仅手头在借书允（复用 _holding_book）；
         # 退会禁。403 语义（ForbiddenError）——innerAudioContext 直链失败即 onError。
-        if state == "unpaid":
+        # R3：判定抽 check_audio 同源（audio-permission 预检端点消费，禁两端点漂移）
+        reason = check_audio(db, child, book_id)
+        if reason != "ok":
             from backend.common.exceptions import ForbiddenError
 
-            raise ForbiddenError("需入会后才能收听音频（请到店咨询）")
-        if state == "withdrawn":
-            from backend.common.exceptions import ForbiddenError
-
-            raise ForbiddenError("已退会，无法收听音频")
-        if state == "expired" and not _holding_book(db, child.id, book_id):
-            from backend.common.exceptions import ForbiddenError
-
-            raise ForbiddenError("会员已过期，只能收听手中在借的图书音频")
+            raise ForbiddenError(AUDIO_REASON_TEXT[reason])
         return
 
     if action in (VOCAB_WRITE, QUIZ, DEPOSIT_SUPPLEMENT):

@@ -66,6 +66,12 @@ Page({
     this._resumeApplied = false
     this._initAudio()
     this.loadProgress()
+    // R3/F-L19：id-only 进入（book_id 传参收口）时 title/封面为空——拉详情补全
+    if (!book.title && book.id) {
+      api.getBookDetail(book.id).then((fresh) => {
+        this.setData({ book: media.formatBook({ ...this.data.book, ...fresh }) })
+      }).catch(() => {})
+    }
   },
 
   onUnload() {
@@ -187,7 +193,12 @@ Page({
       this.setData({ playing: false })
     })
     audio.onError((err) => {
-      this.setData({ playing: false, anomalyMsg: '音频加载失败，请稍后再试' })
+      // R3（插修 16）：403（无收听权限）与真加载失败区分提示——预检端点
+      // 是主防线（book-detail onPlay），此处兜底直链进入场景
+      this.setData({
+        playing: false,
+        anomalyMsg: '无法播放（可能无收听权限），请返回重新进入',
+      })
       console.error('[audio error]', err)
     })
     audio.onTimeUpdate(() => {

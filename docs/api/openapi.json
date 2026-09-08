@@ -9567,6 +9567,65 @@
         ]
       }
     },
+    "/api/miniapp/books/{book_id}/audio-permission": {
+      "get": {
+        "description": "R3（插修 16）：播放入口前置预检——book-detail onPlay 先查此端点，\nallowed=false 不进播放页（按 reason 分流引导文案）；判定与 audio 流同源\n（guards.check_audio——禁两端点漂移）。",
+        "operationId": "audio_permission_api_miniapp_books__book_id__audio_permission_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "child_id",
+            "required": true,
+            "schema": {
+              "title": "Child Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Audio Permission",
+        "tags": [
+          "miniapp"
+        ]
+      }
+    },
     "/api/miniapp/books/{book_id}/progress": {
       "get": {
         "operationId": "get_progress_api_miniapp_books__book_id__progress_get",
