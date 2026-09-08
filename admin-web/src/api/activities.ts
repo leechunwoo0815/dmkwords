@@ -1,5 +1,5 @@
 // activities API（WM9：发布/取消/报名/签到/退款审核）
-import { request } from "./client";
+import { getToken, request } from "./client";
 
 export interface ActivityItem {
   cover_url?: string | null;
@@ -116,5 +116,8 @@ export function apiUploadActivityCover(id: number, file: File): Promise<{ cover_
 }
 
 export function activityCoverUrl(id: number): string {
-  return `/api/admin/activities/${id}/cover-media`;
+  // R1（插修 16）：<img> 不带 Authorization——拼 query token（与 request.ts
+  // TOKEN_KEY 同源 getToken）；cover-media 双通道已支持
+  const token = getToken();
+  return `/api/admin/activities/${id}/cover-media${token ? `?token=${encodeURIComponent(token)}` : ""}`;
 }

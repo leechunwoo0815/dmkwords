@@ -116,7 +116,7 @@ export default function ActivityManage() {
     if (!editTarget) return false;
     try {
       await apiUploadActivityCover(editTarget.id, file);
-      setEditCover(activityCoverUrl(editTarget.id) + `?t=${Date.now()}`);
+      setEditCover(activityCoverUrl(editTarget.id) + `&t=${Date.now()}`);
       message.success("封面已上传");
     } catch (e) {
       message.error((e as Error).message);
