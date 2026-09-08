@@ -281,7 +281,8 @@
 /* T45（FEAT-082）：活动轮播位 */
 .activity-carousel {
   height: 280rpx;
-  margin: 20rpx 24rpx;
+  /* RC（插修 17）：页面已有 padding 24rpx——去掉组件自加横向 margin（双重留白） */
+  margin: 20rpx 0;
   border-radius: 20rpx;
   overflow: hidden;
 }

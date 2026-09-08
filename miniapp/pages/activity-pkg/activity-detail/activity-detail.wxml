@@ -1,8 +1,13 @@
 <view class="page-bg" style="min-height:100vh;" wx:if="{{activity}}">
-  <view class="hero">
-    <view style="font-size:40rpx;font-weight:700;color:#fff;">{{activity.title}}</view>
-    <view style="color:#e8dfc8;margin-top:12rpx;font-size:26rpx;">
-      {{activity.start_at}} · {{activity.location}}
+  <!-- RB（插修 17）：hero 有封面显图+深色遮罩保文字，无封面降级纯色渐变 -->
+  <view class="hero {{activity.cover_url ? 'hero-cover' : ''}}">
+    <image wx:if="{{activity.cover_url}}" src="{{activity.cover_url}}" mode="aspectFill" class="hero-img" />
+    <view class="hero-mask"></view>
+    <view class="hero-content">
+      <view style="font-size:40rpx;font-weight:700;color:#fff;">{{activity.title}}</view>
+      <view style="color:#e8dfc8;margin-top:12rpx;font-size:26rpx;">
+        {{activity.start_at}} · {{activity.location}}
+      </view>
     </view>
   </view>
 

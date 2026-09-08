@@ -1,5 +1,6 @@
 // pages/activity-pkg/activity-detail/activity-detail.js — 活动详情与报名（WM9）
 const api = require('../../../utils/api')
+const media = require('../../../utils/media')
 
 const STATUS_TEXT = {
   enrolled: '已报名', checked_in: '已签到', pending_payment: '待收款确认',
@@ -31,6 +32,8 @@ Page({
       if (a.my_enrollment && ACTIVE.indexOf(a.my_enrollment.status) === -1) {
         a.my_enrollment = null
       }
+      // RB（插修 17）：hero 封面拼 token（书封面正解同款——断链第三处收口）
+      a.cover_url = a.cover_url ? media.fullUrl(a.cover_url, true) : ''
       this.setData({ activity: a })
     } catch (e) { /* toast 已弹 */ }
     finally { this.setData({ loading: false }) }

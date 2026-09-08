@@ -185,7 +185,19 @@ export default function ActivityManage() {
   return (
     <div>
       <Space style={{ marginBottom: 12 }} wrap>
-        <Button type="primary" onClick={() => setCreateOpen(true)}>发布活动</Button>
+        <Button
+          type="primary"
+          onClick={() => {
+            // RA（插修 17）：编辑过一次后 editTarget/表单残留→弹窗还是编辑模式；
+            // 置 null 回创建模式（title/onOk 三元切换）+表单回 initialValues
+            form.resetFields();
+            setEditTarget(null);
+            setEditCover(null);
+            setCreateOpen(true);
+          }}
+        >
+          发布活动
+        </Button>
         <Input.Search
           placeholder="输入入场券码签到" style={{ width: 260 }} value={signinCode}
           onChange={(e) => setSigninCode(e.target.value)} onSearch={onSignin}
