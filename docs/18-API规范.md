@@ -75,6 +75,15 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
   ——不一致项已登记，归 T29 sweep 处置。
 - 媒体流（音频/封面/报告图）：query token 传鉴权（`?token=`），组件无法带
   Authorization 头的历史约束；归属校验见 P0-F1/T25。
+- **媒体消费点纪律（2026-09-09 增补，封面三断链教训）**：新增媒体字段（cover_url 类）
+  的全部消费端（管理端 `<img>`/小程序 `<image>` 各页面）必须逐一接 token 拼 URL——
+  miniapp 走 `media.fullUrl()`（utils/media.js），admin-web 走对应 `xxxUrl()` helper 拼
+  query token。交付时附消费点清单（错误记忆库锚定）。
+- **2026-09 增补端点族**（契约快照执法，改动必须走 contract-change 两步显形）：
+  `GET /api/miniapp/books/{id}/audio-permission`（播放入口预检，与 audio 流共享 guards
+  判定）；`GET /api/miniapp/quiz/status-batch`（书架角标批量，IN 查询禁 N+1）；
+  `GET /api/miniapp/activities/carousel`（首页轮播，有封面优先）；
+  admin 活动 CRUD 扩展（detail/update/cover 上传——activity_type 禁改、名额下限 422）。
 
 ## 五、契约工作流（改接口三步链，缺一步 gate 红或前端断）
 
