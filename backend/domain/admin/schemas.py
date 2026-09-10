@@ -1,7 +1,7 @@
 # backend/domain/admin/schemas.py — admin 域 API Schema
 from datetime import datetime
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from backend.common.base_schema import BaseSchema
 
@@ -85,9 +85,18 @@ class AuditLogResponse(BaseSchema):
     action: str
     target_type: str
     target_id: str
-    detail: str
+    detail: str = ""
     reason: str
     created_at: datetime
+
+    @field_validator("detail", mode="before")
+    @classmethod
+    def _none_detail_to_empty(cls, v: object) -> object:
+        """fix29-R3：detail 列可为 NULL（audit_handlers 对 falsy detail 落 NULL），
+        但本 Schema 契约是字符串——None 归一为 ""，否则列表/分页校验炸 500
+        （用户实锤「点击审计日志 500」；WM14-A circle.pin/admin_unlike 传 detail={} 首发）。
+        前端 renderDetail 已对空串回落「—」，无需改前端。"""
+        return "" if v is None else v
 
 
 class DashboardRecentChange(BaseSchema):

@@ -27,7 +27,11 @@ def _handle_audit_requested(event: AuditRequestedEvent, db) -> None:
             action=event.action,
             target_type=event.target_type,
             target_id=event.target_id,
-            detail=json.dumps(event.detail, ensure_ascii=False) if event.detail else None,
+            # fix29-R3：原 `if event.detail` 把空 dict 也当 falsy 落 NULL（而契约是字符串）
+            # ——显式 {} 保留为 "{}"；只有真正没传 detail 才落 NULL
+            detail=json.dumps(event.detail, ensure_ascii=False)
+            if event.detail is not None
+            else None,
             reason=event.reason,
         )
     )
