@@ -289,6 +289,7 @@
             "type": "string"
           },
           "detail": {
+            "default": "",
             "title": "Detail",
             "type": "string"
           },
@@ -316,7 +317,6 @@
           "action",
           "target_type",
           "target_id",
-          "detail",
           "reason",
           "created_at"
         ],
