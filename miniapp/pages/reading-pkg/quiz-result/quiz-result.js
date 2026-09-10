@@ -8,6 +8,8 @@ Page({
     childName: '',
     percent: 0,
     showWrong: false,
+    // WM14-A：本次提交可晒且未晒的成就卡（null=不显示「晒成就」按钮）
+    shareTarget: null,
   },
 
   async onLoad(options) {
@@ -51,9 +53,51 @@ Page({
       // F-L6/T34：除零守卫
       percent: result.total ? Math.round((result.score * 100) / result.total) : 0,
     })
+    // WM14-A（Q5 裁决）：事件触发点接线——本次提交若产生了"可晒且未晒"的成就
+    // 才显示「晒成就」按钮（满分优先满分卡，否则完读卡）；拉取失败则静默不显示
+    if (result.passed) this._loadShareTarget()
+  },
+
+  _isPerfect() {
+    const r = this.data.result
+    return !!(r && r.total && r.score === r.total)
+  },
+
+  async _loadShareTarget() {
+    const childId = this.data.childId
+    const bookId = this.data.result.book_id
+    let res
+    try {
+      res = await api.circleMyCards(childId)
+    } catch (e) {
+      return // 拿不到可晒库就不显示按钮（不阻塞成绩单阅读）
+    }
+    const avail = (res && res.available) || []
+    // 完读卡 ref_id=book_id（Q10 口径，精确匹配）
+    const finish = avail.find((c) => c.card_type === 'finish_book' && c.ref_id === bookId)
+    // 满分卡 ref_id=测验提交 id（本页拿不到提交 id）——取该书最新一张未晒满分卡
+    const perfect = this._isPerfect()
+      ? avail
+          .filter((c) => c.card_type === 'perfect_quiz')
+          .sort((a, b) => b.ref_id - a.ref_id)[0]
+      : null
+    const shareTarget = perfect || finish || null
+    if (shareTarget) this.setData({ shareTarget })
   },
 
   toggleWrong() { this.setData({ showWrong: !this.data.showWrong }) },
+
+  // WM14-A（Q5 裁决）：结果页「晒成就」——跳晒卡页并定位到本次可晒的成就卡
+  onShare() {
+    const t = this.data.shareTarget
+    if (!t) return
+    wx.navigateTo({
+      url:
+        `/pages/circle/share?child_id=${this.data.childId}` +
+        `&child_name=${encodeURIComponent(this.data.childName || '')}` +
+        `&focus_type=${t.card_type}&focus_ref=${t.ref_id}`,
+    })
+  },
 
   onRetry() {
     wx.redirectTo({

@@ -1342,6 +1342,140 @@ def _ensure_wm4_10_acceptance_data(db: Session) -> None:
     print(f"c WM4-10 验收补数完成{ticket_note}", flush=True)
 
 
+def _ensure_demo_circle(db: Session) -> None:
+    """WM14-A 阅读圈演示帖：3 帖覆盖三类卡 + 金色态/置顶样例（验收步骤 13/18 用）。
+
+    - 演示孩 milestone 卡（admin_liked=1 馆长赞金色态样例）
+    - 观察期孩 perfect_quiz 满分卡
+    - 押金孩 streak 连击卡（is_pinned=1 置顶样例）
+    幂等：成就/帖子均先查后插；不预造点赞（用户验收自己点）。
+    卡片图走 card_engine 真实渲染管线（零 UGC——后端生成）。"""
+    from backend.domain.catalog.models import Book
+    from backend.domain.growth.models import (
+        CheckinStreakRecord,
+        MilestoneAward,
+        QuizAttempt,
+    )
+    from backend.domain.reading_circle import card_engine
+    from backend.domain.reading_circle.models import CirclePost
+
+    def _kid_by_name(parent_id: int, name: str):
+        return (
+            db.query(Child)
+            .filter(Child.parent_id == parent_id, Child.name == name, Child.is_deleted == 0)
+            .first()
+        )
+
+    demo_parent = db.query(Parent).filter(Parent.phone == "13800008888").first()
+    wm3_parent = db.query(Parent).filter(Parent.phone == "13800007777").first()
+    if not (demo_parent and wm3_parent):
+        print("c 阅读圈演示帖跳过：依赖家长未就位（先跑完整 seed）", flush=True)
+        return
+    demo_child = (
+        db.query(Child)
+        .filter(Child.parent_id == demo_parent.id, Child.name == "演示孩", Child.is_deleted == 0)
+        .first()
+    )
+    obs_kid = _kid_by_name(wm3_parent.id, "观察期孩")
+    dep_kid = _kid_by_name(wm3_parent.id, "押金孩")
+    if not (demo_child and obs_kid and dep_kid):
+        print("c 阅读圈演示帖跳过：依赖孩子未就位（先跑完整 seed）", flush=True)
+        return
+
+    def _ensure_post(child, parent_id, card_type, ref_id, *, admin_liked=0, is_pinned=0):
+        exists = (
+            db.query(CirclePost)
+            .filter(
+                CirclePost.child_id == child.id,
+                CirclePost.card_type == card_type,
+                CirclePost.ref_id == ref_id,
+            )
+            .first()
+        )
+        if exists:
+            return False
+        card_data = card_engine.assemble_card_data(db, child, card_type, ref_id)
+        image_path = card_engine.render_card(card_data)
+        db.add(
+            CirclePost(
+                parent_id=parent_id,
+                child_id=child.id,
+                card_type=card_type,
+                ref_id=ref_id,
+                card_data=card_engine.card_data_json(card_data),
+                image_path=image_path,
+                admin_liked=admin_liked,
+                is_pinned=is_pinned,
+            )
+        )
+        db.flush()
+        return True
+
+    created = 0
+
+    # ① 演示孩里程碑卡（造 MilestoneAward 节点 10 万词）——admin_liked=1 金色态样例
+    ms = (
+        db.query(MilestoneAward)
+        .filter(MilestoneAward.child_id == demo_child.id, MilestoneAward.node_words == 100000)
+        .first()
+    )
+    if not ms:
+        ms = MilestoneAward(
+            child_id=demo_child.id,
+            node_words=100000,
+            awarded_at=datetime.now() - timedelta(days=2),
+        )
+        db.add(ms)
+        db.flush()
+    created += _ensure_post(demo_child, demo_parent.id, "milestone", ms.id, admin_liked=1)
+
+    # ② 观察期孩满分卡（造 5/5 满分测验——真实满分卡口径）
+    perfect = (
+        db.query(QuizAttempt)
+        .filter(
+            QuizAttempt.child_id == obs_kid.id, QuizAttempt.score == QuizAttempt.total_questions
+        )
+        .first()
+    )
+    if not perfect:
+        book = (
+            db.query(Book).filter(Book.is_deleted == 0, Book.title.like("Chicka Chicka%")).first()
+        )
+        if book:
+            perfect = QuizAttempt(
+                child_id=obs_kid.id,
+                book_id=book.id,
+                score=5,
+                total_questions=5,
+                passed=1,
+                snapshot="[]",
+                submitted_at=datetime.now() - timedelta(days=1, hours=3),
+            )
+            db.add(perfect)
+            db.flush()
+    if perfect:
+        created += _ensure_post(obs_kid, wm3_parent.id, "perfect_quiz", perfect.id)
+
+    # ③ 押金孩连击卡（造 7 天连击记录）——is_pinned=1 置顶样例
+    streak = (
+        db.query(CheckinStreakRecord).filter(CheckinStreakRecord.child_id == dep_kid.id).first()
+    )
+    if not streak:
+        streak = CheckinStreakRecord(
+            child_id=dep_kid.id,
+            cycle_type="days7",
+            cycle_no=1,
+            streak_at=7,
+            awarded_at=datetime.now() - timedelta(days=1),
+        )
+        db.add(streak)
+        db.flush()
+    created += _ensure_post(dep_kid, wm3_parent.id, "streak", streak.id, is_pinned=1)
+
+    db.commit()
+    print(f"c 阅读圈演示帖完成（新建 {created} 帖：里程碑[馆长赞]/满分/连击[置顶]）", flush=True)
+
+
 def seed() -> None:
     db = SessionLocal()
     try:
@@ -1370,6 +1504,8 @@ def seed() -> None:
         # WM4-10 批量验收补数（依赖：演示孩/小红家长、WM3 三孩、Activity 1、WM13 退款演示孩
         # ——必须在这些段之后；教训 65：跨段依赖按建序排）
         _ensure_wm4_10_acceptance_data(db)
+        # WM14-A 阅读圈演示帖（依赖：演示孩/WM3 观察期孩+押金孩——上述段之后）
+        _ensure_demo_circle(db)
         now = datetime.now()
         _upsert_notification(
             db,

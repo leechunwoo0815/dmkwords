@@ -13,6 +13,7 @@ import {
   UserOutlined,
   NotificationOutlined,
   ScheduleOutlined,
+  StarOutlined,
 } from "@ant-design/icons";
 import { useEffect } from "react";
 import { Badge, Dropdown, Layout as AntLayout, Menu, Typography } from "antd";
@@ -43,6 +44,8 @@ export default function Layout() {
   // T6：线下活动侧边栏徽标（活动报名待确认，单独口径不进 admin_total——
   // admin_total=审核五类不污染；样式同 R6 先例）
   const activityBadge = failed || !counts ? 0 : (counts.activity_enroll_pending ?? 0);
+  // WM14-A：阅读圈徽标（今日新帖未馆长赞数——冷启动巡场动线；样式同先例）
+  const circleBadge = failed || !counts ? 0 : (counts.circle_unliked ?? 0);
 
   const iconBgMap: Record<string, string> = {
     "/": "#FCD34D",
@@ -59,6 +62,7 @@ export default function Layout() {
     "/audit-logs": "#A78BFA",
     "/notifications": "#F472B6",
     "/tasks": "#4ADE80",
+    "/circle": "#FCD34D",
   };
 
   const iconColorMap: Record<string, string> = {
@@ -76,6 +80,7 @@ export default function Layout() {
     "/audit-logs": "#FFFFFF",
     "/notifications": "#FFFFFF",
     "/tasks": "#3B2F2F",
+    "/circle": "#3B2F2F",
   };
 
   const items = [
@@ -126,6 +131,20 @@ export default function Layout() {
           "退款中心"
         ),
       perm: "audit.view",
+    },
+    {
+      key: "/circle",
+      icon: <StarOutlined />,
+      perm: "member.manage",
+      // WM14-A：阅读圈徽标（今日新帖未馆长赞——打开后台第一眼知道今天要赞什么）
+      label:
+        circleBadge > 0 ? (
+          <Badge count={circleBadge} size="small" offset={[10, 0]}>
+            阅读圈
+          </Badge>
+        ) : (
+          "阅读圈"
+        ),
     },
     {
       key: "/notifications",

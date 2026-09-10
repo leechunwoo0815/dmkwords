@@ -9,6 +9,7 @@ import CirculationDesk from "./pages/CirculationDesk";
 import DepositManage from "./pages/DepositManage";
 import ActivityManage from "./pages/ActivityManage";
 import GrowthManage from "./pages/GrowthManage";
+import CircleManage from "./pages/CircleManage";
 import RefundCenter from "./pages/RefundCenter";
 import Reservations from "./pages/Reservations";
 import MemberManage from "./pages/MemberManage";
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="reservations" element={<Reservations />} />
           <Route path="growth" element={<GrowthManage />} />
           <Route path="activities" element={<ActivityManage />} />
+          <Route path="circle" element={<CircleManage />} />
           <Route path="refund-center" element={<RefundCenter />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="tasks" element={<TaskBoard />} />

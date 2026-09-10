@@ -62,6 +62,10 @@ from backend.domain.identity.miniapp_router import router as identity_miniapp_ro
 from backend.domain.identity.router import router as identity_router  # noqa: E402
 from backend.domain.reading.miniapp_router import router as miniapp_router  # noqa: E402
 from backend.domain.reading.router import router as reading_router  # noqa: E402
+from backend.domain.reading_circle.miniapp_router import (  # noqa: E402
+    router as reading_circle_miniapp_router,
+)
+from backend.domain.reading_circle.router import router as reading_circle_router  # noqa: E402
 from backend.tasks.notify_handlers import register_notification_handlers  # noqa: E402
 
 register_audit_handlers()
@@ -81,3 +85,5 @@ app.include_router(billing_miniapp_router, prefix="/api/miniapp")
 app.include_router(growth_router, prefix="/api/admin")
 app.include_router(growth_miniapp_router, prefix="/api/miniapp")
 app.include_router(reading_router, prefix="/api/admin")
+app.include_router(reading_circle_router, prefix="/api/admin")
+app.include_router(reading_circle_miniapp_router, prefix="/api/miniapp")

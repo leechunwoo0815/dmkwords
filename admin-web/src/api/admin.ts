@@ -181,6 +181,8 @@ export interface TodoCounts {
   parent_unread: number;
   /** T6：活动报名待确认（单独口径不进 admin_total，侧边栏活动徽标用） */
   activity_enroll_pending: number;
+  /** WM14-A：阅读圈今日新帖未馆长赞数（侧边栏徽标+页顶胶囊共用） */
+  circle_unliked: number;
 }
 
 export function apiTodoCounts(): Promise<TodoCounts> {

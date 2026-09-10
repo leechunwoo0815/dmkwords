@@ -49,6 +49,7 @@ from backend.domain.reading.models import (  # noqa: E402, F401
     Reservation,
     Vocabulary,
 )
+from backend.domain.reading_circle.models import CircleLike, CirclePost  # noqa: E402, F401
 
 # this is the Alembic Config object
 config = context.config

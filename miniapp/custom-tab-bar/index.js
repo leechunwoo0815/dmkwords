@@ -23,6 +23,12 @@ Component({
         selectedIconPath: '/icons/shelf-active.png',
       },
       {
+        pagePath: '/pages/circle/circle',
+        text: '阅读圈',
+        iconPath: '/icons/circle.png',
+        selectedIconPath: '/icons/circle-active.png',
+      },
+      {
         pagePath: '/pages/member/member',
         text: '我的',
         iconPath: '/icons/me.png',

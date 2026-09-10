@@ -1,0 +1,60 @@
+<view class="page" style="min-height:100vh;">
+  <!-- 晒卡成功态：展示生成的成就卡片 -->
+  <block wx:if="{{sharedPost}}">
+    <view class="success-wrap">
+      <view class="success-title">🎉 晒出去啦！</view>
+      <view class="success-sub">长按卡片可保存，转发现实朋友圈让更多人看到</view>
+      <image class="success-card" src="{{sharedPost.image_url}}" mode="widthFix"
+        bindtap="onPreviewShared" />
+      <view class="success-btns">
+        <view class="btn-secondary" bindtap="onKeepSharing">继续晒</view>
+        <view class="btn-primary" bindtap="goCircle">去阅读圈看看</view>
+      </view>
+    </view>
+  </block>
+
+  <block wx:else>
+    <view class="child-bar">
+      <text class="child-emoji">🧒</text>
+      <text class="child-name">{{childName}} 的成就</text>
+    </view>
+
+    <view class="tabs">
+      <view class="tab {{tab === 'available' ? 'active' : ''}}" data-tab="available"
+        bindtap="onTab">可晒（{{available.length}}）</view>
+      <view class="tab {{tab === 'shared' ? 'active' : ''}}" data-tab="shared"
+        bindtap="onTab">已晒（{{shared.length}}）</view>
+    </view>
+
+    <view wx:if="{{loading}}" class="loading-wrap">加载中…</view>
+
+    <block wx:if="{{!loading && tab === 'available'}}">
+      <view wx:if="{{!available.length}}" class="empty-state">
+        <view class="empty-icon">🌱</view>
+        <view class="empty-text">还没有可晒的新成就——读完一本书、测个满分，回来第一个晒！</view>
+      </view>
+      <view class="card-list">
+        <view wx:for="{{available}}" wx:key="index" class="ach-card"
+          data-card="{{item}}" bindtap="onShareCard">
+          <text class="ach-label">{{item.label}}</text>
+          <view class="ach-title">{{item.title}}</view>
+          <view class="ach-action">{{sharing ? '分享中…' : '晒成就 ›'}}</view>
+        </view>
+      </view>
+    </block>
+
+    <block wx:if="{{!loading && tab === 'shared'}}">
+      <view wx:if="{{!shared.length}}" class="empty-state">
+        <view class="empty-icon">📭</view>
+        <view class="empty-text">还没有晒过的成就</view>
+      </view>
+      <view class="card-list">
+        <view wx:for="{{shared}}" wx:key="index" class="ach-card shared">
+          <text class="ach-label">{{item.label}}</text>
+          <view class="ach-title">{{item.title}}</view>
+          <view class="ach-action shared-action">已晒 ✓</view>
+        </view>
+      </view>
+    </block>
+  </block>
+</view>

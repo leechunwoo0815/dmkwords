@@ -474,3 +474,38 @@
   border-radius: 24rpx 28rpx 20rpx 30rpx;
   box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
 }
+
+/* WM14-A：我的成就入口（晒成就常驻入口） */
+.my-achievements-entry {
+  margin: 24rpx;
+  padding: 26rpx 30rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 22rpx;
+  box-shadow: var(--shadow-hard-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ach-entry-left {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+}
+.ach-entry-icon {
+  font-size: 52rpx;
+}
+.ach-entry-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--fg);
+}
+.ach-entry-sub {
+  font-size: 22rpx;
+  color: var(--muted);
+  margin-top: 4rpx;
+}
+.ach-entry-arrow {
+  font-size: 40rpx;
+  color: var(--muted);
+}

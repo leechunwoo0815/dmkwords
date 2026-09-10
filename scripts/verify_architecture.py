@@ -21,6 +21,7 @@ DOMAINS = [
     "growth",
     "activity",
     "admin",
+    "reading_circle",
 ]
 FOUR_PIECES = ["models.py", "schemas.py", "repository.py", "service.py", "router.py"]
 

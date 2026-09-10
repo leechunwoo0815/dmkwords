@@ -179,10 +179,15 @@ Page({
               if (q.status !== 'available') return
               this._finishPrompted = true // 会话内防重复轰炸（跨会话 onLoad 重置，可再弹）
               // U3（插修8）：文案与详情页徽章语气统一（儿童激励口径）
+              // WM14-A（Q5 裁决）：完读弹窗主职是测验转化（词数入账核心漏斗）——
+              // 保持两键「去测验/先不」，不塞晒成就（wx.showModal 仅两键，塞进去
+              // 会与去测验互斥且吃掉"稍后再说"语义）。晒卡入口 = quiz-result 结果页
+              // 按钮 + 阅读护照「我的成就」+ 阅读圈页顶
               wx.showModal({
                 title: '已读完！',
                 content: `太棒了，读完啦！要不要挑战一下测验？还剩 ${q.attempts_left} 次机会`,
                 confirmText: '去测验',
+                cancelText: '先不',
                 success: (r) => {
                   if (r.confirm) {
                     // R1（插修6）：补 child_id/child_name——原 URL 漏参导致

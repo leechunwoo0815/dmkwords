@@ -52,6 +52,18 @@
     </view>
   </view>
 
+  <!-- WM14-A：我的成就入口（常驻晒卡入口——历史成就补晒，PRD §7.5） -->
+  <view wx:if="{{!passport.read_only}}" class="my-achievements-entry" bindtap="goMyCards">
+    <view class="ach-entry-left">
+      <text class="ach-entry-icon">🏆</text>
+      <view>
+        <view class="ach-entry-title">我的成就</view>
+        <view class="ach-entry-sub">里程碑/满分/连击…晒到馆内阅读圈</view>
+      </view>
+    </view>
+    <text class="ach-entry-arrow">›</text>
+  </view>
+
   <view wx:if="{{passport.read_only}}" class="tip" style="margin:24rpx;text-align:center;color:var(--muted);">
     已退会：护照为只读历史（词数等级永不回收）
   </view>

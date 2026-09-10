@@ -400,6 +400,9 @@ class AdminTodoService:
             "parent_unread": 0,
             # T6：活动报名待确认（R10 裁定后 admin_total 也含——细分值仍供活动徽标）
             "activity_enroll_pending": 0,
+            # WM14-A：阅读圈今日新帖未馆长赞数（冷启动巡场动线——单独口径
+            # 不进 admin_total，侧边栏阅读圈徽标+页顶胶囊共用同一源）
+            "circle_unliked": 0,
         }
         # 家长未读数对所有能进通知中心的角色开放（导航感知，不挂权限分支）
         from backend.common.notification_models import Notification
@@ -468,4 +471,8 @@ class AdminTodoService:
             # 废弃；T6 旧裁定"单独口径不进 admin_total"推翻）；tab 数字
             # （list_inbox.pending_count 全场景）与徽标自此严格同源
             counts["admin_total"] += counts["activity_enroll_pending"]
+            # WM14-A：阅读圈未赞数（member.manage 角色可赞——徽标语义是"你能处理的"）
+            from backend.domain.reading_circle.admin_service import AdminCircleService
+
+            counts["circle_unliked"] = AdminCircleService(self.db).unliked_count()
         return counts

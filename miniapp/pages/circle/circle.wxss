@@ -1,0 +1,177 @@
+/* pages/circle/circle.wxss — 阅读圈信息流（绘本风设计令牌） */
+.page {
+  background: var(--bg);
+}
+
+.share-entry {
+  margin: 24rpx;
+  padding: 28rpx 32rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 24rpx;
+  box-shadow: var(--shadow-hard);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.share-entry-left {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+.share-entry-icon {
+  font-size: 56rpx;
+}
+.share-entry-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--fg);
+}
+.share-entry-sub {
+  font-size: 24rpx;
+  color: var(--muted);
+  margin-top: 4rpx;
+}
+.share-entry-arrow {
+  font-size: 40rpx;
+  color: var(--muted);
+}
+
+.loading-wrap {
+  text-align: center;
+  color: var(--muted);
+  padding: 40rpx 0;
+  font-size: 26rpx;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 120rpx 60rpx;
+}
+.empty-icon {
+  font-size: 100rpx;
+  margin-bottom: 24rpx;
+}
+.empty-text {
+  color: var(--muted);
+  font-size: 28rpx;
+  line-height: 1.6;
+}
+
+.post-list {
+  padding: 0 24rpx;
+}
+.post-card {
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 24rpx;
+  box-shadow: var(--shadow-hard);
+  margin-bottom: 28rpx;
+  padding: 24rpx;
+  position: relative;
+  overflow: hidden;
+}
+/* 馆长赞特殊态：金色边框 */
+.post-card.admin-liked {
+  border-color: var(--gold);
+  box-shadow: 6rpx 6rpx 0 rgba(245, 158, 11, 0.45);
+}
+.pin-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: var(--accent);
+  color: #fff;
+  font-size: 20rpx;
+  padding: 6rpx 18rpx;
+  border-radius: 0 20rpx 0 20rpx;
+  z-index: 2;
+}
+
+.post-header {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+.post-avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: var(--sun-soft);
+  border: 3rpx solid var(--fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  overflow: hidden;
+}
+.post-names {
+  flex: 1;
+  min-width: 0;
+}
+.post-dual-name {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--fg);
+}
+.admin-like-mark {
+  color: var(--gold);
+  font-size: 28rpx;
+}
+.post-time {
+  font-size: 22rpx;
+  color: var(--muted);
+  margin-top: 4rpx;
+}
+.delete-link {
+  font-size: 24rpx;
+  color: var(--error);
+  padding: 8rpx 12rpx;
+}
+
+.post-card-img {
+  width: 100%;
+  border-radius: 16rpx;
+  border: 2rpx solid var(--border);
+  display: block;
+}
+/* 馆长赞卡片图金色描边（与管理端金色 Tag 呼应） */
+.post-card-img.img-gold {
+  border-color: var(--gold);
+}
+
+.post-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16rpx;
+}
+.like-btn {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  padding: 10rpx 28rpx;
+  border-radius: 40rpx;
+  border: 3rpx solid var(--fg);
+  background: var(--surface);
+  min-height: 88rpx; /* MP-018 触控区 */
+}
+.like-btn.liked {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.like-icon {
+  font-size: 32rpx;
+}
+.like-count {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.list-end {
+  text-align: center;
+  color: var(--muted);
+  font-size: 24rpx;
+  padding: 30rpx 0;
+}

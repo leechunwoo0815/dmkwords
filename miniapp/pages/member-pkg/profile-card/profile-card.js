@@ -33,4 +33,13 @@ Page({
       path: '/pages/index/index',
     }
   },
+
+  // WM14-A：我的成就（历史成就补晒入口）
+  goMyCards() {
+    if (!this._childId) return
+    const name = this.data.childName || (this.data.passport ? this.data.passport.child_name : '')
+    wx.navigateTo({
+      url: `/pages/circle/share?child_id=${this._childId}&child_name=${encodeURIComponent(name || '')}`,
+    })
+  },
 })

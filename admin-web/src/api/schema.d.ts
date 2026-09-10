@@ -4,16 +4,41 @@
  */
 
 export interface paths {
-    "/health": {
+    "/api/admin/activities": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Health */
-        get: operations["health_health_get"];
+        /** List Activities */
+        get: operations["list_activities_api_admin_activities_get"];
         put?: never;
+        /** Create Activity */
+        post: operations["create_activity_api_admin_activities_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/activities/{activity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Activity Detail
+         * @description T45：活动详情（含报名统计）。
+         */
+        get: operations["get_activity_detail_api_admin_activities__activity_id__get"];
+        /**
+         * Update Activity
+         * @description T45：活动编辑（仅 PUBLISHED 且未开始；Q7 名额下限/Q8 白名单）。
+         */
+        put: operations["update_activity_api_admin_activities__activity_id__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -21,7 +46,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/login": {
+    "/api/admin/activities/{activity_id}/cancel": {
         parameters: {
             query?: never;
             header?: never;
@@ -30,49 +55,18 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Login */
-        post: operations["login_api_admin_login_post"];
+        /**
+         * Cancel Activity
+         * @description 取消整场活动（已付未签到批量转退款待审）。
+         */
+        post: operations["cancel_activity_api_admin_activities__activity_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/admin/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Me */
-        get: operations["me_api_admin_me_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/configs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Configs */
-        get: operations["list_configs_api_admin_configs_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/configs/{key}": {
+    "/api/admin/activities/{activity_id}/cover": {
         parameters: {
             query?: never;
             header?: never;
@@ -80,24 +74,30 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update Config */
-        put: operations["update_config_api_admin_configs__key__put"];
-        post?: never;
+        put?: never;
+        /**
+         * Upload Activity Cover
+         * @description T45：封面上传（R-316 同款通道统一转 JPG；Router 零异常处理纪律）。
+         */
+        post: operations["upload_activity_cover_api_admin_activities__activity_id__cover_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/admin/audit-logs": {
+    "/api/admin/activities/{activity_id}/cover-media": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Audit Logs */
-        get: operations["list_audit_logs_api_admin_audit_logs_get"];
+        /**
+         * Activity Cover Media
+         * @description T45：封面查看（管理端 <img> 用；query token 双通道——照书目 cover-media 先例）。
+         */
+        get: operations["activity_cover_media_api_admin_activities__activity_id__cover_media_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -106,17 +106,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/dashboard": {
+    "/api/admin/activities/{activity_id}/enrollments": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Dashboard Overview */
-        get: operations["dashboard_overview_api_admin_dashboard_get"];
+        /** List Enrollments */
+        get: operations["list_enrollments_api_admin_activities__activity_id__enrollments_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/activity-refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Refund Pending
+         * @description 退款待审列表（活动）。
+         */
+        get: operations["list_refund_pending_api_admin_activity_refunds_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/activity-refunds/{enrollment_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Refund
+         * @description 退款逐单审核（仅超管）。
+         */
+        post: operations["review_refund_api_admin_activity_refunds__enrollment_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/activity-signin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Signin
+         * @description 扫入场券签到（记录时间 + 操作人）。
+         */
+        post: operations["signin_api_admin_activity_signin_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -163,125 +223,17 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/todo-counts": {
+    "/api/admin/audit-logs": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Todo Counts
-         * @description WM13 感知层聚合（Q9 权限粒度：审计五类仅超管；order_pending_manual 跟 member.manage）。
-         */
-        get: operations["todo_counts_api_admin_todo_counts_get"];
+        /** List Audit Logs */
+        get: operations["list_audit_logs_api_admin_audit_logs_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/notifications": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Notifications */
-        get: operations["list_notifications_api_admin_notifications_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/notifications/{notification_id}/read-status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Toggle Notification Read
-         * @description 管理端代家长标记已读/未读（运营介入，审计留痕）。
-         */
-        post: operations["toggle_notification_read_api_admin_notifications__notification_id__read_status_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/notifications/export": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Export Notifications */
-        get: operations["export_notifications_api_admin_notifications_export_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/tasks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Task Specs */
-        get: operations["task_specs_api_admin_tasks_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/tasks/runs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Task Runs */
-        get: operations["task_runs_api_admin_tasks_runs_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/tasks/{task_name}/run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Task Run */
-        post: operations["task_run_api_admin_tasks__task_name__run_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -305,152 +257,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/dashboard/export": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Export Dashboard */
-        get: operations["export_dashboard_api_admin_dashboard_export_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/staff": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Staff List */
-        get: operations["staff_list_api_admin_staff_get"];
-        put?: never;
-        /** Staff Create */
-        post: operations["staff_create_api_admin_staff_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/staff/{user_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Staff Update */
-        put: operations["staff_update_api_admin_staff__user_id__put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/staff/{user_id}/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Staff Status */
-        put: operations["staff_status_api_admin_staff__user_id__status_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/staff/{user_id}/reset-password": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Staff Reset Password */
-        post: operations["staff_reset_password_api_admin_staff__user_id__reset_password_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/books/import-template": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Import Template
-         * @description Excel 批量导入模板下载（C8：与 import_books 解析列序一致）。
-         */
-        get: operations["import_template_api_admin_books_import_template_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/books/{book_id}/cover-media": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Book Cover Media
-         * @description 封面（管理端 <img> 用；query token 或 Bearer 均可）。
-         */
-        get: operations["book_cover_media_api_admin_books__book_id__cover_media_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/books/{book_id}/audio-media": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Book Audio Media
-         * @description 音频试听（C7 播放器；query token 或 Bearer 均可）。
-         */
-        get: operations["book_audio_media_api_admin_books__book_id__audio_media_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/admin/books": {
         parameters: {
             query?: never;
@@ -464,25 +270,6 @@ export interface paths {
         /** Create Book */
         post: operations["create_book_api_admin_books_post"];
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/books/{book_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Book */
-        get: operations["get_book_api_admin_books__book_id__get"];
-        /** Update Book */
-        put: operations["update_book_api_admin_books__book_id__put"];
-        post?: never;
-        /** Delete Book */
-        delete: operations["delete_book_api_admin_books__book_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -522,6 +309,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/books/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Books Excel */
+        post: operations["import_books_excel_api_admin_books_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/books/import-template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Import Template
+         * @description Excel 批量导入模板下载（C8：与 import_books 解析列序一致）。
+         */
+        get: operations["import_template_api_admin_books_import_template_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/books/{book_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Book */
+        get: operations["get_book_api_admin_books__book_id__get"];
+        /** Update Book */
+        put: operations["update_book_api_admin_books__book_id__put"];
+        post?: never;
+        /** Delete Book */
+        delete: operations["delete_book_api_admin_books__book_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/books/{book_id}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Audio */
+        post: operations["upload_audio_api_admin_books__book_id__audio_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/books/{book_id}/audio-media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Book Audio Media
+         * @description 音频试听（C7 播放器；query token 或 Bearer 均可）。
+         */
+        get: operations["book_audio_media_api_admin_books__book_id__audio_media_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/books/{book_id}/copies": {
         parameters: {
             query?: never;
@@ -534,40 +414,6 @@ export interface paths {
         put?: never;
         /** Add Copies */
         post: operations["add_copies_api_admin_books__book_id__copies_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/books/{book_id}/toggle-status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Toggle Book Status */
-        post: operations["toggle_book_status_api_admin_books__book_id__toggle_status_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/copies/{copy_id}/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Update Copy Status */
-        put: operations["update_copy_status_api_admin_copies__copy_id__status_put"];
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -591,41 +437,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/books/{book_id}/audio": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Upload Audio */
-        post: operations["upload_audio_api_admin_books__book_id__audio_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/books/import": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Import Books Excel */
-        post: operations["import_books_excel_api_admin_books_import_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/uploads/{path}": {
+    "/api/admin/books/{book_id}/cover-media": {
         parameters: {
             query?: never;
             header?: never;
@@ -633,10 +445,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Serve Upload
-         * @description 上传文件访问（鉴权下发；封面后续小程序端另行开放只读路由）。
+         * Book Cover Media
+         * @description 封面（管理端 <img> 用；query token 或 Bearer 均可）。
          */
-        get: operations["serve_upload_api_admin_uploads__path__get"];
+        get: operations["book_cover_media_api_admin_books__book_id__cover_media_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -663,25 +475,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/questions/{question_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Update Question */
-        put: operations["update_question_api_admin_questions__question_id__put"];
-        post?: never;
-        /** Delete Question */
-        delete: operations["delete_question_api_admin_questions__question_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/questions/{question_id}/toggle-active": {
+    "/api/admin/books/{book_id}/toggle-status": {
         parameters: {
             query?: never;
             header?: never;
@@ -690,23 +484,294 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Toggle Question */
-        post: operations["toggle_question_api_admin_questions__question_id__toggle_active_post"];
+        /** Toggle Book Status */
+        post: operations["toggle_book_status_api_admin_books__book_id__toggle_status_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/admin/circulation/children/{child_id}/card": {
+    "/api/admin/children/{child_id}/growth": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Child Card */
-        get: operations["child_card_api_admin_circulation_children__child_id__card_get"];
+        /**
+         * Child Growth
+         * @description 孩子成长档案：汇总 + 词数流水 + 积分明细 + 测验状态。
+         */
+        get: operations["child_growth_api_admin_children__child_id__growth_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/children/{child_id}/milestones/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Milestones
+         * @description 里程碑补发核对（节点配置调低后用）。
+         */
+        post: operations["check_milestones_api_admin_children__child_id__milestones_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/children/{child_id}/observation-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Observation Report
+         * @description 观察期评估报告上传（≤9 张图；家长端可见）。
+         */
+        post: operations["upload_observation_report_api_admin_children__child_id__observation_reports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/children/{child_id}/points/adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Adjust Points
+         * @description 积分人工调整（线下奖励；必填原因留痕）。
+         */
+        post: operations["adjust_points_api_admin_children__child_id__points_adjust_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/children/{child_id}/reading": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Child Reading Profile
+         * @description 孩子档案的阅读数据（WM6 手册步骤 14）。
+         */
+        get: operations["child_reading_profile_api_admin_children__child_id__reading_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/children/{child_id}/reports/{kind}/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Report
+         * @description 生成周报/月报图片（管理端触发，走 uploads 静态下发）。
+         */
+        post: operations["generate_report_api_admin_children__child_id__reports__kind__generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circle/card-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Circle Card Types
+         * @description 类型下拉选项（显式含「全部」——A4 三犯纪律）。
+         */
+        get: operations["circle_card_types_api_admin_circle_card_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circle/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Circle Overview
+         * @description 运营概览（本周新帖/分享家长数/点赞总数/馆长赞覆盖率/类型分布）。
+         */
+        get: operations["circle_overview_api_admin_circle_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circle/posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Circle Posts
+         * @description 帖子管理列表（类型下拉「全部」= 不传 card_type；时间段+家长孩子关键词）。
+         */
+        get: operations["list_circle_posts_api_admin_circle_posts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circle/posts/{post_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Circle Delete Post
+         * @description 超管删任意帖（必填原因——审计留痕）。
+         */
+        delete: operations["circle_delete_post_api_admin_circle_posts__post_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circle/posts/{post_id}/admin-like": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Circle Admin Like
+         * @description 行内一键馆长赞（特殊文案通知帖主家长）。
+         */
+        post: operations["circle_admin_like_api_admin_circle_posts__post_id__admin_like_post"];
+        /**
+         * Circle Admin Unlike
+         * @description 取消馆长赞。
+         */
+        delete: operations["circle_admin_unlike_api_admin_circle_posts__post_id__admin_like_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circle/posts/{post_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Circle Post Image
+         * @description 帖子卡片图（管理端 <img> 用；query token 双通道——照活动 cover-media 先例）。
+         */
+        get: operations["circle_post_image_api_admin_circle_posts__post_id__image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circle/posts/{post_id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Circle Pin
+         * @description 置顶（互斥：同时最多 1 条，置顶新帖自动取消旧置顶帖）。
+         */
+        post: operations["circle_pin_api_admin_circle_posts__post_id__pin_post"];
+        /**
+         * Circle Unpin
+         * @description 取消置顶。
+         */
+        delete: operations["circle_unpin_api_admin_circle_posts__post_id__pin_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circle/unliked-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Circle Unliked Count
+         * @description 未赞徽标数据源（今日新帖 admin_liked=0 计数）。
+         */
+        get: operations["circle_unliked_count_api_admin_circle_unliked_count_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -732,17 +797,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/circulation/return": {
+    "/api/admin/circulation/children/{child_id}/card": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Child Card */
+        get: operations["child_card_api_admin_circulation_children__child_id__card_get"];
         put?: never;
-        /** Return Book */
-        post: operations["return_book_api_admin_circulation_return_post"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circulation/overdue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Overdue List */
+        get: operations["overdue_list_api_admin_circulation_overdue_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -766,15 +848,360 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/circulation/overdue": {
+    "/api/admin/circulation/return": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Overdue List */
-        get: operations["overdue_list_api_admin_circulation_overdue_get"];
+        get?: never;
+        put?: never;
+        /** Return Book */
+        post: operations["return_book_api_admin_circulation_return_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/configs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Configs */
+        get: operations["list_configs_api_admin_configs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/configs/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Config */
+        put: operations["update_config_api_admin_configs__key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/copies/{copy_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Copy Status */
+        put: operations["update_copy_status_api_admin_copies__copy_id__status_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dashboard Overview */
+        get: operations["dashboard_overview_api_admin_dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/dashboard/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Dashboard */
+        get: operations["export_dashboard_api_admin_dashboard_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/deposits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Deposits */
+        get: operations["list_deposits_api_admin_deposits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/deposits/children/{child_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Deposit */
+        get: operations["get_deposit_api_admin_deposits_children__child_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/deposits/children/{child_id}/deduct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deduct Deposit */
+        post: operations["deduct_deposit_api_admin_deposits_children__child_id__deduct_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/deposits/children/{child_id}/ledgers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Deposit Ledgers */
+        get: operations["get_deposit_ledgers_api_admin_deposits_children__child_id__ledgers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/deposits/children/{child_id}/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Deposit Order */
+        post: operations["create_deposit_order_api_admin_deposits_children__child_id__orders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/deposits/children/{child_id}/supplement-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Supplement Order */
+        post: operations["create_supplement_order_api_admin_deposits_children__child_id__supplement_orders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/growth/levels/recalc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recalc Levels
+         * @description 等级阈值变更后的全量重算（只升不降，幂等）。
+         */
+        post: operations["recalc_levels_api_admin_growth_levels_recalc_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login */
+        post: operations["login_api_admin_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Me */
+        get: operations["me_api_admin_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/members/children": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Children Page */
+        get: operations["list_children_page_api_admin_members_children_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/members/children/{child_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Child
+         * @description 维护孩子资料（C19 + WM3-B1 扩展：姓名/性别/生日全开；AR 只升不降；订单守卫 409）。
+         */
+        put: operations["update_child_api_admin_members_children__child_id__put"];
+        post?: never;
+        /**
+         * Delete Child
+         * @description 软删孩子档案（WM3-B1；订单守卫 409）。
+         */
+        delete: operations["delete_child_api_admin_members_children__child_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/members/children/{child_id}/evaluate-approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Evaluate Approve
+         * @description 评估通过转正（C13/R-101-5）：创建年费订单（二孩折扣沿用），收款确认后转正式会员。
+         */
+        post: operations["evaluate_approve_api_admin_members_children__child_id__evaluate_approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/members/children/{child_id}/mark-pending-evaluation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Pending Evaluation
+         * @description 观察期 → 待评估（C13：馆员手动标记；自动转换任务在 WM11）。
+         */
+        post: operations["mark_pending_evaluation_api_admin_members_children__child_id__mark_pending_evaluation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/members/orders/{order_id}/voucher-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Order Voucher Image
+         * @description 凭证查看（WM3-B2；<img> 无法带 Authorization → query token 双通道）。
+         *
+         *     鉴权（media 三道校验 + member.manage 权限实时派生）在 middleware/voucher_auth；
+         *     订单查询/路径安全在 OrderService（Router 零 ORM/try/admin 依赖纪律）。
+         */
+        get: operations["order_voucher_image_api_admin_members_orders__order_id__voucher_image_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -866,15 +1293,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/members/children": {
+    "/api/admin/notifications": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Children Page */
-        get: operations["list_children_page_api_admin_members_children_get"];
+        /** List Notifications */
+        get: operations["list_notifications_api_admin_notifications_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -883,51 +1310,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/members/children/{child_id}/mark-pending-evaluation": {
+    "/api/admin/notifications/export": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Export Notifications */
+        get: operations["export_notifications_api_admin_notifications_export_get"];
         put?: never;
-        /**
-         * Mark Pending Evaluation
-         * @description 观察期 → 待评估（C13：馆员手动标记；自动转换任务在 WM11）。
-         */
-        post: operations["mark_pending_evaluation_api_admin_members_children__child_id__mark_pending_evaluation_post"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/admin/members/children/{child_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update Child
-         * @description 维护孩子资料（C19 + WM3-B1 扩展：姓名/性别/生日全开；AR 只升不降；订单守卫 409）。
-         */
-        put: operations["update_child_api_admin_members_children__child_id__put"];
-        post?: never;
-        /**
-         * Delete Child
-         * @description 软删孩子档案（WM3-B1；订单守卫 409）。
-         */
-        delete: operations["delete_child_api_admin_members_children__child_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/members/children/{child_id}/evaluate-approve": {
+    "/api/admin/notifications/{notification_id}/read-status": {
         parameters: {
             query?: never;
             header?: never;
@@ -937,10 +1337,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Evaluate Approve
-         * @description 评估通过转正（C13/R-101-5）：创建年费订单（二孩折扣沿用），收款确认后转正式会员。
+         * Toggle Notification Read
+         * @description 管理端代家长标记已读/未读（运营介入，审计留痕）。
          */
-        post: operations["evaluate_approve_api_admin_members_children__child_id__evaluate_approve_post"];
+        post: operations["toggle_notification_read_api_admin_notifications__notification_id__read_status_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -985,6 +1385,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/orders/{order_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Order */
+        post: operations["cancel_order_api_admin_orders__order_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/orders/{order_id}/confirm-payment": {
         parameters: {
             query?: never;
@@ -1002,7 +1419,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/orders/{order_id}/cancel": {
+    "/api/admin/orders/{order_id}/refund": {
         parameters: {
             query?: never;
             header?: never;
@@ -1011,8 +1428,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cancel Order */
-        post: operations["cancel_order_api_admin_orders__order_id__cancel_post"];
+        /**
+         * Refund Order
+         * @description 超管代家长发起退款申请（B-15 改造 20260903）：走 R-308 审核链，不再直接退款。
+         *     返回 RefundRequest 视图（pending），后续 review→execute 与家长申请同链。
+         */
+        post: operations["refund_order_api_admin_orders__order_id__refund_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1041,30 +1462,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/members/orders/{order_id}/voucher-image": {
+    "/api/admin/questions/{question_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Order Voucher Image
-         * @description 凭证查看（WM3-B2；<img> 无法带 Authorization → query token 双通道）。
-         *
-         *     鉴权（media 三道校验 + member.manage 权限实时派生）在 middleware/voucher_auth；
-         *     订单查询/路径安全在 OrderService（Router 零 ORM/try/admin 依赖纪律）。
-         */
-        get: operations["order_voucher_image_api_admin_members_orders__order_id__voucher_image_get"];
-        put?: never;
+        get?: never;
+        /** Update Question */
+        put: operations["update_question_api_admin_questions__question_id__put"];
         post?: never;
+        /** Delete Question */
+        delete: operations["delete_question_api_admin_questions__question_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/questions/{question_id}/toggle-active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Toggle Question */
+        post: operations["toggle_question_api_admin_questions__question_id__toggle_active_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/admin/orders/{order_id}/refund": {
+    "/api/admin/quiz/attempts/reset": {
         parameters: {
             query?: never;
             header?: never;
@@ -1074,11 +1507,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Refund Order
-         * @description 超管代家长发起退款申请（B-15 改造 20260903）：走 R-308 审核链，不再直接退款。
-         *     返回 RefundRequest 视图（pending），后续 review→execute 与家长申请同链。
+         * Reset Attempts
+         * @description 重置测验次数（仅超管；成绩不可代标，只能重测）。
          */
-        post: operations["refund_order_api_admin_orders__order_id__refund_post"];
+        post: operations["reset_attempts_api_admin_quiz_attempts_reset_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1105,23 +1537,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/refund-requests/{request_id}/review": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Admin Refund Review */
-        post: operations["admin_refund_review_api_admin_refund_requests__request_id__review_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/admin/refund-requests/{request_id}/execute": {
         parameters: {
             query?: never;
@@ -1142,44 +1557,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/withdrawals": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Admin Withdrawal List */
-        get: operations["admin_withdrawal_list_api_admin_withdrawals_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/withdrawals/{request_id}/settle-preview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Admin Withdrawal Settle Preview
-         * @description X2：退会审核预估结算明细（审核前明批，与真正结算同一份计算代码）。
-         */
-        get: operations["admin_withdrawal_settle_preview_api_admin_withdrawals__request_id__settle_preview_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/withdrawals/{request_id}/review": {
+    "/api/admin/refund-requests/{request_id}/review": {
         parameters: {
             query?: never;
             header?: never;
@@ -1188,8 +1566,188 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Admin Withdrawal Review */
-        post: operations["admin_withdrawal_review_api_admin_withdrawals__request_id__review_post"];
+        /** Admin Refund Review */
+        post: operations["admin_refund_review_api_admin_refund_requests__request_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/reservations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Reservations
+         * @description 预约管理列表（默认全部；status=active 看锁定中；keyword 模糊搜索）。
+         */
+        get: operations["list_reservations_api_admin_reservations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/reservations/{reservation_id}/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Checkout Reservation
+         * @description 核销预约转借阅（到店取书）。
+         */
+        post: operations["checkout_reservation_api_admin_reservations__reservation_id__checkout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Staff List */
+        get: operations["staff_list_api_admin_staff_get"];
+        put?: never;
+        /** Staff Create */
+        post: operations["staff_create_api_admin_staff_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/staff/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Staff Update */
+        put: operations["staff_update_api_admin_staff__user_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/staff/{user_id}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Staff Reset Password */
+        post: operations["staff_reset_password_api_admin_staff__user_id__reset_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/staff/{user_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Staff Status */
+        put: operations["staff_status_api_admin_staff__user_id__status_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Task Specs */
+        get: operations["task_specs_api_admin_tasks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/tasks/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Task Runs */
+        get: operations["task_runs_api_admin_tasks_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/tasks/{task_name}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Task Run */
+        post: operations["task_run_api_admin_tasks__task_name__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/todo-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Todo Counts
+         * @description WM13 感知层聚合（Q9 权限粒度：审计五类仅超管；order_pending_manual 跟 member.manage）。
+         */
+        get: operations["todo_counts_api_admin_todo_counts_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1230,35 +1788,18 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/children/{child_id}/observation-reports": {
+    "/api/admin/uploads/{path}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
         /**
-         * Upload Observation Report
-         * @description 观察期评估报告上传（≤9 张图；家长端可见）。
+         * Serve Upload
+         * @description 上传文件访问（鉴权下发；封面后续小程序端另行开放只读路由）。
          */
-        post: operations["upload_observation_report_api_admin_children__child_id__observation_reports_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/deposits": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Deposits */
-        get: operations["list_deposits_api_admin_deposits_get"];
+        get: operations["serve_upload_api_admin_uploads__path__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1267,15 +1808,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/deposits/children/{child_id}": {
+    "/api/admin/withdrawals": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Deposit */
-        get: operations["get_deposit_api_admin_deposits_children__child_id__get"];
+        /** Admin Withdrawal List */
+        get: operations["admin_withdrawal_list_api_admin_withdrawals_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1284,24 +1825,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/deposits/children/{child_id}/ledgers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Deposit Ledgers */
-        get: operations["get_deposit_ledgers_api_admin_deposits_children__child_id__ledgers_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/deposits/children/{child_id}/orders": {
+    "/api/admin/withdrawals/{request_id}/review": {
         parameters: {
             query?: never;
             header?: never;
@@ -1310,62 +1834,120 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create Deposit Order */
-        post: operations["create_deposit_order_api_admin_deposits_children__child_id__orders_post"];
+        /** Admin Withdrawal Review */
+        post: operations["admin_withdrawal_review_api_admin_withdrawals__request_id__review_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/admin/deposits/children/{child_id}/supplement-orders": {
+    "/api/admin/withdrawals/{request_id}/settle-preview": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        /** Create Supplement Order */
-        post: operations["create_supplement_order_api_admin_deposits_children__child_id__supplement_orders_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/deposits/children/{child_id}/deduct": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Deduct Deposit */
-        post: operations["deduct_deposit_api_admin_deposits_children__child_id__deduct_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
         /**
-         * Login
-         * @description 家长登录（A-1/T6 下沉：逻辑在 identity.auth.authenticate_parent）。
+         * Admin Withdrawal Settle Preview
+         * @description X2：退会审核预估结算明细（审核前明批，与真正结算同一份计算代码）。
          */
-        post: operations["login_api_miniapp_login_post"];
+        get: operations["admin_withdrawal_settle_preview_api_admin_withdrawals__request_id__settle_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/activities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Activities */
+        get: operations["list_activities_api_miniapp_activities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/activities/carousel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Activity Carousel
+         * @description T45（FEAT-082）：首页轮播位（有封面+PUBLISHED+未开始，≤5 条；公开端点——
+         *     活动信息家长可见，无需 child 上下文）。
+         */
+        get: operations["activity_carousel_api_miniapp_activities_carousel_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/activities/{activity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Activity Detail */
+        get: operations["activity_detail_api_miniapp_activities__activity_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/activities/{activity_id}/cover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Activity Cover
+         * @description T45：活动封面（query token 双通道——照书目 covers 先例；封面公开给家长端）。
+         */
+        get: operations["activity_cover_api_miniapp_activities__activity_id__cover_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/activities/{activity_id}/enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enroll */
+        post: operations["enroll_api_miniapp_activities__activity_id__enroll_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1387,92 +1969,6 @@ export interface paths {
         get: operations["list_books_api_miniapp_books_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/books/{book_id}/progress": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Progress */
-        get: operations["get_progress_api_miniapp_books__book_id__progress_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/reading/progress": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Report Progress */
-        post: operations["report_progress_api_miniapp_reading_progress_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/checkins": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Checkin Calendar */
-        get: operations["checkin_calendar_api_miniapp_checkins_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/reservations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Reservations */
-        get: operations["list_reservations_api_miniapp_reservations_get"];
-        put?: never;
-        /** Create Reservation */
-        post: operations["create_reservation_api_miniapp_reservations_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/reservations/{reservation_id}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Cancel Reservation */
-        post: operations["cancel_reservation_api_miniapp_reservations__reservation_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1509,6 +2005,9 @@ export interface paths {
         /**
          * Book Audio
          * @description 音频流（query token：innerAudioContext 无法携带 Authorization 头）。
+         *
+         *     R2/C-13：child_id+会员守卫（guards.AUDIO 403）——此前只验家长 token，
+         *     未缴费/退会持有效 token 可直链听书（WM12 前置清单提前命中）。
          */
         get: operations["book_audio_api_miniapp_books__book_id__audio_get"];
         put?: never;
@@ -1519,7 +2018,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/miniapp/observation-images/{path}": {
+    "/api/miniapp/books/{book_id}/audio-permission": {
         parameters: {
             query?: never;
             header?: never;
@@ -1527,10 +2026,192 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Observation Image
-         * @description 观察期评估报告图片（仅限 observation/ 目录；query token 鉴权 + 归属校验）。
+         * Audio Permission
+         * @description R3（插修 16）：播放入口前置预检——book-detail onPlay 先查此端点，
+         *     allowed=false 不进播放页（按 reason 分流引导文案）；判定与 audio 流同源
+         *     （guards.check_audio——禁两端点漂移）。
          */
-        get: operations["observation_image_api_miniapp_observation_images__path__get"];
+        get: operations["audio_permission_api_miniapp_books__book_id__audio_permission_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/books/{book_id}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Progress */
+        get: operations["get_progress_api_miniapp_books__book_id__progress_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/borrows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Current Borrows */
+        get: operations["current_borrows_api_miniapp_borrows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/checkins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Checkin Calendar */
+        get: operations["checkin_calendar_api_miniapp_checkins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/circle/my-cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Circle My Cards
+         * @description 可晒成就库（已达成未晒 + 已晒分组——历史成就补晒）。
+         */
+        get: operations["circle_my_cards_api_miniapp_circle_my_cards_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/circle/posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Circle Posts
+         * @description 信息流（时间倒序真分页 + 置顶帖置首）。
+         */
+        get: operations["circle_posts_api_miniapp_circle_posts_get"];
+        put?: never;
+        /**
+         * Circle Share
+         * @description 晒卡（服务端校验成就归属 + 同成就终身唯一 + 每日限晒）。
+         */
+        post: operations["circle_share_api_miniapp_circle_posts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/circle/posts/{post_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Circle Delete My Post
+         * @description 家长删自己的帖（删除权仅家长与超管）。
+         */
+        delete: operations["circle_delete_my_post_api_miniapp_circle_posts__post_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/circle/posts/{post_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Circle Post Image
+         * @description 帖子卡片图（query token：image 组件无法带头——照报告图片先例）。
+         */
+        get: operations["circle_post_image_api_miniapp_circle_posts__post_id__image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/circle/posts/{post_id}/like": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Circle Like
+         * @description 点赞（一心一赞；like_count 原子更新；被赞通知同事务）。
+         */
+        post: operations["circle_like_api_miniapp_circle_posts__post_id__like_post"];
+        /**
+         * Circle Unlike
+         * @description 取消点赞。
+         */
+        delete: operations["circle_unlike_api_miniapp_circle_posts__post_id__like_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/continue-listening": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Continue Listening
+         * @description 首页"继续听"卡：最近一次有进度但未读完（finished=0）的上一本。
+         *     读完的/无进度的不返回；无续听对象返回 null（前端隐藏卡片）。
+         */
+        get: operations["continue_listening_api_miniapp_continue_listening_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1559,7 +2240,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/miniapp/vocabulary/lookup": {
+    "/api/miniapp/deposits": {
         parameters: {
             query?: never;
             header?: never;
@@ -1567,10 +2248,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Vocabulary Lookup
-         * @description 查词（命中自动进生词本；播放页下半屏查询不中断音频）。R-313：未缴费禁/过期仅音频场景/退会禁。
+         * My Deposit
+         * @description 押金账户状态（家长端押金页，A-1/T6 下沉：逻辑在 DepositService.my_deposit_view）。
          */
-        get: operations["vocabulary_lookup_api_miniapp_vocabulary_lookup_get"];
+        get: operations["my_deposit_api_miniapp_deposits_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1579,132 +2260,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/miniapp/vocabulary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Vocabulary List */
-        get: operations["vocabulary_list_api_miniapp_vocabulary_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/vocabulary/{vocabulary_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Vocabulary Remove */
-        delete: operations["vocabulary_remove_api_miniapp_vocabulary__vocabulary_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/favorites": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Favorites List */
-        get: operations["favorites_list_api_miniapp_favorites_get"];
-        put?: never;
-        /** Favorites Add */
-        post: operations["favorites_add_api_miniapp_favorites_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/favorites/{book_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Favorites Remove */
-        delete: operations["favorites_remove_api_miniapp_favorites__book_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/borrows": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Current Borrows */
-        get: operations["current_borrows_api_miniapp_borrows_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/continue-listening": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Continue Listening
-         * @description 首页"继续听"卡：最近一次有进度但未读完（finished=0）的上一本。
-         *     读完的/无进度的不返回；无续听对象返回 null（前端隐藏卡片）。
-         */
-        get: operations["continue_listening_api_miniapp_continue_listening_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/activities": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Activities */
-        get: operations["list_activities_api_admin_activities_get"];
-        put?: never;
-        /** Create Activity */
-        post: operations["create_activity_api_admin_activities_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/activities/{activity_id}/cancel": {
+    "/api/miniapp/deposits/supplement-orders": {
         parameters: {
             query?: never;
             header?: never;
@@ -1714,138 +2270,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Cancel Activity
-         * @description 取消整场活动（已付未签到批量转退款待审）。
+         * Create Supplement Order
+         * @description 家长端押金补缴（R-312：差额 = 标准额 − 可用余额；R-313：退会禁）。
          */
-        post: operations["cancel_activity_api_admin_activities__activity_id__cancel_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/activities/{activity_id}/enrollments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Enrollments */
-        get: operations["list_enrollments_api_admin_activities__activity_id__enrollments_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/activity-signin": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Signin
-         * @description 扫入场券签到（记录时间 + 操作人）。
-         */
-        post: operations["signin_api_admin_activity_signin_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/activity-refunds": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Refund Pending
-         * @description 退款待审列表（活动）。
-         */
-        get: operations["list_refund_pending_api_admin_activity_refunds_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/activity-refunds/{enrollment_id}/review": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Review Refund
-         * @description 退款逐单审核（仅超管）。
-         */
-        post: operations["review_refund_api_admin_activity_refunds__enrollment_id__review_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/activities": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Activities */
-        get: operations["list_activities_api_miniapp_activities_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/activities/{activity_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Activity Detail */
-        get: operations["activity_detail_api_miniapp_activities__activity_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/activities/{activity_id}/enroll": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Enroll */
-        post: operations["enroll_api_miniapp_activities__activity_id__enroll_post"];
+        post: operations["create_supplement_order_api_miniapp_deposits_supplement_orders_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1903,7 +2331,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/miniapp/orders": {
+    "/api/miniapp/favorites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Favorites List */
+        get: operations["favorites_list_api_miniapp_favorites_get"];
+        put?: never;
+        /** Favorites Add */
+        post: operations["favorites_add_api_miniapp_favorites_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/favorites/{book_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Favorites Remove */
+        delete: operations["favorites_remove_api_miniapp_favorites__book_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/growth/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Growth Summary */
+        get: operations["growth_summary_api_miniapp_growth_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/leaderboard": {
         parameters: {
             query?: never;
             header?: never;
@@ -1911,12 +2391,32 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * My Orders
-         * @description 家长视角订单列表（A-1/T6 下沉：逻辑在 OrderService.my_orders）。
+         * Leaderboard
+         * @description 五榜单（周期榜仅有效会员可见；总榜含历史学员）。
          */
-        get: operations["my_orders_api_miniapp_orders_get"];
+        get: operations["leaderboard_api_miniapp_leaderboard_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login
+         * @description 家长登录（A-1/T6 下沉：逻辑在 identity.auth.authenticate_parent）。
+         */
+        post: operations["login_api_miniapp_login_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1957,6 +2457,168 @@ export interface paths {
          * @description 标记已读（A-1/T6 下沉：逻辑在 NotificationService.mark_read）。
          */
         post: operations["mark_notifications_read_api_miniapp_notifications_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/observation-images/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Observation Image
+         * @description 观察期评估报告图片（仅限 observation/ 目录；query token 鉴权 + 归属校验）。
+         */
+        get: operations["observation_image_api_miniapp_observation_images__path__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/observation-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Observation Reports */
+        get: operations["observation_reports_api_miniapp_observation_reports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Orders
+         * @description 家长视角订单列表（A-1/T6 下沉：逻辑在 OrderService.my_orders）。
+         */
+        get: operations["my_orders_api_miniapp_orders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/passport": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Passport */
+        get: operations["passport_api_miniapp_passport_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Points Ledger */
+        get: operations["points_ledger_api_miniapp_points_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/quiz/status-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Quiz Status Batch
+         * @description T43（U2）：书架角标批量状态（3 次 IN 查询禁 N+1；book_ids 逗号分隔≤50）。
+         */
+        get: operations["quiz_status_batch_api_miniapp_quiz_status_batch_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/quiz/{book_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Quiz */
+        get: operations["get_quiz_api_miniapp_quiz__book_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/quiz/{book_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Quiz */
+        post: operations["submit_quiz_api_miniapp_quiz__book_id__submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/reading/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report Progress */
+        post: operations["report_progress_api_miniapp_reading_progress_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2018,25 +2680,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/miniapp/withdrawals": {
+    "/api/miniapp/reports/{kind}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Withdrawal List */
-        get: operations["withdrawal_list_api_miniapp_withdrawals_get"];
+        /**
+         * Report
+         * @description 周报/月报数据（家长预览）。R-313：未缴费禁；过期/退会只读。
+         */
+        get: operations["report_api_miniapp_reports__kind__get"];
         put?: never;
-        /** Withdrawal Apply */
-        post: operations["withdrawal_apply_api_miniapp_withdrawals_post"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/miniapp/withdrawals/{request_id}/cancel": {
+    "/api/miniapp/reports/{kind}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Report Image
+         * @description 周报/月报图片（query token：图片组件无法带头）。
+         */
+        get: operations["report_image_api_miniapp_reports__kind__image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/reservations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reservations */
+        get: operations["list_reservations_api_miniapp_reservations_get"];
+        put?: never;
+        /** Create Reservation */
+        post: operations["create_reservation_api_miniapp_reservations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/reservations/{reservation_id}/cancel": {
         parameters: {
             query?: never;
             header?: never;
@@ -2045,11 +2747,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Withdrawal Cancel
-         * @description 家长撤销进行中的退会申请（applying → cancelled + 解锁）。
-         */
-        post: operations["withdrawal_cancel_api_miniapp_withdrawals__request_id__cancel_post"];
+        /** Cancel Reservation */
+        post: operations["cancel_reservation_api_miniapp_reservations__reservation_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2111,15 +2810,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/miniapp/observation-reports": {
+    "/api/miniapp/vocabulary": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Observation Reports */
-        get: operations["observation_reports_api_miniapp_observation_reports_get"];
+        /** Vocabulary List */
+        get: operations["vocabulary_list_api_miniapp_vocabulary_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2128,7 +2827,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/miniapp/deposits": {
+    "/api/miniapp/vocabulary/lookup": {
         parameters: {
             query?: never;
             header?: never;
@@ -2136,10 +2835,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * My Deposit
-         * @description 押金账户状态（家长端押金页，A-1/T6 下沉：逻辑在 DepositService.my_deposit_view）。
+         * Vocabulary Lookup
+         * @description 查词（命中自动进生词本；播放页下半屏查询不中断音频）。R-313：未缴费禁/过期仅音频场景/退会禁。
          */
-        get: operations["my_deposit_api_miniapp_deposits_get"];
+        get: operations["vocabulary_lookup_api_miniapp_vocabulary_lookup_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2148,7 +2847,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/miniapp/deposits/supplement-orders": {
+    "/api/miniapp/vocabulary/{vocabulary_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Vocabulary Remove */
+        delete: operations["vocabulary_remove_api_miniapp_vocabulary__vocabulary_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/withdrawals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Withdrawal List */
+        get: operations["withdrawal_list_api_miniapp_withdrawals_get"];
+        put?: never;
+        /** Withdrawal Apply */
+        post: operations["withdrawal_apply_api_miniapp_withdrawals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/withdrawals/{request_id}/cancel": {
         parameters: {
             query?: never;
             header?: never;
@@ -2158,333 +2892,25 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Create Supplement Order
-         * @description 家长端押金补缴（R-312：差额 = 标准额 − 可用余额；R-313：退会禁）。
+         * Withdrawal Cancel
+         * @description 家长撤销进行中的退会申请（applying → cancelled + 解锁）。
          */
-        post: operations["create_supplement_order_api_miniapp_deposits_supplement_orders_post"];
+        post: operations["withdrawal_cancel_api_miniapp_withdrawals__request_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/admin/children/{child_id}/growth": {
+    "/health": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Child Growth
-         * @description 孩子成长档案：汇总 + 词数流水 + 积分明细 + 测验状态。
-         */
-        get: operations["child_growth_api_admin_children__child_id__growth_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/quiz/attempts/reset": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Reset Attempts
-         * @description 重置测验次数（仅超管；成绩不可代标，只能重测）。
-         */
-        post: operations["reset_attempts_api_admin_quiz_attempts_reset_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/children/{child_id}/points/adjust": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Adjust Points
-         * @description 积分人工调整（线下奖励；必填原因留痕）。
-         */
-        post: operations["adjust_points_api_admin_children__child_id__points_adjust_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/growth/levels/recalc": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Recalc Levels
-         * @description 等级阈值变更后的全量重算（只升不降，幂等）。
-         */
-        post: operations["recalc_levels_api_admin_growth_levels_recalc_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/children/{child_id}/milestones/check": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Check Milestones
-         * @description 里程碑补发核对（节点配置调低后用）。
-         */
-        post: operations["check_milestones_api_admin_children__child_id__milestones_check_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/children/{child_id}/reports/{kind}/generate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Generate Report
-         * @description 生成周报/月报图片（管理端触发，走 uploads 静态下发）。
-         */
-        post: operations["generate_report_api_admin_children__child_id__reports__kind__generate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/quiz/{book_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Quiz */
-        get: operations["get_quiz_api_miniapp_quiz__book_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/quiz/{book_id}/submit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Submit Quiz */
-        post: operations["submit_quiz_api_miniapp_quiz__book_id__submit_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/growth/summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Growth Summary */
-        get: operations["growth_summary_api_miniapp_growth_summary_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/points": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Points Ledger */
-        get: operations["points_ledger_api_miniapp_points_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/leaderboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Leaderboard
-         * @description 五榜单（周期榜仅有效会员可见；总榜含历史学员）。
-         */
-        get: operations["leaderboard_api_miniapp_leaderboard_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/passport": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Passport */
-        get: operations["passport_api_miniapp_passport_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/reports/{kind}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Report
-         * @description 周报/月报数据（家长预览）。R-313：未缴费禁；过期/退会只读。
-         */
-        get: operations["report_api_miniapp_reports__kind__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/miniapp/reports/{kind}/image": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Report Image
-         * @description 周报/月报图片（query token：图片组件无法带头）。
-         */
-        get: operations["report_image_api_miniapp_reports__kind__image_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/reservations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Reservations
-         * @description 预约管理列表（默认全部；status=active 看锁定中；keyword 模糊搜索）。
-         */
-        get: operations["list_reservations_api_admin_reservations_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/reservations/{reservation_id}/checkout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Checkout Reservation
-         * @description 核销预约转借阅（到店取书）。
-         */
-        post: operations["checkout_reservation_api_admin_reservations__reservation_id__checkout_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/children/{child_id}/reading": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Child Reading Profile
-         * @description 孩子档案的阅读数据（WM6 手册步骤 14）。
-         */
-        get: operations["child_reading_profile_api_admin_children__child_id__reading_get"];
+        /** Health */
+        get: operations["health_health_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2499,18 +2925,20 @@ export interface components {
     schemas: {
         /** ActivityCreateRequest */
         ActivityCreateRequest: {
-            /** Title */
-            title: string;
             /**
              * Activity Type
              * @default book_club
              */
             activity_type: string;
+            /** Description */
+            description?: string | null;
+            /** Enroll Deadline */
+            enroll_deadline?: string | null;
             /**
-             * Start At
-             * Format: date-time
+             * Fee
+             * @default 0
              */
-            start_at: string;
+            fee: number | string;
             /**
              * Location
              * @default
@@ -2519,19 +2947,40 @@ export interface components {
             /** Max Quota */
             max_quota: number;
             /**
-             * Fee
-             * @default 0
-             */
-            fee: number | string;
-            /** Description */
-            description?: string | null;
-            /**
              * Member Only
              * @default false
              */
             member_only: boolean;
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /** Title */
+            title: string;
+        };
+        /**
+         * ActivityUpdateRequest
+         * @description T45（FEAT-082·Q8 批复）：编辑白名单 9 字段——activity_type 禁改
+         *     （BaseSchema extra=forbid：传入即 422 显式拒绝）。
+         */
+        ActivityUpdateRequest: {
+            /** Description */
+            description?: string | null;
             /** Enroll Deadline */
             enroll_deadline?: string | null;
+            /** Fee */
+            fee?: number | string | null;
+            /** Location */
+            location?: string | null;
+            /** Max Quota */
+            max_quota?: number | null;
+            /** Member Only */
+            member_only?: boolean | null;
+            /** Start At */
+            start_at?: string | null;
+            /** Title */
+            title?: string | null;
         };
         /** AdjustPointsRequest */
         AdjustPointsRequest: {
@@ -2559,12 +3008,10 @@ export interface components {
         };
         /** AdminUserResponse */
         AdminUserResponse: {
-            /** Id */
-            id: number;
-            /** Username */
-            username: string;
             /** Display Name */
             display_name: string;
+            /** Id */
+            id: number;
             /** Role */
             role: string;
             /**
@@ -2572,30 +3019,32 @@ export interface components {
              * @default 1
              */
             status: number;
+            /** Username */
+            username: string;
         };
         /** AuditLogResponse */
         AuditLogResponse: {
-            /** Id */
-            id: number;
+            /** Action */
+            action: string;
             /** Actor Id */
             actor_id: number;
             /** Actor Name */
             actor_name: string;
-            /** Action */
-            action: string;
-            /** Target Type */
-            target_type: string;
-            /** Target Id */
-            target_id: string;
-            /** Detail */
-            detail: string;
-            /** Reason */
-            reason: string;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+            /** Detail */
+            detail: string;
+            /** Id */
+            id: number;
+            /** Reason */
+            reason: string;
+            /** Target Id */
+            target_id: string;
+            /** Target Type */
+            target_type: string;
         };
         /** BatchDeleteRequest */
         BatchDeleteRequest: {
@@ -2623,6 +3072,11 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_upload_activity_cover_api_admin_activities__activity_id__cover_post */
+        Body_upload_activity_cover_api_admin_activities__activity_id__cover_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_audio_api_admin_books__book_id__audio_post */
         Body_upload_audio_api_admin_books__book_id__audio_post: {
             /** File */
@@ -2635,13 +3089,13 @@ export interface components {
         };
         /** Body_upload_observation_report_api_admin_children__child_id__observation_reports_post */
         Body_upload_observation_report_api_admin_children__child_id__observation_reports_post: {
+            /** Files */
+            files: string[];
             /**
              * Remark
              * @default
              */
             remark: string;
-            /** Files */
-            files: string[];
         };
         /** Body_upload_order_voucher_api_admin_orders__order_id__voucher_post */
         Body_upload_order_voucher_api_admin_orders__order_id__voucher_post: {
@@ -2650,6 +3104,26 @@ export interface components {
         };
         /** BookCreateRequest */
         BookCreateRequest: {
+            /** Ar Level */
+            ar_level?: string | null;
+            /**
+             * Author
+             * @default
+             */
+            author: string;
+            /**
+             * Copy Count
+             * @description 入库副本数（默认1）
+             * @default 1
+             */
+            copy_count: number;
+            /** Description */
+            description?: string | null;
+            /**
+             * Grade
+             * @default
+             */
+            grade: string;
             /**
              * Isbn
              * @description ISBN；无 ISBN 书目传空
@@ -2658,32 +3132,12 @@ export interface components {
             /** Title */
             title: string;
             /**
-             * Author
-             * @default
-             */
-            author: string;
-            /** Word Count */
-            word_count: number;
-            /** Ar Level */
-            ar_level?: string | null;
-            /**
              * Topic
              * @default
              */
             topic: string;
-            /**
-             * Grade
-             * @default
-             */
-            grade: string;
-            /** Description */
-            description?: string | null;
-            /**
-             * Copy Count
-             * @description 入库副本数（默认1）
-             * @default 1
-             */
-            copy_count: number;
+            /** Word Count */
+            word_count: number;
         };
         /**
          * BookListResponse
@@ -2691,16 +3145,23 @@ export interface components {
          */
         BookListResponse: {
             /**
+             * Counts
+             * @description Tab 计数（与列表筛选同口径）
+             */
+            counts?: {
+                [key: string]: number;
+            };
+            /**
+             * Has Next
+             * @description 是否有下一页
+             * @default false
+             */
+            has_next: boolean;
+            /**
              * Items
              * @description 数据列表
              */
             items?: components["schemas"]["BookResponse"][];
-            /**
-             * Total
-             * @description 总数
-             * @default 0
-             */
-            total: number;
             /**
              * Page
              * @description 当前页码
@@ -2714,61 +3175,45 @@ export interface components {
              */
             page_size: number;
             /**
-             * Has Next
-             * @description 是否有下一页
-             * @default false
+             * Total
+             * @description 总数
+             * @default 0
              */
-            has_next: boolean;
-            /**
-             * Counts
-             * @description Tab 计数（与列表筛选同口径）
-             */
-            counts?: {
-                [key: string]: number;
-            };
+            total: number;
         };
         /** BookResponse */
         BookResponse: {
-            /** Id */
-            id: number;
-            /** Isbn */
-            isbn: string | null;
-            /** Internal Code */
-            internal_code: string | null;
-            /** Title */
-            title: string;
-            /** Author */
-            author: string;
-            /** Cover Path */
-            cover_path: string | null;
-            /** Audio Path */
-            audio_path: string | null;
-            /** Audio Duration Seconds */
-            audio_duration_seconds: number | null;
-            /** Word Count */
-            word_count: number;
             /** Ar Level */
             ar_level: string | null;
-            /** Topic */
-            topic: string;
-            /** Grade */
-            grade: string;
-            /** Description */
-            description: string | null;
-            /** Status */
-            status: number;
+            /** Audio Duration Seconds */
+            audio_duration_seconds: number | null;
+            /** Audio Path */
+            audio_path: string | null;
+            /** Author */
+            author: string;
             /**
              * Copy Count
              * @description 在册副本总数
              * @default 0
              */
             copy_count: number;
+            /** Cover Path */
+            cover_path: string | null;
+            /** Description */
+            description: string | null;
+            /** Grade */
+            grade: string;
+            /** Id */
+            id: number;
+            /** Internal Code */
+            internal_code: string | null;
+            /** Isbn */
+            isbn: string | null;
             /**
-             * Question Count
-             * @description 测验题目数量（含停用）
-             * @default 0
+             * Missing
+             * @description 下架态缺失项（封面/音频/AR/词数/测验）
              */
-            question_count: number;
+            missing?: string[];
             /**
              * Question Active Count
              * @description 启用题目数量
@@ -2776,13 +3221,36 @@ export interface components {
              */
             question_active_count: number;
             /**
-             * Missing
-             * @description 下架态缺失项（封面/音频/AR/词数/测验）
+             * Question Count
+             * @description 测验题目数量（含停用）
+             * @default 0
              */
-            missing?: string[];
+            question_count: number;
+            /** Status */
+            status: number;
+            /** Title */
+            title: string;
+            /** Topic */
+            topic: string;
+            /** Word Count */
+            word_count: number;
         };
         /** BookUpdateRequest */
         BookUpdateRequest: {
+            /** Ar Level */
+            ar_level?: string | null;
+            /**
+             * Author
+             * @default
+             */
+            author: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Grade
+             * @default
+             */
+            grade: string;
             /**
              * Isbn
              * @description ISBN；可后补或修改
@@ -2791,35 +3259,15 @@ export interface components {
             /** Title */
             title: string;
             /**
-             * Author
-             * @default
-             */
-            author: string;
-            /** Word Count */
-            word_count: number;
-            /** Ar Level */
-            ar_level?: string | null;
-            /**
              * Topic
              * @default
              */
             topic: string;
-            /**
-             * Grade
-             * @default
-             */
-            grade: string;
-            /** Description */
-            description?: string | null;
+            /** Word Count */
+            word_count: number;
         };
         /** BorrowRecordResponse */
         BorrowRecordResponse: {
-            /** Id */
-            id: number;
-            /** Child Id */
-            child_id: number;
-            /** Copy Id */
-            copy_id: number;
             /** Book Id */
             book_id: number;
             /**
@@ -2827,19 +3275,25 @@ export interface components {
              * Format: date-time
              */
             borrowed_at: string;
+            /** Child Id */
+            child_id: number;
+            /** Copy Id */
+            copy_id: number;
             /**
              * Due At
              * Format: date-time
              */
             due_at: string;
+            /** Id */
+            id: number;
+            /** Override Reason */
+            override_reason: string | null;
+            /** Renew Used */
+            renew_used: number;
             /** Returned At */
             returned_at: string | null;
             /** Status */
             status: string;
-            /** Renew Used */
-            renew_used: number;
-            /** Override Reason */
-            override_reason: string | null;
             /**
              * Warnings
              * @description 借书软提示（AR 超范围等，不拦截）
@@ -2851,15 +3305,15 @@ export interface components {
             /** Child Id */
             child_id: number;
             /**
-             * Isbn
-             * @description 扫 ISBN 借书
-             */
-            isbn?: string | null;
-            /**
              * Copy Id
              * @description 指定副本
              */
             copy_id?: number | null;
+            /**
+             * Isbn
+             * @description 扫 ISBN 借书
+             */
+            isbn?: string | null;
             /**
              * Override Reason
              * @description 人工放行原因（异常借书）
@@ -2868,8 +3322,6 @@ export interface components {
         };
         /** CheckOutResponse */
         CheckOutResponse: {
-            /** Reservation Id */
-            reservation_id: number;
             /** Borrow Record Id */
             borrow_record_id: number;
             /**
@@ -2877,51 +3329,53 @@ export interface components {
              * Format: date-time
              */
             due_at: string;
+            /** Reservation Id */
+            reservation_id: number;
         };
         /** ChildCardResponse */
         ChildCardResponse: {
-            /** Child Id */
-            child_id: number;
-            /** Name */
-            name: string;
-            /** English Name */
-            english_name: string | null;
-            /** Member Status */
-            member_status: string;
-            /** Parent Name */
-            parent_name: string;
-            /** Parent Phone */
-            parent_phone: string;
             /** Active Borrows */
             active_borrows: number;
-            /** Overdue Count */
-            overdue_count: number;
             /** Available Quota */
             available_quota: number;
             /** Borrow Limit */
             borrow_limit: number;
-            /** Deposit Status */
-            deposit_status: string;
+            /** Child Id */
+            child_id: number;
             /** Deposit Available */
             deposit_available: string;
+            /** Deposit Status */
+            deposit_status: string;
+            /** English Name */
+            english_name: string | null;
+            /** Member Status */
+            member_status: string;
+            /** Name */
+            name: string;
+            /** Overdue Count */
+            overdue_count: number;
+            /** Parent Name */
+            parent_name: string;
+            /** Parent Phone */
+            parent_phone: string;
             /** Records */
             records: components["schemas"]["BorrowRecordResponse"][];
         };
         /** ChildCreateRequest */
         ChildCreateRequest: {
-            /** Name */
-            name: string;
+            /** Birthday */
+            birthday?: string | null;
             /** English Name */
             english_name?: string | null;
             /** Gender */
             gender?: number | null;
-            /** Birthday */
-            birthday?: string | null;
             /**
              * Grade
              * @default
              */
             grade: string;
+            /** Name */
+            name: string;
         };
         /** ChildReadingProfileResponse */
         ChildReadingProfileResponse: {
@@ -2929,98 +3383,98 @@ export interface components {
             child_id: number;
             /** Child Name */
             child_name: string;
-            /** Member Status */
-            member_status: string;
-            /** Total Finished */
-            total_finished: number;
-            /** Total Reading Minutes */
-            total_reading_minutes: number;
-            /** Total Checkin Days */
-            total_checkin_days: number;
             /** Current Streak */
             current_streak: number;
             /** Finished Books */
             finished_books: components["schemas"]["FinishedBookItem"][];
+            /** Member Status */
+            member_status: string;
+            /** Total Checkin Days */
+            total_checkin_days: number;
+            /** Total Finished */
+            total_finished: number;
+            /** Total Reading Minutes */
+            total_reading_minutes: number;
         };
         /** ChildResponse */
         ChildResponse: {
-            /** Id */
-            id: number;
-            /** Parent Id */
-            parent_id: number;
-            /** Name */
-            name: string;
+            /** Ar Level */
+            ar_level: string | null;
+            /** Birthday */
+            birthday: string | null;
             /** English Name */
             english_name: string | null;
             /** Gender */
             gender: number | null;
-            /** Birthday */
-            birthday: string | null;
             /** Grade */
             grade: string;
-            /** Member Status */
-            member_status: string;
-            /** Member Start */
-            member_start: string | null;
-            /** Member Expire */
-            member_expire: string | null;
-            /** Ar Level */
-            ar_level: string | null;
             /**
              * Has Orders
              * @description 存在未删订单（WM3-B1 守卫）
              * @default false
              */
             has_orders: boolean;
+            /** Id */
+            id: number;
+            /** Member Expire */
+            member_expire: string | null;
+            /** Member Start */
+            member_start: string | null;
+            /** Member Status */
+            member_status: string;
+            /** Name */
+            name: string;
+            /** Parent Id */
+            parent_id: number;
         };
         /** ChildUpdateRequest */
         ChildUpdateRequest: {
-            /** Name */
-            name?: string | null;
-            /** English Name */
-            english_name?: string | null;
-            /** Gender */
-            gender?: number | null;
-            /** Birthday */
-            birthday?: string | null;
-            /** Grade */
-            grade?: string | null;
             /**
              * Ar Level
              * @description AR 值（老师评估，只升不降）
              */
             ar_level?: string | null;
+            /** Birthday */
+            birthday?: string | null;
+            /** English Name */
+            english_name?: string | null;
+            /** Gender */
+            gender?: number | null;
+            /** Grade */
+            grade?: string | null;
+            /** Name */
+            name?: string | null;
         };
         /** ChildWithParentResponse */
         ChildWithParentResponse: {
-            /** Id */
-            id: number;
-            /** Parent Id */
-            parent_id: number;
-            /** Name */
-            name: string;
+            /** Ar Level */
+            ar_level: string | null;
+            /** Birthday */
+            birthday: string | null;
             /** English Name */
             english_name: string | null;
             /** Gender */
             gender: number | null;
-            /** Birthday */
-            birthday: string | null;
             /** Grade */
             grade: string;
-            /** Member Status */
-            member_status: string;
-            /** Member Start */
-            member_start: string | null;
-            /** Member Expire */
-            member_expire: string | null;
-            /** Ar Level */
-            ar_level: string | null;
             /**
              * Has Orders
              * @description 存在未删订单（WM3-B1 守卫）
              * @default false
              */
             has_orders: boolean;
+            /** Id */
+            id: number;
+            /** Member Expire */
+            member_expire: string | null;
+            /** Member Start */
+            member_start: string | null;
+            /** Member Status */
+            member_status: string;
+            /** Name */
+            name: string;
+            /** Parent Id */
+            parent_id: number;
             /**
              * Parent Name
              * @default
@@ -3032,45 +3486,66 @@ export interface components {
              */
             parent_phone: string;
         };
+        /** CircleDeleteMyPostRequest */
+        CircleDeleteMyPostRequest: {
+            /** Child Id */
+            child_id: number;
+        };
+        /**
+         * CircleDeleteRequest
+         * @description 删除必填原因（审计留痕）。
+         */
+        CircleDeleteRequest: {
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /** CircleShareRequest */
+        CircleShareRequest: {
+            /** Card Type */
+            card_type: string;
+            /** Child Id */
+            child_id: number;
+            /** Ref Id */
+            ref_id: number;
+        };
         /** CopyResponse */
         CopyResponse: {
-            /** Id */
-            id: number;
             /** Book Id */
             book_id: number;
             /** Copy Code */
             copy_code: string;
+            /** Id */
+            id: number;
             /** Status */
             status: string;
         };
         /** CopyStatusUpdateRequest */
         CopyStatusUpdateRequest: {
             /**
-             * Status
-             * @description 新状态
-             */
-            status: string;
-            /**
              * Reason
              * @description 操作原因（留痕）
              */
             reason: string;
+            /**
+             * Status
+             * @description 新状态
+             */
+            status: string;
         };
         /** DashboardOverviewResponse */
         DashboardOverviewResponse: {
-            /** Admin Count */
-            admin_count: number;
-            /** Today Logins */
-            today_logins: number;
-            /** Config Count */
-            config_count: number;
-            /** Recent Config Changes */
-            recent_config_changes: components["schemas"]["DashboardRecentChange"][];
             /**
-             * Copy Total
+             * Activity Enroll Recent
              * @default 0
              */
-            copy_total: number;
+            activity_enroll_recent: number;
+            /** Admin Count */
+            admin_count: number;
+            /** Config Count */
+            config_count: number;
             /**
              * Copy Available
              * @default 0
@@ -3082,79 +3557,83 @@ export interface components {
              */
             copy_borrowed: number;
             /**
-             * Today Borrowed
+             * Copy Lost
              * @default 0
              */
-            today_borrowed: number;
-            /**
-             * Today Returned
-             * @default 0
-             */
-            today_returned: number;
-            /**
-             * Overdue Active
-             * @default 0
-             */
-            overdue_active: number;
-            /**
-             * Member Total
-             * @default 0
-             */
-            member_total: number;
-            /**
-             * Member New Week
-             * @default 0
-             */
-            member_new_week: number;
-            /**
-             * Activity Enroll Recent
-             * @default 0
-             */
-            activity_enroll_recent: number;
+            copy_lost: number;
             /**
              * Copy Maintenance
              * @default 0
              */
             copy_maintenance: number;
             /**
-             * Copy Lost
+             * Copy Total
              * @default 0
              */
-            copy_lost: number;
+            copy_total: number;
             /**
-             * Renew Rate
+             * Member New Week
              * @default 0
              */
-            renew_rate: number;
+            member_new_week: number;
             /**
-             * Withdrawal Rate
+             * Member Total
              * @default 0
              */
-            withdrawal_rate: number;
-            /**
-             * Quiz Pass Rate
-             * @default 0
-             */
-            quiz_pass_rate: number;
+            member_total: number;
             /**
              * Milestone Count
              * @default 0
              */
             milestone_count: number;
             /**
+             * Overdue Active
+             * @default 0
+             */
+            overdue_active: number;
+            /**
              * Pending Evaluation Count
              * @default 0
              */
             pending_evaluation_count: number;
+            /**
+             * Quiz Pass Rate
+             * @default 0
+             */
+            quiz_pass_rate: number;
+            /** Recent Config Changes */
+            recent_config_changes: components["schemas"]["DashboardRecentChange"][];
+            /**
+             * Renew Rate
+             * @default 0
+             */
+            renew_rate: number;
+            /**
+             * Today Borrowed
+             * @default 0
+             */
+            today_borrowed: number;
+            /** Today Logins */
+            today_logins: number;
+            /**
+             * Today Returned
+             * @default 0
+             */
+            today_returned: number;
+            /**
+             * Withdrawal Rate
+             * @default 0
+             */
+            withdrawal_rate: number;
         };
         /** DashboardRecentChange */
         DashboardRecentChange: {
-            /** Config Name */
-            config_name: string;
-            /** Change */
-            change: string;
             /** Actor Name */
             actor_name: string;
+            /** Change */
+            change: string;
+            /** Config Name */
+            config_name: string;
             /** Created At */
             created_at: string;
         };
@@ -3166,40 +3645,42 @@ export interface components {
              */
             amount: number | string;
             /**
-             * Reason
-             * @description 事由（关联图书等，留痕）
-             */
-            reason: string;
-            /**
              * Copy Id
              * @description 关联副本ID
              */
             copy_id?: number | null;
+            /**
+             * Reason
+             * @description 事由（关联图书等，留痕）
+             */
+            reason: string;
         };
         /** DepositLedgerResponse */
         DepositLedgerResponse: {
-            /** Id */
-            id: number;
-            /** Entry Type */
-            entry_type: string;
             /** Amount */
             amount: string;
             /** Balance After */
             balance_after: string;
-            /** Reason */
-            reason: string;
-            /** Related Copy Id */
-            related_copy_id: number | null;
             /**
              * Create Time
              * Format: date-time
              */
             create_time: string;
+            /** Entry Type */
+            entry_type: string;
+            /** Id */
+            id: number;
+            /** Reason */
+            reason: string;
+            /** Related Copy Id */
+            related_copy_id: number | null;
         };
         /** DepositResponse */
         DepositResponse: {
-            /** Id */
-            id: number;
+            /** Amount */
+            amount: string;
+            /** Available Amount */
+            available_amount: string;
             /** Child Id */
             child_id: number;
             /**
@@ -3207,16 +3688,14 @@ export interface components {
              * @default
              */
             child_name: string;
-            /** Amount */
-            amount: string;
-            /** Available Amount */
-            available_amount: string;
             /** Deducted Amount */
             deducted_amount: string;
-            /** Supplemented Total */
-            supplemented_total: string;
+            /** Id */
+            id: number;
             /** Status */
             status: string;
+            /** Supplemented Total */
+            supplemented_total: string;
             /** Unpaid Balance */
             unpaid_balance: string;
         };
@@ -3232,14 +3711,10 @@ export interface components {
         };
         /** FinishedBookItem */
         FinishedBookItem: {
-            /** Book Id */
-            book_id: number;
-            /** Title */
-            title: string;
             /** Author */
             author: string | null;
-            /** Word Count */
-            word_count: number | null;
+            /** Book Id */
+            book_id: number;
             /**
              * Finished At
              * Format: date-time
@@ -3247,6 +3722,10 @@ export interface components {
             finished_at: string;
             /** Reading Minutes */
             reading_minutes: number;
+            /** Title */
+            title: string;
+            /** Word Count */
+            word_count: number | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -3255,17 +3734,17 @@ export interface components {
         };
         /** ImportResultResponse */
         ImportResultResponse: {
-            /** Total Rows */
-            total_rows: number;
-            /** Success Count */
-            success_count: number;
-            /** Failed Count */
-            failed_count: number;
             /**
              * Errors
              * @description 行号+原因
              */
             errors?: string[];
+            /** Failed Count */
+            failed_count: number;
+            /** Success Count */
+            success_count: number;
+            /** Total Rows */
+            total_rows: number;
         };
         /** LoginResponse */
         LoginResponse: {
@@ -3275,9 +3754,9 @@ export interface components {
         };
         /** MeResponse */
         MeResponse: {
-            user: components["schemas"]["AdminUserResponse"];
             /** Permissions */
             permissions: string[];
+            user: components["schemas"]["AdminUserResponse"];
         };
         /** MemberStatusActionRequest */
         MemberStatusActionRequest: {
@@ -3318,19 +3797,19 @@ export interface components {
         };
         /** OrderCreateRequest */
         OrderCreateRequest: {
-            /** Order Type */
-            order_type: string;
+            /** Activity Id */
+            activity_id?: number | null;
+            /** Amount */
+            amount?: number | string | null;
             /** Child Id */
             child_id: number;
+            /** Order Type */
+            order_type: string;
             /**
              * Remark
              * @default
              */
             remark: string;
-            /** Activity Id */
-            activity_id?: number | null;
-            /** Amount */
-            amount?: number | string | null;
         };
         /** OrderRefundRequest */
         OrderRefundRequest: {
@@ -3343,74 +3822,74 @@ export interface components {
         };
         /** OrderResponse */
         OrderResponse: {
+            /** Amount */
+            amount: string;
+            /** Child Id */
+            child_id: number | null;
+            /** Child Name */
+            child_name?: string | null;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /** Enrollment Id */
+            enrollment_id?: number | null;
             /** Id */
             id: number;
             /** Order No */
             order_no: string;
             /** Order Type */
             order_type: string;
-            /** Parent Id */
-            parent_id: number;
-            /** Child Id */
-            child_id: number | null;
-            /** Amount */
-            amount: string;
-            /** Status */
-            status: string;
-            /** Pay Method */
-            pay_method: string | null;
             /** Paid At */
             paid_at: string | null;
-            /** Remark */
-            remark: string;
-            /** Voucher Path */
-            voucher_path?: string | null;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
-            /** Child Name */
-            child_name?: string | null;
+            /** Parent Id */
+            parent_id: number;
             /** Parent Name */
             parent_name?: string | null;
-            /** Enrollment Id */
-            enrollment_id?: number | null;
+            /** Pay Method */
+            pay_method: string | null;
+            /** Remark */
+            remark: string;
+            /** Status */
+            status: string;
+            /** Voucher Path */
+            voucher_path?: string | null;
         };
         /** OverdueItemResponse */
         OverdueItemResponse: {
-            /** Record Id */
-            record_id: number;
-            /** Child Name */
-            child_name: string;
-            /** Parent Phone */
-            parent_phone: string;
             /** Book Title */
             book_title: string;
+            /** Child Name */
+            child_name: string;
             /** Copy Code */
             copy_code: string;
+            /** Days Overdue */
+            days_overdue: number;
             /**
              * Due At
              * Format: date-time
              */
             due_at: string;
-            /** Days Overdue */
-            days_overdue: number;
+            /** Parent Phone */
+            parent_phone: string;
+            /** Record Id */
+            record_id: number;
         };
         /** PaginatedResponse[AuditLogResponse] */
         PaginatedResponse_AuditLogResponse_: {
+            /**
+             * Has Next
+             * @description 是否有下一页
+             * @default false
+             */
+            has_next: boolean;
             /**
              * Items
              * @description 数据列表
              */
             items?: components["schemas"]["AuditLogResponse"][];
             /**
-             * Total
-             * @description 总数
-             * @default 0
-             */
-            total: number;
-            /**
              * Page
              * @description 当前页码
              * @default 1
@@ -3423,26 +3902,26 @@ export interface components {
              */
             page_size: number;
             /**
+             * Total
+             * @description 总数
+             * @default 0
+             */
+            total: number;
+        };
+        /** PaginatedResponse[ChildWithParentResponse] */
+        PaginatedResponse_ChildWithParentResponse_: {
+            /**
              * Has Next
              * @description 是否有下一页
              * @default false
              */
             has_next: boolean;
-        };
-        /** PaginatedResponse[ChildWithParentResponse] */
-        PaginatedResponse_ChildWithParentResponse_: {
             /**
              * Items
              * @description 数据列表
              */
             items?: components["schemas"]["ChildWithParentResponse"][];
             /**
-             * Total
-             * @description 总数
-             * @default 0
-             */
-            total: number;
-            /**
              * Page
              * @description 当前页码
              * @default 1
@@ -3455,26 +3934,26 @@ export interface components {
              */
             page_size: number;
             /**
+             * Total
+             * @description 总数
+             * @default 0
+             */
+            total: number;
+        };
+        /** PaginatedResponse[DepositResponse] */
+        PaginatedResponse_DepositResponse_: {
+            /**
              * Has Next
              * @description 是否有下一页
              * @default false
              */
             has_next: boolean;
-        };
-        /** PaginatedResponse[DepositResponse] */
-        PaginatedResponse_DepositResponse_: {
             /**
              * Items
              * @description 数据列表
              */
             items?: components["schemas"]["DepositResponse"][];
             /**
-             * Total
-             * @description 总数
-             * @default 0
-             */
-            total: number;
-            /**
              * Page
              * @description 当前页码
              * @default 1
@@ -3487,26 +3966,26 @@ export interface components {
              */
             page_size: number;
             /**
+             * Total
+             * @description 总数
+             * @default 0
+             */
+            total: number;
+        };
+        /** PaginatedResponse[OrderResponse] */
+        PaginatedResponse_OrderResponse_: {
+            /**
              * Has Next
              * @description 是否有下一页
              * @default false
              */
             has_next: boolean;
-        };
-        /** PaginatedResponse[OrderResponse] */
-        PaginatedResponse_OrderResponse_: {
             /**
              * Items
              * @description 数据列表
              */
             items?: components["schemas"]["OrderResponse"][];
             /**
-             * Total
-             * @description 总数
-             * @default 0
-             */
-            total: number;
-            /**
              * Page
              * @description 当前页码
              * @default 1
@@ -3519,26 +3998,26 @@ export interface components {
              */
             page_size: number;
             /**
+             * Total
+             * @description 总数
+             * @default 0
+             */
+            total: number;
+        };
+        /** PaginatedResponse[ParentWithStatsResponse] */
+        PaginatedResponse_ParentWithStatsResponse_: {
+            /**
              * Has Next
              * @description 是否有下一页
              * @default false
              */
             has_next: boolean;
-        };
-        /** PaginatedResponse[ParentWithStatsResponse] */
-        PaginatedResponse_ParentWithStatsResponse_: {
             /**
              * Items
              * @description 数据列表
              */
             items?: components["schemas"]["ParentWithStatsResponse"][];
             /**
-             * Total
-             * @description 总数
-             * @default 0
-             */
-            total: number;
-            /**
              * Page
              * @description 当前页码
              * @default 1
@@ -3551,11 +4030,11 @@ export interface components {
              */
             page_size: number;
             /**
-             * Has Next
-             * @description 是否有下一页
-             * @default false
+             * Total
+             * @description 总数
+             * @default 0
              */
-            has_next: boolean;
+            total: number;
         };
         /** ParentCreateRequest */
         ParentCreateRequest: {
@@ -3600,6 +4079,22 @@ export interface components {
          * @description 家长管理 tab 行（WM3-B1）：含孩子数与订单守卫标志。
          */
         ParentWithStatsResponse: {
+            /**
+             * Children Count
+             * @default 0
+             */
+            children_count: number;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Has Orders
+             * @description 名下任一孩子存在订单（禁改禁删守卫）
+             * @default false
+             */
+            has_orders: boolean;
             /** Id */
             id: number;
             /** Name */
@@ -3608,29 +4103,13 @@ export interface components {
             phone: string;
             /** Remark */
             remark: string;
-            /**
-             * Children Count
-             * @default 0
-             */
-            children_count: number;
-            /**
-             * Has Orders
-             * @description 名下任一孩子存在订单（禁改禁删守卫）
-             * @default false
-             */
-            has_orders: boolean;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
         };
         /** ProgressReportRequest */
         ProgressReportRequest: {
-            /** Child Id */
-            child_id: number;
             /** Book Id */
             book_id: number;
+            /** Child Id */
+            child_id: number;
             /** Position */
             position: number;
             /** Session Start */
@@ -3638,70 +4117,70 @@ export interface components {
         };
         /** QuizQuestionCreateRequest */
         QuizQuestionCreateRequest: {
+            /** Answer */
+            answer: string;
+            /** Options */
+            options: string[];
+            /** Question Text */
+            question_text: string;
             /**
              * Question Type
              * @default single
              */
             question_type: string;
-            /** Question Text */
-            question_text: string;
-            /** Options */
-            options: string[];
-            /** Answer */
-            answer: string;
         };
         /** QuizQuestionResponse */
         QuizQuestionResponse: {
-            /** Id */
-            id: number;
-            /** Book Id */
-            book_id: number;
-            /** Question Type */
-            question_type: string;
-            /** Question Text */
-            question_text: string;
-            /** Options */
-            options: string[];
             /** Answer */
             answer: string;
-            /** Sort Order */
-            sort_order: number;
+            /** Book Id */
+            book_id: number;
+            /** Id */
+            id: number;
             /** Is Active */
             is_active: number;
+            /** Options */
+            options: string[];
+            /** Question Text */
+            question_text: string;
+            /** Question Type */
+            question_type: string;
+            /** Sort Order */
+            sort_order: number;
         };
         /** QuizQuestionUpdateRequest */
         QuizQuestionUpdateRequest: {
+            /** Answer */
+            answer: string;
+            /** Options */
+            options: string[];
+            /** Question Text */
+            question_text: string;
             /**
              * Question Type
              * @default single
              */
             question_type: string;
-            /** Question Text */
-            question_text: string;
-            /** Options */
-            options: string[];
-            /** Answer */
-            answer: string;
         };
         /** QuizSubmitRequest */
         QuizSubmitRequest: {
-            /** Child Id */
-            child_id: number;
             /** Answers */
             answers: string[];
+            /** Child Id */
+            child_id: number;
         };
         /** ReadNotificationsRequest */
         ReadNotificationsRequest: {
-            /**
-             * Ids
-             * @default []
-             */
-            ids: number[];
             /**
              * All
              * @default false
              */
             all: boolean;
+            /**
+             * Ids
+             * @default []
+             */
+            ids: number[];
         };
         /** RefundApplyRequest */
         RefundApplyRequest: {
@@ -3720,16 +4199,16 @@ export interface components {
         /** RefundExecuteRequest */
         RefundExecuteRequest: {
             /**
-             * Success
-             * @description 执行结果：true=退款成功（凭证登记）/ false=失败（可重试）
-             */
-            success: boolean;
-            /**
              * Remark
              * @description 退款凭证/失败原因（留痕）
              * @default
              */
             remark: string;
+            /**
+             * Success
+             * @description 执行结果：true=退款成功（凭证登记）/ false=失败（可重试）
+             */
+            success: boolean;
         };
         /** RefundReviewRequest */
         RefundReviewRequest: {
@@ -3753,50 +4232,50 @@ export interface components {
         };
         /** ReservationCreateRequest */
         ReservationCreateRequest: {
-            /** Child Id */
-            child_id: number;
             /** Book Id */
             book_id: number;
+            /** Child Id */
+            child_id: number;
         };
         /** ReservationItemResponse */
         ReservationItemResponse: {
-            /** Id */
-            id: number;
-            /** Child Id */
-            child_id: number;
-            /** Child Name */
-            child_name: string;
-            /** Parent Name */
-            parent_name: string;
-            /** Parent Phone */
-            parent_phone: string;
             /** Book Id */
             book_id: number;
             /** Book Title */
             book_title: string;
+            /** Child Id */
+            child_id: number;
+            /** Child Name */
+            child_name: string;
             /** Copy Id */
             copy_id: number;
-            /** Status */
-            status: string;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+            /** Expired */
+            expired: boolean;
             /**
              * Expires At
              * Format: date-time
              */
             expires_at: string;
-            /** Expired */
-            expired: boolean;
+            /** Id */
+            id: number;
+            /** Parent Name */
+            parent_name: string;
+            /** Parent Phone */
+            parent_phone: string;
+            /** Status */
+            status: string;
         };
         /** ResetAttemptsRequest */
         ResetAttemptsRequest: {
-            /** Child Id */
-            child_id: number;
             /** Book Id */
             book_id: number;
+            /** Child Id */
+            child_id: number;
             /**
              * Reason
              * @description 重置原因（必填留痕）
@@ -3805,13 +4284,13 @@ export interface components {
         };
         /** ReturnRequest */
         ReturnRequest: {
-            /** Copy Id */
-            copy_id: number;
             /**
              * Condition
              * @default normal
              */
             condition: string;
+            /** Copy Id */
+            copy_id: number;
         };
         /** ReviewRequest */
         ReviewRequest: {
@@ -3831,17 +4310,17 @@ export interface components {
         };
         /** StaffCreateRequest */
         StaffCreateRequest: {
-            /** Username */
-            username: string;
-            /** Password */
-            password: string;
             /** Display Name */
             display_name: string;
+            /** Password */
+            password: string;
             /**
              * Role
              * @default staff
              */
             role: string;
+            /** Username */
+            username: string;
         };
         /** StaffResetPasswordRequest */
         StaffResetPasswordRequest: {
@@ -3862,35 +4341,35 @@ export interface components {
         };
         /** SystemConfigResponse */
         SystemConfigResponse: {
-            /** Id */
-            id: number;
+            /** Category */
+            category: string;
             /** Config Key */
             config_key: string;
-            /** Display Name */
-            display_name: string;
             /** Config Value */
             config_value: string;
             /** Default Value */
             default_value: string;
-            /** Value Type */
-            value_type: string;
-            /** Category */
-            category: string;
             /** Description */
             description: string;
+            /** Display Name */
+            display_name: string;
+            /** Id */
+            id: number;
+            /** Value Type */
+            value_type: string;
         };
         /** SystemConfigUpdateRequest */
         SystemConfigUpdateRequest: {
-            /**
-             * Value
-             * @description 新值（字符串，服务端按类型解析）
-             */
-            value: string;
             /**
              * Reason
              * @description 变更原因（必填留痕）
              */
             reason: string;
+            /**
+             * Value
+             * @description 新值（字符串，服务端按类型解析）
+             */
+            value: string;
         };
         /** TransferApplyRequest */
         TransferApplyRequest: {
@@ -3901,16 +4380,16 @@ export interface components {
         };
         /** ValidationError */
         ValidationError: {
+            /** Context */
+            ctx?: Record<string, never>;
+            /** Input */
+            input?: unknown;
             /** Location */
             loc: (string | number)[];
             /** Message */
             msg: string;
             /** Error Type */
             type: string;
-            /** Input */
-            input?: unknown;
-            /** Context */
-            ctx?: Record<string, never>;
         };
         /** VoucherUploadResponse */
         VoucherUploadResponse: {
@@ -3935,20 +4414,20 @@ export interface components {
         };
         /** LoginRequest */
         backend__domain__admin__schemas__LoginRequest: {
-            /** Username */
-            username: string;
             /** Password */
             password: string;
+            /** Username */
+            username: string;
         };
         /** LoginRequest */
         backend__domain__reading__miniapp_router__LoginRequest: {
-            /** Phone */
-            phone: string;
             /**
              * Code
              * @description 短信验证码（开发期固定 1234）
              */
             code: string;
+            /** Phone */
+            phone: string;
         };
     };
     responses: never;
@@ -3959,9 +4438,13 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    health_health_get: {
+    list_activities_api_admin_activities_get: {
         parameters: {
-            query?: never;
+            query?: {
+                status?: string | null;
+                keyword?: string | null;
+                activity_type?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3974,33 +4457,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
-    login_api_admin_login_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["backend__domain__admin__schemas__LoginRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LoginResponse"];
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -4014,14 +4471,18 @@ export interface operations {
             };
         };
     };
-    me_api_admin_me_get: {
+    create_activity_api_admin_activities_post: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivityCreateRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -4029,76 +4490,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MeResponse"];
+                    "application/json": unknown;
                 };
             };
-        };
-    };
-    list_configs_api_admin_configs_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SystemConfigResponse"][];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
     };
-    update_config_api_admin_configs__key__put: {
+    get_activity_detail_api_admin_activities__activity_id__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                key: string;
+                activity_id: number;
             };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SystemConfigUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SystemConfigResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_audit_logs_api_admin_audit_logs_get: {
-        parameters: {
-            query?: {
-                page?: number;
-                page_size?: number;
-                actor_id?: number | null;
-                action?: string | null;
-            };
-            header?: never;
-            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -4109,7 +4521,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PaginatedResponse_AuditLogResponse_"];
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -4123,7 +4535,172 @@ export interface operations {
             };
         };
     };
-    dashboard_overview_api_admin_dashboard_get: {
+    update_activity_api_admin_activities__activity_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                activity_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivityUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_activity_api_admin_activities__activity_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                activity_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_activity_cover_api_admin_activities__activity_id__cover_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                activity_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_activity_cover_api_admin_activities__activity_id__cover_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activity_cover_media_api_admin_activities__activity_id__cover_media_get: {
+        parameters: {
+            query?: {
+                token?: string;
+            };
+            header?: never;
+            path: {
+                activity_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_enrollments_api_admin_activities__activity_id__enrollments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                activity_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_refund_pending_api_admin_activity_refunds_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -4138,7 +4715,75 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DashboardOverviewResponse"];
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    review_refund_api_admin_activity_refunds__enrollment_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                enrollment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefundReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    signin_api_admin_activity_signin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SigninRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4213,36 +4858,13 @@ export interface operations {
             };
         };
     };
-    todo_counts_api_admin_todo_counts_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    list_notifications_api_admin_notifications_get: {
+    list_audit_logs_api_admin_audit_logs_get: {
         parameters: {
             query?: {
                 page?: number;
                 page_size?: number;
-                category?: string | null;
-                scene?: string | null;
-                parent_name?: string | null;
-                unread?: boolean | null;
-                read?: boolean | null;
+                actor_id?: number | null;
+                action?: string | null;
             };
             header?: never;
             path?: never;
@@ -4256,144 +4878,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    toggle_notification_read_api_admin_notifications__notification_id__read_status_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                notification_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NotificationReadStatusRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    export_notifications_api_admin_notifications_export_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    task_specs_api_admin_tasks_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    task_runs_api_admin_tasks_runs_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    task_run_api_admin_tasks__task_name__run_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PaginatedResponse_AuditLogResponse_"];
                 };
             };
             /** @description Validation Error */
@@ -4423,272 +4908,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
-                };
-            };
-        };
-    };
-    export_dashboard_api_admin_dashboard_export_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    staff_list_api_admin_staff_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminUserResponse"][];
-                };
-            };
-        };
-    };
-    staff_create_api_admin_staff_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StaffCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminUserResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    staff_update_api_admin_staff__user_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StaffUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminUserResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    staff_status_api_admin_staff__user_id__status_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StaffStatusRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminUserResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    staff_reset_password_api_admin_staff__user_id__reset_password_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StaffResetPasswordRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    import_template_api_admin_books_import_template_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    book_cover_media_api_admin_books__book_id__cover_media_get: {
-        parameters: {
-            query?: {
-                token?: string;
-            };
-            header?: never;
-            path: {
-                book_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    book_audio_media_api_admin_books__book_id__audio_media_get: {
-        parameters: {
-            query?: {
-                token?: string;
-            };
-            header?: never;
-            path: {
-                book_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4762,6 +4981,125 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    batch_delete_books_api_admin_books_batch_delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    batch_toggle_book_status_api_admin_books_batch_toggle_status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchToggleStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_books_excel_api_admin_books_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_books_excel_api_admin_books_import_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportResultResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_template_api_admin_books_import_template_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };
@@ -4863,16 +5201,18 @@ export interface operations {
             };
         };
     };
-    batch_delete_books_api_admin_books_batch_delete_post: {
+    upload_audio_api_admin_books__book_id__audio_post: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                book_id: number;
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["BatchDeleteRequest"];
+                "multipart/form-data": components["schemas"]["Body_upload_audio_api_admin_books__book_id__audio_post"];
             };
         };
         responses: {
@@ -4882,7 +5222,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["BookResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4896,18 +5236,18 @@ export interface operations {
             };
         };
     };
-    batch_toggle_book_status_api_admin_books_batch_toggle_status_post: {
+    book_audio_media_api_admin_books__book_id__audio_media_get: {
         parameters: {
-            query?: never;
+            query?: {
+                token?: string;
+            };
             header?: never;
-            path?: never;
+            path: {
+                book_id: number;
+            };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BatchToggleStatusRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -4993,72 +5333,6 @@ export interface operations {
             };
         };
     };
-    toggle_book_status_api_admin_books__book_id__toggle_status_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                book_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BookResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_copy_status_api_admin_copies__copy_id__status_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                copy_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CopyStatusUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CopyResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     upload_cover_api_admin_books__book_id__cover_post: {
         parameters: {
             query?: never;
@@ -5094,80 +5368,14 @@ export interface operations {
             };
         };
     };
-    upload_audio_api_admin_books__book_id__audio_post: {
+    book_cover_media_api_admin_books__book_id__cover_media_get: {
         parameters: {
-            query?: never;
+            query?: {
+                token?: string;
+            };
             header?: never;
             path: {
                 book_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_upload_audio_api_admin_books__book_id__audio_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BookResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    import_books_excel_api_admin_books_import_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_import_books_excel_api_admin_books_import_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ImportResultResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    serve_upload_api_admin_uploads__path__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                path: string;
             };
             cookie?: never;
         };
@@ -5259,20 +5467,16 @@ export interface operations {
             };
         };
     };
-    update_question_api_admin_questions__question_id__put: {
+    toggle_book_status_api_admin_books__book_id__toggle_status_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                question_id: number;
+                book_id: number;
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QuizQuestionUpdateRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -5280,7 +5484,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["QuizQuestionResponse"];
+                    "application/json": components["schemas"]["BookResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5294,12 +5498,12 @@ export interface operations {
             };
         };
     };
-    delete_question_api_admin_questions__question_id__delete: {
+    child_growth_api_admin_children__child_id__growth_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                question_id: number;
+                child_id: number;
             };
             cookie?: never;
         };
@@ -5325,12 +5529,12 @@ export interface operations {
             };
         };
     };
-    toggle_question_api_admin_questions__question_id__toggle_active_post: {
+    check_milestones_api_admin_children__child_id__milestones_check_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                question_id: number;
+                child_id: number;
             };
             cookie?: never;
         };
@@ -5342,7 +5546,461 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["QuizQuestionResponse"];
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_observation_report_api_admin_children__child_id__observation_reports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_observation_report_api_admin_children__child_id__observation_reports_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    adjust_points_api_admin_children__child_id__points_adjust_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdjustPointsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    child_reading_profile_api_admin_children__child_id__reading_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChildReadingProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_report_api_admin_children__child_id__reports__kind__generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circle_card_types_api_admin_circle_card_types_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    circle_overview_api_admin_circle_overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    list_circle_posts_api_admin_circle_posts_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                card_type?: string | null;
+                start?: string | null;
+                end?: string | null;
+                keyword?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circle_delete_post_api_admin_circle_posts__post_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                post_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CircleDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circle_admin_like_api_admin_circle_posts__post_id__admin_like_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                post_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circle_admin_unlike_api_admin_circle_posts__post_id__admin_like_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                post_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circle_post_image_api_admin_circle_posts__post_id__image_get: {
+        parameters: {
+            query?: {
+                token?: string;
+            };
+            header?: never;
+            path: {
+                post_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circle_pin_api_admin_circle_posts__post_id__pin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                post_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circle_unpin_api_admin_circle_posts__post_id__pin_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                post_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circle_unliked_count_api_admin_circle_unliked_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    borrow_book_api_admin_circulation_borrow_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BorrowRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BorrowRecordResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5387,7 +6045,27 @@ export interface operations {
             };
         };
     };
-    borrow_book_api_admin_circulation_borrow_post: {
+    overdue_list_api_admin_circulation_overdue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverdueItemResponse"][];
+                };
+            };
+        };
+    };
+    renew_book_api_admin_circulation_renew_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -5396,7 +6074,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["BorrowRequest"];
+                "application/json": components["schemas"]["RenewRequest"];
             };
         };
         responses: {
@@ -5453,40 +6131,7 @@ export interface operations {
             };
         };
     };
-    renew_book_api_admin_circulation_renew_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RenewRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BorrowRecordResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    overdue_list_api_admin_circulation_overdue_get: {
+    list_configs_api_admin_configs_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -5501,7 +6146,586 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OverdueItemResponse"][];
+                    "application/json": components["schemas"]["SystemConfigResponse"][];
+                };
+            };
+        };
+    };
+    update_config_api_admin_configs__key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SystemConfigUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemConfigResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_copy_status_api_admin_copies__copy_id__status_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                copy_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CopyStatusUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CopyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dashboard_overview_api_admin_dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardOverviewResponse"];
+                };
+            };
+        };
+    };
+    export_dashboard_api_admin_dashboard_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    list_deposits_api_admin_deposits_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                status?: string | null;
+                keyword?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedResponse_DepositResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_deposit_api_admin_deposits_children__child_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositResponse"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deduct_deposit_api_admin_deposits_children__child_id__deduct_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeductRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_deposit_ledgers_api_admin_deposits_children__child_id__ledgers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositLedgerResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_deposit_order_api_admin_deposits_children__child_id__orders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_supplement_order_api_admin_deposits_children__child_id__supplement_orders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recalc_levels_api_admin_growth_levels_recalc_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    login_api_admin_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["backend__domain__admin__schemas__LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    me_api_admin_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+        };
+    };
+    list_children_page_api_admin_members_children_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                keyword?: string | null;
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedResponse_ChildWithParentResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_child_api_admin_members_children__child_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChildUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChildResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_child_api_admin_members_children__child_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    evaluate_approve_api_admin_members_children__child_id__evaluate_approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberStatusActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_pending_evaluation_api_admin_members_children__child_id__mark_pending_evaluation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberStatusActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChildResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    order_voucher_image_api_admin_members_orders__order_id__voucher_image_get: {
+        parameters: {
+            query?: {
+                token?: string;
+            };
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5735,117 +6959,19 @@ export interface operations {
             };
         };
     };
-    list_children_page_api_admin_members_children_get: {
+    list_notifications_api_admin_notifications_get: {
         parameters: {
             query?: {
                 page?: number;
                 page_size?: number;
-                keyword?: string | null;
-                status?: string | null;
+                category?: string | null;
+                scene?: string | null;
+                parent_name?: string | null;
+                unread?: boolean | null;
+                read?: boolean | null;
             };
             header?: never;
             path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PaginatedResponse_ChildWithParentResponse_"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    mark_pending_evaluation_api_admin_members_children__child_id__mark_pending_evaluation_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                child_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MemberStatusActionRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChildResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_child_api_admin_members_children__child_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                child_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChildUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChildResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_child_api_admin_members_children__child_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                child_id: number;
-            };
             cookie?: never;
         };
         requestBody?: never;
@@ -5870,18 +6996,38 @@ export interface operations {
             };
         };
     };
-    evaluate_approve_api_admin_members_children__child_id__evaluate_approve_post: {
+    export_notifications_api_admin_notifications_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    toggle_notification_read_api_admin_notifications__notification_id__read_status_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                child_id: number;
+                notification_id: number;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MemberStatusActionRequest"];
+                "application/json": components["schemas"]["NotificationReadStatusRequest"];
             };
         };
         responses: {
@@ -5891,7 +7037,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrderResponse"];
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -5993,41 +7139,6 @@ export interface operations {
             };
         };
     };
-    confirm_payment_api_admin_orders__order_id__confirm_payment_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                order_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["OrderConfirmRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OrderResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     cancel_order_api_admin_orders__order_id__cancel_post: {
         parameters: {
             query?: never;
@@ -6059,7 +7170,7 @@ export interface operations {
             };
         };
     };
-    upload_order_voucher_api_admin_orders__order_id__voucher_post: {
+    confirm_payment_api_admin_orders__order_id__confirm_payment_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -6070,7 +7181,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_upload_order_voucher_api_admin_orders__order_id__voucher_post"];
+                "application/json": components["schemas"]["OrderConfirmRequest"];
             };
         };
         responses: {
@@ -6080,40 +7191,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VoucherUploadResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    order_voucher_image_api_admin_members_orders__order_id__voucher_image_get: {
-        parameters: {
-            query?: {
-                token?: string;
-            };
-            header?: never;
-            path: {
-                order_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OrderResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6162,13 +7240,83 @@ export interface operations {
             };
         };
     };
-    admin_refund_list_api_admin_refund_requests_get: {
+    upload_order_voucher_api_admin_orders__order_id__voucher_post: {
         parameters: {
-            query?: {
-                status?: string | null;
-            };
+            query?: never;
             header?: never;
-            path?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_order_voucher_api_admin_orders__order_id__voucher_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_question_api_admin_questions__question_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                question_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuizQuestionUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizQuestionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_question_api_admin_questions__question_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                question_id: number;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -6193,20 +7341,80 @@ export interface operations {
             };
         };
     };
-    admin_refund_review_api_admin_refund_requests__request_id__review_post: {
+    toggle_question_api_admin_questions__question_id__toggle_active_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                request_id: number;
+                question_id: number;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizQuestionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_attempts_api_admin_quiz_attempts_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ReviewRequest"];
+                "application/json": components["schemas"]["ResetAttemptsRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_refund_list_api_admin_refund_requests_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -6263,69 +7471,7 @@ export interface operations {
             };
         };
     };
-    admin_withdrawal_list_api_admin_withdrawals_get: {
-        parameters: {
-            query?: {
-                status?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    admin_withdrawal_settle_preview_api_admin_withdrawals__request_id__settle_preview_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                request_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    admin_withdrawal_review_api_admin_withdrawals__request_id__review_post: {
+    admin_refund_review_api_admin_refund_requests__request_id__review_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -6356,6 +7502,331 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reservations_api_admin_reservations_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                keyword?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReservationItemResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    checkout_reservation_api_admin_reservations__reservation_id__checkout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reservation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckOutResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    staff_list_api_admin_staff_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"][];
+                };
+            };
+        };
+    };
+    staff_create_api_admin_staff_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaffCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    staff_update_api_admin_staff__user_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaffUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    staff_reset_password_api_admin_staff__user_id__reset_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaffResetPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    staff_status_api_admin_staff__user_id__status_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaffStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    task_specs_api_admin_tasks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    task_runs_api_admin_tasks_runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    task_run_api_admin_tasks__task_name__run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    todo_counts_api_admin_todo_counts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };
@@ -6426,20 +7897,16 @@ export interface operations {
             };
         };
     };
-    upload_observation_report_api_admin_children__child_id__observation_reports_post: {
+    serve_upload_api_admin_uploads__path__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                child_id: number;
+                path: string;
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_upload_observation_report_api_admin_children__child_id__observation_reports_post"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -6461,13 +7928,10 @@ export interface operations {
             };
         };
     };
-    list_deposits_api_admin_deposits_get: {
+    admin_withdrawal_list_api_admin_withdrawals_get: {
         parameters: {
             query?: {
-                page?: number;
-                page_size?: number;
                 status?: string | null;
-                keyword?: string | null;
             };
             header?: never;
             path?: never;
@@ -6481,7 +7945,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PaginatedResponse_DepositResponse_"];
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -6495,16 +7959,20 @@ export interface operations {
             };
         };
     };
-    get_deposit_api_admin_deposits_children__child_id__get: {
+    admin_withdrawal_review_api_admin_withdrawals__request_id__review_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                child_id: number;
+                request_id: number;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -6512,7 +7980,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DepositResponse"] | null;
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -6526,43 +7994,12 @@ export interface operations {
             };
         };
     };
-    get_deposit_ledgers_api_admin_deposits_children__child_id__ledgers_get: {
+    admin_withdrawal_settle_preview_api_admin_withdrawals__request_id__settle_preview_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                child_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DepositLedgerResponse"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_deposit_order_api_admin_deposits_children__child_id__orders_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                child_id: number;
+                request_id: number;
             };
             cookie?: never;
         };
@@ -6588,12 +8025,69 @@ export interface operations {
             };
         };
     };
-    create_supplement_order_api_admin_deposits_children__child_id__supplement_orders_post: {
+    list_activities_api_miniapp_activities_get: {
+        parameters: {
+            query: {
+                child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activity_carousel_api_miniapp_activities_carousel_get: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    activity_detail_api_miniapp_activities__activity_id__get: {
+        parameters: {
+            query: {
                 child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path: {
+                activity_id: number;
             };
             cookie?: never;
         };
@@ -6619,20 +8113,20 @@ export interface operations {
             };
         };
     };
-    deduct_deposit_api_admin_deposits_children__child_id__deduct_post: {
+    activity_cover_api_miniapp_activities__activity_id__cover_get: {
         parameters: {
-            query?: never;
-            header?: never;
+            query?: {
+                token?: string;
+            };
+            header?: {
+                Authorization?: string | null;
+            };
             path: {
-                child_id: number;
+                activity_id: number;
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DeductRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -6640,7 +8134,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DepositResponse"];
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -6654,16 +8148,20 @@ export interface operations {
             };
         };
     };
-    login_api_miniapp_login_post: {
+    enroll_api_miniapp_activities__activity_id__enroll_post: {
         parameters: {
             query?: never;
-            header?: never;
-            path?: never;
+            header: {
+                authorization: string;
+            };
+            path: {
+                activity_id: number;
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["backend__domain__reading__miniapp_router__LoginRequest"];
+                "application/json": components["schemas"]["EnrollRequest"];
             };
         };
         responses: {
@@ -6728,215 +8226,6 @@ export interface operations {
             };
         };
     };
-    get_progress_api_miniapp_books__book_id__progress_get: {
-        parameters: {
-            query: {
-                child_id: number;
-            };
-            header: {
-                authorization: string;
-            };
-            path: {
-                book_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    report_progress_api_miniapp_reading_progress_post: {
-        parameters: {
-            query?: never;
-            header: {
-                authorization: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProgressReportRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    checkin_calendar_api_miniapp_checkins_get: {
-        parameters: {
-            query: {
-                child_id: number;
-                days?: number;
-            };
-            header: {
-                authorization: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_reservations_api_miniapp_reservations_get: {
-        parameters: {
-            query: {
-                child_id: number;
-            };
-            header: {
-                authorization: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_reservation_api_miniapp_reservations_post: {
-        parameters: {
-            query?: never;
-            header: {
-                authorization: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReservationCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    cancel_reservation_api_miniapp_reservations__reservation_id__cancel_post: {
-        parameters: {
-            query?: never;
-            header: {
-                authorization: string;
-            };
-            path: {
-                reservation_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReservationCancelRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     book_detail_api_miniapp_books__book_id__get: {
         parameters: {
             query?: never;
@@ -6973,6 +8262,7 @@ export interface operations {
     book_audio_api_miniapp_books__book_id__audio_get: {
         parameters: {
             query?: {
+                child_id?: number | null;
                 token?: string;
             };
             header?: never;
@@ -7003,46 +8293,13 @@ export interface operations {
             };
         };
     };
-    observation_image_api_miniapp_observation_images__path__get: {
+    audio_permission_api_miniapp_books__book_id__audio_permission_get: {
         parameters: {
-            query?: {
-                token?: string;
+            query: {
+                child_id: number;
             };
-            header?: never;
-            path: {
-                path: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    book_cover_api_miniapp_covers__book_id__get: {
-        parameters: {
-            query?: {
-                token?: string;
-            };
-            header?: {
-                Authorization?: string | null;
+            header: {
+                authorization: string;
             };
             path: {
                 book_id: number;
@@ -7071,180 +8328,7 @@ export interface operations {
             };
         };
     };
-    vocabulary_lookup_api_miniapp_vocabulary_lookup_get: {
-        parameters: {
-            query: {
-                word: string;
-                child_id: number;
-                book_id?: number | null;
-            };
-            header: {
-                authorization: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    vocabulary_list_api_miniapp_vocabulary_get: {
-        parameters: {
-            query: {
-                child_id: number;
-            };
-            header: {
-                authorization: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    vocabulary_remove_api_miniapp_vocabulary__vocabulary_id__delete: {
-        parameters: {
-            query: {
-                child_id: number;
-            };
-            header: {
-                authorization: string;
-            };
-            path: {
-                vocabulary_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    favorites_list_api_miniapp_favorites_get: {
-        parameters: {
-            query: {
-                child_id: number;
-            };
-            header: {
-                authorization: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    favorites_add_api_miniapp_favorites_post: {
-        parameters: {
-            query?: never;
-            header: {
-                authorization: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    favorites_remove_api_miniapp_favorites__book_id__delete: {
+    get_progress_api_miniapp_books__book_id__progress_get: {
         parameters: {
             query: {
                 child_id: number;
@@ -7312,6 +8396,278 @@ export interface operations {
             };
         };
     };
+    checkin_calendar_api_miniapp_checkins_get: {
+        parameters: {
+            query: {
+                child_id: number;
+                days?: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circle_my_cards_api_miniapp_circle_my_cards_get: {
+        parameters: {
+            query: {
+                child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circle_posts_api_miniapp_circle_posts_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circle_share_api_miniapp_circle_posts_post: {
+        parameters: {
+            query?: never;
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CircleShareRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circle_delete_my_post_api_miniapp_circle_posts__post_id__delete: {
+        parameters: {
+            query?: never;
+            header: {
+                authorization: string;
+            };
+            path: {
+                post_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CircleDeleteMyPostRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circle_post_image_api_miniapp_circle_posts__post_id__image_get: {
+        parameters: {
+            query?: {
+                token?: string;
+            };
+            header?: never;
+            path: {
+                post_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circle_like_api_miniapp_circle_posts__post_id__like_post: {
+        parameters: {
+            query?: never;
+            header: {
+                authorization: string;
+            };
+            path: {
+                post_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circle_unlike_api_miniapp_circle_posts__post_id__like_delete: {
+        parameters: {
+            query?: never;
+            header: {
+                authorization: string;
+            };
+            path: {
+                post_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     continue_listening_api_miniapp_continue_listening_get: {
         parameters: {
             query: {
@@ -7345,78 +8701,16 @@ export interface operations {
             };
         };
     };
-    list_activities_api_admin_activities_get: {
+    book_cover_api_miniapp_covers__book_id__get: {
         parameters: {
             query?: {
-                status?: string | null;
-                keyword?: string | null;
-                activity_type?: string | null;
+                token?: string;
             };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
+            header?: {
+                Authorization?: string | null;
             };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_activity_api_admin_activities_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ActivityCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    cancel_activity_api_admin_activities__activity_id__cancel_post: {
-        parameters: {
-            query?: never;
-            header?: never;
             path: {
-                activity_id: number;
+                book_id: number;
             };
             cookie?: never;
         };
@@ -7442,126 +8736,7 @@ export interface operations {
             };
         };
     };
-    list_enrollments_api_admin_activities__activity_id__enrollments_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                activity_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    signin_api_admin_activity_signin_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SigninRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_refund_pending_api_admin_activity_refunds_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    review_refund_api_admin_activity_refunds__enrollment_id__review_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                enrollment_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RefundReviewRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_activities_api_miniapp_activities_get: {
+    my_deposit_api_miniapp_deposits_get: {
         parameters: {
             query: {
                 child_id: number;
@@ -7594,55 +8769,20 @@ export interface operations {
             };
         };
     };
-    activity_detail_api_miniapp_activities__activity_id__get: {
-        parameters: {
-            query: {
-                child_id: number;
-            };
-            header: {
-                authorization: string;
-            };
-            path: {
-                activity_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    enroll_api_miniapp_activities__activity_id__enroll_post: {
+    create_supplement_order_api_miniapp_deposits_supplement_orders_post: {
         parameters: {
             query?: never;
             header: {
                 authorization: string;
             };
-            path: {
-                activity_id: number;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["EnrollRequest"];
+                "application/json": {
+                    [key: string]: unknown;
+                };
             };
         };
         responses: {
@@ -7773,7 +8913,7 @@ export interface operations {
             };
         };
     };
-    my_orders_api_miniapp_orders_get: {
+    favorites_list_api_miniapp_favorites_get: {
         parameters: {
             query: {
                 child_id: number;
@@ -7785,6 +8925,178 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    favorites_add_api_miniapp_favorites_post: {
+        parameters: {
+            query?: never;
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    favorites_remove_api_miniapp_favorites__book_id__delete: {
+        parameters: {
+            query: {
+                child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path: {
+                book_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    growth_summary_api_miniapp_growth_summary_get: {
+        parameters: {
+            query: {
+                child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leaderboard_api_miniapp_leaderboard_get: {
+        parameters: {
+            query?: {
+                period?: string;
+                child_id?: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_api_miniapp_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["backend__domain__reading__miniapp_router__LoginRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -7853,6 +9165,312 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ReadNotificationsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    observation_image_api_miniapp_observation_images__path__get: {
+        parameters: {
+            query?: {
+                token?: string;
+            };
+            header?: never;
+            path: {
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    observation_reports_api_miniapp_observation_reports_get: {
+        parameters: {
+            query: {
+                child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_orders_api_miniapp_orders_get: {
+        parameters: {
+            query: {
+                child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    passport_api_miniapp_passport_get: {
+        parameters: {
+            query: {
+                child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    points_ledger_api_miniapp_points_get: {
+        parameters: {
+            query: {
+                child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    quiz_status_batch_api_miniapp_quiz_status_batch_get: {
+        parameters: {
+            query: {
+                child_id: number;
+                book_ids: string;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_quiz_api_miniapp_quiz__book_id__get: {
+        parameters: {
+            query: {
+                child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path: {
+                book_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_quiz_api_miniapp_quiz__book_id__submit_post: {
+        parameters: {
+            query?: never;
+            header: {
+                authorization: string;
+            };
+            path: {
+                book_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuizSubmitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_progress_api_miniapp_reading_progress_post: {
+        parameters: {
+            query?: never;
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgressReportRequest"];
             };
         };
         responses: {
@@ -8015,7 +9633,76 @@ export interface operations {
             };
         };
     };
-    withdrawal_list_api_miniapp_withdrawals_get: {
+    report_api_miniapp_reports__kind__get: {
+        parameters: {
+            query: {
+                child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_image_api_miniapp_reports__kind__image_get: {
+        parameters: {
+            query: {
+                child_id: number;
+                token?: string;
+            };
+            header?: never;
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reservations_api_miniapp_reservations_get: {
         parameters: {
             query: {
                 child_id: number;
@@ -8048,7 +9735,7 @@ export interface operations {
             };
         };
     };
-    withdrawal_apply_api_miniapp_withdrawals_post: {
+    create_reservation_api_miniapp_reservations_post: {
         parameters: {
             query?: never;
             header: {
@@ -8059,7 +9746,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["WithdrawalApplyRequest"];
+                "application/json": components["schemas"]["ReservationCreateRequest"];
             };
         };
         responses: {
@@ -8083,20 +9770,20 @@ export interface operations {
             };
         };
     };
-    withdrawal_cancel_api_miniapp_withdrawals__request_id__cancel_post: {
+    cancel_reservation_api_miniapp_reservations__reservation_id__cancel_post: {
         parameters: {
             query?: never;
             header: {
                 authorization: string;
             };
             path: {
-                request_id: number;
+                reservation_id: number;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["WithdrawalCancelRequest"];
+                "application/json": components["schemas"]["ReservationCancelRequest"];
             };
         };
         responses: {
@@ -8253,7 +9940,7 @@ export interface operations {
             };
         };
     };
-    observation_reports_api_miniapp_observation_reports_get: {
+    vocabulary_list_api_miniapp_vocabulary_get: {
         parameters: {
             query: {
                 child_id: number;
@@ -8286,7 +9973,77 @@ export interface operations {
             };
         };
     };
-    my_deposit_api_miniapp_deposits_get: {
+    vocabulary_lookup_api_miniapp_vocabulary_lookup_get: {
+        parameters: {
+            query: {
+                word: string;
+                child_id: number;
+                book_id?: number | null;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vocabulary_remove_api_miniapp_vocabulary__vocabulary_id__delete: {
+        parameters: {
+            query: {
+                child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path: {
+                vocabulary_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdrawal_list_api_miniapp_withdrawals_get: {
         parameters: {
             query: {
                 child_id: number;
@@ -8319,7 +10076,7 @@ export interface operations {
             };
         };
     };
-    create_supplement_order_api_miniapp_deposits_supplement_orders_post: {
+    withdrawal_apply_api_miniapp_withdrawals_post: {
         parameters: {
             query?: never;
             header: {
@@ -8330,9 +10087,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["WithdrawalApplyRequest"];
             };
         };
         responses: {
@@ -8356,82 +10111,20 @@ export interface operations {
             };
         };
     };
-    child_growth_api_admin_children__child_id__growth_get: {
+    withdrawal_cancel_api_miniapp_withdrawals__request_id__cancel_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                authorization: string;
+            };
             path: {
-                child_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reset_attempts_api_admin_quiz_attempts_reset_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ResetAttemptsRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    adjust_points_api_admin_children__child_id__points_adjust_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                child_id: number;
+                request_id: number;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AdjustPointsRequest"];
+                "application/json": components["schemas"]["WithdrawalCancelRequest"];
             };
         };
         responses: {
@@ -8455,7 +10148,7 @@ export interface operations {
             };
         };
     };
-    recalc_levels_api_admin_growth_levels_recalc_post: {
+    health_health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -8470,438 +10163,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    check_milestones_api_admin_children__child_id__milestones_check_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                child_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    generate_report_api_admin_children__child_id__reports__kind__generate_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                child_id: number;
-                kind: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_quiz_api_miniapp_quiz__book_id__get: {
-        parameters: {
-            query: {
-                child_id: number;
-            };
-            header: {
-                authorization: string;
-            };
-            path: {
-                book_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    submit_quiz_api_miniapp_quiz__book_id__submit_post: {
-        parameters: {
-            query?: never;
-            header: {
-                authorization: string;
-            };
-            path: {
-                book_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QuizSubmitRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    growth_summary_api_miniapp_growth_summary_get: {
-        parameters: {
-            query: {
-                child_id: number;
-            };
-            header: {
-                authorization: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    points_ledger_api_miniapp_points_get: {
-        parameters: {
-            query: {
-                child_id: number;
-            };
-            header: {
-                authorization: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    leaderboard_api_miniapp_leaderboard_get: {
-        parameters: {
-            query?: {
-                period?: string;
-                child_id?: number;
-            };
-            header: {
-                authorization: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    passport_api_miniapp_passport_get: {
-        parameters: {
-            query: {
-                child_id: number;
-            };
-            header: {
-                authorization: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    report_api_miniapp_reports__kind__get: {
-        parameters: {
-            query: {
-                child_id: number;
-            };
-            header: {
-                authorization: string;
-            };
-            path: {
-                kind: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    report_image_api_miniapp_reports__kind__image_get: {
-        parameters: {
-            query: {
-                child_id: number;
-                token?: string;
-            };
-            header?: never;
-            path: {
-                kind: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_reservations_api_admin_reservations_get: {
-        parameters: {
-            query?: {
-                status?: string | null;
-                keyword?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReservationItemResponse"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    checkout_reservation_api_admin_reservations__reservation_id__checkout_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                reservation_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CheckOutResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    child_reading_profile_api_admin_children__child_id__reading_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                child_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChildReadingProfileResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

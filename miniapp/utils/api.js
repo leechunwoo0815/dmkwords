@@ -218,4 +218,26 @@ module.exports = {
   markNotificationsRead(ids = [], all = false) {
     return req.post('/api/miniapp/notifications/read', { ids, all })
   },
+
+  // 阅读圈（WM14-A）
+  circlePosts(page = 1, pageSize = 10) {
+    return req.get('/api/miniapp/circle/posts', null, { params: { page, page_size: pageSize } })
+  },
+  circleMyCards(childId) {
+    return req.get('/api/miniapp/circle/my-cards', null, { params: { child_id: childId } })
+  },
+  circleShare(childId, cardType, refId) {
+    return req.post('/api/miniapp/circle/posts', {
+      child_id: childId, card_type: cardType, ref_id: refId,
+    })
+  },
+  circleLike(postId) {
+    return req.post(`/api/miniapp/circle/posts/${postId}/like`)
+  },
+  circleUnlike(postId) {
+    return req.del(`/api/miniapp/circle/posts/${postId}/like`)
+  },
+  circleDeletePost(postId) {
+    return req.del(`/api/miniapp/circle/posts/${postId}`)
+  },
 }

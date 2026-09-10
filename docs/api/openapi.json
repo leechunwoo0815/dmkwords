@@ -1506,6 +1506,43 @@
         "title": "ChildWithParentResponse",
         "type": "object"
       },
+      "CircleDeleteRequest": {
+        "additionalProperties": false,
+        "description": "删除必填原因（审计留痕）。",
+        "properties": {
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "title": "CircleDeleteRequest",
+        "type": "object"
+      },
+      "CircleShareRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "card_type": {
+            "title": "Card Type",
+            "type": "string"
+          },
+          "child_id": {
+            "title": "Child Id",
+            "type": "integer"
+          },
+          "ref_id": {
+            "title": "Ref Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "child_id",
+          "card_type",
+          "ref_id"
+        ],
+        "title": "CircleShareRequest",
+        "type": "object"
+      },
       "CopyResponse": {
         "additionalProperties": false,
         "properties": {
@@ -5649,6 +5686,495 @@
         ]
       }
     },
+    "/api/admin/circle/card-types": {
+      "get": {
+        "description": "类型下拉选项（显式含「全部」——A4 三犯纪律）。",
+        "operationId": "circle_card_types_api_admin_circle_card_types_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Circle Card Types",
+        "tags": [
+          "circle-admin"
+        ]
+      }
+    },
+    "/api/admin/circle/overview": {
+      "get": {
+        "description": "运营概览（本周新帖/分享家长数/点赞总数/馆长赞覆盖率/类型分布）。",
+        "operationId": "circle_overview_api_admin_circle_overview_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Circle Overview",
+        "tags": [
+          "circle-admin"
+        ]
+      }
+    },
+    "/api/admin/circle/posts": {
+      "get": {
+        "description": "帖子管理列表（类型下拉「全部」= 不传 card_type；时间段+家长孩子关键词）。",
+        "operationId": "list_circle_posts_api_admin_circle_posts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "card_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Card Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "in": "query",
+            "name": "keyword",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 50,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Keyword"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Circle Posts",
+        "tags": [
+          "circle-admin"
+        ]
+      }
+    },
+    "/api/admin/circle/posts/{post_id}": {
+      "delete": {
+        "description": "超管删任意帖（必填原因——审计留痕）。",
+        "operationId": "circle_delete_post_api_admin_circle_posts__post_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "post_id",
+            "required": true,
+            "schema": {
+              "title": "Post Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CircleDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Circle Delete Post",
+        "tags": [
+          "circle-admin"
+        ]
+      }
+    },
+    "/api/admin/circle/posts/{post_id}/admin-like": {
+      "delete": {
+        "description": "取消馆长赞。",
+        "operationId": "circle_admin_unlike_api_admin_circle_posts__post_id__admin_like_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "post_id",
+            "required": true,
+            "schema": {
+              "title": "Post Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Circle Admin Unlike",
+        "tags": [
+          "circle-admin"
+        ]
+      },
+      "post": {
+        "description": "行内一键馆长赞（特殊文案通知帖主家长）。",
+        "operationId": "circle_admin_like_api_admin_circle_posts__post_id__admin_like_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "post_id",
+            "required": true,
+            "schema": {
+              "title": "Post Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Circle Admin Like",
+        "tags": [
+          "circle-admin"
+        ]
+      }
+    },
+    "/api/admin/circle/posts/{post_id}/image": {
+      "get": {
+        "description": "帖子卡片图（管理端 <img> 用；query token 双通道——照活动 cover-media 先例）。",
+        "operationId": "circle_post_image_api_admin_circle_posts__post_id__image_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "post_id",
+            "required": true,
+            "schema": {
+              "title": "Post Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Circle Post Image",
+        "tags": [
+          "circle-admin"
+        ]
+      }
+    },
+    "/api/admin/circle/posts/{post_id}/pin": {
+      "delete": {
+        "description": "取消置顶。",
+        "operationId": "circle_unpin_api_admin_circle_posts__post_id__pin_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "post_id",
+            "required": true,
+            "schema": {
+              "title": "Post Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Circle Unpin",
+        "tags": [
+          "circle-admin"
+        ]
+      },
+      "post": {
+        "description": "置顶（互斥：同时最多 1 条，置顶新帖自动取消旧置顶帖）。",
+        "operationId": "circle_pin_api_admin_circle_posts__post_id__pin_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "post_id",
+            "required": true,
+            "schema": {
+              "title": "Post Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Circle Pin",
+        "tags": [
+          "circle-admin"
+        ]
+      }
+    },
+    "/api/admin/circle/unliked-count": {
+      "get": {
+        "description": "未赞徽标数据源（今日新帖 admin_liked=0 计数）。",
+        "operationId": "circle_unliked_count_api_admin_circle_unliked_count_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Circle Unliked Count",
+        "tags": [
+          "circle-admin"
+        ]
+      }
+    },
     "/api/admin/circulation/borrow": {
       "post": {
         "operationId": "borrow_book_api_admin_circulation_borrow_post",
@@ -9789,6 +10315,368 @@
         "summary": "Checkin Calendar",
         "tags": [
           "miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/circle/my-cards": {
+      "get": {
+        "description": "可晒成就库（已达成未晒 + 已晒分组——历史成就补晒）。",
+        "operationId": "circle_my_cards_api_miniapp_circle_my_cards_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "child_id",
+            "required": true,
+            "schema": {
+              "title": "Child Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Circle My Cards",
+        "tags": [
+          "circle-miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/circle/posts": {
+      "get": {
+        "description": "信息流（时间倒序真分页 + 置顶帖置首）。",
+        "operationId": "circle_posts_api_miniapp_circle_posts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Circle Posts",
+        "tags": [
+          "circle-miniapp"
+        ]
+      },
+      "post": {
+        "description": "晒卡（服务端校验成就归属 + 同成就终身唯一 + 每日限晒）。",
+        "operationId": "circle_share_api_miniapp_circle_posts_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CircleShareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Circle Share",
+        "tags": [
+          "circle-miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/circle/posts/{post_id}": {
+      "delete": {
+        "description": "家长删自己的帖（Q15 裁决：无 body——鉴权=parent token + post.parent_id 归属，\n删除权仅家长与超管；DELETE 带 body 客户端不友好）。",
+        "operationId": "circle_delete_my_post_api_miniapp_circle_posts__post_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "post_id",
+            "required": true,
+            "schema": {
+              "title": "Post Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Circle Delete My Post",
+        "tags": [
+          "circle-miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/circle/posts/{post_id}/image": {
+      "get": {
+        "description": "帖子卡片图（query token：image 组件无法带头——照报告图片先例）。",
+        "operationId": "circle_post_image_api_miniapp_circle_posts__post_id__image_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "post_id",
+            "required": true,
+            "schema": {
+              "title": "Post Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Circle Post Image",
+        "tags": [
+          "circle-miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/circle/posts/{post_id}/like": {
+      "delete": {
+        "description": "取消点赞。",
+        "operationId": "circle_unlike_api_miniapp_circle_posts__post_id__like_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "post_id",
+            "required": true,
+            "schema": {
+              "title": "Post Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Circle Unlike",
+        "tags": [
+          "circle-miniapp"
+        ]
+      },
+      "post": {
+        "description": "点赞（一心一赞；like_count 原子更新；被赞通知同事务）。",
+        "operationId": "circle_like_api_miniapp_circle_posts__post_id__like_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "post_id",
+            "required": true,
+            "schema": {
+              "title": "Post Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Circle Like",
+        "tags": [
+          "circle-miniapp"
         ]
       }
     },

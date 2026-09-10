@@ -1,0 +1,57 @@
+<view class="page" style="min-height:100vh;padding-bottom:120rpx;">
+  <!-- 顶部晒成就入口（常驻） -->
+  <view class="share-entry" bindtap="goShare">
+    <view class="share-entry-left">
+      <text class="share-entry-icon">🌟</text>
+      <view>
+        <view class="share-entry-title">晒成就</view>
+        <view class="share-entry-sub">把孩子的高光时刻分享到馆内阅读圈</view>
+      </view>
+    </view>
+    <text class="share-entry-arrow">›</text>
+  </view>
+
+  <view wx:if="{{loading && !posts.length && !loadError}}" class="loading-wrap">加载中…</view>
+
+  <error-view wx:if="{{loadError}}" type="network" title="加载失败"
+    desc="阅读圈加载失败，请重试" bind:onRetry="onRetryLoad" />
+
+  <block wx:if="{{!loading && !loadError && !posts.length}}">
+    <view class="empty-state">
+      <view class="empty-icon">📖</view>
+      <view class="empty-text">还没有小伙伴晒成就——读完一本书，来做第一个！</view>
+    </view>
+  </block>
+
+  <view class="post-list">
+    <view wx:for="{{posts}}" wx:key="id" class="post-card {{item.admin_liked ? 'admin-liked' : ''}}">
+      <!-- 馆方推荐角标（置顶帖） -->
+      <view wx:if="{{item.is_pinned}}" class="pin-badge">馆方推荐</view>
+      <view class="post-header">
+        <view class="post-avatar">{{item.avatar || '🧒'}}</view>
+        <view class="post-names">
+          <view class="post-dual-name">
+            {{item.parent_name}} · {{item.child_name}}
+            <text wx:if="{{item.admin_liked}}" class="admin-like-mark">🌟</text>
+          </view>
+          <view class="post-time">{{item.card_type_label}} · {{item.created_at}}</view>
+        </view>
+        <text wx:if="{{item.is_mine}}" class="delete-link" data-id="{{item.id}}"
+          catchtap="onDeletePost">删除</text>
+      </view>
+      <!-- 卡片图：点卡片全屏预览（长按保存） -->
+      <image class="post-card-img {{item.admin_liked ? 'img-gold' : ''}}" src="{{item.image_url}}"
+        mode="widthFix" data-url="{{item.image_url}}" bindtap="onPreviewCard" />
+      <view class="post-footer">
+        <view class="like-btn {{item.liked_by_me ? 'liked' : ''}}" data-id="{{item.id}}"
+          bindtap="onToggleLike">
+          <text class="like-icon">{{item.liked_by_me ? '❤️' : '🤍'}}</text>
+          <text class="like-count">{{item.like_count}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{!loading && posts.length && finished}}" class="list-end">— 到底啦，去读书吧 —</view>
+  <view wx:if="{{loading && posts.length}}" class="loading-wrap">加载中…</view>
+</view>

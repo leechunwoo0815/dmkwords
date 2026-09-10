@@ -4,7 +4,9 @@
     "pages/books/books",
     "pages/shelf/shelf",
     "pages/member/member",
-    "pages/login/login"
+    "pages/login/login",
+    "pages/circle/circle",
+    "pages/circle/share"
   ],
   "subPackages": [
     {
@@ -97,6 +99,12 @@
         "text": "书架",
         "iconPath": "icons/shelf.png",
         "selectedIconPath": "icons/shelf-active.png"
+      },
+      {
+        "pagePath": "pages/circle/circle",
+        "text": "阅读圈",
+        "iconPath": "icons/circle.png",
+        "selectedIconPath": "icons/circle-active.png"
       },
       {
         "pagePath": "pages/member/member",

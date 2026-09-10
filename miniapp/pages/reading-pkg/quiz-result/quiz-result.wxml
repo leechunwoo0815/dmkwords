@@ -58,6 +58,7 @@
 
   <view class="btn-group">
     <view class="btn-secondary" bindtap="onBack">返回</view>
+    <view wx:if="{{shareTarget}}" class="btn-primary" bindtap="onShare">晒成就</view>
     <view wx:if="{{!result.passed && result.attempts_left > 0}}" class="btn-primary" bindtap="onRetry">再测一次</view>
   </view>
 </view>

@@ -46,6 +46,7 @@ SCENE_RESERVATION_RELEASED = "reservation.released"
 SCENE_REPORT_GENERATED = "report.generated"
 SCENE_OTHER_EVALUATION_UPLOADED = "other.evaluation_uploaded"
 SCENE_OTHER_TRANSFER_RESULT = "other.transfer_result"
+SCENE_CIRCLE_LIKED = "circle.liked"
 
 
 class NotificationService:

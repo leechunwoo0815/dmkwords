@@ -1,0 +1,156 @@
+/* pages/circle/share.wxss — 晒成就页（绘本风设计令牌） */
+.page {
+  background: var(--bg);
+}
+
+.child-bar {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 24rpx 32rpx 8rpx;
+}
+.child-emoji {
+  font-size: 40rpx;
+}
+.child-name {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.tabs {
+  display: flex;
+  gap: 16rpx;
+  padding: 16rpx 32rpx 24rpx;
+}
+.tab {
+  padding: 12rpx 30rpx;
+  border-radius: 36rpx;
+  border: 3rpx solid var(--fg);
+  background: var(--surface);
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--muted);
+}
+.tab.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--fg);
+}
+
+.loading-wrap {
+  text-align: center;
+  color: var(--muted);
+  padding: 60rpx 0;
+  font-size: 26rpx;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 100rpx 60rpx;
+}
+.empty-icon {
+  font-size: 90rpx;
+  margin-bottom: 20rpx;
+}
+.empty-text {
+  color: var(--muted);
+  font-size: 26rpx;
+  line-height: 1.6;
+}
+
+.card-list {
+  padding: 0 32rpx 40rpx;
+}
+.ach-card {
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 20rpx;
+  box-shadow: var(--shadow-hard-sm);
+  padding: 28rpx 30rpx;
+  margin-bottom: 22rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+.ach-label {
+  align-self: flex-start;
+  background: var(--sun-soft);
+  border: 2rpx solid var(--fg);
+  border-radius: 20rpx;
+  padding: 4rpx 16rpx;
+  font-size: 20rpx;
+  font-weight: 600;
+  color: var(--fg);
+}
+.ach-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--fg);
+}
+.ach-action {
+  font-size: 26rpx;
+  color: var(--accent);
+  font-weight: 600;
+  text-align: right;
+}
+.ach-card.shared {
+  opacity: 0.65;
+}
+.shared-action {
+  color: var(--muted);
+}
+
+/* 晒卡成功态 */
+.success-wrap {
+  padding: 60rpx 40rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.success-title {
+  font-size: 44rpx;
+  font-weight: 800;
+  color: var(--fg);
+  margin-bottom: 12rpx;
+}
+.success-sub {
+  font-size: 24rpx;
+  color: var(--muted);
+  margin-bottom: 32rpx;
+  text-align: center;
+}
+.success-card {
+  width: 100%;
+  border-radius: 20rpx;
+  border: 3rpx solid var(--fg);
+  box-shadow: var(--shadow-hard);
+}
+.success-btns {
+  display: flex;
+  gap: 24rpx;
+  margin-top: 40rpx;
+  width: 100%;
+}
+.btn-secondary {
+  flex: 1;
+  text-align: center;
+  padding: 22rpx 0;
+  border-radius: 40rpx;
+  border: 3rpx solid var(--fg);
+  background: var(--surface);
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--fg);
+}
+.btn-primary {
+  flex: 1;
+  text-align: center;
+  padding: 22rpx 0;
+  border-radius: 40rpx;
+  border: 3rpx solid var(--fg);
+  background: var(--accent);
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 700;
+}
