@@ -327,6 +327,33 @@ body {
   scrollbar-width: none;
 }
 
+/* fix29-R1：侧边栏菜单区独立滚动——antd Sider 内层 children 撑满高度做 flex 列，
+   菜单区吃掉剩余高度并滚动（细滚动条，不破坏 paint-texture 视觉）。
+   背景：新增「阅读圈」菜单后超管全量菜单超出 100vh，外层 overflow:hidden 把
+   底部菜单（员工管理/系统配置/审计日志）裁掉且无从滚动。 */
+.paint-sider .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.paint-sider-scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.paint-sider-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.paint-sider-scroll::-webkit-scrollbar-thumb {
+  background: rgba(59, 47, 47, 0.28);
+  border-radius: 3px;
+}
+.paint-sider-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 47, 47, 0.45);
+}
+.paint-sider-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 /* 自定义横向滚动条容器 */
 .paint-hscrollbar-track {
   display: flex;

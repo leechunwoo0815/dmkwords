@@ -182,7 +182,18 @@ export default function Layout() {
 
   return (
     <AntLayout style={{ height: "100vh", overflow: "hidden" }}>
-      <Sider className="paint-texture" theme="light" width={240} style={{ borderRight: "2px solid var(--paint-ink)", height: "100vh", position: "sticky", top: 0 }}>
+      <Sider
+        className="paint-texture paint-sider"
+        theme="light"
+        width={240}
+        style={{
+          borderRight: "2px solid var(--paint-ink)",
+          height: "100vh",
+          position: "sticky",
+          top: 0,
+          overflow: "hidden",
+        }}
+      >
         <div
           style={{
             padding: "22px 18px 18px",
@@ -191,6 +202,7 @@ export default function Layout() {
             fontWeight: 800,
             color: "#FF6B35",
             letterSpacing: 1,
+            flexShrink: 0,
           }}
         >
           DmkWords
@@ -198,13 +210,20 @@ export default function Layout() {
             少儿英语分级阅读
           </div>
         </div>
-        <Menu
-          mode="inline"
-          selectedKeys={[selected]}
-          items={items}
-          onClick={({ key }) => navigate(key)}
-          style={{ borderInlineEnd: "none" }}
-        />
+        {/* fix29-R1：菜单项随模块增长会超出视口——菜单区独立滚动，否则外层
+            overflow:hidden 会把底部菜单（员工管理/系统配置/审计日志）裁掉且无从滚动 */}
+        <div
+          className="paint-sider-scroll"
+          style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto" }}
+        >
+          <Menu
+            mode="inline"
+            selectedKeys={[selected]}
+            items={items}
+            onClick={({ key }) => navigate(key)}
+            style={{ borderInlineEnd: "none" }}
+          />
+        </div>
       </Sider>
       <AntLayout style={{ minWidth: 0, height: "100vh", overflow: "hidden" }}>
         <Header

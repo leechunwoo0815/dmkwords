@@ -53,6 +53,16 @@ function typeTagColor(t: string): string {
   }
 }
 
+// fix29-R2：管理端署名口径——运营认孩子中文姓名为主标识，英文名有值时括注
+// （家长端小程序仍走 R-317/318 英文名口径，此处仅管理端内部视角）。
+// 中文名缺失时回退后端 child_name（英文名/「小朋友NNN」兜底），防脏数据空白。
+function dualName(r: CirclePostItem): string {
+  const cn = r.child_cn_name;
+  if (!cn) return `${r.parent_name} · ${r.child_name}`;
+  const isRealEnglish = !!r.child_name && !/^小朋友\d+$/.test(r.child_name);
+  return `${r.parent_name} · ${cn}${isRealEnglish ? `（${r.child_name}）` : ""}`;
+}
+
 export default function CircleManage() {
   const { message } = AntdApp.useApp();
   const { page, setPage, pageSize, setPageSize } = usePaintPagination(10, 1);
@@ -197,7 +207,7 @@ export default function CircleManage() {
         width: 200,
         render: (_: unknown, r: CirclePostItem) => (
           <span>
-            {r.parent_name} · {r.child_name}
+            {dualName(r)}
           </span>
         ),
       },
@@ -420,8 +430,7 @@ export default function CircleManage() {
         cancelText="取消"
       >
         <div style={{ marginBottom: 8, color: "rgba(0,0,0,0.65)" }}>
-          {deleteTarget?.parent_name} · {deleteTarget?.child_name} ·{" "}
-          {deleteTarget?.card_type_label}
+          {deleteTarget ? `${dualName(deleteTarget)} · ${deleteTarget.card_type_label}` : ""}
         </div>
         <Input.TextArea
           rows={3}
@@ -442,7 +451,7 @@ export default function CircleManage() {
         {previewPost && (
           <>
             <div style={{ marginBottom: 8, color: "rgba(0,0,0,0.65)" }}>
-              {previewPost.parent_name} · {previewPost.child_name} · {previewPost.card_type_label}
+              {dualName(previewPost)} · {previewPost.card_type_label}
             </div>
             <img
               src={circlePostImageUrl(previewPost.id)}
