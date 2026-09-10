@@ -1,7 +1,7 @@
 # backend/domain/reading_circle/models.py — 阅读圈帖子 / 点赞（WM14-A，FEAT-084）
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Index, Integer, SmallInteger, String, Text
+from sqlalchemy import Column, Date, DateTime, Index, Integer, SmallInteger, String, Text
 
 from backend.common.base_model import BaseModel
 
@@ -32,6 +32,11 @@ class CirclePost(BaseModel):
     CARD_PERFECT_QUIZ = "perfect_quiz"  # 满分卡（ref_id=QuizAttempt.id）
     CARD_STREAK = "streak"  # 连击卡（ref_id=CheckinStreakRecord.id）
     CARD_FINISH_BOOK = "finish_book"  # 完读卡（ref_id=book_id；词数取 (child,book) 账目）
+    # ---- WM14-B 二期 ----
+    CARD_RANK_TOP = "rank_top"  # 上榜卡（ref_id=周起始日 YYYYMMDD；周榜 TOP10）
+    CARD_RANK_UP = "rank_up"  # 上升卡（ref_id=本周周起始日 YYYYMMDD；位次上升 delta）
+    CARD_WEEKLY_REPORT = "weekly_report"  # 周报卡（ref_id=上周一 YYYYMMDD；实时算上周）
+    CARD_BREAKTHROUGH = "breakthrough"  # 突破卡（ref_id=新高日 YYYYMMDD；单日词数新高）
 
     CARD_TYPES = (
         CARD_MILESTONE,
@@ -40,6 +45,10 @@ class CirclePost(BaseModel):
         CARD_PERFECT_QUIZ,
         CARD_STREAK,
         CARD_FINISH_BOOK,
+        CARD_RANK_TOP,
+        CARD_RANK_UP,
+        CARD_WEEKLY_REPORT,
+        CARD_BREAKTHROUGH,
     )
 
     parent_id = Column(Integer, nullable=False, index=True, comment="发布家长ID")
@@ -66,4 +75,22 @@ class CircleLike(BaseModel):
 
     post_id = Column(Integer, nullable=False, index=True)
     parent_id = Column(Integer, nullable=False, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+
+
+class CircleRankSnapshot(BaseModel):
+    """周榜快照（WM14-B）：每周一结算上一完整自然周的名次，供上榜卡/上升卡消费。
+
+    口径与 `LeaderboardService._entries(start, active_only=True, end)` 周榜**同源**
+    （计数同源纪律）——落 words>0 的上榜孩子，rank 按词数倒序 i+1。
+    幂等：唯一索引 (child_id, week_start)，重跑天然跳过。
+    """
+
+    __tablename__ = "circle_rank_snapshots"
+    __table_args__ = (Index("uq_circle_rank_snapshot", "child_id", "week_start", unique=True),)
+
+    child_id = Column(Integer, nullable=False, index=True)
+    week_start = Column(Date, nullable=False, index=True, comment="周一（该周起始日）")
+    rank = Column(Integer, nullable=False, comment="该周名次（词数倒序）")
+    words = Column(Integer, nullable=False, comment="该周词数")
     created_at = Column(DateTime, nullable=False, default=datetime.now)

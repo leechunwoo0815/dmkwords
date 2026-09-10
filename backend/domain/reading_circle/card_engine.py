@@ -12,8 +12,9 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.common.exceptions import NotFoundError, ValidationError
@@ -25,9 +26,13 @@ from backend.domain.growth.models import (
     WordsLedger,
 )
 from backend.domain.identity.models import Child
-from backend.domain.reading_circle.models import CirclePost
+from backend.domain.reading_circle.models import CirclePost, CircleRankSnapshot
+from backend.domain.reading_circle.snapshot_service import CircleSnapshotService
 
 LEVEL_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+# 上榜卡门槛：周榜 TOP N（与 PRD §7.5 二期「上榜/上升」口径一致）
+RANK_TOP_N = 10
 
 # 卡片类型 → 中文标签（管理端 Tag / 小程序角标共用，防「英文裸输出」）
 CARD_TYPE_LABELS = {
@@ -37,9 +42,13 @@ CARD_TYPE_LABELS = {
     CirclePost.CARD_PERFECT_QUIZ: "测验满分",
     CirclePost.CARD_STREAK: "连续打卡",
     CirclePost.CARD_FINISH_BOOK: "完读",
+    CirclePost.CARD_RANK_TOP: "周榜上榜",
+    CirclePost.CARD_RANK_UP: "名次上升",
+    CirclePost.CARD_WEEKLY_REPORT: "阅读周报",
+    CirclePost.CARD_BREAKTHROUGH: "单日突破",
 }
 
-# 6 类卡片配色（底色/装饰/强调/字色——gen_cover 绘本风同源）
+# 10 类卡片配色（底色/装饰/强调/字色——gen_cover 绘本风同源）
 CARD_PALETTES = {
     CirclePost.CARD_MILESTONE: ("#FCD34D", "#FF6B35", "#6B4A12"),
     CirclePost.CARD_BOOKS_COUNT: ("#4ADE80", "#FCD34D", "#14532D"),
@@ -47,6 +56,10 @@ CARD_PALETTES = {
     CirclePost.CARD_PERFECT_QUIZ: ("#F472B6", "#FCD34D", "#7A1F43"),
     CirclePost.CARD_STREAK: ("#5EEAD4", "#FF6B35", "#0F4C43"),
     CirclePost.CARD_FINISH_BOOK: ("#FF8A5C", "#4ADE80", "#6B1D1D"),
+    CirclePost.CARD_RANK_TOP: ("#FBBF24", "#FF6B35", "#7C2D12"),
+    CirclePost.CARD_RANK_UP: ("#34D399", "#FCD34D", "#064E3B"),
+    CirclePost.CARD_WEEKLY_REPORT: ("#A78BFA", "#FCD34D", "#3B0764"),
+    CirclePost.CARD_BREAKTHROUGH: ("#FB7185", "#FCD34D", "#7F1D1D"),
 }
 
 FONT_CANDIDATES = [
@@ -70,6 +83,64 @@ def _font(size: int):
         except OSError:
             continue
     return ImageFont.load_default()
+
+
+# ---------- WM14-B 通用小工具 ----------
+
+
+def _yyyymmdd(d: date) -> int:
+    """日期 → ref_id 整数（如 20260914）：可读、可解析、全局唯一。"""
+    return int(d.strftime("%Y%m%d"))
+
+
+def _parse_yyyymmdd(v: int) -> date | None:
+    try:
+        return datetime.strptime(str(v), "%Y%m%d").date()
+    except (ValueError, TypeError):
+        return None
+
+
+def _week_label(d: date) -> str:
+    return f"{d:%m月%d日}"
+
+
+def _day_words(db: Session, child_id: int, day: date) -> int:
+    """某自然日入账词数（区间口径与周报同源）。"""
+    start = datetime.combine(day, datetime.min.time())
+    end = start + timedelta(days=1)
+    return int(
+        db.query(func.coalesce(func.sum(WordsLedger.word_count), 0))
+        .filter(
+            WordsLedger.child_id == child_id,
+            WordsLedger.created_at >= start,
+            WordsLedger.created_at < end,
+            WordsLedger.is_deleted == 0,
+        )
+        .scalar()
+        or 0
+    )
+
+
+def _best_day(db: Session, child_id: int) -> tuple[date, int] | None:
+    """历史最高单日词数 (day, words)；无账目返回 None（突破卡数据源）。"""
+    rows = (
+        db.query(func.date(WordsLedger.created_at), func.sum(WordsLedger.word_count))
+        .filter(WordsLedger.child_id == child_id, WordsLedger.is_deleted == 0)
+        .group_by(func.date(WordsLedger.created_at))
+        .all()
+    )
+    if not rows:
+        return None
+    day, words = max(rows, key=lambda r: r[1])
+    if isinstance(day, str):
+        day = datetime.strptime(day, "%Y-%m-%d").date()
+    return day, int(words)
+
+
+def _breakthrough_min_words(db: Session) -> int:
+    from backend.common.config_service import ConfigService
+
+    return int(ConfigService(db).get_value("circle_breakthrough_min_words", "1000"))
 
 
 # ---------- 数据装配（含成就归属校验：伪造 ref_id → 422） ----------
@@ -199,6 +270,101 @@ def assemble_card_data(db: Session, child: Child, card_type: str, ref_id: int) -
             "title": "连续打卡",
             "value_text": f"{row.streak_at} 天",
             "value_label": "每天阅读 坚持到底",
+            "label": CARD_TYPE_LABELS[card_type],
+        }
+
+    # ---------- WM14-B 二期卡（快照 / 周报 / 突破） ----------
+
+    if card_type == CirclePost.CARD_RANK_TOP:
+        week = _parse_yyyymmdd(ref_id)
+        row = (
+            db.query(CircleRankSnapshot)
+            .filter(
+                CircleRankSnapshot.child_id == child.id,
+                CircleRankSnapshot.week_start == week,
+                CircleRankSnapshot.is_deleted == 0,
+            )
+            .first()
+            if week
+            else None
+        )
+        if not row or row.rank > RANK_TOP_N:
+            _fail()
+        return {
+            **base,
+            "title": "周榜上榜！",
+            "value_text": f"第 {row.rank} 名",
+            "value_label": f"{_week_label(row.week_start)} 周榜 · {row.words:,} 词",
+            "label": CARD_TYPE_LABELS[card_type],
+        }
+
+    if card_type == CirclePost.CARD_RANK_UP:
+        week = _parse_yyyymmdd(ref_id)
+        if not week:
+            _fail()
+        cur = (
+            db.query(CircleRankSnapshot)
+            .filter(
+                CircleRankSnapshot.child_id == child.id,
+                CircleRankSnapshot.week_start == week,
+                CircleRankSnapshot.is_deleted == 0,
+            )
+            .first()
+        )
+        prev = (
+            db.query(CircleRankSnapshot)
+            .filter(
+                CircleRankSnapshot.child_id == child.id,
+                CircleRankSnapshot.week_start == week - timedelta(days=7),
+                CircleRankSnapshot.is_deleted == 0,
+            )
+            .first()
+        )
+        # 新上榜（上周无 baseline）不算上升；名次持平/下降不算
+        if not cur or not prev or prev.rank <= cur.rank:
+            _fail()
+        delta = prev.rank - cur.rank
+        return {
+            **base,
+            "title": "名次上升！",
+            "value_text": f"↑ {delta} 位",
+            "value_label": f"{_week_label(week)} 周榜第 {cur.rank} 名 · {cur.words:,} 词",
+            "label": CARD_TYPE_LABELS[card_type],
+        }
+
+    if card_type == CirclePost.CARD_WEEKLY_REPORT:
+        from backend.domain.growth.report_service import ReportService
+
+        week = _parse_yyyymmdd(ref_id)
+        # 只可晒已完整结束的自然周（周一为界）——与快照"上一完整周"口径一致
+        if not week or week.weekday() != 0 or week > CircleSnapshotService.last_complete_week()[0]:
+            _fail()
+        start = datetime.combine(week, datetime.min.time())
+        summary = ReportService(db).range_summary(child, start, start + timedelta(days=7))
+        if summary["words"] <= 0 and summary["checkin_days"] <= 0:
+            _fail()
+        return {
+            **base,
+            "title": "阅读周报",
+            "value_text": f"{summary['words']:,} 词",
+            "value_label": (
+                f"读完 {summary['books']} 本 · 打卡 {summary['checkin_days']} 天"
+                f"（{_week_label(week)} 那周）"
+            ),
+            "label": CARD_TYPE_LABELS[card_type],
+        }
+
+    if card_type == CirclePost.CARD_BREAKTHROUGH:
+        day = _parse_yyyymmdd(ref_id)
+        words = _day_words(db, child.id, day) if day else 0
+        # 门槛化：太少则刷屏（配置 circle_breakthrough_min_words，默认 1000）
+        if not day or words < _breakthrough_min_words(db):
+            _fail()
+        return {
+            **base,
+            "title": "单日突破！",
+            "value_text": f"{words:,} 词",
+            "value_label": f"{day:%Y-%m-%d} 单日新高",
             "label": CARD_TYPE_LABELS[card_type],
         }
 
@@ -335,6 +501,65 @@ def enumerate_cards(db: Session, child: Child) -> list[dict]:
                 "card_type": CirclePost.CARD_FINISH_BOOK,
                 "ref_id": row.book_id,
                 "title": f"读完《{_book_title(row.book_id)}》 +{row.word_count} 词",
+            }
+        )
+
+    # ---- WM14-B 二期卡 ----
+
+    # 周榜上榜 / 名次上升（消费快照表；晒/未晒分组由 service 负责）
+    snaps = (
+        db.query(CircleRankSnapshot)
+        .filter(CircleRankSnapshot.child_id == child.id, CircleRankSnapshot.is_deleted == 0)
+        .order_by(CircleRankSnapshot.week_start.desc())
+        .all()
+    )
+    by_week = {s.week_start: s for s in snaps}
+    for s in snaps:
+        if s.rank <= RANK_TOP_N:
+            cards.append(
+                {
+                    "card_type": CirclePost.CARD_RANK_TOP,
+                    "ref_id": _yyyymmdd(s.week_start),
+                    "title": f"周榜上榜 · {_week_label(s.week_start)} 第 {s.rank} 名",
+                }
+            )
+        prev = by_week.get(s.week_start - timedelta(days=7))
+        if prev and prev.rank > s.rank:
+            cards.append(
+                {
+                    "card_type": CirclePost.CARD_RANK_UP,
+                    "ref_id": _yyyymmdd(s.week_start),
+                    "title": f"名次上升 · ↑{prev.rank - s.rank} 位（{_week_label(s.week_start)}）",
+                }
+            )
+
+    # 阅读周报（仅上一完整周；区间聚合走 ReportService.range_summary 同源口径）
+    from backend.domain.growth.report_service import ReportService
+
+    last_monday = CircleSnapshotService.last_complete_week()[0]
+    week_start_dt = datetime.combine(last_monday, datetime.min.time())
+    week_summary = ReportService(db).range_summary(
+        child, week_start_dt, week_start_dt + timedelta(days=7)
+    )
+    if week_summary["words"] > 0 or week_summary["checkin_days"] > 0:
+        cards.append(
+            {
+                "card_type": CirclePost.CARD_WEEKLY_REPORT,
+                "ref_id": _yyyymmdd(last_monday),
+                "title": (
+                    f"阅读周报 · {week_summary['words']:,} 词 / 读完 {week_summary['books']} 本"
+                ),
+            }
+        )
+
+    # 单日突破（历史最高单日词数过门槛才成卡；更高单日 → 新 ref_id 新成就）
+    best = _best_day(db, child.id)
+    if best and best[1] >= _breakthrough_min_words(db):
+        cards.append(
+            {
+                "card_type": CirclePost.CARD_BREAKTHROUGH,
+                "ref_id": _yyyymmdd(best[0]),
+                "title": f"单日突破 · {best[1]:,} 词（{best[0]:%m月%d日}）",
             }
         )
     return cards

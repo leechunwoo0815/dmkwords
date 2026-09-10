@@ -75,6 +75,14 @@ class LeaderboardService:
         entries.sort(key=lambda e: e["words"], reverse=True)
         return entries
 
+    def period_entries(self, start: datetime, end: datetime | None = None) -> list[dict]:
+        """周期榜条目（有效会员 + 词数倒序 + 已滤 words>0）——**周榜同款口径**。
+
+        计数同源纪律（已有 7 案前科）：周快照 / 阅读圈横幅等一切「本周/上周」聚合
+        必须走这里，禁在别处自创第二套聚合。名次 = 返回列表下标 + 1。
+        """
+        return [e for e in self._entries(start, active_only=True, end=end) if e["words"] > 0]
+
     def board(self, viewer: Child, period: str) -> dict:
         if period not in ("week", "month", "year", "total", "progress"):
             raise ValidationError("榜单类型不正确")
@@ -83,7 +91,7 @@ class LeaderboardService:
 
         if period == "week":
             start = datetime.combine(self._week_start(today), datetime.min.time())
-            entries = [e for e in self._entries(start, active_only=True) if e["words"] > 0]
+            entries = self.period_entries(start)
             title = "本周词数榜"
         elif period == "month":
             start = datetime.combine(today.replace(day=1), datetime.min.time())

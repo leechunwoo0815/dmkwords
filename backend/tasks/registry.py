@@ -111,7 +111,23 @@ def _first_activity_90d_remind(db: Session) -> int:
     return OrderService(db).first_activity_90d_remind()
 
 
-# 13 项定时任务（WM13-4 新增 transfer_expiring_warn 后 12→13；周月报定时生成不在本批）
+def _circle_rank_snapshot(db: Session) -> int:
+    """WM14-B：周榜快照（结算上一完整自然周）。interval 每小时自检，
+    靠 (child_id, week_start) 唯一索引实现「每周一次」幂等。"""
+    from backend.domain.reading_circle.snapshot_service import CircleSnapshotService
+
+    return CircleSnapshotService(db).run_weekly_snapshot()
+
+
+def _circle_image_cleanup(db: Session) -> int:
+    """WM14-B：清理已删帖超过 30 天的卡片图物理文件（Q13 二期挂账）。"""
+    from backend.domain.reading_circle.admin_service import CircleImageCleanupService
+
+    return CircleImageCleanupService(db).cleanup_orphan_images()
+
+
+# 15 项定时任务（WM13-4 新增 transfer_expiring_warn 后 12→13；WM14-B 新增
+# circle_rank_snapshot / circle_image_cleanup 后 13→15；周月报定时生成不在本批）
 TASKS: dict[str, TaskSpec] = {
     "member_expire_check": TaskSpec(
         "member_expire_check", "会员过期落库", "会员", 300, _member_expire_check
@@ -145,6 +161,14 @@ TASKS: dict[str, TaskSpec] = {
     ),
     "first_activity_90d_remind": TaskSpec(
         "first_activity_90d_remind", "99元活动90天提醒", "会员", 86400, _first_activity_90d_remind
+    ),
+    # WM14-B：阅读圈周榜快照（每小时自检；(child_id, week_start) 唯一索引保证每周一次）
+    "circle_rank_snapshot": TaskSpec(
+        "circle_rank_snapshot", "阅读圈周榜快照", "阅读圈", 3600, _circle_rank_snapshot
+    ),
+    # WM14-B：孤儿卡片图清理（每日；30 天阈值下多跑无害）
+    "circle_image_cleanup": TaskSpec(
+        "circle_image_cleanup", "阅读圈卡片图清理", "阅读圈", 86400, _circle_image_cleanup
     ),
 }
 

@@ -11,13 +11,14 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from sqlalchemy import func, update
+from sqlalchemy.orm import Session
 
 from backend.common.exceptions import NotFoundError, ValidationError
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, Parent
 from backend.domain.reading_circle.card_engine import CARD_TYPE_LABELS
 from backend.domain.reading_circle.models import CirclePost
-from backend.domain.reading_circle.service import CircleService, _display_name
+from backend.domain.reading_circle.service import CircleService, _display_name, _parent_display
 
 
 class AdminCircleService(CircleService):
@@ -55,6 +56,7 @@ class AdminCircleService(CircleService):
             q = q.filter(
                 (Child.name.like(like))
                 | (ParentModel.name.like(like))
+                | (ParentModel.display_name.like(like))
                 | (Child.english_name.like(like))
             )
         total = q.count()
@@ -78,7 +80,7 @@ class AdminCircleService(CircleService):
         parent = self.db.query(Parent).filter(Parent.id == post.parent_id).first()
         return {
             "id": post.id,
-            "parent_name": parent.name if parent else "",
+            "parent_name": _parent_display(parent) if parent else "",
             "child_name": _display_name(child) if child else "",
             "child_cn_name": child.name if child else "",
             "card_type": post.card_type,
@@ -306,3 +308,50 @@ class AdminCircleService(CircleService):
                 (CARD_TYPE_LABELS.get(t, t) if t else t): int(c) for t, c in dist_rows
             },
         }
+
+
+class CircleImageCleanupService:
+    """孤儿卡片图清理（Q13 二期挂账·WM14-B C3）。
+
+    删帖超 RETENTION_DAYS 天的卡片图物理删除：只删文件、不删帖子行
+    （软删行是审计/追溯依据）；删后 image_path 置空串，天然防重复清理（幂等）。
+    安全：unlink 前用 abspath 校验落在 uploads/circle/ 内（路径穿越防御）。
+    """
+
+    RETENTION_DAYS = 30
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def cleanup_orphan_images(self) -> int:
+        import os
+
+        from backend.config import get_settings
+
+        cutoff = datetime.now() - timedelta(days=self.RETENTION_DAYS)
+        rows = (
+            self.db.query(CirclePost)
+            .filter(
+                CirclePost.is_deleted == 1,
+                CirclePost.image_path.isnot(None),
+                CirclePost.image_path != "",
+                CirclePost.update_time < cutoff,
+            )
+            .all()
+        )
+        if not rows:
+            return 0
+        root = os.path.abspath(get_settings().UPLOADS_DIR)
+        circle_dir = os.path.join(root, "circle") + os.sep
+        removed = 0
+        for row in rows:
+            full = os.path.abspath(os.path.join(root, row.image_path))
+            if full.startswith(circle_dir) and os.path.isfile(full):
+                try:
+                    os.remove(full)
+                except OSError:
+                    continue  # 文件被占用/已丢失：不置空，下次任务重试
+            row.image_path = ""
+            removed += 1
+        self.db.commit()
+        return removed

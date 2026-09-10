@@ -2,7 +2,7 @@
 """FEAT-084 一期 MVP：晒卡（归属/终身唯一/日限2）+ 点赞（一心一赞/原子计数）
 + 馆长赞（特殊文案通知）+ 删除（家长自己/超管必填原因）+ 置顶互斥/分页/未赞数。"""
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from fastapi.testclient import TestClient
 
@@ -449,3 +449,303 @@ def test_finish_book_ref_id_is_book_id(client: TestClient):
     # 用账目行 id 晒 → 422（语义已切换，防回归）
     if ledger_id != b1:
         assert _share(client, m1, c1, FINISH_BOOK, ledger_id).status_code == 422
+
+
+# ==================== WM14-B 二期 ====================
+
+RANK_TOP = "rank_top"
+RANK_UP = "rank_up"
+WEEKLY_REPORT = "weekly_report"
+BREAKTHROUGH = "breakthrough"
+
+
+def _credit_words_at(child_id: int, book_id: int, words: int, when) -> int:
+    """指定时间点的词账（真链路：word_count 取书目总词数由调用方保证）。"""
+    from backend.domain.growth.models import WordsLedger
+
+    with _db() as db:
+        row = WordsLedger(child_id=child_id, book_id=book_id, word_count=words, created_at=when)
+        db.add(row)
+        db.commit()
+        return row.id
+
+
+def _monday_of(d=None):
+    d = d or date.today()
+    return d - timedelta(days=d.weekday())
+
+
+def _snapshot(today=None) -> int:
+    from backend.domain.reading_circle.snapshot_service import CircleSnapshotService
+
+    with _db() as db:
+        return CircleSnapshotService(db).run_weekly_snapshot(today=today)
+
+
+def _cards_of(client: TestClient, mini: dict, child_id: int) -> dict:
+    return client.get(f"/api/miniapp/circle/my-cards?child_id={child_id}", headers=mini).json()
+
+
+def _in(bucket: list, card_type: str, ref_id: int | None = None):
+    for c in bucket:
+        if c["card_type"] == card_type and (ref_id is None or c["ref_id"] == ref_id):
+            return c
+    return None
+
+
+def test_rank_snapshot_idempotent_and_same_source_as_board(client: TestClient):
+    """B1：快照幂等（第二遍 0 新增）+ 名次/词数与周榜口径逐条一致（计数同源机器化）。"""
+    h = _h(client)
+    c1, _ = _mk_parent_with_child(client, h, "13800000801", "榜孩A", "RankA")
+    b1 = _seed_book(client, h, "9788400000901", 900)
+    b2 = _seed_book(client, h, "9788400000902", 300)
+    lm = _monday_of() - timedelta(days=7)  # 上一个完整自然周（周一）
+    _credit_words_at(c1, b1, 900, datetime.combine(lm + timedelta(days=1), datetime.min.time()))
+    _credit_words_at(c1, b2, 300, datetime.combine(lm + timedelta(days=2), datetime.min.time()))
+
+    assert _snapshot(today=date.today()) == 1
+    assert _snapshot(today=date.today()) == 0  # 幂等：同周重跑不再落库
+
+    from backend.domain.growth.board_service import LeaderboardService
+    from backend.domain.reading_circle.models import CircleRankSnapshot
+
+    with _db() as db:
+        start = datetime.combine(lm, datetime.min.time())
+        end = datetime.combine(lm + timedelta(days=7), datetime.min.time())
+        entries = LeaderboardService(db).period_entries(start, end)
+        snaps = (
+            db.query(CircleRankSnapshot)
+            .filter(CircleRankSnapshot.week_start == lm)
+            .order_by(CircleRankSnapshot.rank)
+            .all()
+        )
+    assert [(s.child_id, s.rank, s.words) for s in snaps] == [
+        (e["child_id"], i + 1, e["words"]) for i, e in enumerate(entries)
+    ], "快照名次/词数必须与周榜口径逐条一致（计数同源）"
+
+
+def test_rank_top_and_rank_up_cards(client: TestClient):
+    """B2：上榜卡（TOP10）与上升卡（本周 rank < 上周 rank）；新上榜不产生上升卡。"""
+    h = _h(client)
+    c1, m1 = _mk_parent_with_child(client, h, "13800000802", "升孩", "Riser")
+    c2, m2 = _mk_parent_with_child(client, h, "13800000803", "降孩", "Faller")
+    books = [
+        _seed_book(client, h, f"978840000091{i}", w) for i, w in enumerate([9000, 5000, 1200, 300])
+    ]
+    lw = _monday_of() - timedelta(days=7)  # 上一个完整周
+    pw = lw - timedelta(days=7)  # 再往前一周
+    # 上上周：降孩 9000 > 升孩 300（升孩 rank2）；上周：升孩 9000 > 降孩 300（升孩 rank1）
+    _credit_words_at(
+        c1, books[3], 300, datetime.combine(pw + timedelta(days=1), datetime.min.time())
+    )
+    _credit_words_at(
+        c2, books[0], 9000, datetime.combine(pw + timedelta(days=1), datetime.min.time())
+    )
+    _credit_words_at(
+        c1, books[0], 9000, datetime.combine(lw + timedelta(days=1), datetime.min.time())
+    )
+    _credit_words_at(
+        c2, books[3], 300, datetime.combine(lw + timedelta(days=1), datetime.min.time())
+    )
+    assert _snapshot(today=lw + timedelta(days=3)) == 2  # 结算上上周
+    assert _snapshot(today=date.today()) == 2  # 结算上周
+
+    cards = _cards_of(client, m1, c1)
+    top = _in(cards["available"], RANK_TOP, int(lw.strftime("%Y%m%d")))
+    assert top and "第 1 名" in top["title"], cards["available"]
+    up = _in(cards["available"], RANK_UP, int(lw.strftime("%Y%m%d")))
+    assert up and "↑1 位" in up["title"], cards["available"]
+    # 降孩：上周第 2 → 上榜但无上升卡（名次下降）
+    cards2 = _cards_of(client, m2, c2)
+    assert _in(cards2["available"], RANK_TOP, int(lw.strftime("%Y%m%d")))
+    assert _in(cards2["available"], RANK_UP, int(lw.strftime("%Y%m%d"))) is None
+    # 晒卡链路（写路径）：上升卡可晒，伪造成本周 ref_id → 422
+    assert _share(client, m1, c1, RANK_UP, int(lw.strftime("%Y%m%d"))).status_code == 200
+    assert _share(client, m1, c1, RANK_UP, 20990101).status_code == 422
+
+
+def test_weekly_report_card(client: TestClient):
+    """B3：周报卡取上一完整周（区间口径同 ReportService），ref_id=上周一 YYYYMMDD。"""
+    h = _h(client)
+    c1, m1 = _mk_parent_with_child(client, h, "13800000804", "周报孩", "Weekly")
+    b1 = _seed_book(client, h, "9788400000921", 700)
+    b2 = _seed_book(client, h, "9788400000922", 500)
+    lw = _monday_of() - timedelta(days=7)  # 上一个完整周（周报卡的区间）
+    when = datetime.combine(lw + timedelta(days=2), datetime.min.time())
+    _credit_words_at(c1, b1, 700, when)
+    _credit_words_at(c1, b2, 500, when)
+
+    cards = _cards_of(client, m1, c1)
+    rep = _in(cards["available"], WEEKLY_REPORT, int(lw.strftime("%Y%m%d")))
+    assert rep and "1,200 词" in rep["title"], cards["available"]
+    resp = _share(client, m1, c1, WEEKLY_REPORT, int(lw.strftime("%Y%m%d")))
+    assert resp.status_code == 200, resp.text
+    # 未来周/非周一 → 422
+    assert _share(client, m1, c1, WEEKLY_REPORT, 20990101).status_code == 422
+    assert _share(client, m1, c1, WEEKLY_REPORT, 20260909).status_code == 422
+
+
+def test_breakthrough_card_threshold_and_renewal(client: TestClient):
+    """B4：单日突破卡——阈值下不成卡；更高单日出现后 ref_id 更新（不断超越自己）。"""
+    h = _h(client)
+    c1, m1 = _mk_parent_with_child(client, h, "13800000805", "突破孩", "Break")
+    b1 = _seed_book(client, h, "9788400000931", 800)
+    b2 = _seed_book(client, h, "9788400000932", 3000)
+    day = _monday_of() - timedelta(days=5)  # 任意历史日
+    _credit_words_at(c1, b1, 800, datetime.combine(day, datetime.min.time()))
+    cards = _cards_of(client, m1, c1)
+    assert _in(cards["available"], BREAKTHROUGH) is None, "800 词未达阈值 1000，不应成卡"
+
+    day2 = day + timedelta(days=1)
+    _credit_words_at(c1, b2, 3000, datetime.combine(day2, datetime.min.time()))
+    cards = _cards_of(client, m1, c1)
+    card = _in(cards["available"], BREAKTHROUGH, int(day2.strftime("%Y%m%d")))
+    assert card and "3,000 词" in card["title"], cards["available"]
+    assert _share(client, m1, c1, BREAKTHROUGH, int(day2.strftime("%Y%m%d"))).status_code == 200
+
+
+def test_banner_same_source_as_week_board(client: TestClient):
+    """B5：社区横幅两数字与周榜口径同源（在会 + 本周有入账）。"""
+    h = _h(client)
+    c1, m1 = _mk_parent_with_child(client, h, "13800000806", "横幅孩", "Banner")
+    b1 = _seed_book(client, h, "9788400000941", 600)
+    _credit_words_at(c1, b1, 600, datetime.now())  # 本周（今天）
+    res = client.get("/api/miniapp/circle/posts", headers=m1).json()
+    assert res["banner"]["words"] >= 600 and res["banner"]["kids"] >= 1
+
+    from backend.domain.growth.board_service import LeaderboardService
+
+    with _db() as db:
+        monday = datetime.combine(_monday_of(), datetime.min.time())
+        entries = LeaderboardService(db).period_entries(monday)
+        expect_words = sum(e["words"] for e in entries)
+    assert res["banner"] == {"words": expect_words, "kids": len(entries)}
+
+
+def test_display_name_three_consumers(client: TestClient):
+    """B6/Q11：称呼三消费端（信息流署名 / 管理端署名 / 被赞通知文案）。"""
+    h = _h(client)
+    c1, m1 = _mk_parent_with_child(client, h, "13800000807", "称呼孩", "Nick")
+    _, m2 = _mk_parent_with_child(client, h, "13800000808", "点赞孩2", "Liker2")
+    ms = _award_milestone(c1, 100000)
+    post_id = _share(client, m1, c1, MILESTONE, ms).json()["post_id"]
+
+    # 未设称呼 → 回退真实姓名（测试造数家长名统一「圈家长」）
+    items = client.get("/api/miniapp/circle/posts", headers=m1).json()["items"]
+    assert next(p for p in items if p["id"] == post_id)["parent_name"] == "圈家长"
+    # 帖主设称呼 → 信息流署名 / 管理端署名同步（消费端 1、2）
+    with _db() as db:
+        from backend.domain.identity.models import Parent
+
+        owner = db.query(Parent).filter(Parent.phone == "13800000807").first()
+        owner.display_name = "Nick妈妈"
+        liker = db.query(Parent).filter(Parent.phone == "13800000808").first()
+        liker.display_name = "Liker妈妈"
+        db.commit()
+    items = client.get("/api/miniapp/circle/posts", headers=m1).json()["items"]
+    assert next(p for p in items if p["id"] == post_id)["parent_name"] == "Nick妈妈"
+    adm = client.get("/api/admin/circle/posts", headers=h).json()["items"]
+    assert next(p for p in adm if p["id"] == post_id)["parent_name"] == "Nick妈妈"
+    # 被赞通知文案取**点赞人**称呼（消费端 3）
+    assert client.post(f"/api/miniapp/circle/posts/{post_id}/like", headers=m2).status_code == 200
+    notes = client.get("/api/miniapp/notifications?category=其他", headers=m1).json()["items"]
+    assert any("Liker妈妈 赞了" in n["content"] for n in notes), notes
+    # 自助改称呼端点（空串=回退）
+    r = client.put("/api/miniapp/parent/profile", json={"display_name": "Nick爸"}, headers=m1)
+    assert r.status_code == 200 and r.json()["display_name"] == "Nick爸"
+    r = client.put("/api/miniapp/parent/profile", json={"display_name": ""}, headers=m1)
+    assert r.json()["display_name"] == "" and r.json()["name"] == "圈家长"
+
+
+def test_orphan_card_image_cleanup(client: TestClient):
+    """C3/Q13：删帖超 30 天的卡片图物理清理；未到期不动；幂等。"""
+    import os
+    from datetime import timedelta
+
+    from backend.config import get_settings
+    from backend.domain.reading_circle.admin_service import CircleImageCleanupService
+    from backend.domain.reading_circle.models import CirclePost
+
+    h = _h(client)
+    c1, m1 = _mk_parent_with_child(client, h, "13800000809", "清理孩", "Clean")
+    ms = _award_milestone(c1, 100000)
+    post_id = _share(client, m1, c1, MILESTONE, ms).json()["post_id"]
+    assert client.delete(f"/api/miniapp/circle/posts/{post_id}", headers=m1).status_code == 200
+
+    root = os.path.abspath(get_settings().UPLOADS_DIR)
+    with _db() as db:
+        post = db.query(CirclePost).filter(CirclePost.id == post_id).first()
+        rel = post.image_path
+        full = os.path.join(root, rel)
+        assert os.path.isfile(full), "晒卡必须真渲染落盘（真链路）"
+
+        # 未到期：不改动
+        assert CircleImageCleanupService(db).cleanup_orphan_images() == 0
+        assert os.path.isfile(full)
+        # 回填 update_time 到 31 天前 → 清理
+        post.update_time = datetime.now() - timedelta(days=31)
+        db.commit()
+    with _db() as db:
+        assert CircleImageCleanupService(db).cleanup_orphan_images() == 1
+    assert not os.path.isfile(full), "到期孤儿图应被物理删除"
+    with _db() as db:
+        post = db.query(CirclePost).filter(CirclePost.id == post_id).first()
+        assert post.image_path == ""  # 置空防重复清理
+        assert CircleImageCleanupService(db).cleanup_orphan_images() == 0  # 幂等
+
+
+def test_assemble_card_data_fields_all_types(client: TestClient):
+    """C2 补测：A 期 6 类卡 card_data 关键字段装配正确（不只测 422 归属）。"""
+    from backend.domain.reading_circle import card_engine
+
+    h = _h(client)
+    c1, _ = _mk_parent_with_child(client, h, "13800000810", "装配孩", "Assemble")
+    b1 = _seed_book(client, h, "9788400000951", 420)
+    ms = _award_milestone(c1, 100000)
+    qa = _award_perfect_quiz(c1, b1)
+    st = _award_streak(c1, "week", 7)
+    wl = _credit_words(c1, b1, 420)
+
+    with _db() as db:
+        from backend.domain.identity.models import Child
+
+        child = db.query(Child).filter(Child.id == c1).first()
+        d_ms = card_engine.assemble_card_data(db, child, MILESTONE, ms)
+        assert d_ms["value_text"] == "10 万" and d_ms["title"] == "里程碑达成"
+        d_book = card_engine.assemble_card_data(db, child, FINISH_BOOK, b1)
+        assert "+420 词" in d_book["value_text"] and "Circle" in d_book["value_label"]
+        d_quiz = card_engine.assemble_card_data(db, child, PERFECT_QUIZ, qa)
+        assert d_quiz["value_text"] == "5/5"
+        d_streak = card_engine.assemble_card_data(db, child, STREAK, st)
+        assert d_streak["value_text"] == "7 天"
+        # 归属校验：他人孩子的成就 → 422
+        from backend.common.exceptions import ValidationError as _VE
+        from backend.domain.identity.models import Child as C
+
+        c2, _ = _mk_parent_with_child(client, h, "13800000811", "别人孩", "Other2")
+        other = db.query(C).filter(C.id == c2).first()
+        for ct, ref in ((MILESTONE, ms), (PERFECT_QUIZ, qa), (STREAK, st), (FINISH_BOOK, b1)):
+            try:
+                card_engine.assemble_card_data(db, other, ct, ref)
+            except _VE:
+                continue
+            raise AssertionError(f"{ct} 归属校验失效：他人孩子成就竟装配成功")
+    _ = wl
+
+
+def test_admin_overview_metrics(client: TestClient):
+    """C2 补测：运营概览五指标口径（周新帖/分享家长/点赞总数/馆长赞覆盖率/类型分布）。"""
+    h = _h(client)
+    c1, m1 = _mk_parent_with_child(client, h, "13800000812", "概览孩A", "OvA")
+    c2, m2 = _mk_parent_with_child(client, h, "13800000813", "概览孩B", "OvB")
+    p1 = _share(client, m1, c1, MILESTONE, _award_milestone(c1, 100000)).json()["post_id"]
+    _share(client, m2, c2, MILESTONE, _award_milestone(c2, 100000))
+    assert client.post(f"/api/miniapp/circle/posts/{p1}/like", headers=m2).status_code == 200
+    assert client.post(f"/api/admin/circle/posts/{p1}/admin-like", headers=h).status_code == 200
+
+    ov = client.get("/api/admin/circle/overview", headers=h).json()
+    assert ov["week_new_posts"] == 2
+    assert ov["sharing_parents"] == 2
+    assert ov["total_likes"] == 2  # 家长赞 +1、馆长赞 +1 均计入 like_count
+    assert ov["admin_liked_coverage"] == 50.0
+    assert ov["card_type_distribution"] == {"里程碑": 2}

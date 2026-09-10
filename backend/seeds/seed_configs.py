@@ -149,6 +149,14 @@ CONFIG_SEEDS = [
         "读本数卡节点（累计读完本数，逗号分隔）",
         "读本数卡节点（本）",
     ),
+    (
+        "circle_breakthrough_min_words",
+        "1000",
+        "int",
+        "阅读圈",
+        "单日突破卡门槛（单日新增词数达标才成卡——太低会刷屏）",
+        "单日词数（词）",
+    ),
     # 会员与转让
     (
         "transfer_review_timeout_hours",

@@ -1342,6 +1342,86 @@ def _ensure_wm4_10_acceptance_data(db: Session) -> None:
     print(f"c WM4-10 验收补数完成{ticket_note}", flush=True)
 
 
+def _ensure_demo_circle_rank(db: Session) -> None:
+    """WM14-B 周榜演示：造两周真实链路数据，供上榜卡/上升卡/周报卡/突破卡验收。
+
+    真链路纪律（E-20260904-01）：词数只从 WordsLedger 入账、快照由
+    CircleSnapshotService **真跑**（不直插快照表）——历史周靠 today 注入结算，
+    与线上定时任务同一段代码。书目复用既有 35 本（不新增，保核验基线不变）。
+    幂等：上一完整周快照已存在即整体跳过。
+    """
+    from datetime import datetime as _dt
+    from datetime import time as _time
+    from datetime import timedelta as _td
+
+    from backend.domain.catalog.models import Book
+    from backend.domain.growth.models import WordsLedger
+    from backend.domain.identity.models import Child
+    from backend.domain.reading_circle.models import CircleRankSnapshot
+    from backend.domain.reading_circle.snapshot_service import CircleSnapshotService
+
+    today = _dt.now().date()
+    this_monday = today - _td(days=today.weekday())
+    last_monday = this_monday - _td(days=7)
+    prev_monday = last_monday - _td(days=7)
+
+    done = (
+        db.query(CircleRankSnapshot.id).filter(CircleRankSnapshot.week_start == prev_monday).first()
+    )
+    if done:
+        print("c 阅读圈周榜快照已存在，跳过", flush=True)
+        return
+
+    def _avail_books(child_id: int):
+        """该孩子尚未入账的在架书目，按词数倒序（复用既有 35 本，不新建）。"""
+        used = {
+            r[0]
+            for r in db.query(WordsLedger.book_id).filter(WordsLedger.child_id == child_id).all()
+        }
+        rows = (
+            db.query(Book)
+            .filter(Book.is_deleted == 0, Book.status == Book.STATUS_ON, Book.word_count > 0)
+            .order_by(Book.word_count.desc())
+            .all()
+        )
+        return [b for b in rows if b.id not in used]
+
+    # 剧本：上上周 观察期孩读大书(#1)、演示孩读小书(#2)；上周反过来 → 演示孩 2→1（上升 1 位）。
+    # 词数一律取书目真实 word_count（真链路：ledger.word_count ≡ 该书总词数，禁自定值）。
+    plan = [
+        ("演示孩", "big", last_monday + _td(days=2)),
+        ("演示孩", "small", prev_monday + _td(days=2)),
+        ("观察期孩", "small", last_monday + _td(days=3)),
+        ("观察期孩", "big", prev_monday + _td(days=3)),
+    ]
+    for child_name, size, day in plan:
+        child = db.query(Child).filter(Child.name == child_name, Child.is_deleted == 0).first()
+        if not child:
+            continue
+        avail = _avail_books(child.id)
+        if not avail:
+            continue
+        book = avail[0] if size == "big" else avail[-1]
+        db.execute(
+            mysql_insert(WordsLedger)
+            .values(
+                child_id=child.id,
+                book_id=book.id,
+                word_count=book.word_count,
+                source="quiz",
+                created_at=_dt.combine(day, _time(10, 0)),
+            )
+            .prefix_with("IGNORE")
+        )
+        db.flush()  # autoflush=False：不 flush 则下轮选书仍看不到本行（教训 41 同族）
+
+    svc = CircleSnapshotService(db)
+    # 结算上上周：today 需落在 [上周一, 本周一) 才会把「上上周」判为上一完整周
+    n_prev = svc.run_weekly_snapshot(today=last_monday + _td(days=3))
+    n_last = svc.run_weekly_snapshot(today=today)  # 结算上周
+    print(f"c 阅读圈周榜快照：上上周 {n_prev} 条 / 上周 {n_last} 条", flush=True)
+
+
 def _ensure_demo_circle(db: Session) -> None:
     """WM14-A 阅读圈演示帖：3 帖覆盖三类卡 + 金色态/置顶样例（验收步骤 13/18 用）。
 
@@ -1506,6 +1586,8 @@ def seed() -> None:
         _ensure_wm4_10_acceptance_data(db)
         # WM14-A 阅读圈演示帖（依赖：演示孩/WM3 观察期孩+押金孩——上述段之后）
         _ensure_demo_circle(db)
+        # WM14-B 周榜快照演示（依赖：上述孩子档案 + 书目；词账 → 快照任务真跑）
+        _ensure_demo_circle_rank(db)
         now = datetime.now()
         _upsert_notification(
             db,

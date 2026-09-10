@@ -55,8 +55,14 @@ class ReportService:
             raise ValidationError("报告类型仅支持 weekly/monthly")
         return start, end, label
 
-    def report_data(self, child: Child, kind: str) -> dict:
-        start, end, label = self.period_range(kind)
+    def range_summary(self, child: Child, start: datetime, end: datetime) -> dict:
+        """任意区间阅读汇总（本数/词数/打卡天数）——**report_data 同源口径**。
+
+        WM14-B：阅读圈周报卡需回溯任意历史周，故把区间聚合抽成公开方法，
+        禁止在阅读圈侧另写一套（计数同源纪律）。
+        """
+        from backend.domain.reading.models import CheckIn
+
         rows = (
             self.db.query(WordsLedger)
             .filter(
@@ -67,8 +73,6 @@ class ReportService:
             )
             .all()
         )
-        from backend.domain.reading.models import CheckIn
-
         checkin_days = (
             self.db.query(func.count(CheckIn.id))
             .filter(
@@ -79,6 +83,15 @@ class ReportService:
             )
             .scalar()
         )
+        return {
+            "books": len(rows),
+            "words": sum(r.word_count for r in rows),
+            "checkin_days": int(checkin_days or 0),
+        }
+
+    def report_data(self, child: Child, kind: str) -> dict:
+        start, end, label = self.period_range(kind)
+        summary_range = self.range_summary(child, start, end)
         attempts = (
             self.db.query(QuizAttempt)
             .filter(
@@ -100,9 +113,9 @@ class ReportService:
             "period_label": label,
             "child_name": child.name,
             "english_name": child.english_name,
-            "books": len(rows),
-            "words": sum(r.word_count for r in rows),
-            "checkin_days": int(checkin_days or 0),
+            "books": summary_range["books"],
+            "words": summary_range["words"],
+            "checkin_days": summary_range["checkin_days"],
             "quiz_count": len(attempts),
             "quiz_avg_percent": avg_score,
             "total_words": summary["words_total"],

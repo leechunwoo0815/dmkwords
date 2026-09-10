@@ -3,7 +3,10 @@
     <view class="profile-main">
       <view class="profile-avatar">👩</view>
       <view class="profile-info">
-        <view class="profile-name">{{parent.name || '家长'}}</view>
+        <view class="profile-name" bindtap="onEditDisplayName">
+          {{parent.display_name || parent.name || '家长'}}
+          <text class="profile-edit">✏️</text>
+        </view>
         <view class="profile-phone">{{parent.phone || '已登录'}}</view>
       </view>
     </view>

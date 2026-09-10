@@ -7,6 +7,11 @@ function getCurrentChild() {
   return children.find((c) => c.id === id) || children[0] || null
 }
 function setCurrentChild(id) { wx.setStorageSync('currentChildId', id) }
+// WM14-B：局部更新家长资料（改称呼后同步本地缓存，避免重登才生效）
+function patchParent(patch) {
+  const p = getParent() || {}
+  wx.setStorageSync('parent', { ...p, ...patch })
+}
 function isLoggedIn() { return !!wx.getStorageSync('token') }
 function ensureLogin() {
   if (!isLoggedIn()) {
@@ -22,4 +27,4 @@ function logout() {
   app.globalData.userInfo = null
   app.globalData.currentChild = null
 }
-module.exports = { getParent, getChildren, getCurrentChild, setCurrentChild, isLoggedIn, ensureLogin, logout }
+module.exports = { getParent, getChildren, getCurrentChild, setCurrentChild, patchParent, isLoggedIn, ensureLogin, logout }

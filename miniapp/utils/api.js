@@ -219,6 +219,11 @@ module.exports = {
     return req.post('/api/miniapp/notifications/read', { ids, all })
   },
 
+  // 家长资料（WM14-B：展示称呼）
+  updateParentProfile(displayName) {
+    return req.put('/api/miniapp/parent/profile', { display_name: displayName })
+  },
+
   // 阅读圈（WM14-A）
   circlePosts(page = 1, pageSize = 10) {
     return req.get('/api/miniapp/circle/posts', null, { params: { page, page_size: pageSize } })

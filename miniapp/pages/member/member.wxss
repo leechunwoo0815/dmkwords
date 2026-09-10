@@ -411,6 +411,12 @@
   font-size: 36rpx;
   color: var(--fg);
 }
+/* WM14-B：称呼可点改（双署名取它） */
+.profile-header .profile-edit {
+  font-size: 26rpx;
+  margin-left: 8rpx;
+  opacity: 0.7;
+}
 
 /* 卡片：粗黑边 + 手绘圆角 + 硬阴影 */
 .section-card {

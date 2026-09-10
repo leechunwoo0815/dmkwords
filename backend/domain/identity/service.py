@@ -48,6 +48,19 @@ class ParentService:
             raise NotFoundError("家长不存在")
         return parent
 
+    def update_display_name(self, parent: Parent, display_name: str) -> dict:
+        """家长自助改展示称呼（WM14-B Q11 清偿）：只允许该字段，空串=回退真实姓名。
+
+        消费端三处（信息流署名 / 管理端列表 / 被赞通知）统一走
+        reading_circle.service._parent_display（display_name or name）。
+        """
+        value = (display_name or "").strip()
+        if len(value) > 20:
+            raise ValidationError("称呼最多 20 个字")
+        parent.display_name = value or None
+        self.db.commit()
+        return {"display_name": parent.display_name or "", "name": parent.name}
+
     def list_children(self, parent_id: int) -> list[Child]:
         return (
             self.db.query(Child)

@@ -30,6 +30,23 @@ class TransferApplyRequest(BaseSchema):
     target_child_id: int
 
 
+class ParentProfileRequest(BaseSchema):
+    display_name: str = ""
+
+
+# ---------- 家长资料（WM14-B：展示称呼，双署名/被赞通知取它） ----------
+@router.put("/parent/profile")
+def update_parent_profile(
+    body: ParentProfileRequest,
+    auth: Any = Depends(get_current_parent),
+):
+    """只允许改展示称呼（display_name）；空串=回退真实姓名。"""
+    from backend.domain.identity.service import ParentService
+
+    parent, db = auth
+    return ParentService(db).update_display_name(parent, body.display_name)
+
+
 # ---------- 订单（家长视角，退款申请用） ----------
 @router.get("/orders")
 def my_orders(child_id: int, auth: Any = Depends(get_current_parent)):

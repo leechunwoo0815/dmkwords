@@ -6,6 +6,11 @@ const session = require('../../utils/session')
 
 const PAGE_SIZE = 10
 
+// 千分位（横幅数字可读性：384000 → 384,000）
+function _fmt(n) {
+  return String(n || 0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
 Page({
   data: {
     posts: [],
@@ -14,6 +19,9 @@ Page({
     loading: true,
     loadError: false,
     finished: false,
+    // WM14-B 社区横幅（本周全馆共读词数/人数；空则不显示）
+    bannerWordsText: '',
+    bannerKids: 0,
   },
 
   onShow() {
@@ -37,11 +45,14 @@ Page({
     this.setData({ loading: true, loadError: false })
     try {
       const res = await api.circlePosts(1, PAGE_SIZE)
+      const banner = res.banner || null
       this.setData({
         posts: this._decorate(res.items || []),
         page: 1,
         total: res.total || 0,
         finished: (res.items || []).length >= (res.total || 0),
+        bannerWordsText: banner && banner.words > 0 ? _fmt(banner.words) : '',
+        bannerKids: banner ? banner.kids || 0 : 0,
       })
     } catch (e) {
       this.setData({ loadError: true })

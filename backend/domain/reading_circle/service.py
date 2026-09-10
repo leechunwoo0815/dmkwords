@@ -11,7 +11,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import func, update
 from sqlalchemy.orm import Session
@@ -28,6 +28,13 @@ from backend.domain.reading_circle.models import CircleLike, CirclePost
 def _display_name(child: Child) -> str:
     """孩子英文名兜底（榜单口径 R-317/318）。"""
     return child.english_name or f"小朋友{child.id:03d}"
+
+
+def _parent_display(parent: Parent) -> str:
+    """家长署名（WM14-B/Q11 清偿）：display_name（如「Tommy妈妈」）优先，
+    空则回退真实姓名。**三消费端必须走这里**：信息流署名 / 管理端列表 / 被赞通知文案
+    ——新增显示字段枚举全部消费端（媒体消费点清单化同款纪律）。"""
+    return (parent.display_name or "").strip() or parent.name
 
 
 class CircleService:
@@ -153,7 +160,23 @@ class CircleService:
             "page": page,
             "page_size": page_size,
             "has_next": page * page_size < total,
+            "banner": self._banner(),
         }
+
+    def _banner(self) -> dict:
+        """社区横幅（WM14-B）：本周全馆共读词数 + 在坚持的孩子数。
+
+        计数同源：口径与周榜完全一致（LeaderboardService.period_entries——
+        active_only 且在会、words>0），禁在此另写聚合（计数同源第 8 案预防）。
+        """
+        from backend.domain.growth.board_service import LeaderboardService
+
+        today = datetime.now().date()
+        monday = today - timedelta(days=today.weekday())
+        entries = LeaderboardService(self.db).period_entries(
+            datetime.combine(monday, datetime.min.time())
+        )
+        return {"words": sum(e["words"] for e in entries), "kids": len(entries)}
 
     def _post_view(self, post: CirclePost, viewer_parent_id: int) -> dict:
         child = (
@@ -175,7 +198,7 @@ class CircleService:
         )
         return {
             "id": post.id,
-            "parent_name": parent.name if parent else "",
+            "parent_name": _parent_display(parent) if parent else "",
             "child_name": _display_name(child) if child else "",
             "avatar": child.avatar if child else None,
             "card_type": post.card_type,
@@ -220,7 +243,9 @@ class CircleService:
         self.db.flush()
         # 被赞通知（同事务；自己赞自己不发）
         if post.parent_id != parent.id:
-            self._notify_liked(post, liker_name=parent.name, dedup_key=f"parent:{parent.id}")
+            self._notify_liked(
+                post, liker_name=_parent_display(parent), dedup_key=f"parent:{parent.id}"
+            )
         self.db.commit()
         fresh = self.db.query(CirclePost.like_count).filter(CirclePost.id == post_id).scalar()
         return {"post_id": post_id, "like_count": fresh, "liked": True}

@@ -13,6 +13,9 @@ class Parent(BaseModel):
     __tablename__ = "parents"
 
     name = Column(String(64), nullable=False, default="", comment="家长姓名")
+    display_name = Column(
+        String(64), nullable=True, comment="展示称呼（如「Tommy妈妈」；空则回退 name）"
+    )
     phone = Column(String(20), unique=True, nullable=False, index=True, comment="手机号（唯一）")
     wechat_openid = Column(String(64), unique=True, nullable=True, comment="微信 openid")
     remark = Column(String(200), nullable=False, default="")

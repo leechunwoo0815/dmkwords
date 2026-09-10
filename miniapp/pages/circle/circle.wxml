@@ -11,6 +11,12 @@
     <text class="share-entry-arrow">›</text>
   </view>
 
+  <!-- 社区横幅（WM14-B）：本周全馆共读——口径同周榜（在会且本周有入账） -->
+  <view wx:if="{{bannerWordsText}}" class="banner">
+    <text class="banner-emoji">🌏</text>
+    <text class="banner-text">本周全馆共读 {{bannerWordsText}} 词 · {{bannerKids}} 位小朋友在坚持</text>
+  </view>
+
   <view wx:if="{{loading && !posts.length && !loadError}}" class="loading-wrap">加载中…</view>
 
   <error-view wx:if="{{loadError}}" type="network" title="加载失败"

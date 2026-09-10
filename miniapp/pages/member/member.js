@@ -1,4 +1,5 @@
 // pages/member/member.js — 我的（WM6：家长信息 + 孩子切换 + 入口 + 退出）
+const api = require('../../utils/api')
 const session = require('../../utils/session')
 
 const MEMBER_STATUS_TEXT = {
@@ -133,6 +134,29 @@ Page({
     const c = this.data.currentChild
     if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return } // F-L17/T34
     wx.navigateTo({ url: `/pages/order-pkg/reservation/reservation?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
+  },
+
+  // WM14-B：设置展示称呼（阅读圈双署名/被赞通知取它，空=回退真实姓名）
+  onEditDisplayName() {
+    wx.showModal({
+      title: '设置称呼',
+      editable: true,
+      placeholderText: '如：Tommy妈妈（最多 20 字）',
+      success: async (res) => {
+        if (!res.confirm) return
+        const value = (res.content || '').trim()
+        if (value.length > 20) {
+          wx.showToast({ title: '称呼最多 20 个字', icon: 'none' })
+          return
+        }
+        try {
+          const r = await api.updateParentProfile(value)
+          session.patchParent({ display_name: r.display_name || '' })
+          this.refresh()
+          wx.showToast({ title: '已保存', icon: 'success' })
+        } catch (e) { /* request.js 已 toast */ }
+      },
+    })
   },
 
   onLogout() {

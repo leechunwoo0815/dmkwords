@@ -35,6 +35,7 @@ ADMIN_TABLES = [
     "favorites",
     "circle_likes",
     "circle_posts",
+    "circle_rank_snapshots",
     # dictionary_words 不清（2026-08-29 用户裁定；2026-09-02 更新：开发期词库
     # 已裁至 100 行+seed 演示词 ≈309 行，全量 335 万备份在
     # ~/dmkwords-backups/dictionary_words-full-20260902.sql.gz，上线再导回；

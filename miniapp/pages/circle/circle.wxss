@@ -3,6 +3,28 @@
   background: var(--bg);
 }
 
+/* 社区横幅（WM14-B）：本周全馆共读——暖色横条，与晒成就入口区分 */
+.banner {
+  margin: 24rpx 24rpx 0;
+  padding: 22rpx 28rpx;
+  background: var(--accent, #fcd34d);
+  border: 3rpx solid var(--fg);
+  border-radius: 24rpx;
+  box-shadow: var(--shadow-hard);
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+.banner-emoji {
+  font-size: 40rpx;
+}
+.banner-text {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--fg);
+  line-height: 1.4;
+}
+
 .share-entry {
   margin: 24rpx;
   padding: 28rpx 32rpx;
