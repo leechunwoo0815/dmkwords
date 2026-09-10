@@ -2594,6 +2594,18 @@
         "title": "ParentCreateRequest",
         "type": "object"
       },
+      "ParentProfileRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "default": "",
+            "title": "Display Name",
+            "type": "string"
+          }
+        },
+        "title": "ParentProfileRequest",
+        "type": "object"
+      },
       "ParentResponse": {
         "additionalProperties": false,
         "properties": {
@@ -11650,6 +11662,57 @@
           }
         },
         "summary": "My Orders",
+        "tags": [
+          "identity-miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/parent/profile": {
+      "put": {
+        "description": "只允许改展示称呼（display_name）；空串=回退真实姓名。",
+        "operationId": "update_parent_profile_api_miniapp_parent_profile_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParentProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Parent Profile",
         "tags": [
           "identity-miniapp"
         ]
