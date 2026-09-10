@@ -56,7 +56,7 @@
 | FEAT-024 | 续费与到期提醒 | 留存 | P1 | 021 | 提前续费原到期日+365；过期续费付款日+365；30/14/7/当天四档提醒〔V1.1 §3.4〕 | membership.feature | DRAFTED |
 | FEAT-025 | 押金状态机 | 资金安全 | P0 | 015 | unpaid/paid/partially_deducted/fully_deducted/refunding/refunded；按孩子独立；转移矩阵〔R-312〕 | deposit.feature | DRAFTED |
 | FEAT-026 | 押金扣除与赔偿 | 遗失损坏处理 | P0 | 025 | 原价赔偿优先扣本人押金；不够扣记待结清持续提醒；先协商后赔偿；找回恢复上架〔V1.1 §3.6〕 | deposit.feature | DRAFTED |
-| FEAT-027 | 押金补缴 | 恢复全额 | P0 | 025 | 余额<全额时可补缴=deposit_amount−available；补后状态回 paid；流水记录；退会退 available 不退 deducted〔R-312〕 | deposit.feature | DRAFTED |
+| FEAT-027 | 押金补缴 | 恢复全额+待结清 | P0 | 025 | 补缴=deposit_amount−available+待结清（扣多少补多少，20260909 用户裁决 E-20260909-03；原公式漏待结清且支付即清零=真金漏洞）；补后状态回 paid；支付拆分入账（先恢复余额再结清）；流水记录；退会退 available 不退 deducted〔R-312〕 | deposit.feature | DRAFTED |
 | FEAT-028 | 退会申请 | 生命周期终点 | P0 | 021 | 6 态状态机；前置校验（无借阅/逾期/未结赔偿/进行中申请）；锁定范围；超管审核；结算三笔退款〔R-311〕 | withdrawal.feature | DRAFTED |
 | FEAT-029 | 会员费退款联动退会 | 退款即退会 | P0 | 020,028 | observation/formal 退款=同时建退会申请+锁定；成功前再校验；成功后 withdrawn+自动发起押金退款；观察期用尽可退 0 禁提交〔R-309, R-310〕 | refund.feature | DRAFTED |
 | FEAT-030 | 重新入会 | 回流客户 | P1 | 021 | withdrawn→observation（观察期单支付）/→formal（年费单支付或转让通过）；历史词数/积分/等级/打卡全保留〔R-301〕 | membership.feature | DRAFTED |

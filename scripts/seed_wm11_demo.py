@@ -954,6 +954,394 @@ def _ensure_demo_wm13_states(db: Session) -> None:
     print("c WM13 演示：待审退款 + 待审转让（管理待办通知已落库）", flush=True)
 
 
+def _seed_passed_book(db: Session, child, book, words_at: datetime) -> None:
+    """一本书完整通过旅程（三表一致铁律 E-20260904-01）：ReadingProgress 读完
+    → QuizAttempt passed → WordsLedger 入账 + PointLedger 首过加分。时间戳错开
+    禁同秒（E-20260904-01 假数据特征）。幂等：WordsLedger 唯一索引 IGNORE，
+    其余先查后插/upsert。"""
+    from backend.domain.growth.models import PointLedger, QuizAttempt, WordsLedger
+    from backend.domain.reading.models import ReadingProgress
+
+    total = int(book.audio_duration_seconds or 6)
+    finished_at = words_at - timedelta(hours=5)
+    progress = (
+        db.query(ReadingProgress)
+        .filter(ReadingProgress.child_id == child.id, ReadingProgress.book_id == book.id)
+        .first()
+    )
+    if progress:
+        progress.intervals = f"[[0,{total}]]"
+        progress.coverage_seconds = total
+        progress.total_seconds = total
+        progress.finished = 1
+        progress.finished_at = finished_at
+        progress.last_position = total
+        progress.last_report_at = finished_at
+    else:
+        db.add(
+            ReadingProgress(
+                child_id=child.id,
+                book_id=book.id,
+                intervals=f"[[0,{total}]]",
+                coverage_seconds=total,
+                total_seconds=total,
+                finished=1,
+                finished_at=finished_at,
+                last_position=total,
+                last_report_at=finished_at,
+            )
+        )
+    db.flush()
+    attempt = (
+        db.query(QuizAttempt)
+        .filter(QuizAttempt.child_id == child.id, QuizAttempt.book_id == book.id)
+        .first()
+    )
+    if not attempt:
+        db.add(
+            QuizAttempt(
+                child_id=child.id,
+                book_id=book.id,
+                score=4,
+                total_questions=5,
+                passed=1,
+                snapshot="[]",
+                submitted_at=words_at - timedelta(hours=2),
+            )
+        )
+        db.flush()
+    db.execute(
+        mysql_insert(WordsLedger)
+        .values(
+            child_id=child.id,
+            book_id=book.id,
+            word_count=book.word_count,
+            source="quiz",
+            created_at=words_at,
+        )
+        .prefix_with("IGNORE")
+    )
+    if (
+        not db.query(PointLedger)
+        .filter(
+            PointLedger.child_id == child.id,
+            PointLedger.related_id == book.id,
+            PointLedger.reason_type == "quiz_first_pass",
+            PointLedger.is_deleted == 0,
+        )
+        .first()
+    ):
+        db.add(
+            PointLedger(
+                child_id=child.id,
+                points=5,
+                reason_type="quiz_first_pass",
+                related_id=book.id,
+                detail="演示：首次通过测验",
+                created_at=words_at - timedelta(hours=2),
+            )
+        )
+    db.flush()
+
+
+def _sync_growth_state(db: Session, child) -> None:
+    """成长汇总与流水对齐（words/books/points 均按真实入账求和——禁手拍数字）。"""
+    from backend.domain.growth.models import ChildGrowthState, PointLedger, WordsLedger
+
+    words_total = (
+        db.query(func.sum(WordsLedger.word_count))
+        .filter(WordsLedger.child_id == child.id, WordsLedger.is_deleted == 0)
+        .scalar()
+        or 0
+    )
+    books_total = (
+        db.query(func.count(WordsLedger.id))
+        .filter(WordsLedger.child_id == child.id, WordsLedger.is_deleted == 0)
+        .scalar()
+        or 0
+    )
+    points_total = (
+        db.query(func.sum(PointLedger.points))
+        .filter(PointLedger.child_id == child.id, PointLedger.is_deleted == 0)
+        .scalar()
+        or 0
+    )
+    state = db.query(ChildGrowthState).filter(ChildGrowthState.child_id == child.id).first()
+    if not state:
+        state = ChildGrowthState(child_id=child.id, level="A")
+        db.add(state)
+    state.words_total = int(words_total)
+    state.books_total = int(books_total)
+    state.points_total = int(points_total)
+    db.flush()
+
+
+def _ensure_wm4_10_acceptance_data(db: Session) -> None:
+    """WM4-10 批量验收补数（2026-09-09 验收前盘点缺口落地，全部真实链路/三表一致）：
+
+    ① 小红（演示家长名下 none 孩）——WM6-3/5 切换+音频拦截、WM9-2 双孩报名
+    ② Activity 1 报名三态——演示孩/押金孩 enrolled+paid（WM9-5 签到、7 退款、16 造单 422），
+       观察期孩 checked_in（WM9-6 已签到退款被拒）；enroll→confirm_payment→signin 真链
+    ③ 过期孩在借一本书——WM9-22 担保语义（过期仅在借书可听；非在借书 403 同孩可测）
+    ④ 榜单对比数据——观察期孩 本周480+上周180、押金孩 上周260（周榜缺席对照）、
+       退会孩 历史1200（总榜"历史学员"标签）→ 周/月/总/进步四榜排序两两不同
+    ⑤ 演示孩生词本 2 词（ham/adventure）——WM8-3/4 查词收录动线
+    ⑥ 退款演示孩押金 1200——WM10-4 退会通过后押金退款单自动生成链
+    时效性数据（90 分钟边界活动/refunded 报名/pending 报名）不预造——验收时
+    用户自建更真实（清单注明步骤）。"""
+    from types import SimpleNamespace
+
+    from backend.domain.activity.models import Activity, ActivityEnrollment
+    from backend.domain.activity.service import ActivityService
+    from backend.domain.catalog.models import Book, BookCopy
+    from backend.domain.circulation.models import BorrowRecord
+    from backend.domain.identity.models import Child
+    from backend.domain.identity.order_service import OrderService
+    from backend.domain.reading.models import Vocabulary
+
+    admin = db.query(AdminUser).filter(AdminUser.username == "admin").first()
+    demo_parent = (
+        db.query(Parent).filter(Parent.phone == "13800008888", Parent.is_deleted == 0).first()
+    )
+    wm3_parent = (
+        db.query(Parent).filter(Parent.phone == "13800007777", Parent.is_deleted == 0).first()
+    )
+    wm13_parent = (
+        db.query(Parent).filter(Parent.phone == "13800006666", Parent.is_deleted == 0).first()
+    )
+    if not (admin and demo_parent and wm3_parent and wm13_parent):
+        print("c WM4-10 验收补数跳过：依赖家长/admin 未就位（先跑完整 seed）", flush=True)
+        return
+
+    def _kid(parent_id: int, name: str, status: str, expire=None, english: str | None = None):
+        c = (
+            db.query(Child)
+            .filter(Child.parent_id == parent_id, Child.name == name, Child.is_deleted == 0)
+            .first()
+        )
+        if not c:
+            c = Child(
+                parent_id=parent_id,
+                name=name,
+                english_name=english,
+                member_status=status,
+                member_expire=expire,
+            )
+            db.add(c)
+            db.flush()
+        return c
+
+    # ① 小红
+    _kid(demo_parent.id, "小红", Child.MEMBER_NONE)
+
+    # ② 活动报名三态（真实链路：enroll→confirm_payment→[signin]）
+    act = (
+        db.query(Activity)
+        .filter(Activity.title == "周末英文绘本读书会（演示）", Activity.is_deleted == 0)
+        .first()
+    )
+    tickets: dict[str, str] = {}
+    if act and act.start_at > datetime.now():
+        obs_kid = _kid(wm3_parent.id, "观察期孩", Child.MEMBER_OBSERVATION)
+        dep_kid = _kid(wm3_parent.id, "押金孩", Child.MEMBER_FORMAL)
+        demo_child = (
+            db.query(Child)
+            .filter(
+                Child.parent_id == demo_parent.id, Child.name == "演示孩", Child.is_deleted == 0
+            )
+            .first()
+        )
+
+        def _ensure_enrollment(kid, checked_in: bool) -> None:
+            e = (
+                db.query(ActivityEnrollment)
+                .filter(
+                    ActivityEnrollment.activity_id == act.id,
+                    ActivityEnrollment.child_id == kid.id,
+                    ActivityEnrollment.status.in_(ActivityEnrollment.ACTIVE_STATUSES),
+                    ActivityEnrollment.is_deleted == 0,
+                )
+                .first()
+            )
+            if e:
+                tickets[kid.name] = e.ticket_code
+                return
+            result = ActivityService(db).enroll(kid, act.id)
+            if result["order_id"]:
+                OrderService(db).confirm_payment(
+                    admin,
+                    result["order_id"],
+                    SimpleNamespace(pay_method="scan", remark="验收演示：活动费收款确认"),
+                )
+            e = (
+                db.query(ActivityEnrollment)
+                .filter(
+                    ActivityEnrollment.order_id == result["order_id"],
+                    ActivityEnrollment.is_deleted == 0,
+                )
+                .first()
+            )
+            if checked_in and e:
+                ActivityService(db).signin(admin, e.ticket_code)
+            if e:
+                tickets[kid.name] = e.ticket_code
+
+        if demo_child is not None:
+            _ensure_enrollment(demo_child, checked_in=False)  # WM9-7 退款矩阵载体
+        _ensure_enrollment(dep_kid, checked_in=False)  # WM9-5 签到载体（enrolled 待签）
+        _ensure_enrollment(obs_kid, checked_in=True)  # WM9-6 已签到退款被拒
+    elif act:
+        print("c 活动报名三态跳过：演示活动已开始（重跑 seed 可重建）", flush=True)
+
+    # ③ 过期孩在借（担保语义：过期仅在借书可听）
+    expired_kid = _kid(wm3_parent.id, "过期孩", Child.MEMBER_EXPIRED)
+    has_active_borrow = (
+        db.query(BorrowRecord)
+        .filter(
+            BorrowRecord.child_id == expired_kid.id,
+            BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
+            BorrowRecord.is_deleted == 0,
+        )
+        .first()
+    )
+    if not has_active_borrow:
+        book = (
+            db.query(Book)
+            .filter(
+                Book.is_deleted == 0,
+                Book.status == Book.STATUS_ON,
+                Book.audio_path.isnot(None),
+                Book.title.like("The Magic School Bus%"),
+            )
+            .first()
+        )
+        if book is None:
+            book = (
+                db.query(Book)
+                .filter(
+                    Book.is_deleted == 0,
+                    Book.status == Book.STATUS_ON,
+                    Book.audio_path.isnot(None),
+                )
+                .first()
+            )
+        if book:
+            copy = (
+                db.query(BookCopy)
+                .filter(
+                    BookCopy.book_id == book.id,
+                    BookCopy.status == BookCopy.STATUS_AVAILABLE,
+                    BookCopy.is_deleted == 0,
+                )
+                .first()
+            )
+            if copy is None:
+                copy = BookCopy(
+                    book_id=book.id,
+                    copy_code=f"DEMO-EXPIRED-{book.id}",
+                    status=BookCopy.STATUS_AVAILABLE,
+                )
+                db.add(copy)
+                db.flush()
+            copy.status = BookCopy.STATUS_BORROWED
+            db.add(
+                BorrowRecord(
+                    child_id=expired_kid.id,
+                    copy_id=copy.id,
+                    book_id=book.id,
+                    borrowed_at=datetime.now() - timedelta(days=5),
+                    due_at=datetime.now() + timedelta(days=25),
+                    status=BorrowRecord.STATUS_ACTIVE,
+                )
+            )
+            db.flush()
+
+    # ④ 榜单对比数据（周一边界锚定，重跑不过期错位）
+    #    演示孩 journey 词账时间戳冻结在首次 seed 时（IGNORE 不刷新），不可依赖其入周榜
+    #    ——故待评估孩补一笔本周词数，保证周榜/进步榜也有 2 人可对比排序
+    today = datetime.now().date()
+    this_monday = today - timedelta(days=today.weekday())
+    last_monday = this_monday - timedelta(days=7)
+    obs_kid = _kid(wm3_parent.id, "观察期孩", Child.MEMBER_OBSERVATION)
+    pend_kid = _kid(wm3_parent.id, "待评估孩", Child.MEMBER_PENDING_EVALUATION)
+    dep_kid = _kid(wm3_parent.id, "押金孩", Child.MEMBER_FORMAL)
+    alumni_kid = _kid(wm3_parent.id, "退会孩", Child.MEMBER_WITHDRAWN, None, english="Alumni")
+    board_plan = (
+        # (孩, 书 title 前缀, 词数入账时间)
+        (
+            obs_kid,
+            "Frog and Toad%",
+            datetime.combine(this_monday, datetime.min.time()) + timedelta(hours=10),
+        ),
+        (
+            obs_kid,
+            "The Snowy Day%",
+            datetime.combine(last_monday, datetime.min.time())
+            + timedelta(days=2, hours=10),  # 上周三（锚周一可能落在上月——月榜对照需要九月内）
+        ),
+        (
+            pend_kid,
+            "Chicka Chicka%",
+            datetime.combine(this_monday, datetime.min.time()) + timedelta(hours=16),
+        ),
+        (
+            dep_kid,
+            "If You Give a Mouse%",
+            datetime.combine(last_monday, datetime.min.time()) + timedelta(days=3, hours=15),
+        ),
+        (
+            alumni_kid,
+            "Nate the Great%",
+            datetime.combine(today - timedelta(days=40), datetime.min.time()) + timedelta(hours=16),
+        ),
+    )
+    for kid, prefix, when in board_plan:
+        book = db.query(Book).filter(Book.is_deleted == 0, Book.title.like(prefix)).first()
+        if book:
+            _seed_passed_book(db, kid, book, when)
+    for kid in (obs_kid, pend_kid, dep_kid, alumni_kid):
+        _sync_growth_state(db, kid)
+
+    # ⑤ 生词本（查词收录演示——WM8-3 播放页查 adventure、WM6-F 查 ham）
+    demo_child = (
+        db.query(Child)
+        .filter(Child.parent_id == demo_parent.id, Child.name == "演示孩", Child.is_deleted == 0)
+        .first()
+    )
+    if demo_child is not None:
+        source_book = (
+            db.query(Book).filter(Book.is_deleted == 0, Book.title.like("Brown Bear%")).first()
+        )
+        for word in ("ham", "adventure"):
+            exists = (
+                db.query(Vocabulary)
+                .filter(
+                    Vocabulary.child_id == demo_child.id,
+                    Vocabulary.word == word,
+                    Vocabulary.is_deleted == 0,
+                )
+                .first()
+            )
+            if not exists and source_book:
+                db.add(Vocabulary(child_id=demo_child.id, word=word, book_id=source_book.id))
+        db.flush()
+
+    # ⑥ 退款演示孩押金（WM10-4 退会通过 → 押金退款单自动生成 + WM10-5 审核退余额）
+    refund_kid = (
+        db.query(Child)
+        .filter(
+            Child.parent_id == wm13_parent.id, Child.name == "退款演示孩", Child.is_deleted == 0
+        )
+        .first()
+    )
+    if refund_kid is not None:
+        _ensure_demo_deposit(db, refund_kid)
+
+    db.commit()
+    ticket_note = "；券码 " + " / ".join(f"{k}={v}" for k, v in tickets.items()) if tickets else ""
+    print(f"c WM4-10 验收补数完成{ticket_note}", flush=True)
+
+
 def seed() -> None:
     db = SessionLocal()
     try:
@@ -979,6 +1367,9 @@ def seed() -> None:
         _ensure_demo_t41_data(db, demo_child)
         _ensure_activity_covers(db)
         _ensure_demo_wm13_states(db)
+        # WM4-10 批量验收补数（依赖：演示孩/小红家长、WM3 三孩、Activity 1、WM13 退款演示孩
+        # ——必须在这些段之后；教训 65：跨段依赖按建序排）
+        _ensure_wm4_10_acceptance_data(db)
         now = datetime.now()
         _upsert_notification(
             db,

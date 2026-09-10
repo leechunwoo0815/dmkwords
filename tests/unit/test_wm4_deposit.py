@@ -123,9 +123,28 @@ def test_deduct_insufficient_creates_unpaid(client: TestClient):
     assert dep["available_amount"] == "0.00"
     assert dep["status"] == "fully_deducted"
     assert Decimal(dep["unpaid_balance"]) == Decimal("800.00")
-    # 待结清时补缴订单 = 1200（补至全额）
+    # E-20260909-03（用户裁决「扣多少补多少」）：补缴订单 = 恢复全额 1200 + 待结清 800 = 2000
+    # ——原实现只算 1200，且支付后凭空清零待结清（800 分文未收即豁免，真金漏洞）
     r2 = client.post(f"/api/admin/deposits/children/{c['id']}/supplement-orders", headers=h)
-    assert Decimal(r2.json()["amount"]) == Decimal("1200")
+    assert r2.status_code == 200, r2.text
+    assert Decimal(r2.json()["amount"]) == Decimal("2000"), r2.text
+    # 支付后：余额回全额、待结清真结清、状态 paid、累计补缴 2000
+    r3 = client.post(
+        f"/api/admin/orders/{r2.json()['order_id']}/confirm-payment",
+        json={"pay_method": "scan"},
+        headers=h,
+    )
+    assert r3.status_code == 200, r3.text
+    dep2 = client.get(f"/api/admin/deposits/children/{c['id']}", headers=h).json()
+    assert dep2["status"] == "paid"
+    assert dep2["available_amount"] == "1200.00"
+    assert Decimal(dep2["unpaid_balance"]) == Decimal("0.00")
+    assert dep2["supplemented_total"] == "2000.00"
+    # 流水：补缴行业务额 2000、余额快照 1200（与 deduct 行同口径，Σ流水金额=余额可对账）
+    ledgers = client.get(f"/api/admin/deposits/children/{c['id']}/ledgers", headers=h).json()
+    supp = [e for e in ledgers if e["entry_type"] == "supplement"][-1]
+    assert Decimal(supp["amount"]) == Decimal("2000.00")
+    assert supp["balance_after"] == "1200.00"
 
 
 def test_deduct_without_deposit_rejected(client: TestClient):

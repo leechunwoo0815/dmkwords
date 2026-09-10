@@ -66,10 +66,13 @@ Page({
     this._resumeApplied = false
     this._initAudio()
     this.loadProgress()
-    // R3/F-L19：id-only 进入（book_id 传参收口）时 title/封面为空——拉详情补全
+    // R3/F-L19：id-only 进入（book_id 传参收口）时 title/封面为空——拉详情补全；
+    // E-20260909-02：补全后必须重建音频实例（首轮 audio_url 为空已跳过 init，
+    // 不重建则 src 永远无效——book-detail 主入口全量哑火根因之一）
     if (!book.title && book.id) {
       api.getBookDetail(book.id).then((fresh) => {
         this.setData({ book: media.formatBook({ ...this.data.book, ...fresh }) })
+        this._initAudio()
       }).catch(() => {})
     }
   },
@@ -112,10 +115,20 @@ Page({
   },
 
   _initAudio() {
-    const { book } = this.data
+    const { book, childId } = this.data
     const token = wx.getStorageSync('token')
+    // E-20260909-02：防重复实例——补详情后二次 init 前先销毁旧 context（防双实例双上报）
+    if (this._audio) {
+      this._audio.destroy()
+      this._audio = null
+    }
+    // E-20260909-02：id-only 进入首轮 book.audio_url 为空——跳过，等补详情回调再 init
+    if (!book.audio_url) return
     const base = book.audio_url.split('?')[0]
-    const url = `${base}?token=${encodeURIComponent(token)}`
+    // E-20260909-02（媒体消费点断链族 §六十二同族新案）：C-13 收口后音频流
+    // child_id 必填（会员门禁上下文）——漏拼即全量 403「缺少 child_id」，
+    // 插修 15 后端加必填参数时未枚举到此消费端，音频自该批起全量哑火
+    const url = `${base}?child_id=${childId}&token=${encodeURIComponent(token)}`
     const audio = wx.createInnerAudioContext()
     audio.src = url
     audio.playbackRate = 1.0

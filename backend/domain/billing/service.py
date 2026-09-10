@@ -72,19 +72,38 @@ class DepositService:
             dep.available_amount = standard
             dep.status = Deposit.STATUS_PAID
             self._ledger(dep, DepositLedger.ENTRY_PAY, order.amount, "押金缴纳", admin)
-        else:  # deposit_supplement 补缴（R-312：补至全额）
+        else:  # deposit_supplement 补缴（R-312：补至全额；E-20260909-03：金额含待结清）
             if dep.status not in (Deposit.STATUS_PARTIALLY_DEDUCTED, Deposit.STATUS_FULLY_DEDUCTED):
                 raise ValidationError("押金当前无需补缴")
-            dep.available_amount = standard
-            dep.deducted_amount = (
-                dep.deducted_amount - order.amount
-                if dep.deducted_amount >= order.amount
-                else Decimal("0")
+            # E-20260909-03（用户裁决「扣多少补多少」）：拆分入账——先恢复可用余额
+            # 至标准额，余下部分结清待结清。原实现直接 available=标准额 且 unpaid 清零，
+            # 超扣场景下待结清分文未收即豁免（扣 2000 只收 1200 的真金漏洞）。
+            refill = min(order.amount, max(Decimal("0"), standard - dep.available_amount)).quantize(
+                Decimal("0.01")
             )
-            dep.supplemented_total += order.amount
-            dep.unpaid_balance = Decimal("0")
-            dep.status = Deposit.STATUS_PAID
-            self._ledger(dep, DepositLedger.ENTRY_SUPPLEMENT, order.amount, "押金补缴至全额", admin)
+            settle = (order.amount - refill).quantize(Decimal("0.01"))
+            if settle > (dep.unpaid_balance or Decimal("0")):
+                # 订单创建后押金状态已变（待结清缩小/标准额下调）——金额对不上，
+                # 拒绝防漏收；调用方取消旧单按新状态重建即可
+                raise ValidationError("押金状态已变化，补缴金额与当前差额不符，请重新创建补缴订单")
+            dep.available_amount = (dep.available_amount + refill).quantize(Decimal("0.01"))
+            dep.deducted_amount = (
+                dep.deducted_amount - refill if dep.deducted_amount >= refill else Decimal("0")
+            )
+            dep.supplemented_total = (dep.supplemented_total + order.amount).quantize(
+                Decimal("0.01")
+            )
+            dep.unpaid_balance = ((dep.unpaid_balance or Decimal("0")) - settle).quantize(
+                Decimal("0.01")
+            )
+            if dep.unpaid_balance > 0:
+                dep.status = Deposit.STATUS_FULLY_DEDUCTED
+            elif dep.available_amount < standard:
+                dep.status = Deposit.STATUS_PARTIALLY_DEDUCTED
+            else:
+                dep.status = Deposit.STATUS_PAID
+            reason = "押金补缴至全额" if settle <= 0 else f"押金补缴至全额（含结清待结清 {settle}）"
+            self._ledger(dep, DepositLedger.ENTRY_SUPPLEMENT, order.amount, reason, admin)
 
         publish_audit(
             self.db,
@@ -133,13 +152,20 @@ class DepositService:
         return order
 
     def create_supplement_order(self, admin, child_id: int) -> Order:
-        """补缴订单：差额 = 标准额 − 可用余额（R-312 公式）。"""
+        """补缴订单：金额 = 恢复全额（标准额−可用余额）+ 待结清。
+
+        E-20260909-03（用户裁决「扣多少补多少」）：原公式只算「标准额−可用余额」，
+        超扣场景待结清永远收不回（支付侧还清零）——扣 2000 只补 1200 的真金漏洞。
+        """
         child = self.db.query(Child).filter(Child.id == child_id, Child.is_deleted == 0).first()
         if not child:
             raise NotFoundError("孩子不存在")
         dep = self._get_or_create(child.id)
         standard = Decimal(ConfigService(self.db).get_value("deposit_amount"))
-        diff = (standard - dep.available_amount).quantize(Decimal("0.01"))
+        # E-20260909-03（扣多少补多少）：恢复全额 + 待结清（干净场景恰好 = 赔偿总额）
+        diff = (standard - dep.available_amount + (dep.unpaid_balance or Decimal("0"))).quantize(
+            Decimal("0.01")
+        )
         if diff <= 0:
             raise ValidationError("押金余额充足，无需补缴")
         if dep.status not in (Deposit.STATUS_PARTIALLY_DEDUCTED, Deposit.STATUS_FULLY_DEDUCTED):
