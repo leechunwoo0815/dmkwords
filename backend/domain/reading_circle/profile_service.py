@@ -12,7 +12,6 @@
 from __future__ import annotations
 
 import os
-import uuid
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -222,7 +221,8 @@ class CircleProfileService:
         from PIL import Image
 
         img = cv.img.resize((POSTER_W, POSTER_H), Image.LANCZOS)
-        filename = f"poster_{child.id}_{uuid.uuid4().hex[:6]}.png"
+        # 按孩子**覆盖**（派生数据无需留历史；避免每次请求堆积 ~700KB 新文件）
+        filename = f"poster_{child.id}.png"
         img.save(os.path.join(out_dir, filename), "PNG")
         return f"posters/{filename}"
 
