@@ -173,6 +173,8 @@ Page({
               : `${first.name} 赞了你的成就`
             : '',
         likesQuietText: total ? `收到的赞 · 共 ${total} 条` : '',
+        // fix34e：把算出来的播报文案**真正写进 data**（首版漏了这一步 → 浮层永不显示）
+        celebrate: celebrate || this.data.celebrate,
         // 没有可展示的内容时收起面板（避免"空面板还开着"这类死状态）
         likesOpen: items.length ? this.data.likesOpen : false,
       })
