@@ -302,3 +302,26 @@
   font-size: 22rpx;
   color: #b9ada3;
 }
+
+/* fix34 R0b：已读态的低调条（小红点消失后仍可回看"谁赞了我"；一行灰字，不抢信息流视觉） */
+.likes-quiet {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16rpx 30rpx 0;
+  padding: 10rpx 4rpx;
+}
+.likes-quiet-text {
+  font-size: 24rpx;
+  color: #9a8c80;
+}
+.likes-quiet .likes-bar-arrow {
+  font-size: 22rpx;
+  color: #b3743f;
+}
+.likes-panel-empty {
+  padding: 26rpx 0 22rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: #b9ada3;
+}

@@ -53,6 +53,7 @@ Page({
     bannerKids: 0,
     // fix34 R0：朋友圈式「谁赞了你」（顶部通知条 + 展开列表；看过即消）
     likes: [],
+    likesUnread: [],
     unreadLikes: 0,
     likesOpen: false,
     likesText: '',
@@ -134,13 +135,15 @@ Page({
 
   onRetryLoad() { this.reload() },
 
-  // fix34 R0：拉「谁赞了你」——数据源=消息中心 circle.liked 未读（**同一张表同一口径**，
-  // 与 tab 红点同源，禁自建第二套计数）
+  // fix34 R0/R0b：拉「收到的赞」——数据源=消息中心 circle.liked（**同一张表同一口径**，
+  // 与 tab 红点同源，禁自建第二套计数）。
+  // R0b 修正（用户实测）：**列表拿全量**（含已读），只有"未读数"决定高亮——
+  // 原实现只留未读，导致"看过的赞"再也回看不了、且留下空面板死状态。
   async loadLikes() {
     try {
-      const r = await api.notifications(1, 10, '', 'circle.liked')
+      const r = await api.notifications(1, 20, '', 'circle.liked')
       const unread = (r.unread_by_scene && r.unread_by_scene.circle_liked) || 0
-      const items = (r.items || []).filter((i) => !i.read).map((i) => ({
+      const items = (r.items || []).map((i) => ({
         id: i.id,
         // 行为主体：ref_type=child 时 ref_id=点赞孩子 id（点进 TA 的名片）
         childId: i.ref_type === 'child' ? Number(i.ref_id) : 0,
@@ -148,31 +151,52 @@ Page({
         avatarUrl: _avatarUrl(i.actor_avatar),
         level: i.actor_level || 'A',
         relTime: _relTime(i.created_at),
+        read: !!i.read,
       }))
+      const total = r.total || items.length
+      const unreadItems = items.filter((i) => !i.read)
+      const first = unreadItems[0] || items[0]
       this.setData({
         likes: items,
+        // 高亮条只堆"没看过的那几个"头像（已读的不参与堆叠，避免空槽位）
+        likesUnread: unreadItems,
         unreadLikes: items.length ? unread : 0,
-        likesText: items.length
-          ? items.length > 1
-            ? `${items[0].name} 等 ${items.length} 位小伙伴赞了你的成就`
-            : `${items[0].name} 赞了你的成就`
-          : '',
+        likesText:
+          items.length && first
+            ? unread > 1
+              ? `${first.name} 等 ${unread} 位小伙伴赞了你的成就`
+              : `${first.name} 赞了你的成就`
+            : '',
+        likesQuietText: total ? `收到的赞 · 共 ${total} 条` : '',
+        // 没有可展示的内容时收起面板（避免"空面板还开着"这类死状态）
+        likesOpen: items.length ? this.data.likesOpen : false,
       })
     } catch (e) {
-      // 通知条失败不影响信息流（静默降级：不显示条）
-      this.setData({ likes: [], unreadLikes: 0, likesText: '' })
+      // 通知条失败不影响信息流（降级：不显示条）
+      this.setData({
+        likes: [],
+        likesUnread: [],
+        unreadLikes: 0,
+        likesText: '',
+        likesQuietText: '',
+        likesOpen: false,
+      })
     }
   },
 
-  // 展开 = 看过了 → 立刻标记本场景全部已读 → 条与 tab 红点同时消失（"看完不再提示"）
+  // 展开 = 看过了 → 把**未读**标记已读（红点与高亮同时消失），列表保留可继续看/再点收起
   onOpenLikes() {
     const opening = !this.data.likesOpen
     this.setData({ likesOpen: opening })
     if (!opening) return
-    const ids = this.data.likes.map((i) => i.id)
+    const ids = this.data.likes.filter((i) => !i.read).map((i) => i.id)
     if (!ids.length) return
     api.markNotificationsRead(ids, false).then(() => {
-      this.setData({ unreadLikes: 0 })
+      // 本地同步为已读（条从"高亮"降级为"低调"，列表元素不消失）
+      this.setData({
+        unreadLikes: 0,
+        likes: this.data.likes.map((i) => ({ ...i, read: true })),
+      })
       const tb = typeof this.getTabBar === 'function' && this.getTabBar()
       if (tb && tb.refreshBadge) tb.refreshBadge()
     }).catch(() => { /* request.js 已 toast */ })

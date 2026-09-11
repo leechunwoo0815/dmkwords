@@ -11,19 +11,26 @@
     <text class="share-entry-arrow">›</text>
   </view>
 
-  <!-- fix34 R0：朋友圈式「谁赞了你」——未读才出现；点开看到是谁，看完即消 -->
-  <view wx:if="{{unreadLikes > 0 || likesOpen}}" class="likes-bar {{likesOpen ? 'open' : ''}}"
+  <!-- fix34 R0/R0b：朋友圈式「收到的赞」
+       未读 → 高亮条（头像堆叠 + 文案，看完红点即消）；已读 → 低调条（永远可回看，不再"看完就找不着"） -->
+  <view wx:if="{{unreadLikes > 0}}" class="likes-bar {{likesOpen ? 'open' : ''}}"
     bindtap="onOpenLikes">
     <view class="likes-bar-avatars">
-      <view wx:for="{{likes}}" wx:key="id" class="likes-bar-slot">
+      <view wx:for="{{likesUnread}}" wx:key="id" class="likes-bar-slot">
         <avatar-ring src="{{item.avatarUrl}}" level="{{item.level}}" size="{{48}}" />
       </view>
     </view>
-    <text class="likes-bar-text">{{likesText || '谁赞了你'}}</text>
+    <text class="likes-bar-text">{{likesText}}</text>
     <text class="likes-bar-arrow">{{likesOpen ? '︿' : '﹀'}}</text>
   </view>
+  <view wx:elif="{{likes.length}}" class="likes-quiet {{likesOpen ? 'open' : ''}}"
+    bindtap="onOpenLikes">
+    <text class="likes-quiet-text">{{likesQuietText}}</text>
+    <text class="likes-bar-arrow">{{likesOpen ? '︿' : '查看 ﹀'}}</text>
+  </view>
 
-  <view wx:if="{{likesOpen && likes.length}}" class="likes-panel">
+  <view wx:if="{{likesOpen}}" class="likes-panel">
+    <view wx:if="{{!likes.length}}" class="likes-panel-empty">还没有人给你点赞，晒张成就卡试试～</view>
     <view wx:for="{{likes}}" wx:key="id" class="likes-item"
       data-child="{{item.childId}}" bindtap="onLikeItem">
       <avatar-ring src="{{item.avatarUrl}}" level="{{item.level}}" size="{{56}}" />
@@ -33,7 +40,9 @@
       </view>
       <text class="likes-item-go">看名片 ›</text>
     </view>
-    <view class="likes-panel-done">看完了，不再提醒 ✓</view>
+    <view wx:if="{{likes.length}}" class="likes-panel-done">
+      {{unreadLikes > 0 ? '看完了，红点会一起消失 ✓' : '已看过的赞都在这里，随时回看'}}
+    </view>
   </view>
 
   <!-- 社区横幅（WM14-B）：本周全馆共读 -->
