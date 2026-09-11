@@ -6,6 +6,8 @@
 
 > 规则（宪法第六节）：每轮开工读本文件取第一个未闭环项；状态流转必须先落证据（gate-runs/ 输出）再改本表；禁止凭记忆报进度。
 
+> 🔴 **2026-09-12 批次告警**：fix34 主体（09-11 `gate-fix34a.log`：453 passed / 83.46% / BDD 103）之后，用户连续 5 轮实测反馈产生了 fix34b~fix34e5 共 20 刀改动（含后端 identity/reading_circle、seed、gate.sh 新增第[5]步检查器），**均未过全量门禁**，只跑过定向测试（test_fix34_circle 9 passed / test_wm15_circle 19 passed / t8 3 passed）。**接手第一件事：`GATE_LOG_NAME=fix34b bash scripts/gate.sh full`**
+
 ## 模块交付主线（详册：docs/04-模块交付顺序与手动验收手册.md）
 
 | # | 任务 | 状态 | 证据 | 备注 |
