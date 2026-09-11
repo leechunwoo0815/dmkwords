@@ -38,7 +38,8 @@
         <view class="likes-item-name">{{item.name}} 赞了你的成就</view>
         <view class="likes-item-time">{{item.relTime}}</view>
       </view>
-      <text class="likes-item-go">看名片 ›</text>
+      <text wx:if="{{item.refType === 'circle_admin'}}" class="likes-item-badge">亲赞 ✨</text>
+      <text wx:else class="likes-item-go">看名片 ›</text>
     </view>
     <view wx:if="{{likes.length}}" class="likes-panel-done">
       {{unreadLikes > 0 ? '看完了，红点会一起消失 ✓' : '已看过的赞都在这里，随时回看'}}

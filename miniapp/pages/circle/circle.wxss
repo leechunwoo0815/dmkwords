@@ -453,3 +453,14 @@
   background: linear-gradient(135deg, #d99a24, #b87a12);
   box-shadow: 0 8rpx 20rpx rgba(184, 122, 18, 0.45);
 }
+
+/* fix34e3：馆长亲赞条目右侧标记（无"看名片"去处，改为金色徽标） */
+.likes-item-badge {
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #8a4d21;
+  background: linear-gradient(135deg, #fff2c4, #ffd166);
+  border: 2rpx solid rgba(184, 122, 18, 0.5);
+}

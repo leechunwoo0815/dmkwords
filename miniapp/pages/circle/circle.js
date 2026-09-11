@@ -196,7 +196,11 @@ Page({
     const opening = !this.data.likesOpen
     this.setData({ likesOpen: opening })
     if (!opening) return
-    const ids = this.data.likes.filter((i) => !i.read).map((i) => i.id)
+    // fix34e3：只标记**孩子赞**——馆长亲赞必须由金光播报消费（否则点一下通知条
+    // 就把播报悄悄吃掉了，用户永远看不到馆长排面）
+    const ids = this.data.likes
+      .filter((i) => !i.read && i.refType !== 'circle_admin')
+      .map((i) => i.id)
     if (!ids.length) return
     api.markNotificationsRead(ids, false).then(() => {
       // 本地同步为已读（条从"高亮"降级为"低调"，列表元素不消失）
@@ -209,19 +213,19 @@ Page({
     }).catch(() => { /* request.js 已 toast */ })
   },
 
-  // fix34e：关掉金光播报 → 这条馆长赞标记已读（不再重复弹）+ tab 红点跟随
+  // fix34e：关掉金光播报 → **把未读的馆长赞一次清干净**（馆长赞了多帖不该连弹多次）
   onCloseCelebrate() {
-    const hit = this.data.likes.find(
-      (i) => !i.read && i.refType === 'circle_admin' && i.content === this.data.celebrate
-    )
+    const hits = this.data.likes.filter((i) => !i.read && i.refType === 'circle_admin')
+    const shown = hits.find((i) => i.content === this.data.celebrate) || hits[0]
     this.setData({ celebrate: '' })
-    if (!hit) return
-    this._celebratedId = hit.id
-    api.markNotificationsRead([hit.id], false).then(() => {
+    if (!hits.length) return
+    this._celebratedId = shown ? shown.id : 0
+    const ids = hits.map((i) => i.id)
+    api.markNotificationsRead(ids, false).then(() => {
       this.setData({
-        unreadLikes: Math.max(0, this.data.unreadLikes - 1),
-        likes: this.data.likes.map((i) => (i.id === hit.id ? { ...i, read: true } : i)),
-        likesUnread: this.data.likesUnread.filter((i) => i.id !== hit.id),
+        unreadLikes: Math.max(0, this.data.unreadLikes - ids.length),
+        likes: this.data.likes.map((i) => (hits.some((h) => h.id === i.id) ? { ...i, read: true } : i)),
+        likesUnread: this.data.likesUnread.filter((i) => !hits.some((h) => h.id === i.id)),
       })
       const tb = typeof this.getTabBar === 'function' && this.getTabBar()
       if (tb && tb.refreshBadge) tb.refreshBadge()

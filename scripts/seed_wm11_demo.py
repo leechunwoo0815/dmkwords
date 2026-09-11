@@ -1479,9 +1479,22 @@ def _ensure_demo_circle_visuals(db: Session) -> None:
     # （seed 直接写标志位，不走 admin_like 真链路）→ 按真链路口径补一条馆长赞通知，
     # 进阅读圈即会弹一次金光播报（幂等：唯一键 parent+scene+ref_type+ref_id+dedup_key）
     n_admin_note = 0
-    for post in (
+    admin_posts = (
         db.query(CirclePost).filter(CirclePost.is_deleted == 0, CirclePost.admin_liked == 1).all()
-    ):
+    )
+    # 演示卫生：清掉指向"帖子已不存在 / 馆长赞已取消"的陈旧馆长赞通知
+    # （历史 seed 与测试留下的 ref_id 指向早已删除的帖子，会永远挂在未读里 → 播报基数脏）
+    valid_ids = {str(p.id) for p in admin_posts}
+    stale = db.query(Notification).filter(
+        Notification.scene == "circle.liked", Notification.ref_type == "circle_admin"
+    )
+    stale = (
+        stale.filter(Notification.ref_id.notin_(valid_ids))
+        if valid_ids
+        else stale.filter(Notification.id.isnot(None))
+    )
+    n_stale = stale.delete(synchronize_session=False)
+    for post in admin_posts:
         owner = db.query(Parent).filter(Parent.id == post.parent_id).first()
         if not owner:
             continue
@@ -1513,6 +1526,19 @@ def _ensure_demo_circle_visuals(db: Session) -> None:
         )
         if not before:
             n_admin_note += 1
+        # 演示幂等：每次 seed 把**演示帖**的馆长赞通知重置为未读——否则被"看过一次"之后
+        # 重跑 seed 也再看不到金光播报（演示可复现性 > 状态保真；生产不受影响）
+        db.execute(
+            update(Notification)
+            .where(
+                Notification.parent_id == owner.id,
+                Notification.scene == "circle.liked",
+                Notification.ref_type == "circle_admin",
+                Notification.ref_id == str(post.id),
+                Notification.is_deleted == 0,
+            )
+            .values(read_at=None)
+        )
     db.commit()
 
     # ③ fix34 R5：演示里程碑帖补齐「全馆第 N 位」快照（老 card_data 无此字段 →
@@ -1522,7 +1548,7 @@ def _ensure_demo_circle_visuals(db: Session) -> None:
     print(
         f"c 阅读圈视觉：头像设置 {n_avatar} 个 / 缩略图重渲 {thumbs['rendered']} 张"
         f"（跳过 {thumbs['skipped']}）/ 里程碑播报补齐 {n_hall} 帖 / 生日彩蛋对齐 {n_bday} 人"
-        f" / 馆长赞计数对齐 {n_admin} 帖 / 馆长赞通知补 {n_admin_note} 条",
+        f" / 馆长赞计数对齐 {n_admin} 帖 / 馆长赞通知补 {n_admin_note} 条（清陈旧 {n_stale}）",
         flush=True,
     )
 
