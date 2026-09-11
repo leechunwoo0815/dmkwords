@@ -183,6 +183,8 @@ def test_notifications_scene_filter(client: TestClient):
         body["items"][0]["actor_avatar"] == "bunny_mint" or body["items"][0]["actor_avatar"] is None
     )
     assert body["items"][0]["actor_level"] == "C"
+    # fix34e4：展示名由后端给（前端不再从文案 split —— 馆长文案无空格会切错）
+    assert body["items"][0]["actor_name"] == "FanKid"  # 圈内展示名=英文名（与榜单/署名同口径）
     # 未过滤时还有别的场景（证明过滤真的在生效，而不是库里本来就只有这一条）
     allbody = client.get("/api/miniapp/notifications", headers=m1).json()
     assert allbody["total"] > body["total"]
@@ -389,3 +391,26 @@ def test_admin_like_notification_ref_type_and_per_post_dedup(client: TestClient)
     notes = client.get("/api/miniapp/notifications?scene=circle.liked", headers=m1).json()["items"]
     kid_notes = [n for n in notes if n["ref_type"] == "child"]
     assert len(kid_notes) == 2, [n["content"] for n in kid_notes]  # 两帖各一条（去重键含 post）
+
+
+def test_admin_like_notification_actor_name_is_curator(client: TestClient):
+    """fix34e4：馆长赞通知的 actor_name 固定为「馆长」（前端展示名不靠文案切分）。
+
+    回归背景：前端原用 content.split(' 赞了')[0] 取名字，而馆长文案是
+    「馆长赞了 X 的成就」（无空格）→ 切不出来 → 横幅显示成
+    「馆长赞了 Demo 的成就 赞了你的成就」（用户实测）。
+    """
+    h = _h(client)
+    c1, m1, _ = _mk_parent_with_child(client, h, "13800000971", "馆长名孩", "CurName")
+    post_id = _share(client, m1, c1, _award_milestone(c1, 100000)).json()["post_id"]
+    assert (
+        client.post(f"/api/admin/circle/posts/{post_id}/admin-like", headers=h).status_code == 200
+    )
+    note = next(
+        n
+        for n in client.get("/api/miniapp/notifications?scene=circle.liked", headers=m1).json()[
+            "items"
+        ]
+        if n["ref_type"] == "circle_admin"
+    )
+    assert note["actor_name"] == "馆长"

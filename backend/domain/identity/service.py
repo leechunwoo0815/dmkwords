@@ -26,6 +26,11 @@ def attach_actor_profiles(db: Session, data: dict) -> dict:
     from backend.domain.identity.models import Child
 
     items = data.get("items") or []
+    # 馆长赞的展示名固定为「馆长」——与"有没有孩子行为主体"无关，必须在下面
+    # `if not ids: return` 之前处理（首版写在后面 → 通知里只有馆长赞时 actor_name 缺失）
+    for i in items:
+        if i.get("ref_type") == "circle_admin":
+            i["actor_name"] = "馆长"
     ids = [
         int(i["ref_id"])
         for i in items
@@ -41,9 +46,17 @@ def attach_actor_profiles(db: Session, data: dict) -> dict:
     }
     lv = levels_map(db, ids)
     keys = set(ids)
+    names = {
+        cid: (en or f"小朋友{cid:03d}")
+        for cid, en in db.query(Child.id, Child.english_name).filter(Child.id.in_(ids)).all()
+    }
     for i in items:
+        # fix34e4：行为主体的**展示名**由后端给（前端不再靠 split 通知文案猜——
+        # 馆长文案是「馆长赞了 X 的成就」(无空格)，孩子文案是「Tommy 赞了 X 的成就」，
+        # 揉在文案里解析必然出错：实测横幅显示成「馆长赞了 Demo 的成就 赞了你的成就」）
         key = int(i["ref_id"]) if str(i.get("ref_id") or "").isdigit() else 0
         if key in keys:
+            i["actor_name"] = names.get(key, "")
             i["actor_avatar"] = avatars.get(key)
             i["actor_level"] = lv.get(key, "A")
     return data

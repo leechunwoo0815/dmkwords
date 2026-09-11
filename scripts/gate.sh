@@ -65,6 +65,8 @@ else
   skip "check_model_consistency 旧结构工具待 F0 重写"
 fi
 run python -m scripts.check_fake_assertions
+# E-20260912-01 防复发：小程序数据面断链（wxml 读的顶层变量必须真的进过 data）
+run python scripts/check_miniapp_bindings.py
 
 step 6 "数据库迁移一致性"
 # 首个迁移文件创建后启用：

@@ -144,10 +144,14 @@ Page({
       const r = await api.notifications(1, 20, '', 'circle.liked')
       const unread = (r.unread_by_scene && r.unread_by_scene.circle_liked) || 0
       const items = (r.items || []).map((i) => ({
+        // 装饰层必须把**下游要用的每个字段都带上**（fix34e4：之前漏了 content，
+        // 导致播报文案取到 undefined → 浮层恒不显示；教训入错误记忆库 §六十三）
+        content: i.content || '',
         id: i.id,
         // 行为主体：ref_type=child 时 ref_id=点赞孩子 id（点进 TA 的名片）
         childId: i.ref_type === 'child' ? Number(i.ref_id) : 0,
-        name: (i.content || '').split(' 赞了')[0] || '小伙伴',
+        // 展示名由后端给（actor_name：馆长 / 孩子英文名）；兜底才用文案切分
+        name: i.actor_name || (i.content || '').split(' 赞了')[0] || '小伙伴',
         avatarUrl: _avatarUrl(i.actor_avatar),
         level: i.actor_level || 'A',
         relTime: _relTime(i.created_at),
@@ -159,7 +163,7 @@ Page({
       // fix34e：未读的馆长赞 → 金光播报（同一 id 只弹一次，关掉时标已读）
       const adminHit = unreadItems.find((i) => i.refType === 'circle_admin')
       const celebrate =
-        adminHit && adminHit.id !== this._celebratedId ? adminHit.content : ''
+        adminHit && adminHit.id !== this._celebratedId ? adminHit.content || '馆长亲赞了你的成就！' : ''
       const first = unreadItems[0] || items[0]
       this.setData({
         likes: items,
@@ -196,11 +200,10 @@ Page({
     const opening = !this.data.likesOpen
     this.setData({ likesOpen: opening })
     if (!opening) return
-    // fix34e3：只标记**孩子赞**——馆长亲赞必须由金光播报消费（否则点一下通知条
-    // 就把播报悄悄吃掉了，用户永远看不到馆长排面）
-    const ids = this.data.likes
-      .filter((i) => !i.read && i.refType !== 'circle_admin')
-      .map((i) => i.id)
+    // fix34e4：恢复"标记全部未读"（含馆长赞）——红点任何时候都必须能清掉。
+    // 播报在**进页瞬间**就弹（早于用户任何点击），所以不怕被这一次点击抢掉；
+    // 反之若把馆长赞排除在外，播报一旦异常红点就永远消不掉（实测踩到）
+    const ids = this.data.likes.filter((i) => !i.read).map((i) => i.id)
     if (!ids.length) return
     api.markNotificationsRead(ids, false).then(() => {
       // 本地同步为已读（条从"高亮"降级为"低调"，列表元素不消失）
@@ -216,10 +219,9 @@ Page({
   // fix34e：关掉金光播报 → **把未读的馆长赞一次清干净**（馆长赞了多帖不该连弹多次）
   onCloseCelebrate() {
     const hits = this.data.likes.filter((i) => !i.read && i.refType === 'circle_admin')
-    const shown = hits.find((i) => i.content === this.data.celebrate) || hits[0]
     this.setData({ celebrate: '' })
     if (!hits.length) return
-    this._celebratedId = shown ? shown.id : 0
+    this._celebratedId = hits[0].id
     const ids = hits.map((i) => i.id)
     api.markNotificationsRead(ids, false).then(() => {
       this.setData({

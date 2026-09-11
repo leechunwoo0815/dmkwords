@@ -401,11 +401,12 @@
   background: linear-gradient(160deg, #fff8de 0%, #ffe9a8 52%, #f7c552 100%);
   border: 4rpx solid #b87a12;
   box-shadow: 0 24rpx 70rpx rgba(120, 70, 10, 0.5);
-  animation: gmPop 0.44s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  /* 只做 scale 弹入、**不淡入**且不设 fill：万一动画没跑，卡片仍是可见的静态金卡 */
+  animation: gmPop 0.44s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 @keyframes gmPop {
-  from { transform: scale(0.55); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  from { transform: scale(0.72); }
+  to { transform: scale(1); }
 }
 .gm-glow {
   position: absolute;
