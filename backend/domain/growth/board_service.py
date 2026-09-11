@@ -133,6 +133,14 @@ class LeaderboardService:
             entries.sort(key=lambda e: e["words"], reverse=True)
             title = "进步榜（本周比上周多读）"
 
+        # fix34 R4：等级头像框数据面——**在 board() 统一批查**（progress 榜是另一条构造路径，
+        # 放 _entries 里会让周快照/横幅等只读词数的调用方白付一次查询）
+        from backend.domain.growth.service import levels_map
+
+        lv = levels_map(self.db, [e["child_id"] for e in entries])
+        for e in entries:
+            e["level"] = lv.get(e["child_id"], "A")
+
         my_rank = None
         for i, e in enumerate(entries):
             if e["child_id"] == viewer.id:

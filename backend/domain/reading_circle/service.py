@@ -163,7 +163,8 @@ class CircleService:
             rows = q.offset((page - 1) * page_size - pin_offset).limit(page_size).all()
 
         likers = self._likers_map([r.id for r in rows])
-        items = [self._post_view(r, viewer.id, likers, child_id) for r in rows]
+        levels = self._levels_map([r.child_id for r in rows])
+        items = [self._post_view(r, viewer.id, likers, child_id, levels) for r in rows]
         return {
             "items": items,
             "total": total,
@@ -188,9 +189,16 @@ class CircleService:
         )
         return {"words": sum(e["words"] for e in entries), "kids": len(entries)}
 
+    def _levels_map(self, child_ids: list[int]) -> dict[int, str]:
+        """发帖孩子等级（fix34 R4 头像框数据面）——**批查，不在 _post_view 里逐条查**（禁 N+1）。"""
+        from backend.domain.growth.service import levels_map
+
+        return levels_map(self.db, child_ids)
+
     def _likers_map(self, post_ids: list[int], limit: int = 8) -> dict[int, list]:
         """点赞头像墙（批查，禁 N+1）：按社交主体 child_id 关联（fix33 R2）。
-        每帖最多 limit 个，按点赞先后 id 升序。"""
+        每帖最多 limit 个，按点赞先后 id 升序；含等级（fix34 R4 头像框数据面）。"""
+        from backend.domain.growth.service import levels_map
         from backend.domain.reading_circle.models import CircleLike
 
         if not post_ids:
@@ -206,11 +214,19 @@ class CircleService:
             .order_by(CircleLike.id.asc())
             .all()
         )
+        lv = levels_map(self.db, [cid for _, cid, _, _ in rows])
         out: dict[int, list] = {}
         for pid, cid, en, av in rows:
             bucket = out.setdefault(pid, [])
             if len(bucket) < limit:
-                bucket.append({"child_id": cid, "name": en or f"小朋友{cid:03d}", "avatar": av})
+                bucket.append(
+                    {
+                        "child_id": cid,
+                        "name": en or f"小朋友{cid:03d}",
+                        "avatar": av,
+                        "level": lv.get(cid, "A"),
+                    }
+                )
         return out
 
     @staticmethod
@@ -228,6 +244,7 @@ class CircleService:
         viewer_parent_id: int,
         likers: dict[int, list] | None = None,
         viewer_child_id: int | None = None,
+        levels: dict[int, str] | None = None,
     ) -> dict:
         child = (
             self.db.query(Child).filter(Child.id == post.child_id, Child.is_deleted == 0).first()
@@ -256,6 +273,8 @@ class CircleService:
             "parent_name": _parent_display(parent) if parent else "",
             "child_name": _display_name(child) if child else "",
             "avatar": child.avatar if child else None,
+            # fix34 R4：等级头像框数据面（前端按等级映射档位；批查注入，缺失兜底 A）
+            "level": (levels or {}).get(post.child_id, "A"),
             "card_type": post.card_type,
             "card_type_label": card_engine.CARD_TYPE_LABELS.get(post.card_type, post.card_type),
             "title": title,

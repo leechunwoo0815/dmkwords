@@ -91,13 +91,14 @@ def my_notifications(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     category: str | None = Query(None),
+    scene: str | None = Query(None, description="按场景过滤（fix34 R0：如 circle.liked）"),
     auth: Any = Depends(get_current_parent),
 ):
     """家长端消息中心（A-1/T6 下沉：逻辑在 NotificationService.list_mine）。"""
     from backend.common.notifications import NotificationService
 
     parent, db = auth
-    return NotificationService(db).list_mine(parent.id, page, page_size, category)
+    return NotificationService(db).list_mine(parent.id, page, page_size, category, scene)
 
 
 @router.post("/notifications/read")

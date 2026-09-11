@@ -39,6 +39,27 @@ from backend.domain.identity.models import Child
 LEVEL_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 
+def levels_map(db: Session, child_ids: list[int]) -> dict[int, str]:
+    """批量取孩子等级（fix34 R4：等级头像框的数据面）。
+
+    **批查禁 N+1**——信息流/榜单/点赞头像墙都要等级时逐条查会打爆（头像墙同款纪律）。
+    无成长状态的孩子按最低档 "A"（与前端 `frameForLevel` 兜底一致）。
+    """
+    from backend.domain.growth.models import ChildGrowthState
+
+    if not child_ids:
+        return {}
+    rows = (
+        db.query(ChildGrowthState.child_id, ChildGrowthState.level)
+        .filter(
+            ChildGrowthState.child_id.in_(child_ids),
+            ChildGrowthState.is_deleted == 0,
+        )
+        .all()
+    )
+    return {int(cid): (lvl or "A") for cid, lvl in rows}
+
+
 class GrowthService:
     def __init__(self, db: Session):
         self.db = db

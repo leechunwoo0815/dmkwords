@@ -241,7 +241,8 @@ def test_child_profile_privacy_and_poster(client: TestClient):
 
     token = m1["Authorization"].split()[1]
     r = client.get(f"/api/miniapp/circle/children/{c1}/poster", params={"token": token})
-    assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+    # fix34 R2：海报改 JPEG（体积 723KB → ~180KB，真机加载更快）
+    assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
     assert len(r.content) > 10000
 
 

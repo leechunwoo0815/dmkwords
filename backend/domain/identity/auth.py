@@ -79,6 +79,9 @@ def authenticate_parent(db, phone: str, code: str) -> dict:
         .order_by(Child.id)
         .all()
     )
+    from backend.domain.growth.service import levels_map
+
+    lv = levels_map(db, [c.id for c in children])
     return {
         "token": _parent_token(parent.id),
         "parent": {"id": parent.id, "name": parent.name, "phone": parent.phone},
@@ -89,6 +92,8 @@ def authenticate_parent(db, phone: str, code: str) -> dict:
                 "english_name": c.english_name,
                 "member_status": c.member_status,
                 "avatar": c.avatar,
+                # fix34 R4：登录即带等级（前端按等级映射头像框档位；批查一次，禁逐条）
+                "level": lv.get(c.id, "A"),
             }
             for c in children
         ],

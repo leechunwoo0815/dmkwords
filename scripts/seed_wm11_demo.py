@@ -1449,11 +1449,68 @@ def _ensure_demo_circle_visuals(db: Session) -> None:
 
     # ② 缩略图对齐当前规格（fix33 R1：缺图补渲 / 旧规格重渲并删旧文件；幂等）
     thumbs = card_engine.ensure_circle_thumbs(db)
+    # ③ fix34 R5：演示里程碑帖补齐「全馆第 N 位」快照（老 card_data 无此字段 →
+    # 副标题/卡面都缺播报）。演示数据专享的一次性补齐：重算 + 重渲双规格 + 删旧图；
+    # 补齐后字段已在快照里 → 重跑即跳（幂等）。**生产历史帖按"无字段不显示"容错，不动。**
+    n_hall = _backfill_demo_hall_rank(db)
     print(
         f"c 阅读圈视觉：头像设置 {n_avatar} 个 / 缩略图重渲 {thumbs['rendered']} 张"
-        f"（跳过 {thumbs['skipped']}）",
+        f"（跳过 {thumbs['skipped']}）/ 里程碑播报补齐 {n_hall} 帖",
         flush=True,
     )
+
+
+def _backfill_demo_hall_rank(db: Session) -> int:
+    """给缺 hall_rank 的**演示**里程碑帖补「全馆第 N 位达成」并重渲双规格（幂等）。"""
+    import json
+    import os
+
+    from backend.domain.reading_circle import card_engine
+    from backend.domain.reading_circle.models import CirclePost
+
+    posts = (
+        db.query(CirclePost)
+        .filter(
+            CirclePost.is_deleted == 0,
+            CirclePost.card_type == CirclePost.CARD_MILESTONE,
+        )
+        .all()
+    )
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
+    n = 0
+    for post in posts:
+        data = json.loads(post.card_data or "{}")
+        if data.get("hall_rank"):
+            continue  # 已补齐（幂等）
+        award = (
+            db.query(card_engine.MilestoneAward)
+            .filter(
+                card_engine.MilestoneAward.child_id == post.child_id,
+                card_engine.MilestoneAward.is_deleted == 0,
+            )
+            .order_by(card_engine.MilestoneAward.id.desc())
+            .first()
+        )
+        if not award:
+            continue
+        rank = card_engine.milestone_hall_rank(db, award)
+        data["hall_rank"] = rank
+        data["value_label"] = f"累计有效阅读词数 · 全馆第 {rank} 位达成"
+        post.card_data = json.dumps(data, ensure_ascii=False)
+        rendered = card_engine.render_card(data)  # 版式更新 → 大图与缩略图一起重出
+        old = [post.image_path, post.thumb_path]
+        post.image_path = rendered["image_path"]
+        post.thumb_path = rendered["thumb_path"]
+        for rel in old:
+            full = os.path.abspath(os.path.join(root, rel or ""))
+            if rel and full.startswith(root) and os.path.isfile(full):
+                try:
+                    os.remove(full)
+                except OSError:
+                    pass  # 删不掉只留孤儿文件，不影响正确性
+        n += 1
+    db.commit()
+    return n
 
 
 def _ensure_demo_circle(db: Session) -> None:

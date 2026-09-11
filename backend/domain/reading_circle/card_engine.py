@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from backend.common.exceptions import ValidationError
@@ -179,6 +179,28 @@ def _breakthrough_min_words(db: Session) -> int:
 # ---------- 数据装配（含成就归属校验：伪造 ref_id → 422） ----------
 
 
+def milestone_hall_rank(db: Session, award: MilestoneAward) -> int:
+    """全馆第 N 位达成该里程碑节点（fix34 R5）——**含本人**，按达成时刻排序。
+
+    口径（专家确认的实现提案）：同节点 `is_deleted=0` 的达成记录中，
+    `(awarded_at, id) <= 本人` 的条数即名次；`awarded_at` 缺失回退 `create_time`。
+    冻结语义：名次在**晒卡那一刻**算出并写进 card_data 快照，随帖永久不变。
+    """
+    ts = func.coalesce(MilestoneAward.awarded_at, MilestoneAward.create_time)
+    mine = award.awarded_at or award.create_time
+    rank = (
+        db.query(func.count(MilestoneAward.id))
+        .filter(
+            MilestoneAward.node_words == award.node_words,
+            MilestoneAward.is_deleted == 0,
+            or_(ts < mine, and_(ts == mine, MilestoneAward.id <= award.id)),
+        )
+        .scalar()
+        or 1
+    )
+    return int(rank)
+
+
 def assemble_card_data(db: Session, child: Child, card_type: str, ref_id: int) -> dict:
     """按类型装配 card_data 快照（成就归属校验 + 文案冻结要素）。
 
@@ -212,12 +234,16 @@ def assemble_card_data(db: Session, child: Child, card_type: str, ref_id: int) -
             _fail()
         node = row.node_words
         text = f"{node / 10000:.0f} 万" if node >= 10000 else str(node)
+        # fix34 R5 全馆播报：副标题带「全馆第 N 位达成」（稀缺感荣誉）——副标题同时是
+        # 信息流原生文字，故播报在列表页就看得见，不藏在图里
+        rank = milestone_hall_rank(db, row)
         return {
             **base,
             "title": "里程碑达成",
             "value_text": text,
-            "value_label": "累计有效阅读词数",
+            "value_label": f"累计有效阅读词数 · 全馆第 {rank} 位达成",
             "label": CARD_TYPE_LABELS[card_type],
+            "hall_rank": rank,
         }
 
     if card_type == CirclePost.CARD_BOOKS_COUNT:

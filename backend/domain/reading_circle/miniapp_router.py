@@ -135,7 +135,8 @@ def circle_child_poster(child_id: int, token: str = "", db: Session = Depends(ge
     full = os.path.abspath(os.path.join(root, rel))
     if not full.startswith(root) or not os.path.isfile(full):
         raise NotFoundError("名片海报文件不存在")
-    return FileResponse(full, media_type="image/png")
+    # fix34 R2：海报改 JPEG（体积 723KB → ~180KB），content-type 同步
+    return FileResponse(full, media_type="image/jpeg")
 
 
 @router.get("/circle/posts/{post_id}/thumb")

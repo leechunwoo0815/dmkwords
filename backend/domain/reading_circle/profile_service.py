@@ -53,10 +53,26 @@ class CircleProfileService:
             "checkin_days": self._checkin_days(child),
             "badges": badges,
             "member_status": child.member_status,
+            # fix34 R6 生日彩蛋：**只回布尔**（不暴露生日日期本身 —— 隐私红线不破）
+            "is_birthday": self._is_birthday(child),
             # 历史荣誉态：退会/过期孩子名片可见但只展示累计值（无"本周"类动态元素）
             "is_history": bool(child.is_expired_member)
             or child.member_status == Child.MEMBER_WITHDRAWN,
         }
+
+    @staticmethod
+    def _is_birthday(child: Child) -> bool:
+        """今天是否是孩子的生日（月日比对；生日缺失 → False）。
+
+        业务时区口径同晒卡日限：naive 本地时间（部署时区锚定 +8）。
+        """
+        from datetime import datetime
+
+        b = child.birthday
+        if not b:
+            return False
+        today = datetime.now().date()
+        return (b.month, b.day) == (today.month, today.day)
 
     def _checkin_days(self, child: Child) -> int:
         from backend.domain.reading.models import CheckIn
@@ -220,10 +236,19 @@ class CircleProfileService:
         os.makedirs(out_dir, exist_ok=True)
         from PIL import Image
 
-        img = cv.img.resize((POSTER_W, POSTER_H), Image.LANCZOS)
+        img = cv.img.resize((POSTER_W, POSTER_H), Image.LANCZOS).convert("RGB")
         # 按孩子**覆盖**（派生数据无需留历史；避免每次请求堆积 ~700KB 新文件）
-        filename = f"poster_{child.id}.png"
-        img.save(os.path.join(out_dir, filename), "PNG")
+        # fix34 R2：PNG → JPEG q85。海报 750×1150 的 723KB 体积主因是**纸纹噪点**
+        # （PNG 压不动噪点），JPEG 对噪点友好 → 降到约 1/4，真机加载明显更快。
+        # 旧 .png 顺手删掉，不留孤儿。
+        filename = f"poster_{child.id}.jpg"
+        img.save(os.path.join(out_dir, filename), "JPEG", quality=85, optimize=True)
+        legacy = os.path.join(out_dir, f"poster_{child.id}.png")
+        if os.path.isfile(legacy):
+            try:
+                os.remove(legacy)
+            except OSError:
+                pass  # 删不掉只留孤儿文件，不影响正确性
         return f"posters/{filename}"
 
     @staticmethod
