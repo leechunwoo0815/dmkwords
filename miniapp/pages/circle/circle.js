@@ -62,6 +62,7 @@ Page({
     if (!session.ensureLogin()) return
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 3 })
+      this.getTabBar().refreshBadge && this.getTabBar().refreshBadge() // fix34b：每个 tab 页各自刷新（红点只活在首页实例上=原 bug）
       // 红点由组件 pageLifetimes.show 自刷新（fix34 R0：组件自治，本页不再手动调）
     }
     // fix33 R2 状态隔离：每次进页都带「当前孩子」重载——在会员页切了孩子再回来，

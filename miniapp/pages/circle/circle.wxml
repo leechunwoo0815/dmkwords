@@ -16,7 +16,7 @@
     bindtap="onOpenLikes">
     <view class="likes-bar-avatars">
       <view wx:for="{{likes}}" wx:key="id" class="likes-bar-slot">
-        <avatar-ring src="{{item.avatarUrl}}" level="{{item.level}}" size="48" />
+        <avatar-ring src="{{item.avatarUrl}}" level="{{item.level}}" size="{{48}}" />
       </view>
     </view>
     <text class="likes-bar-text">{{likesText || '谁赞了你'}}</text>
@@ -26,7 +26,7 @@
   <view wx:if="{{likesOpen && likes.length}}" class="likes-panel">
     <view wx:for="{{likes}}" wx:key="id" class="likes-item"
       data-child="{{item.childId}}" bindtap="onLikeItem">
-      <avatar-ring src="{{item.avatarUrl}}" level="{{item.level}}" size="56" />
+      <avatar-ring src="{{item.avatarUrl}}" level="{{item.level}}" size="{{56}}" />
       <view class="likes-item-body">
         <view class="likes-item-name">{{item.name}} 赞了你的成就</view>
         <view class="likes-item-time">{{item.relTime}}</view>
@@ -62,7 +62,7 @@
       <!-- 头部：点头像/名字 → 名片页 -->
       <view class="post-head" bindtap="onChildProfile"
         data-child="{{item.child_id}}" data-name="{{item.child_name}}">
-        <avatar-ring src="{{item.avatarUrl}}" level="{{item.level}}" size="84" />
+        <avatar-ring src="{{item.avatarUrl}}" level="{{item.level}}" size="{{84}}" />
         <view class="head-main">
           <view class="name-row">
             <text class="child-name">{{item.child_name}}</text>
@@ -90,7 +90,7 @@
         </view>
         <view wx:if="{{item.likers.length}}" class="liker-wall">
           <view wx:for="{{item.likers}}" wx:for-item="lk" wx:key="child_id" class="liker-slot">
-            <avatar-ring src="{{lk.avatarUrl}}" level="{{lk.level}}" size="46" />
+            <avatar-ring src="{{lk.avatarUrl}}" level="{{lk.level}}" size="{{46}}" />
           </view>
           <text wx:if="{{item.like_count > item.likers.length}}" class="liker-more">+{{item.like_count - item.likers.length}}</text>
         </view>

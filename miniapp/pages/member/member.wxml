@@ -2,7 +2,7 @@
   <view class="profile-header">
     <view class="profile-main">
       <view bindtap="openAvatarPicker">
-        <avatar-ring size="104"
+        <avatar-ring size="{{104}}"
           src="{{currentChild && currentChild.avatar ? '/icons/avatars/' + currentChild.avatar + '.png' : '/icons/avatars/cat_sun.png'}}"
           level="{{currentChild.level}}" />
       </view>

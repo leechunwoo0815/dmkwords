@@ -7,7 +7,9 @@
     <!-- 名片头 -->
     <view class="card">
       <view wx:if="{{profile.is_history}}" class="history-tag">历史小读者</view>
-      <avatar-ring src="{{profile.avatarUrl}}" level="{{profile.level}}" size="168" />
+      <!-- fix34 R6 生日彩蛋：当天才出现（后端只回布尔，无生日日期） -->
+      <view wx:if="{{isBirthday}}" class="birthday-bar">{{birthdayText}}</view>
+      <avatar-ring src="{{profile.avatarUrl}}" level="{{profile.level}}" size="{{168}}" />
       <view class="name">{{profile.english_name}}</view>
       <view class="level-chip">{{profile.level}} 级小读者</view>
 

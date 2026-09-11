@@ -48,6 +48,7 @@ Page({
     if (!session.ensureLogin()) return
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 1 })
+      this.getTabBar().refreshBadge && this.getTabBar().refreshBadge() // fix34b：每个 tab 页各自刷新（红点只活在首页实例上=原 bug）
     }
     if (!this.data.loaded) this.reload()
   },

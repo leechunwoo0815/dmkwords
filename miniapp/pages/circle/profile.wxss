@@ -76,3 +76,15 @@
 .loading-wrap {
   padding: 120rpx 0; text-align: center; font-size: 26rpx; color: var(--fg-muted, #8a7d72);
 }
+
+/* fix34 R6 生日彩蛋横幅（当天才渲染；彩带渐变 + 轻描边，与卡片暖色系一致） */
+.birthday-bar {
+  margin: 0 0 16rpx;
+  padding: 14rpx 26rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #a34a1a;
+  background: linear-gradient(135deg, #fff1c9, #ffe0e8);
+  border: 2rpx solid rgba(242, 147, 91, 0.4);
+}

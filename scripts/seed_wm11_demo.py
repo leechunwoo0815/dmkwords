@@ -1447,6 +1447,23 @@ def _ensure_demo_circle_visuals(db: Session) -> None:
             child.avatar = aid
             n_avatar += 1
 
+    # ①b fix34 R6 生日彩蛋：把演示孩生日对齐"今天"（月日）→ 进 TA 的名片页即可看见 🎂；
+    # 演示账号带订单 → 管理端生日字段被锁（已创建订单的孩子锁定姓名/性别/生日），
+    # 故由 seed 造这个演示条件；已是今天的月日则跳过（幂等）
+    n_bday = 0
+    demo_kid = db.query(Child).filter(Child.name == "演示孩", Child.is_deleted == 0).first()
+    if demo_kid:
+        today = datetime.now().date()
+        if not demo_kid.birthday or (demo_kid.birthday.month, demo_kid.birthday.day) != (
+            today.month,
+            today.day,
+        ):
+            try:
+                demo_kid.birthday = today.replace(year=2019)  # 演示用固定出生年
+            except ValueError:  # 2/29 落在非闰年 → 换闰年
+                demo_kid.birthday = today.replace(year=2020)
+            n_bday = 1
+
     # ② 缩略图对齐当前规格（fix33 R1：缺图补渲 / 旧规格重渲并删旧文件；幂等）
     thumbs = card_engine.ensure_circle_thumbs(db)
     # ③ fix34 R5：演示里程碑帖补齐「全馆第 N 位」快照（老 card_data 无此字段 →
@@ -1455,7 +1472,7 @@ def _ensure_demo_circle_visuals(db: Session) -> None:
     n_hall = _backfill_demo_hall_rank(db)
     print(
         f"c 阅读圈视觉：头像设置 {n_avatar} 个 / 缩略图重渲 {thumbs['rendered']} 张"
-        f"（跳过 {thumbs['skipped']}）/ 里程碑播报补齐 {n_hall} 帖",
+        f"（跳过 {thumbs['skipped']}）/ 里程碑播报补齐 {n_hall} 帖 / 生日彩蛋对齐 {n_bday} 人",
         flush=True,
     )
 
