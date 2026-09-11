@@ -116,45 +116,49 @@ def test_thumb_falls_back_to_full_for_legacy_post(client: TestClient):
 
 
 def test_like_with_child_identity_and_liker_wall(client: TestClient):
-    """带 child_id 点赞 → 落 liker_child_id、头像墙出现、通知文案是**孩子名义**、ref 指孩子。"""
+    """带 child_id 点赞 → child_id/liker_child_id 落库、头像墙出现、通知文案是**孩子名义**。"""
     from backend.domain.reading_circle.models import CircleLike
 
     h = _h(client)
     c1, m1, _ = _mk_parent_with_child(client, h, "13800000903", "被赞孩", "Owner")
-    _, m2, _ = _mk_parent_with_child(client, h, "13800000904", "点赞孩", "Liker")
+    c2, m2, _ = _mk_parent_with_child(client, h, "13800000904", "点赞孩", "Liker")
     post_id = _share(client, m1, c1, MILESTONE, _award_milestone(c1, 100000)).json()["post_id"]
 
-    r = client.post(
-        f"/api/miniapp/circle/posts/{post_id}/like", json={"child_id": c1 + 1}, headers=m2
-    )
+    r = client.post(f"/api/miniapp/circle/posts/{post_id}/like", json={"child_id": c2}, headers=m2)
     assert r.status_code == 200, r.text
     with _db() as db:
         row = db.query(CircleLike).filter(CircleLike.post_id == post_id).first()
-        assert row.liker_child_id is not None  # 名义快照
+        assert row.child_id == c2  # fix33：社交主体=孩子
+        assert row.liker_child_id == c2  # 名义快照列同值（downgrade 可回滚）
 
-    items = client.get("/api/miniapp/circle/posts", headers=m1).json()["items"]
+    items = client.get(f"/api/miniapp/circle/posts?child_id={c2}", headers=m1).json()["items"]
     me = next(x for x in items if x["id"] == post_id)
-    assert len(me["likers"]) == 1 and me["likers"][0]["child_id"] == row.liker_child_id
+    assert len(me["likers"]) == 1 and me["likers"][0]["child_id"] == c2
 
     notes = client.get("/api/miniapp/notifications", headers=m1).json()
     liked = next(n for n in notes["items"] if n["scene"] == "circle.liked")
     assert "Liker" in liked["content"] and "赞了" in liked["content"]
-    assert liked["ref_type"] == "child" and liked["ref_id"] == str(row.liker_child_id)
+    assert liked["ref_type"] == "child" and liked["ref_id"] == str(c2)
 
 
-def test_like_without_child_falls_back_to_parent_name(client: TestClient):
-    """老版本端不带 body → 仍可点赞，文案降级家长显示名（C4 兼容）。"""
+def test_like_without_child_422(client: TestClient):
+    """fix33 R2 breaking：点赞必须带 child_id —— 缺/空 → 422「请先选择孩子」。"""
     h = _h(client)
-    c1, m1, _ = _mk_parent_with_child(client, h, "13800000905", "兼容孩", "Compat")
-    _, m2, _ = _mk_parent_with_child(client, h, "13800000906", "旧端孩", "Old")
+    c1, m1, _ = _mk_parent_with_child(client, h, "13800000905", "必填孩", "NeedChild")
+    _, m2, _ = _mk_parent_with_child(client, h, "13800000906", "老端孩", "Old")
     post_id = _share(client, m1, c1, MILESTONE, _award_milestone(c1, 100000)).json()["post_id"]
+    url = f"/api/miniapp/circle/posts/{post_id}/like"
 
-    r = client.post(f"/api/miniapp/circle/posts/{post_id}/like", headers=m2)
-    assert r.status_code == 200
-    notes = client.get("/api/miniapp/notifications", headers=m1).json()["items"]
-    liked = next(n for n in notes if n["scene"] == "circle.liked")
-    assert "圈家长 赞了" in liked["content"]  # 家长显示名兜底
-    assert liked["ref_type"] == "circle_post"
+    # 老版本端两种老姿势：整包 body 不带、body 里 child_id 为 null → 同一文案
+    for body in (None, {"child_id": None}):
+        r = client.post(url, json=body, headers=m2)
+        assert r.status_code == 422, r.text
+        assert "请先选择孩子" in str(r.json()), r.text
+    # 计数未被污染
+    with _db() as db:
+        from backend.domain.reading_circle.models import CirclePost
+
+        assert db.query(CirclePost).filter(CirclePost.id == post_id).first().like_count == 0
 
 
 # ---------- C1：分场景未读 ----------
@@ -163,9 +167,9 @@ def test_like_without_child_falls_back_to_parent_name(client: TestClient):
 def test_unread_by_scene_and_ref_fields(client: TestClient):
     h = _h(client)
     c1, m1, _ = _mk_parent_with_child(client, h, "13800000907", "未读孩", "Unread")
-    _, m2, _ = _mk_parent_with_child(client, h, "13800000908", "赞孩", "LikerX")
+    c2, m2, _ = _mk_parent_with_child(client, h, "13800000908", "赞孩", "LikerX")
     post_id = _share(client, m1, c1, MILESTONE, _award_milestone(c1, 100000)).json()["post_id"]
-    client.post(f"/api/miniapp/circle/posts/{post_id}/like", json={"child_id": c1 + 1}, headers=m2)
+    client.post(f"/api/miniapp/circle/posts/{post_id}/like", json={"child_id": c2}, headers=m2)
 
     body = client.get("/api/miniapp/notifications", headers=m1).json()
     assert body["unread_by_scene"].get("circle_liked", 0) >= 1

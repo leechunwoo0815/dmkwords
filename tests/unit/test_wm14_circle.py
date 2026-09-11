@@ -184,41 +184,37 @@ def test_daily_limit_two_posts(client: TestClient):
 def test_like_unique_cancel_relike(client: TestClient):
     h = _h(client)
     c1, m1 = _mk_parent_with_child(client, h, "13800000705", "帖主孩", "Poster")
-    _, m2 = _mk_parent_with_child(client, h, "13800000706", "点赞孩", "Liker")
+    c2, m2 = _mk_parent_with_child(client, h, "13800000706", "点赞孩", "Liker")
     ms = _award_milestone(c1, 100000)
     post_id = _share(client, m1, c1, MILESTONE, ms).json()["post_id"]
+    feed = f"/api/miniapp/circle/posts?child_id={c2}"  # fix33：liked_by_me 按孩子算
 
-    def _like():  # 小程序端家长2 的赞
-        return client.post(f"/api/miniapp/circle/posts/{post_id}/like", headers=m2)
+    def _like():  # 小程序端家长2 的孩子 c2 的赞
+        return client.post(
+            f"/api/miniapp/circle/posts/{post_id}/like", json={"child_id": c2}, headers=m2
+        )
 
     r = _like()
     assert r.status_code == 200, r.text
-    items = client.get("/api/miniapp/circle/posts", headers=m2).json()["items"]
+    items = client.get(feed, headers=m2).json()["items"]
     post = next(p for p in items if p["id"] == post_id)
     assert post["like_count"] == 1 and post["liked_by_me"] is True
     # 重复点赞：幂等返回但计数仍 1（库级唯一约束兜底）
     r2 = _like()
     assert r2.status_code == 200
-    post = next(
-        p
-        for p in client.get("/api/miniapp/circle/posts", headers=m2).json()["items"]
-        if p["id"] == post_id
-    )
+    post = next(p for p in client.get(feed, headers=m2).json()["items"] if p["id"] == post_id)
     assert post["like_count"] == 1
     # 取消 → 0；再赞 → 1（计数经原子 UPDATE 保持一致）
-    assert client.delete(f"/api/miniapp/circle/posts/{post_id}/like", headers=m2).status_code == 200
-    post = next(
-        p
-        for p in client.get("/api/miniapp/circle/posts", headers=m2).json()["items"]
-        if p["id"] == post_id
+    assert (
+        client.delete(
+            f"/api/miniapp/circle/posts/{post_id}/like?child_id={c2}", headers=m2
+        ).status_code
+        == 200
     )
+    post = next(p for p in client.get(feed, headers=m2).json()["items"] if p["id"] == post_id)
     assert post["like_count"] == 0 and post["liked_by_me"] is False
     assert _like().status_code == 200
-    post = next(
-        p
-        for p in client.get("/api/miniapp/circle/posts", headers=m2).json()["items"]
-        if p["id"] == post_id
-    )
+    post = next(p for p in client.get(feed, headers=m2).json()["items"] if p["id"] == post_id)
     assert post["like_count"] == 1
 
 
@@ -228,15 +224,20 @@ def test_like_unique_cancel_relike(client: TestClient):
 def test_admin_like_and_notifications(client: TestClient):
     h = _h(client)
     c1, m1 = _mk_parent_with_child(client, h, "13800000707", "被赞孩", "Liked")
-    _, m2 = _mk_parent_with_child(client, h, "13800000708", "点赞家长", "Fan")
+    c2, m2 = _mk_parent_with_child(client, h, "13800000708", "点赞孩", "Fan")
     b1 = _seed_book(client, h, "9788400000011", 600)
     qa = _award_perfect_quiz(c1, b1)
     post_id = _share(client, m1, c1, PERFECT_QUIZ, qa).json()["post_id"]
 
-    # 普通家长赞 → 帖主收「点赞家长 赞了 Liked 的成就」（家长显示名+孩子英文名）
-    assert client.post(f"/api/miniapp/circle/posts/{post_id}/like", headers=m2).status_code == 200
+    # 普通孩子赞 → 帖主收「Fan 赞了 Liked 的成就」（fix33：名义=孩子，非家长显示名）
+    assert (
+        client.post(
+            f"/api/miniapp/circle/posts/{post_id}/like", json={"child_id": c2}, headers=m2
+        ).status_code
+        == 200
+    )
     notes = client.get("/api/miniapp/notifications?category=其他", headers=m1).json()["items"]
-    assert any("圈家长 赞了 Liked 的成就" in n["content"] for n in notes), notes
+    assert any("Fan 赞了 Liked 的成就" in n["content"] for n in notes), notes
 
     # 馆长行内赞 → admin_liked 标记 + like_count+1 + 特殊文案「馆长赞了 ...」
     r = client.post(f"/api/admin/circle/posts/{post_id}/admin-like", headers=h)
@@ -623,10 +624,15 @@ def test_banner_same_source_as_week_board(client: TestClient):
 
 
 def test_display_name_three_consumers(client: TestClient):
-    """B6/Q11：称呼三消费端（信息流署名 / 管理端署名 / 被赞通知文案）。"""
+    """B6/Q11 称呼消费端（信息流署名 / 管理端署名）。
+
+    fix33 R2 变更：被赞通知文案不再取家长称呼——社交主体切到孩子后，文案是
+    「{点赞孩子英文名} 赞了 {帖主孩子英文名} 的成就」，家长 display_name 只剩
+    署名两端（此处继续断言，防「媒体消费点断链」回潮）。
+    """
     h = _h(client)
     c1, m1 = _mk_parent_with_child(client, h, "13800000807", "称呼孩", "Nick")
-    _, m2 = _mk_parent_with_child(client, h, "13800000808", "点赞孩2", "Liker2")
+    c2, m2 = _mk_parent_with_child(client, h, "13800000808", "点赞孩2", "Liker2")
     ms = _award_milestone(c1, 100000)
     post_id = _share(client, m1, c1, MILESTONE, ms).json()["post_id"]
 
@@ -646,10 +652,16 @@ def test_display_name_three_consumers(client: TestClient):
     assert next(p for p in items if p["id"] == post_id)["parent_name"] == "Nick妈妈"
     adm = client.get("/api/admin/circle/posts", headers=h).json()["items"]
     assert next(p for p in adm if p["id"] == post_id)["parent_name"] == "Nick妈妈"
-    # 被赞通知文案取**点赞人**称呼（消费端 3）
-    assert client.post(f"/api/miniapp/circle/posts/{post_id}/like", headers=m2).status_code == 200
+    # 被赞通知文案取**点赞孩子**名义（fix33 R2：家长不参与社交，认孩子不认家长称呼）
+    assert (
+        client.post(
+            f"/api/miniapp/circle/posts/{post_id}/like", json={"child_id": c2}, headers=m2
+        ).status_code
+        == 200
+    )
     notes = client.get("/api/miniapp/notifications?category=其他", headers=m1).json()["items"]
-    assert any("Liker妈妈 赞了" in n["content"] for n in notes), notes
+    assert any("Liker2 赞了 Nick 的成就" in n["content"] for n in notes), notes
+    assert not any("Liker妈妈" in n["content"] for n in notes), notes  # 家长称呼不进通知
     # 自助改称呼端点（空串=回退）
     r = client.put("/api/miniapp/parent/profile", json={"display_name": "Nick爸"}, headers=m1)
     assert r.status_code == 200 and r.json()["display_name"] == "Nick爸"
@@ -740,7 +752,12 @@ def test_admin_overview_metrics(client: TestClient):
     c2, m2 = _mk_parent_with_child(client, h, "13800000813", "概览孩B", "OvB")
     p1 = _share(client, m1, c1, MILESTONE, _award_milestone(c1, 100000)).json()["post_id"]
     _share(client, m2, c2, MILESTONE, _award_milestone(c2, 100000))
-    assert client.post(f"/api/miniapp/circle/posts/{p1}/like", headers=m2).status_code == 200
+    assert (
+        client.post(
+            f"/api/miniapp/circle/posts/{p1}/like", json={"child_id": c2}, headers=m2
+        ).status_code
+        == 200
+    )
     assert client.post(f"/api/admin/circle/posts/{p1}/admin-like", headers=h).status_code == 200
 
     ov = client.get("/api/admin/circle/overview", headers=h).json()

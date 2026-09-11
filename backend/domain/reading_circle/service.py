@@ -4,7 +4,8 @@
 - 防滥用：同一成就**同时至多一条活跃帖**（ix_circle_post_achievement 普通索引 +
   本文件 is_deleted=0 查重——删除即恢复晒权）+ 每日限晒 2 帖
   （配置 circle_daily_post_limit，按孩子计）+ 帖子不可编辑（card_data 快照冻结）；
-- 点赞：一心一赞（post_id+parent_id 唯一，软删复活同 FavoriteService 先例），
+- 点赞：**一孩一赞**（post_id+child_id 唯一，软删复活同 FavoriteService 先例；
+  fix33 起社交主体=孩子，兄弟可各赞各的，家长不再参与），
   like_count 原子 UPDATE（禁读改写——并发红线），like 同事务发通知 scene=circle.liked；
 - 删除权：家长删自己的帖（软删）；超管删任意帖必填原因（admin_service）。
 """
@@ -126,8 +127,14 @@ class CircleService:
 
     # ---------- 信息流 ----------
 
-    def list_posts(self, viewer: Parent, page: int = 1, page_size: int = 10) -> dict:
-        """时间倒序真分页 + 置顶帖置首（一条）。"""
+    def list_posts(
+        self, viewer: Parent, page: int = 1, page_size: int = 10, child_id: int | None = None
+    ) -> dict:
+        """时间倒序真分页 + 置顶帖置首（一条）。
+
+        `child_id` = 观看方**当前选中的孩子**（fix33 R2：liked_by_me 按孩子算，
+        兄弟之间互不串味）；不传则 liked_by_me 全 false（未选孩子的浏览态）。
+        """
         base = self.db.query(CirclePost).filter(CirclePost.is_deleted == 0)
         total = base.count()
 
@@ -156,7 +163,7 @@ class CircleService:
             rows = q.offset((page - 1) * page_size - pin_offset).limit(page_size).all()
 
         likers = self._likers_map([r.id for r in rows])
-        items = [self._post_view(r, viewer.id, likers) for r in rows]
+        items = [self._post_view(r, viewer.id, likers, child_id) for r in rows]
         return {
             "items": items,
             "total": total,
@@ -182,15 +189,15 @@ class CircleService:
         return {"words": sum(e["words"] for e in entries), "kids": len(entries)}
 
     def _likers_map(self, post_ids: list[int], limit: int = 8) -> dict[int, list]:
-        """点赞头像墙（批查，禁 N+1）：只取有名义的赞（liker_child_id 为空的历史赞不入墙，
-        仍计入 like_count）。每帖最多 limit 个。"""
+        """点赞头像墙（批查，禁 N+1）：按社交主体 child_id 关联（fix33 R2）。
+        每帖最多 limit 个，按点赞先后 id 升序。"""
         from backend.domain.reading_circle.models import CircleLike
 
         if not post_ids:
             return {}
         rows = (
             self.db.query(CircleLike.post_id, Child.id, Child.english_name, Child.avatar)
-            .join(Child, Child.id == CircleLike.liker_child_id)
+            .join(Child, Child.id == CircleLike.child_id)
             .filter(
                 CircleLike.post_id.in_(post_ids),
                 CircleLike.is_deleted == 0,
@@ -216,7 +223,11 @@ class CircleService:
         return str(d.get("title", "")), str(d.get("value_label", ""))
 
     def _post_view(
-        self, post: CirclePost, viewer_parent_id: int, likers: dict[int, list] | None = None
+        self,
+        post: CirclePost,
+        viewer_parent_id: int,
+        likers: dict[int, list] | None = None,
+        viewer_child_id: int | None = None,
     ) -> dict:
         child = (
             self.db.query(Child).filter(Child.id == post.child_id, Child.is_deleted == 0).first()
@@ -226,15 +237,18 @@ class CircleService:
             .filter(Parent.id == post.parent_id, Parent.is_deleted == 0)
             .first()
         )
-        liked = (
-            self.db.query(func.count(CircleLike.id))
-            .filter(
-                CircleLike.post_id == post.id,
-                CircleLike.parent_id == viewer_parent_id,
-                CircleLike.is_deleted == 0,
+        # liked_by_me 按**观看方当前孩子**判定（fix33 R2）；未选孩子 → false
+        liked = False
+        if viewer_child_id:
+            liked = bool(
+                self.db.query(func.count(CircleLike.id))
+                .filter(
+                    CircleLike.post_id == post.id,
+                    CircleLike.child_id == viewer_child_id,
+                    CircleLike.is_deleted == 0,
+                )
+                .scalar()
             )
-            .scalar()
-        )
         title, subtitle = self._card_fields(post)
         return {
             "id": post.id,
@@ -250,7 +264,7 @@ class CircleService:
             "thumb_url": f"/api/miniapp/circle/posts/{post.id}/thumb",
             "likers": (likers or {}).get(post.id, []),
             "like_count": post.like_count,
-            "liked_by_me": bool(liked),
+            "liked_by_me": liked,
             "admin_liked": bool(post.admin_liked),
             "is_pinned": bool(post.is_pinned),
             "is_mine": post.parent_id == viewer_parent_id,
@@ -259,7 +273,12 @@ class CircleService:
 
     # ---------- 点赞 ----------
 
-    def like(self, parent: Parent, post_id: int, child_id: int | None = None) -> dict:
+    def like(self, parent: Parent, post_id: int, child: Child) -> dict:
+        """点赞（fix33 R2：社交主体=孩子，必传）。
+
+        一孩一赞：同一孩子重复点赞幂等；兄弟各赞各的（唯一索引 (post_id, child_id)）。
+        软删行复活（同 FavoriteService B5 先例——唯一索引不含 is_deleted）。
+        """
         post = (
             self.db.query(CirclePost)
             .filter(CirclePost.id == post_id, CirclePost.is_deleted == 0)
@@ -267,32 +286,24 @@ class CircleService:
         )
         if not post:
             raise NotFoundError("帖子不存在")
-        # 一心一赞：软删行复活（同 FavoriteService B5 先例——唯一索引不含 is_deleted）
         existing = (
             self.db.query(CircleLike)
-            .filter(CircleLike.post_id == post_id, CircleLike.parent_id == parent.id)
+            .filter(CircleLike.post_id == post_id, CircleLike.child_id == child.id)
             .first()
         )
-        # 展示名义快照（C3/C4）：记录点赞那一刻家长选中的孩子；未传则 NULL（老版本端兼容）
-        liker_child = None
-        if child_id:
-            liker_child = (
-                self.db.query(Child)
-                .filter(Child.id == child_id, Child.parent_id == parent.id, Child.is_deleted == 0)
-                .first()
-            )
         if existing and existing.is_deleted == 0:
             return {"post_id": post_id, "like_count": post.like_count, "liked": True}
         if existing:
             existing.is_deleted = 0
-            if liker_child and not existing.liker_child_id:
-                existing.liker_child_id = liker_child.id
+            existing.parent_id = parent.id
+            existing.liker_child_id = child.id  # 名义快照列与主体同值（downgrade 可回滚）
         else:
             self.db.add(
                 CircleLike(
                     post_id=post_id,
                     parent_id=parent.id,
-                    liker_child_id=liker_child.id if liker_child else None,
+                    child_id=child.id,
+                    liker_child_id=child.id,
                 )
             )
         # 原子 UPDATE（禁读改写——并发红线）
@@ -302,21 +313,20 @@ class CircleService:
             .values(like_count=CirclePost.like_count + 1)
         )
         self.db.flush()
-        # 被赞通知（同事务；自己赞自己不发）
+        # 被赞通知（同事务；自家帖不打扰——同一家长名下多孩互赞也不提醒）
         if post.parent_id != parent.id:
-            # C3：文案切孩子名义（「Tommy 赞了你的成就」）；无名义则降级家长显示名（C4 兼容）
-            liker_name = _display_name(liker_child) if liker_child else _parent_display(parent)
             self._notify_liked(
                 post,
-                liker_name=liker_name,
-                dedup_key=f"parent:{parent.id}",
-                liker_child_id=liker_child.id if liker_child else None,
+                liker_name=_display_name(child),
+                dedup_key=f"child:{child.id}",
+                liker_child_id=child.id,
             )
         self.db.commit()
         fresh = self.db.query(CirclePost.like_count).filter(CirclePost.id == post_id).scalar()
         return {"post_id": post_id, "like_count": fresh, "liked": True}
 
-    def unlike(self, parent: Parent, post_id: int) -> dict:
+    def unlike(self, post_id: int, child: Child) -> dict:
+        """取消点赞（按孩子主体定位行；未赞过则幂等返回）。"""
         post = (
             self.db.query(CirclePost)
             .filter(CirclePost.id == post_id, CirclePost.is_deleted == 0)
@@ -328,7 +338,7 @@ class CircleService:
             self.db.query(CircleLike)
             .filter(
                 CircleLike.post_id == post_id,
-                CircleLike.parent_id == parent.id,
+                CircleLike.child_id == child.id,
                 CircleLike.is_deleted == 0,
             )
             .first()

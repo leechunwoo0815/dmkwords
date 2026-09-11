@@ -5,9 +5,12 @@ import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import model_validator
+from pydantic_core import PydanticCustomError
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
+from backend.common.exceptions import ValidationError
 from backend.database import get_db
 from backend.domain.identity.auth import _parent_from_token, child_of_parent, get_current_parent
 from backend.domain.reading_circle.card_engine import post_card_image
@@ -17,8 +20,17 @@ router = APIRouter(tags=["circle-miniapp"])
 
 
 class CircleLikeRequest(BaseSchema):
-    #: 点赞方家长当前选中的孩子（展示名义快照）；老版本端不带 → 降级家长显示名
-    child_id: int | None = None
+    #: 点赞方当前选中的孩子（fix33 R2：社交主体=孩子，**必填**）
+    child_id: int
+
+    @model_validator(mode="before")
+    @classmethod
+    def _require_child(cls, data):
+        """缺孩子 → 422「请先选择孩子」（老版本端送 `{child_id: null}` 走这里；
+        用 PydanticCustomError 而非 ValueError，避免 msg 被加上 "Value error, " 前缀）。"""
+        if not isinstance(data, dict) or not data.get("child_id"):
+            raise PydanticCustomError("child_required", "请先选择孩子")
+        return data
 
 
 class CircleShareRequest(BaseSchema):
@@ -31,11 +43,12 @@ class CircleShareRequest(BaseSchema):
 def circle_posts(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=50),
+    child_id: int | None = Query(None, description="观看方当前选中的孩子（liked_by_me 口径）"),
     auth: Any = Depends(get_current_parent),
 ):
     """信息流（时间倒序真分页 + 置顶帖置首）。"""
     parent, db = auth
-    return CircleService(db).list_posts(parent, page, page_size)
+    return CircleService(db).list_posts(parent, page, page_size, child_id)
 
 
 @router.get("/circle/my-cards")
@@ -60,20 +73,29 @@ def circle_like(
     body: CircleLikeRequest | None = None,
     auth: Any = Depends(get_current_parent),
 ):
-    """点赞（一心一赞；like_count 原子更新；被赞通知同事务）。
+    """点赞（fix33 R2：**社交主体=孩子**，child_id 必填；一孩一赞；被赞通知同事务）。
 
-    WM15-R6：body.child_id 可选（点赞方当前孩子）——记录为展示名义快照，
-    通知文案随之为「Tommy 赞了你的成就」；缺省则降级家长显示名（老版本端兼容）。
+    缺 child_id → 422「请先选择孩子」（连带覆盖「整包 body 都不带」的老端）。
     """
     parent, db = auth
-    return CircleService(db).like(parent, post_id, body.child_id if body else None)
+    if body is None:
+        raise ValidationError("请先选择孩子")
+    child = child_of_parent(db, parent.id, body.child_id)
+    return CircleService(db).like(parent, post_id, child)
 
 
 @router.delete("/circle/posts/{post_id}/like")
-def circle_unlike(post_id: int, auth: Any = Depends(get_current_parent)):
-    """取消点赞。"""
+def circle_unlike(
+    post_id: int,
+    child_id: int | None = Query(None, description="点赞主体孩子（定位取消的赞）"),
+    auth: Any = Depends(get_current_parent),
+):
+    """取消点赞（按孩子主体定位行；DELETE 走 query 而非 body——客户端不友好先例）。"""
     parent, db = auth
-    return CircleService(db).unlike(parent, post_id)
+    if not child_id:
+        raise ValidationError("请先选择孩子")
+    child = child_of_parent(db, parent.id, child_id)
+    return CircleService(db).unlike(post_id, child)
 
 
 @router.delete("/circle/posts/{post_id}")

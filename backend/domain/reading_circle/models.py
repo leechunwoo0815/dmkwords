@@ -67,22 +67,36 @@ class CirclePost(BaseModel):
 
 
 class CircleLike(BaseModel):
-    """阅读圈点赞（仅点赞无评论；一心一赞库级兜底 uq_circle_like）。
+    """阅读圈点赞（仅点赞无评论；**一孩对一帖一赞**库级兜底 uq_circle_like）。
+
+    fix33 R2 裁决（社交主体彻底切到孩子）：唯一索引 = (post_id, child_id)
+    ——兄弟可各赞各的（同家长多孩不再互斥）；parent_id 降为审计/通知归属，
+    不参与唯一性。
 
     软删+复活模式（同 FavoriteService 先例：唯一索引不含 is_deleted，
     复赞撞索引时复活软删行）。
+
+    child_id 可空是为「无孩历史赞」留位：迁移把这类行软删（is_deleted=1）后
+    其 child_id 仍是 NULL —— MySQL 唯一索引视多个 NULL 互不冲突，故不阻塞
+    后续正常点赞；活跃行必非空（service 强校验）。
     """
 
     __tablename__ = "circle_likes"
-    __table_args__ = (Index("uq_circle_like", "post_id", "parent_id", unique=True),)
+    __table_args__ = (Index("uq_circle_like", "post_id", "child_id", unique=True),)
 
     post_id = Column(Integer, nullable=False, index=True)
     parent_id = Column(Integer, nullable=False, index=True)
+    child_id = Column(
+        Integer,
+        nullable=True,
+        index=True,
+        comment="社交主体=点赞孩子ID（活跃行必非空；历史无孩赞已软删保留 NULL）",
+    )
     liker_child_id = Column(
         Integer,
         nullable=True,
         index=True,
-        comment="点赞方当时选中的孩子（展示名义快照；旧数据/未传为 NULL）",
+        comment="WM15 名义快照列（fix33 起与 child_id 同值保留，仅供 downgrade 回滚）",
     )
     created_at = Column(DateTime, nullable=False, default=datetime.now)
 

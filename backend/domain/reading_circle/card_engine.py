@@ -584,9 +584,18 @@ CARD_MASCOT = {
 
 CARD_W, CARD_H = 750, 1000
 
+# 缩略图规格版本（fix33 R1）：v2 = 与完整版**同构图**（复用同一绘制管线，仅跳文字层）。
+# 版本号进文件名 → `ensure_circle_thumbs` 能识别旧规格缩略图并重渲（幂等：已是 v2 即跳过），
+# 重渲后删旧文件，不留无主残留。
+THUMB_SPEC_VERSION = "v2"
 
-def _render_full(card_data: dict, pal: dict, kind: str, base: dict, out_dir: str, tag: str) -> str:
-    """含字完整版（预览/保存转发用）：标题胶囊 + 主数字 + 说明行 + 吉祥物 + 页脚。"""
+
+def _paint_card(card_data: dict, pal: dict, kind: str, base: dict, *, with_text: bool):
+    """卡片共绘画布（fix33 R1）：完整版与缩略图**走同一条管线、坐标完全一致**。
+
+    唯一差异是文字层——`with_text=False`（缩略图）跳过标题胶囊/成就文字/署名/日期/馆标
+    （这些信息由信息流原生文字渲染），插画、主数字、吉祥物、星闪、纸纹全留。
+    """
     from backend.domain.reading_circle import art
     from backend.domain.reading_circle.art_mascot import mascot as art_mascot
 
@@ -601,15 +610,19 @@ def _render_full(card_data: dict, pal: dict, kind: str, base: dict, out_dir: str
     art.sparkle(cv, 28, 466, 12, "#FFFFFF", 225)
     art.sparkle(cv, 722, 258, 11, "#FFFFFF", 215)
 
-    # 标题胶囊（accent 填充 + 白字，全 10 类卡统一）
-    art.bubble(cv, (196, 64, 554, 146), radius=41, fill=pal["accent"], outline=None)
-    art.sticker_text(cv, (375, 105), str(card_data.get("label", "")), art.font_cn(44), "#FFFFFF")
+    # 标题胶囊（accent 填充 + 白字）——纯文字容器，缩略图略去（空胶囊是视觉噪声）
+    if with_text:
+        art.bubble(cv, (196, 64, 554, 146), radius=41, fill=pal["accent"], outline=None)
+        art.sticker_text(
+            cv, (375, 105), str(card_data.get("label", "")), art.font_cn(44), "#FFFFFF"
+        )
 
     # 卡面
     art.soft_shadow(cv, (66, 176, 684, 770), radius=46, blur=12, alpha=58)
     art.bubble(cv, (66, 176, 684, 770), radius=46, fill=art.PAPER, outline=pal["accent"], width=6)
     art.glow(cv, 375, 340, 190, "#FFFFFF", 90)
 
+    # 主数字：**两规格都画**（信息流原生文字只渲染 title/value_label，数值只在图上）
     big = str(card_data.get("value_text", ""))
     num, _, unit = big.partition(" ")
     if unit:
@@ -629,61 +642,51 @@ def _render_full(card_data: dict, pal: dict, kind: str, base: dict, out_dir: str
         art.sticker_text(
             cv, (375, 330), big, art.font_round(142), pal["deep"], stroke="#FFFFFF", stroke_w=9
         )
-    title = str(card_data.get("title", ""))
-    label = str(card_data.get("value_label", ""))
-    if title:
-        art.sticker_text(cv, (375, 462), title, art.font_cn(36), art.INK)
-    if label:
-        art.sticker_text(cv, (375, 518), label, art.font_cn(32), pal["deep"])
+    if with_text:
+        title = str(card_data.get("title", ""))
+        label = str(card_data.get("value_label", ""))
+        if title:
+            art.sticker_text(cv, (375, 462), title, art.font_cn(36), art.INK)
+        if label:
+            art.sticker_text(cv, (375, 518), label, art.font_cn(32), pal["deep"])
 
     art_mascot(cv, 190, 650, 82, kind=kind, fur=base["fur"], ear=base["ear"], blush=base["blush"])
     art.star(cv, 520, 636, 26, "#FFE08A", outline=pal["accent"], width=3.2, rotate=0.22)
     art.star(cv, 604, 700, 17, "#FFF3C4", outline=pal["accent"], width=2.4, rotate=-0.24)
     art.sparkle(cv, 486, 566, 15, "#FFFFFF", 235)
 
-    art.bubble(cv, (268, 800, 482, 856), radius=28, fill=art.PAPER, outline=pal["deep"], width=4)
-    art.sticker_text(
-        cv, (375, 829), str(card_data.get("english_name", "")), art.font_cn(28), art.INK
-    )
-    art.bubble(cv, (48, 876, 702, 936), radius=26, fill=pal["accent"], outline=None)
-    art.sticker_text(
-        cv,
-        (375, 907),
-        f"{card_data.get('date', '')} · 保存分享这份成长",
-        art.font_cn(26),
-        "#FFFFFF",
-    )
-    art.sticker_text(cv, (375, 966), "DmkWords 少儿英语阅读馆", art.font_cn(23), art.INK)
+    if with_text:
+        art.bubble(
+            cv, (268, 800, 482, 856), radius=28, fill=art.PAPER, outline=pal["deep"], width=4
+        )
+        art.sticker_text(
+            cv, (375, 829), str(card_data.get("english_name", "")), art.font_cn(28), art.INK
+        )
+        art.bubble(cv, (48, 876, 702, 936), radius=26, fill=pal["accent"], outline=None)
+        art.sticker_text(
+            cv,
+            (375, 907),
+            f"{card_data.get('date', '')} · 保存分享这份成长",
+            art.font_cn(26),
+            "#FFFFFF",
+        )
+        art.sticker_text(cv, (375, 966), "DmkWords 少儿英语阅读馆", art.font_cn(23), art.INK)
     art.paper_grain(cv)
+    return cv
+
+
+def _render_full(card_data: dict, pal: dict, kind: str, base: dict, out_dir: str, tag: str) -> str:
+    """含字完整版（预览/保存转发用）：标题胶囊 + 主数字 + 说明行 + 吉祥物 + 页脚。"""
+    cv = _paint_card(card_data, pal, kind, base, with_text=True)
     return _save(cv, out_dir, f"card_{card_data.get('card_type', 'x')}_{tag}.png")
 
 
 def _render_thumb(card_data: dict, pal: dict, kind: str, base: dict, out_dir: str, tag: str) -> str:
-    """无字缩略版（信息流小图）：插画 + 主数字，无任何文字（文字由列表原生渲染）。"""
-    from backend.domain.reading_circle import art
-    from backend.domain.reading_circle.art_mascot import mascot as art_mascot
-
-    cv = art.Canvas(CARD_W, CARD_H, pal)
-    art.glow(cv, 375, 400, 260, "#FFFFFF", 120)
-    art.cloud(cv, 128, 150, 150, "#FFFFFF", 190)
-    art.cloud(cv, 630, 210, 118, "#FFFFFF", 160)
-    art.rainbow(cv, 375, 1024, 168, 9.0, 150)
-    for cx, cy, r in ((126, 592, 18), (628, 560, 15)):
-        art.star(cv, cx, cy, r, "#FFFFFF", outline=pal["accent"], width=2.6, rotate=0.2)
-    for cx, cy, r in ((238, 300, 14), (534, 288, 12), (300, 520, 11), (620, 700, 13)):
-        art.sparkle(cv, cx, cy, r, "#FFFFFF", 235)
-    art.sticker_text(
-        cv,
-        (375, 412),
-        str(card_data.get("value_text", "")),
-        art.font_round(168),
-        pal["deep"],
-        stroke="#FFFFFF",
-        stroke_w=13,
+    """无字缩略版（信息流小图）：**同构图**（fix33 R1）——同一管线去掉文字层。"""
+    cv = _paint_card(card_data, pal, kind, base, with_text=False)
+    return _save(
+        cv, out_dir, f"thumb_{THUMB_SPEC_VERSION}_{card_data.get('card_type', 'x')}_{tag}.png"
     )
-    art_mascot(cv, 375, 720, 104, kind=kind, fur=base["fur"], ear=base["ear"], blush=base["blush"])
-    art.paper_grain(cv)
-    return _save(cv, out_dir, f"thumb_{card_data.get('card_type', 'x')}_{tag}.png")
 
 
 def _save(cv, out_dir: str, filename: str) -> str:
@@ -695,7 +698,7 @@ def _save(cv, out_dir: str, filename: str) -> str:
 
 
 def render_thumb(card_data: dict) -> str:
-    """只渲染无字缩略图（WM15-B3：旧帖一次性回填用，不重渲大图）。"""
+    """只渲染无字缩略图（WM15-B3：旧帖回填用，不重渲大图；规格随 _render_thumb 走）。"""
     from backend.domain.reading_circle import art
 
     card_type = card_data.get("card_type", CirclePost.CARD_FINISH_BOOK)
@@ -704,6 +707,41 @@ def render_thumb(card_data: dict) -> str:
     out_dir = os.path.join(_uploads_root(), "circle")
     os.makedirs(out_dir, exist_ok=True)
     return _render_thumb(card_data, pal, kind, art.KIND_BASE[kind], out_dir, uuid.uuid4().hex[:8])
+
+
+def ensure_circle_thumbs(db: Session) -> dict:
+    """把存量帖缩略图对齐到**当前规格**（fix33 R1）：缺图则补渲、旧规格则重渲。
+
+    幂等：文件名已含当前 `THUMB_SPEC_VERSION` 即跳过（重跑零渲染）；
+    重渲成功后删旧缩略图文件（避免无主残留），**大图 image_path 一律不动**。
+    单帖失败跳过不阻塞整批（返回 skipped 计数供调用方显式报告）。
+    """
+    from backend.domain.reading_circle.models import CirclePost as Post
+
+    marker = f"thumb_{THUMB_SPEC_VERSION}_"
+    rows = db.query(Post).filter(Post.is_deleted == 0).all()
+    root = _uploads_root()
+    circle_dir = os.path.join(root, "circle") + os.sep
+    rendered = skipped = 0
+    for post in rows:
+        if post.thumb_path and marker in os.path.basename(post.thumb_path):
+            continue
+        old_rel = post.thumb_path or ""
+        try:
+            post.thumb_path = render_thumb(json.loads(post.card_data or "{}"))
+        except Exception:  # 单帖失败不影响整批
+            skipped += 1
+            continue
+        if old_rel:
+            old_full = os.path.abspath(os.path.join(root, old_rel))
+            if old_full.startswith(circle_dir) and os.path.isfile(old_full):
+                try:
+                    os.remove(old_full)
+                except OSError:
+                    pass  # 删不掉只留孤儿文件，不影响正确性（清理任务可兜底）
+        rendered += 1
+    db.commit()
+    return {"rendered": rendered, "skipped": skipped}
 
 
 def render_card(card_data: dict) -> dict:
