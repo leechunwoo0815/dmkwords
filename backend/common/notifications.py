@@ -219,9 +219,6 @@ class NotificationService:
             .group_by(Notification.scene)
             .all()
         )
-        # fix34 R0：阅读圈顶部「谁赞了你」通知条要显示**点赞者头像**（朋友圈式观感）——
-        # 按 ref_id（= 点赞孩子 id）批查头像/等级，一次查完（禁逐条）
-        actors = self._actor_map(rows)
         return {
             "unread": unread,
             "unread_by_scene": {(k or "").replace(".", "_"): int(v) for k, v in unread_rows},
@@ -238,33 +235,9 @@ class NotificationService:
                     "ref_type": n.ref_type or "",
                     "ref_id": n.ref_id or "",
                     "created_at": n.create_time.strftime("%Y-%m-%d %H:%M") if n.create_time else "",
-                    # fix34 R0：行为主体（点赞者）的头像/等级——"谁赞了我"列表直接渲染
-                    "actor_avatar": actors.get(str(n.ref_id or ""), {}).get("avatar"),
-                    "actor_level": actors.get(str(n.ref_id or ""), {}).get("level", "A"),
                 }
                 for n in rows
             ],
-        }
-
-    def _actor_map(self, rows: list) -> dict[str, dict]:
-        """ref_type=child 的通知 → 该孩子（行为主体）的头像/等级（批查）。"""
-        from backend.domain.growth.service import levels_map
-        from backend.domain.identity.models import Child
-
-        ids = [
-            int(n.ref_id) for n in rows if n.ref_type == "child" and str(n.ref_id or "").isdigit()
-        ]
-        if not ids:
-            return {}
-        avatars = {
-            cid: av
-            for cid, av in self.db.query(Child.id, Child.avatar)
-            .filter(Child.id.in_(ids), Child.is_deleted == 0)
-            .all()
-        }
-        lv = levels_map(self.db, ids)
-        return {
-            str(cid): {"avatar": avatars.get(cid), "level": lv.get(cid, "A")} for cid in set(ids)
         }
 
     def mark_read(self, parent_id: int, ids: list[int], all_: bool = False) -> int:

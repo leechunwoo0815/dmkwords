@@ -15,6 +15,40 @@ from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, Order, Parent
 
 
+def attach_actor_profiles(db: Session, data: dict) -> dict:
+    """给通知列表补「行为主体」的头像/等级（fix34 R0：阅读圈顶部"谁赞了你"要显头像）。
+
+    为什么不在 `common/notifications`：架构关禁止 common 依赖业务域（等级在 ChildGrowthState、
+    头像在 Child，都是业务域数据）——通知**表**在 common，**业务装饰**归各域自己补。
+    ref_type=child 时 ref_id = 行为孩子 id（点赞者）→ 批查一次，禁逐条。
+    """
+    from backend.domain.growth.service import levels_map
+    from backend.domain.identity.models import Child
+
+    items = data.get("items") or []
+    ids = [
+        int(i["ref_id"])
+        for i in items
+        if i.get("ref_type") == "child" and str(i.get("ref_id") or "").isdigit()
+    ]
+    if not ids:
+        return data
+    avatars = {
+        cid: av
+        for cid, av in db.query(Child.id, Child.avatar)
+        .filter(Child.id.in_(ids), Child.is_deleted == 0)
+        .all()
+    }
+    lv = levels_map(db, ids)
+    keys = set(ids)
+    for i in items:
+        key = int(i["ref_id"]) if str(i.get("ref_id") or "").isdigit() else 0
+        if key in keys:
+            i["actor_avatar"] = avatars.get(key)
+            i["actor_level"] = lv.get(key, "A")
+    return data
+
+
 class ParentService:
     def __init__(self, db: Session):
         self.db = db

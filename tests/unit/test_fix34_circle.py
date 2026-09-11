@@ -149,22 +149,40 @@ def test_notifications_scene_filter(client: TestClient):
 
     h = _h(client)
     c1, m1, pid = _mk_parent_with_child(client, h, "13800000943", "通知孩", "NoticeKid")
+    c2, _, _ = _mk_parent_with_child(client, h, "13800000948", "点赞孩甲", "FanKid")
+    _set_level(c2, "C")
     with _db() as db:
-        for scene, title in (("circle.liked", "收到点赞"), ("borrow.success", "借书成功")):
-            db.add(
-                Notification(
-                    parent_id=pid,
-                    child_id=c1,
-                    scene=scene,
-                    category="其他" if scene == "circle.liked" else "借阅",
-                    title=title,
-                    content=f"{title} 内容",
-                )
+        db.add(
+            Notification(
+                parent_id=pid,
+                child_id=c1,
+                scene="circle.liked",
+                category="其他",
+                title="收到点赞",
+                content="点赞孩甲 赞了你的成就",
+                ref_type="child",  # 行为主体=点赞孩子 → 列表要能显示 TA 的头像/等级
+                ref_id=str(c2),
             )
+        )
+        db.add(
+            Notification(
+                parent_id=pid,
+                child_id=c1,
+                scene="borrow.success",
+                category="借阅",
+                title="借书成功",
+                content="借书成功 内容",
+            )
+        )
         db.commit()
 
     body = client.get("/api/miniapp/notifications?scene=circle.liked", headers=m1).json()
     assert body["total"] == 1 and all(i["scene"] == "circle.liked" for i in body["items"])
+    # fix34 R0：通知项带"行为主体"（点赞者）头像/等级 → 顶部通知条直接渲染头像堆叠
+    assert (
+        body["items"][0]["actor_avatar"] == "bunny_mint" or body["items"][0]["actor_avatar"] is None
+    )
+    assert body["items"][0]["actor_level"] == "C"
     # 未过滤时还有别的场景（证明过滤真的在生效，而不是库里本来就只有这一条）
     allbody = client.get("/api/miniapp/notifications", headers=m1).json()
     assert allbody["total"] > body["total"]

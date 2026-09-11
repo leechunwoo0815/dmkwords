@@ -98,7 +98,10 @@ def my_notifications(
     from backend.common.notifications import NotificationService
 
     parent, db = auth
-    return NotificationService(db).list_mine(parent.id, page, page_size, category, scene)
+    from backend.domain.identity.service import attach_actor_profiles
+
+    data = NotificationService(db).list_mine(parent.id, page, page_size, category, scene)
+    return attach_actor_profiles(db, data)  # fix34 R0：补点赞者头像/等级（业务域装饰）
 
 
 @router.post("/notifications/read")
