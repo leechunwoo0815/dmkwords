@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from sqlalchemy import func, update
+from sqlalchemy import and_, func, or_, update
 from sqlalchemy.orm import Session
 
 from backend.common.exceptions import NotFoundError, ValidationError
@@ -314,7 +314,8 @@ class CircleImageCleanupService:
     """孤儿卡片图清理（Q13 二期挂账·WM14-B C3）。
 
     删帖超 RETENTION_DAYS 天的卡片图物理删除：只删文件、不删帖子行
-    （软删行是审计/追溯依据）；删后 image_path 置空串，天然防重复清理（幂等）。
+    （软删行是审计/追溯依据）；删后 image_path/thumb_path 置空串，天然防重复清理（幂等）。
+    WM15-B1：双规格后**两列两文件一起清**——否则缩略图会成永久孤儿（首版会漏）。
     安全：unlink 前用 abspath 校验落在 uploads/circle/ 内（路径穿越防御）。
     """
 
@@ -333,9 +334,11 @@ class CircleImageCleanupService:
             self.db.query(CirclePost)
             .filter(
                 CirclePost.is_deleted == 1,
-                CirclePost.image_path.isnot(None),
-                CirclePost.image_path != "",
                 CirclePost.update_time < cutoff,
+                or_(
+                    and_(CirclePost.image_path.isnot(None), CirclePost.image_path != ""),
+                    and_(CirclePost.thumb_path.isnot(None), CirclePost.thumb_path != ""),
+                ),
             )
             .all()
         )
@@ -345,13 +348,20 @@ class CircleImageCleanupService:
         circle_dir = os.path.join(root, "circle") + os.sep
         removed = 0
         for row in rows:
-            full = os.path.abspath(os.path.join(root, row.image_path))
-            if full.startswith(circle_dir) and os.path.isfile(full):
-                try:
-                    os.remove(full)
-                except OSError:
-                    continue  # 文件被占用/已丢失：不置空，下次任务重试
-            row.image_path = ""
-            removed += 1
+            blocked = False
+            for attr in ("image_path", "thumb_path"):
+                rel = getattr(row, attr) or ""
+                if not rel:
+                    continue
+                full = os.path.abspath(os.path.join(root, rel))
+                if full.startswith(circle_dir) and os.path.isfile(full):
+                    try:
+                        os.remove(full)
+                    except OSError:
+                        blocked = True  # 文件被占用：不置空，下次任务重试
+                        continue
+                setattr(row, attr, "")
+            if not blocked:
+                removed += 1
         self.db.commit()
         return removed

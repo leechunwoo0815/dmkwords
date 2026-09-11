@@ -56,7 +56,12 @@ class CirclePost(BaseModel):
     card_type = Column(String(30), nullable=False, comment="卡片类型")
     ref_id = Column(Integer, nullable=False, comment="成就关联ID（按类型语义见常量注释）")
     card_data = Column(Text, nullable=False, default="{}", comment="卡片数据 JSON 快照（冻结）")
-    image_path = Column(String(255), nullable=True, comment="卡片图（uploads/circle/）")
+    image_path = Column(
+        String(255), nullable=True, comment="卡片大图（含字完整版，uploads/circle/）"
+    )
+    thumb_path = Column(
+        String(255), nullable=True, comment="卡片缩略图（无字纯图版，信息流小图用）"
+    )
     like_count = Column(Integer, nullable=False, default=0, comment="点赞数（原子更新）")
     admin_liked = Column(SmallInteger, nullable=False, default=0, comment="1=馆长赞")
     is_pinned = Column(SmallInteger, nullable=False, default=0, comment="1=置顶（同时最多1条）")
@@ -75,6 +80,12 @@ class CircleLike(BaseModel):
 
     post_id = Column(Integer, nullable=False, index=True)
     parent_id = Column(Integer, nullable=False, index=True)
+    liker_child_id = Column(
+        Integer,
+        nullable=True,
+        index=True,
+        comment="点赞方当时选中的孩子（展示名义快照；旧数据/未传为 NULL）",
+    )
     created_at = Column(DateTime, nullable=False, default=datetime.now)
 
 

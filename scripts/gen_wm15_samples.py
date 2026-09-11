@@ -13,7 +13,6 @@
 
 from __future__ import annotations
 
-import math
 import os
 
 from PIL import Image, ImageDraw
@@ -31,9 +30,9 @@ from backend.domain.reading_circle.art import (
     glow,
     hex2rgb,
     mascot,
+    paper_grain,
     rainbow,
     soft_shadow,
-    paper_grain,
     sparkle,
     star,
     sticker_pair,
@@ -92,9 +91,22 @@ def _card(
     # 主数字（deep 深色 + 白描边 = 贴纸数字）；"7 天"这类数字+量词整体居中
     num, _, unit = big.partition(" ")
     if unit:
-        sticker_pair(cv, (375, 330), num, font_round(150), unit, font_cn(74), pal["deep"], stroke="#FFFFFF", stroke_w=10, dy_unit=26)
+        sticker_pair(
+            cv,
+            (375, 330),
+            num,
+            font_round(150),
+            unit,
+            font_cn(74),
+            pal["deep"],
+            stroke="#FFFFFF",
+            stroke_w=10,
+            dy_unit=26,
+        )
     else:
-        sticker_text(cv, (375, 330), big, font_round(142), pal["deep"], stroke="#FFFFFF", stroke_w=9)
+        sticker_text(
+            cv, (375, 330), big, font_round(142), pal["deep"], stroke="#FFFFFF", stroke_w=9
+        )
     sticker_text(cv, (375, 462), line1, font_cn(36), INK)
     sticker_text(cv, (375, 518), line2, font_cn(32), pal["deep"])
 
@@ -116,7 +128,9 @@ def _card(
     return cv.finish(path)
 
 
-def card_thumb(path: str, key: str, big: str, *, kind: str, fur: str, ear: str | None, blush: str = "#FF9CB4") -> str:
+def card_thumb(
+    path: str, key: str, big: str, *, kind: str, fur: str, ear: str | None, blush: str = "#FF9CB4"
+) -> str:
     """无字纯图版（信息流小图专用）：插画 + 主数字，无任何文字。"""
     pal = PALETTES[key]
     cv = Canvas(W, H, pal)
@@ -137,13 +151,33 @@ def card_thumb(path: str, key: str, big: str, *, kind: str, fur: str, ear: str |
 # ---------------- 头像（24 枚中的 3 枚代表） ----------------
 
 
-def avatar(path: str, *, kind: str, fur: str, ear: str | None, coin: str, blush: str = "#FF9CB4", size: int = 256) -> str:
+def avatar(
+    path: str,
+    *,
+    kind: str,
+    fur: str,
+    ear: str | None,
+    coin: str,
+    blush: str = "#FF9CB4",
+    size: int = 256,
+) -> str:
     cv = Canvas(size, size, {"top": coin, "bot": coin}, transparent=True)
     r = size * 0.355
     cx, cy = size * 0.5, size * 0.545
     # 圆币底
-    cv.d.ellipse(cv.box(cx - r * 1.26, cy - r * 1.26, cx + r * 1.26, cy + r * 1.26), fill=hex2rgb(coin) + (255,), outline=hex2rgb(INK) + (255,), width=int(size * 0.032 * 3))
-    cv.d.arc(cv.box(cx - r * 1.06, cy - r * 1.06, cx + r * 1.06, cy + r * 1.06), start=196, end=330, fill=(255, 255, 255, 120), width=int(size * 0.021 * 3))
+    cv.d.ellipse(
+        cv.box(cx - r * 1.26, cy - r * 1.26, cx + r * 1.26, cy + r * 1.26),
+        fill=hex2rgb(coin) + (255,),
+        outline=hex2rgb(INK) + (255,),
+        width=int(size * 0.032 * 3),
+    )
+    cv.d.arc(
+        cv.box(cx - r * 1.06, cy - r * 1.06, cx + r * 1.06, cy + r * 1.06),
+        start=196,
+        end=330,
+        fill=(255, 255, 255, 120),
+        width=int(size * 0.021 * 3),
+    )
     mascot(cv, cx, cy, r * 0.95, kind=kind, fur=fur, ear=ear, blush=blush)
     return cv.finish(path)
 
@@ -157,11 +191,26 @@ def badge_milestone(path: str, size: int = 256) -> str:
     r = size * 0.34
     for sx in (-1, 1):
         cv.d.polygon(
-            [cv.p(cx + sx * r * 0.16, cy + r * 0.70), cv.p(cx + sx * r * 0.74, cy + r * 1.18), cv.p(cx + sx * r * 0.36, cy + r * 1.26), cv.p(cx + sx * r * 0.02, cy + r * 0.86)],
-            fill=hex2rgb("#F2765E") + (255,), outline=hex2rgb(INK) + (255,), width=int(size * 0.014 * 3),
+            [
+                cv.p(cx + sx * r * 0.16, cy + r * 0.70),
+                cv.p(cx + sx * r * 0.74, cy + r * 1.18),
+                cv.p(cx + sx * r * 0.36, cy + r * 1.26),
+                cv.p(cx + sx * r * 0.02, cy + r * 0.86),
+            ],
+            fill=hex2rgb("#F2765E") + (255,),
+            outline=hex2rgb(INK) + (255,),
+            width=int(size * 0.014 * 3),
         )
-    cv.d.ellipse(cv.box(cx - r, cy - r, cx + r, cy + r), fill=hex2rgb("#FFD166") + (255,), outline=hex2rgb(INK) + (255,), width=int(size * 0.026 * 3))
-    cv.d.ellipse(cv.box(cx - r * 0.84, cy - r * 0.84, cx + r * 0.84, cy + r * 0.84), fill=hex2rgb("#FFF6D8") + (255,))
+    cv.d.ellipse(
+        cv.box(cx - r, cy - r, cx + r, cy + r),
+        fill=hex2rgb("#FFD166") + (255,),
+        outline=hex2rgb(INK) + (255,),
+        width=int(size * 0.026 * 3),
+    )
+    cv.d.ellipse(
+        cv.box(cx - r * 0.84, cy - r * 0.84, cx + r * 0.84, cy + r * 0.84),
+        fill=hex2rgb("#FFF6D8") + (255,),
+    )
     star(cv, cx, cy, r * 0.62, "#FFC93C", outline=INK, width=size * 0.014, rotate=0.0)
     paper_grain(cv, 12)
     return cv.finish(path)
@@ -178,9 +227,22 @@ def badge_level(path: str, letter: str = "A", size: int = 256) -> str:
         base = [(0.0, -1.15), (1.0, -0.60), (0.72, 0.70), (0.0, 1.22), (-0.72, 0.70), (-1.0, -0.60)]
         return [cv.p(cx + bx * w * scale, cy + by * h * scale) for bx, by in base]
 
-    cv.d.polygon(pentagon(1.0), fill=hex2rgb(pal["accent"]) + (255,), outline=hex2rgb(INK) + (255,), width=int(size * 0.026 * 3))
+    cv.d.polygon(
+        pentagon(1.0),
+        fill=hex2rgb(pal["accent"]) + (255,),
+        outline=hex2rgb(INK) + (255,),
+        width=int(size * 0.026 * 3),
+    )
     cv.d.polygon(pentagon(0.84), fill=hex2rgb("#E9F3FF") + (255,))
-    sticker_text(cv, (cx, cy + h * 0.06), letter, font_round(int(size * 0.42)), pal["deep"], stroke="#FFFFFF", stroke_w=size * 0.022)
+    sticker_text(
+        cv,
+        (cx, cy + h * 0.06),
+        letter,
+        font_round(int(size * 0.42)),
+        pal["deep"],
+        stroke="#FFFFFF",
+        stroke_w=size * 0.022,
+    )
     paper_grain(cv, 12)
     return cv.finish(path)
 
@@ -193,18 +255,35 @@ def badge_streak(path: str, size: int = 256) -> str:
 
     def draw_flame(scale: float, fill: str, outline: str | None, lw: float) -> None:
         pts = [cv.p(x, cy + (y - cy) * scale) for x, y in flame_outline(cx, cy, w, h)]
-        cv.d.polygon(pts, fill=hex2rgb(fill) + (255,), outline=hex2rgb(outline) + (255,) if outline else None, width=int(lw * 3) if outline else 0)
+        cv.d.polygon(
+            pts,
+            fill=hex2rgb(fill) + (255,),
+            outline=hex2rgb(outline) + (255,) if outline else None,
+            width=int(lw * 3) if outline else 0,
+        )
 
     draw_flame(1.0, "#FF9E7A", INK, size * 0.024)
     draw_flame(0.60, "#FFD98A", None, 0)
     # 可爱脸（与吉祥物同一视觉语言）
     for sx in (-1, 1):
         ex, ey = cx + sx * size * 0.052, cy + size * 0.020
-        cv.d.ellipse(cv.box(ex - size * 0.017, ey - size * 0.020, ex + size * 0.017, ey + size * 0.020), fill=hex2rgb(INK) + (255,))
-    cv.d.arc(cv.box(cx - size * 0.040, cy + size * 0.030, cx + size * 0.040, cy + size * 0.086), start=20, end=160, fill=hex2rgb(INK) + (255,), width=int(size * 0.012 * 3))
+        cv.d.ellipse(
+            cv.box(ex - size * 0.017, ey - size * 0.020, ex + size * 0.017, ey + size * 0.020),
+            fill=hex2rgb(INK) + (255,),
+        )
+    cv.d.arc(
+        cv.box(cx - size * 0.040, cy + size * 0.030, cx + size * 0.040, cy + size * 0.086),
+        start=20,
+        end=160,
+        fill=hex2rgb(INK) + (255,),
+        width=int(size * 0.012 * 3),
+    )
     for sx in (-1, 1):
         bx = cx + sx * size * 0.088
-        cv.d.ellipse(cv.box(bx - size * 0.028, cy + size * 0.036, bx + size * 0.028, cy + size * 0.078), fill=(255, 156, 180, 150))
+        cv.d.ellipse(
+            cv.box(bx - size * 0.028, cy + size * 0.036, bx + size * 0.028, cy + size * 0.078),
+            fill=(255, 156, 180, 150),
+        )
     sparkle(cv, size * 0.13, size * 0.87, size * 0.048, "#FFFFFF", 220)
     paper_grain(cv, 12)
     return cv.finish(path)
@@ -219,7 +298,12 @@ def contact_sheet(paths: list[tuple[str, str]], out: str) -> str:
     sheet_h = 96 + sum(h + pad for h in row_h)
     sheet = Image.new("RGB", (sheet_w, sheet_h), hex2rgb(PAPER))
     d = ImageDraw.Draw(sheet)
-    d.text((pad, 26), "WM15 样图门 · 9 样（3 卡 / 3 头像 / 3 勋章）", font=font_cn(34), fill=hex2rgb(INK))
+    d.text(
+        (pad, 26),
+        "WM15 样图门 · 9 样（3 卡 / 3 头像 / 3 勋章）",
+        font=font_cn(34),
+        fill=hex2rgb(INK),
+    )
     y = 96
     for r_i, row in enumerate(rows):
         for c_i, (p, label) in enumerate(row):
@@ -231,7 +315,13 @@ def contact_sheet(paths: list[tuple[str, str]], out: str) -> str:
             bg = Image.new("RGB", (box_w, box_h), hex2rgb("#FFFFFF"))
             bg.paste(im, (0, 0), im)
             sheet.paste(bg, (x + 10, y))
-            d.text((x + 10 + box_w // 2, y + box_h + 20), label, font=font_cn(24), fill=hex2rgb(INK), anchor="ma")
+            d.text(
+                (x + 10 + box_w // 2, y + box_h + 20),
+                label,
+                font=font_cn(24),
+                fill=hex2rgb(INK),
+                anchor="ma",
+            )
         y += row_h[r_i] + pad
     sheet.save(out, "PNG")
     return out
@@ -240,17 +330,102 @@ def contact_sheet(paths: list[tuple[str, str]], out: str) -> str:
 def main() -> None:
     os.makedirs(OUT, exist_ok=True)
     made: list[tuple[str, str]] = []
-    made.append((_card(os.path.join(OUT, "01-card-milestone.png"), "milestone", "里程碑达成", "100,000", "累计有效阅读词数", "10 万词 达成！", kind="cat", fur="#FFC98F", ear="#FFB472"), "卡1 里程碑"))
-    made.append((_card(os.path.join(OUT, "02-card-quiz.png"), "perfect_quiz", "测验满分！", "5 / 5", "《Brown Bear》", "全部答对 太厉害啦", kind="bunny", fur="#FFFFFF", ear="#FFE3EC"), "卡2 测验满分"))
-    made.append((_card(os.path.join(OUT, "03-card-streak.png"), "streak", "连续打卡", "7 天", "每天阅读 坚持到底", "第 1 次连续达标", kind="panda", fur="#FFFFFF", ear="#3B3B3B"), "卡3 连续打卡"))
-    made.append((avatar(os.path.join(OUT, "04-avatar-cat-orange.png"), kind="cat", fur="#FFC98F", ear="#FFB472", coin="#FFF0DC"), "头像 猫"))
-    made.append((avatar(os.path.join(OUT, "05-avatar-panda.png"), kind="panda", fur="#FFFFFF", ear="#3B3B3B", coin="#CDE7DE"), "头像 熊猫"))
-    made.append((avatar(os.path.join(OUT, "06-avatar-bunny.png"), kind="bunny", fur="#FFFFFF", ear="#FFE3EC", coin="#FDEBF3"), "头像 兔"))
+    made.append(
+        (
+            _card(
+                os.path.join(OUT, "01-card-milestone.png"),
+                "milestone",
+                "里程碑达成",
+                "100,000",
+                "累计有效阅读词数",
+                "10 万词 达成！",
+                kind="cat",
+                fur="#FFC98F",
+                ear="#FFB472",
+            ),
+            "卡1 里程碑",
+        )
+    )
+    made.append(
+        (
+            _card(
+                os.path.join(OUT, "02-card-quiz.png"),
+                "perfect_quiz",
+                "测验满分！",
+                "5 / 5",
+                "《Brown Bear》",
+                "全部答对 太厉害啦",
+                kind="bunny",
+                fur="#FFFFFF",
+                ear="#FFE3EC",
+            ),
+            "卡2 测验满分",
+        )
+    )
+    made.append(
+        (
+            _card(
+                os.path.join(OUT, "03-card-streak.png"),
+                "streak",
+                "连续打卡",
+                "7 天",
+                "每天阅读 坚持到底",
+                "第 1 次连续达标",
+                kind="panda",
+                fur="#FFFFFF",
+                ear="#3B3B3B",
+            ),
+            "卡3 连续打卡",
+        )
+    )
+    made.append(
+        (
+            avatar(
+                os.path.join(OUT, "04-avatar-cat-orange.png"),
+                kind="cat",
+                fur="#FFC98F",
+                ear="#FFB472",
+                coin="#FFF0DC",
+            ),
+            "头像 猫",
+        )
+    )
+    made.append(
+        (
+            avatar(
+                os.path.join(OUT, "05-avatar-panda.png"),
+                kind="panda",
+                fur="#FFFFFF",
+                ear="#3B3B3B",
+                coin="#CDE7DE",
+            ),
+            "头像 熊猫",
+        )
+    )
+    made.append(
+        (
+            avatar(
+                os.path.join(OUT, "06-avatar-bunny.png"),
+                kind="bunny",
+                fur="#FFFFFF",
+                ear="#FFE3EC",
+                coin="#FDEBF3",
+            ),
+            "头像 兔",
+        )
+    )
     made.append((badge_milestone(os.path.join(OUT, "07-badge-milestone.png")), "勋章 里程碑"))
     made.append((badge_level(os.path.join(OUT, "08-badge-level.png"), "A"), "勋章 等级"))
     made.append((badge_streak(os.path.join(OUT, "09-badge-streak.png")), "勋章 打卡"))
     sheet = contact_sheet(made, os.path.join(OUT, "00-contact-sheet.png"))
-    extra = card_thumb(os.path.join(OUT, "10-card-milestone-thumb.png"), "milestone", "100,000", kind="cat", fur="#FFC98F", ear="#FFB472")
+    extra = card_thumb(
+        os.path.join(OUT, "10-card-milestone-thumb.png"),
+        "milestone",
+        "100,000",
+        kind="cat",
+        fur="#FFC98F",
+        ear="#FFB472",
+    )
     print("样图门 9 样 + 触板 + 无字缩略图：")
     for p, label in made:
         print(f"  {label:14s} {os.path.abspath(p)}")

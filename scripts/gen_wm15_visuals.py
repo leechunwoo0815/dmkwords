@@ -60,7 +60,7 @@ MILESTONE_TIERS = [
 
 def _tint(hex_color: str, tint: str, t: float) -> str:
     a, b = hex2rgb(hex_color), hex2rgb(tint)
-    return "#%02X%02X%02X" % tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
+    return "#" + "".join(f"{max(0, min(255, int(a[i] + (b[i] - a[i]) * t))):02X}" for i in range(3))
 
 
 def avatar_img(avatar_id: str) -> Image.Image:
@@ -82,7 +82,10 @@ def avatar_img(avatar_id: str) -> Image.Image:
     )
     cv.d.arc(
         cv.box(cx - r * 1.06, cy - r * 1.06, cx + r * 1.06, cy + r * 1.06),
-        start=196, end=330, fill=(255, 255, 255, 90), width=int(AVATAR_SIZE * 0.019 * 3),
+        start=196,
+        end=330,
+        fill=(255, 255, 255, 90),
+        width=int(AVATAR_SIZE * 0.019 * 3),
     )
     mascot(cv, cx, cy, r * 0.95, kind=kind, fur=fur, ear=ear, blush=base["blush"])
     paper_grain(cv, 11)
@@ -104,8 +107,16 @@ def badge_medal(size: int, ring: str, deep: str) -> Image.Image:
             outline=hex2rgb(_INK) + (255,),
             width=int(size * 0.014 * 3),
         )
-    cv.d.ellipse(cv.box(cx - r, cy - r, cx + r, cy + r), fill=hex2rgb(ring) + (255,), outline=hex2rgb(_INK) + (255,), width=int(size * 0.026 * 3))
-    cv.d.ellipse(cv.box(cx - r * 0.84, cy - r * 0.84, cx + r * 0.84, cy + r * 0.84), fill=hex2rgb("#FFFDF6") + (255,))
+    cv.d.ellipse(
+        cv.box(cx - r, cy - r, cx + r, cy + r),
+        fill=hex2rgb(ring) + (255,),
+        outline=hex2rgb(_INK) + (255,),
+        width=int(size * 0.026 * 3),
+    )
+    cv.d.ellipse(
+        cv.box(cx - r * 0.84, cy - r * 0.84, cx + r * 0.84, cy + r * 0.84),
+        fill=hex2rgb("#FFFDF6") + (255,),
+    )
     star(cv, cx, cy, r * 0.62, deep, outline=_INK, width=size * 0.014, rotate=0.0)
     paper_grain(cv, 11)
     return cv.img.resize((size, size), Image.LANCZOS)
@@ -119,7 +130,12 @@ def badge_level_template(size: int) -> Image.Image:
         base = [(0.0, -1.15), (1.0, -0.60), (0.72, 0.70), (0.0, 1.22), (-0.72, 0.70), (-1.0, -0.60)]
         return [cv.p(cx + bx * w * scale, cy + by * h * scale) for bx, by in base]
 
-    cv.d.polygon(pentagon(1.0), fill=hex2rgb("#6C9BF0") + (255,), outline=hex2rgb(_INK) + (255,), width=int(size * 0.040 * 3))
+    cv.d.polygon(
+        pentagon(1.0),
+        fill=hex2rgb("#6C9BF0") + (255,),
+        outline=hex2rgb(_INK) + (255,),
+        width=int(size * 0.040 * 3),
+    )
     cv.d.polygon(pentagon(0.84), fill=hex2rgb("#EFF5FF") + (255,))
     paper_grain(cv, 11)
     return cv.img.resize((size, size), Image.LANCZOS)
@@ -132,14 +148,30 @@ def badge_flame(size: int, days: str) -> Image.Image:
 
     def draw_flame(scale: float, fill: str, outline: str | None, lw: float) -> None:
         pts = [cv.p(x, cy + (y - cy) * scale) for x, y in flame_outline(cx, cy, w, h)]
-        cv.d.polygon(pts, fill=hex2rgb(fill) + (255,), outline=hex2rgb(outline) + (255,) if outline else None, width=int(lw * 3) if outline else 0)
+        cv.d.polygon(
+            pts,
+            fill=hex2rgb(fill) + (255,),
+            outline=hex2rgb(outline) + (255,) if outline else None,
+            width=int(lw * 3) if outline else 0,
+        )
 
     draw_flame(1.0, "#FF9E7A", _INK, size * 0.024)
     draw_flame(0.62, "#FFE0A0", None, 0)
     for sx in (-1, 1):
         ex, ey = cx + sx * size * 0.062, cy - size * 0.052
-        cv.d.ellipse(cv.box(ex - size * 0.019, ey - size * 0.023, ex + size * 0.019, ey + size * 0.023), fill=hex2rgb(_INK) + (255,))
-    sticker_text(cv, (cx, cy + size * 0.075), days, font_round(int(size * 0.19)), "#C24E3C", stroke="#FFFFFF", stroke_w=size * 0.009)
+        cv.d.ellipse(
+            cv.box(ex - size * 0.019, ey - size * 0.023, ex + size * 0.019, ey + size * 0.023),
+            fill=hex2rgb(_INK) + (255,),
+        )
+    sticker_text(
+        cv,
+        (cx, cy + size * 0.075),
+        days,
+        font_round(int(size * 0.19)),
+        "#C24E3C",
+        stroke="#FFFFFF",
+        stroke_w=size * 0.009,
+    )
     sparkle(cv, size * 0.13, size * 0.87, size * 0.048, "#FFFFFF", 215)
     paper_grain(cv, 11)
     return cv.img.resize((size, size), Image.LANCZOS)
@@ -171,7 +203,9 @@ def build_all() -> None:
         for d in BADGE_DIRS:
             im.save(os.path.join(d, f"{bid}.png"), "PNG")
 
-    print(f"头像 {len(AVATAR_IDS)} 枚 × {len(AVATAR_DIRS)} 端；勋章 {len(BADGE_IDS)} 枚 × {len(BADGE_DIRS)} 端")
+    print(
+        f"头像 {len(AVATAR_IDS)} 枚 × {len(AVATAR_DIRS)} 端；勋章 {len(BADGE_IDS)} 枚 × {len(BADGE_DIRS)} 端"
+    )
     for d in AVATAR_DIRS + BADGE_DIRS:
         print(f"  {len(os.listdir(d)):3d} 个文件  {os.path.relpath(d, ROOT)}")
 

@@ -197,8 +197,20 @@ class NotificationService:
         rows = (
             q.order_by(Notification.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
         )
+        # WM15-C1：分场景未读（阅读圈 tab 红点=circle_liked，**同表同源**，非第二套计数）
+        unread_rows = (
+            self.db.query(Notification.scene, func.count(Notification.id))
+            .filter(
+                Notification.parent_id == parent_id,
+                Notification.is_deleted == 0,
+                Notification.read_at.is_(None),
+            )
+            .group_by(Notification.scene)
+            .all()
+        )
         return {
             "unread": unread,
+            "unread_by_scene": {(k or "").replace(".", "_"): int(v) for k, v in unread_rows},
             "total": total,
             "items": [
                 {
@@ -208,6 +220,9 @@ class NotificationService:
                     "title": n.title,
                     "content": n.content,
                     "read": n.is_read,
+                    # WM15-A1：深链数据面（此前库里存了但没暴露给小程序的 API）
+                    "ref_type": n.ref_type or "",
+                    "ref_id": n.ref_id or "",
                     "created_at": n.create_time.strftime("%Y-%m-%d %H:%M") if n.create_time else "",
                 }
                 for n in rows

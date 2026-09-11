@@ -1076,6 +1076,18 @@
       "ChildCreateRequest": {
         "additionalProperties": false,
         "properties": {
+          "avatar": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar"
+          },
           "birthday": {
             "anyOf": [
               {
@@ -1315,6 +1327,19 @@
             "description": "AR 值（老师评估，只升不降）",
             "title": "Ar Level"
           },
+          "avatar": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "WM15：系统内置头像 id（白名单校验）",
+            "title": "Avatar"
+          },
           "birthday": {
             "anyOf": [
               {
@@ -1517,6 +1542,24 @@
           }
         },
         "title": "CircleDeleteRequest",
+        "type": "object"
+      },
+      "CircleLikeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "child_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Child Id"
+          }
+        },
+        "title": "CircleLikeRequest",
         "type": "object"
       },
       "CircleShareRequest": {
@@ -10330,6 +10373,107 @@
         ]
       }
     },
+    "/api/miniapp/circle/children/{child_id}/poster": {
+      "get": {
+        "description": "名片海报图（R5；query token：image 组件无法带头——照报告图片先例）。",
+        "operationId": "circle_child_poster_api_miniapp_circle_children__child_id__poster_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "child_id",
+            "required": true,
+            "schema": {
+              "title": "Child Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Circle Child Poster",
+        "tags": [
+          "circle-miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/circle/children/{child_id}/profile": {
+      "get": {
+        "description": "孩子名片页（R4）：英文名/头像/成就数据 + 勋章墙 + TA 的帖子（隐私见 profile_service）。",
+        "operationId": "circle_child_profile_api_miniapp_circle_children__child_id__profile_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "child_id",
+            "required": true,
+            "schema": {
+              "title": "Child Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Circle Child Profile",
+        "tags": [
+          "circle-miniapp"
+        ]
+      }
+    },
     "/api/miniapp/circle/my-cards": {
       "get": {
         "description": "可晒成就库（已达成未晒 + 已晒分组——历史成就补晒）。",
@@ -10644,7 +10788,7 @@
         ]
       },
       "post": {
-        "description": "点赞（一心一赞；like_count 原子更新；被赞通知同事务）。",
+        "description": "点赞（一心一赞；like_count 原子更新；被赞通知同事务）。\n\nWM15-R6：body.child_id 可选（点赞方当前孩子）——记录为展示名义快照，\n通知文案随之为「Tommy 赞了你的成就」；缺省则降级家长显示名（老版本端兼容）。",
         "operationId": "circle_like_api_miniapp_circle_posts__post_id__like_post",
         "parameters": [
           {
@@ -10662,6 +10806,74 @@
             "required": true,
             "schema": {
               "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/CircleLikeRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Circle Like",
+        "tags": [
+          "circle-miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/circle/posts/{post_id}/thumb": {
+      "get": {
+        "description": "帖子缩略图（无字纯图版，信息流小图；旧帖回落大图——post_thumb_image 内兜底）。",
+        "operationId": "circle_post_thumb_api_miniapp_circle_posts__post_id__thumb_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "post_id",
+            "required": true,
+            "schema": {
+              "title": "Post Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Token",
               "type": "string"
             }
           }
@@ -10686,7 +10898,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Circle Like",
+        "summary": "Circle Post Thumb",
         "tags": [
           "circle-miniapp"
         ]

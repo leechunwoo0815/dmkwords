@@ -169,6 +169,7 @@ def update_child(
             name=body.name,
             gender=body.gender,
             birthday=body.birthday,
+            avatar=getattr(body, "avatar", None),
         )
     )
 

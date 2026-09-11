@@ -26,6 +26,8 @@ class ChildCreateRequest(BaseSchema):
     gender: int | None = Field(None, ge=1, le=2)
     birthday: date | None = None
     grade: str = Field("", max_length=50)
+    #: WM15-R3 系统内置头像 id（AVATAR_IDS 白名单；存 id 不存 URL——本地包零加载零 token）
+    avatar: str | None = Field(None, max_length=64)
 
 
 class ChildUpdateRequest(BaseSchema):
@@ -36,6 +38,9 @@ class ChildUpdateRequest(BaseSchema):
     birthday: date | None = None
     grade: str | None = Field(None, max_length=50)
     ar_level: str | None = Field(None, max_length=10, description="AR 值（老师评估，只升不降）")
+    avatar: str | None = Field(
+        None, max_length=64, description="WM15：系统内置头像 id（白名单校验）"
+    )
 
 
 class ChildResponse(BaseSchema):

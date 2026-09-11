@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 
 from sqlalchemy import func, update
@@ -105,14 +106,15 @@ class CircleService:
             raise ValidationError(f"今日已晒 {today_count} 帖，每日限晒 {limit} 帖，明天再来吧")
 
         # ④ 渲染卡片图 + 落帖（card_data 快照冻结）
-        image_path = card_engine.render_card(card_data)
+        rendered = card_engine.render_card(card_data)  # WM15-R2：双规格（含字大图 + 无字缩略图）
         post = CirclePost(
             parent_id=parent.id,
             child_id=child.id,
             card_type=card_type,
             ref_id=ref_id,
             card_data=card_engine.card_data_json(card_data),
-            image_path=image_path,
+            image_path=rendered["image_path"],
+            thumb_path=rendered["thumb_path"],
         )
         self.db.add(post)
         self.db.commit()
@@ -153,7 +155,8 @@ class CircleService:
         else:
             rows = q.offset((page - 1) * page_size - pin_offset).limit(page_size).all()
 
-        items = [self._post_view(r, viewer.id) for r in rows]
+        likers = self._likers_map([r.id for r in rows])
+        items = [self._post_view(r, viewer.id, likers) for r in rows]
         return {
             "items": items,
             "total": total,
@@ -178,7 +181,43 @@ class CircleService:
         )
         return {"words": sum(e["words"] for e in entries), "kids": len(entries)}
 
-    def _post_view(self, post: CirclePost, viewer_parent_id: int) -> dict:
+    def _likers_map(self, post_ids: list[int], limit: int = 8) -> dict[int, list]:
+        """点赞头像墙（批查，禁 N+1）：只取有名义的赞（liker_child_id 为空的历史赞不入墙，
+        仍计入 like_count）。每帖最多 limit 个。"""
+        from backend.domain.reading_circle.models import CircleLike
+
+        if not post_ids:
+            return {}
+        rows = (
+            self.db.query(CircleLike.post_id, Child.id, Child.english_name, Child.avatar)
+            .join(Child, Child.id == CircleLike.liker_child_id)
+            .filter(
+                CircleLike.post_id.in_(post_ids),
+                CircleLike.is_deleted == 0,
+                Child.is_deleted == 0,
+            )
+            .order_by(CircleLike.id.asc())
+            .all()
+        )
+        out: dict[int, list] = {}
+        for pid, cid, en, av in rows:
+            bucket = out.setdefault(pid, [])
+            if len(bucket) < limit:
+                bucket.append({"child_id": cid, "name": en or f"小朋友{cid:03d}", "avatar": av})
+        return out
+
+    @staticmethod
+    def _card_fields(post: CirclePost) -> tuple[str, str]:
+        """从冻结的 card_data 快照取原生渲染文本（WM15-R1：文字脱离图片原生化）。"""
+        try:
+            d = json.loads(post.card_data or "{}")
+        except (ValueError, TypeError):
+            return "", ""
+        return str(d.get("title", "")), str(d.get("value_label", ""))
+
+    def _post_view(
+        self, post: CirclePost, viewer_parent_id: int, likers: dict[int, list] | None = None
+    ) -> dict:
         child = (
             self.db.query(Child).filter(Child.id == post.child_id, Child.is_deleted == 0).first()
         )
@@ -196,14 +235,20 @@ class CircleService:
             )
             .scalar()
         )
+        title, subtitle = self._card_fields(post)
         return {
             "id": post.id,
+            "child_id": post.child_id,
             "parent_name": _parent_display(parent) if parent else "",
             "child_name": _display_name(child) if child else "",
             "avatar": child.avatar if child else None,
             "card_type": post.card_type,
             "card_type_label": card_engine.CARD_TYPE_LABELS.get(post.card_type, post.card_type),
+            "title": title,
+            "subtitle": subtitle,
             "image_url": f"/api/miniapp/circle/posts/{post.id}/image",
+            "thumb_url": f"/api/miniapp/circle/posts/{post.id}/thumb",
+            "likers": (likers or {}).get(post.id, []),
             "like_count": post.like_count,
             "liked_by_me": bool(liked),
             "admin_liked": bool(post.admin_liked),
@@ -214,7 +259,7 @@ class CircleService:
 
     # ---------- 点赞 ----------
 
-    def like(self, parent: Parent, post_id: int) -> dict:
+    def like(self, parent: Parent, post_id: int, child_id: int | None = None) -> dict:
         post = (
             self.db.query(CirclePost)
             .filter(CirclePost.id == post_id, CirclePost.is_deleted == 0)
@@ -228,12 +273,28 @@ class CircleService:
             .filter(CircleLike.post_id == post_id, CircleLike.parent_id == parent.id)
             .first()
         )
+        # 展示名义快照（C3/C4）：记录点赞那一刻家长选中的孩子；未传则 NULL（老版本端兼容）
+        liker_child = None
+        if child_id:
+            liker_child = (
+                self.db.query(Child)
+                .filter(Child.id == child_id, Child.parent_id == parent.id, Child.is_deleted == 0)
+                .first()
+            )
         if existing and existing.is_deleted == 0:
             return {"post_id": post_id, "like_count": post.like_count, "liked": True}
         if existing:
             existing.is_deleted = 0
+            if liker_child and not existing.liker_child_id:
+                existing.liker_child_id = liker_child.id
         else:
-            self.db.add(CircleLike(post_id=post_id, parent_id=parent.id))
+            self.db.add(
+                CircleLike(
+                    post_id=post_id,
+                    parent_id=parent.id,
+                    liker_child_id=liker_child.id if liker_child else None,
+                )
+            )
         # 原子 UPDATE（禁读改写——并发红线）
         self.db.execute(
             update(CirclePost)
@@ -243,8 +304,13 @@ class CircleService:
         self.db.flush()
         # 被赞通知（同事务；自己赞自己不发）
         if post.parent_id != parent.id:
+            # C3：文案切孩子名义（「Tommy 赞了你的成就」）；无名义则降级家长显示名（C4 兼容）
+            liker_name = _display_name(liker_child) if liker_child else _parent_display(parent)
             self._notify_liked(
-                post, liker_name=_parent_display(parent), dedup_key=f"parent:{parent.id}"
+                post,
+                liker_name=liker_name,
+                dedup_key=f"parent:{parent.id}",
+                liker_child_id=liker_child.id if liker_child else None,
             )
         self.db.commit()
         fresh = self.db.query(CirclePost.like_count).filter(CirclePost.id == post_id).scalar()
@@ -281,7 +347,13 @@ class CircleService:
         return {"post_id": post_id, "like_count": fresh, "liked": False}
 
     def _notify_liked(
-        self, post: CirclePost, *, liker_name: str, dedup_key: str, admin: bool = False
+        self,
+        post: CirclePost,
+        *,
+        liker_name: str,
+        dedup_key: str,
+        admin: bool = False,
+        liker_child_id: int | None = None,
     ) -> None:
         """被赞通知（scene=circle.liked；馆长赞特殊文案「馆长赞了 X 的成就」；
         dedup_key=点赞者（同帖同家长重赞不重复轰炸；馆长走 admin 键）。"""
@@ -300,8 +372,8 @@ class CircleService:
             content=content,
             category=Notification.CATEGORY_OTHER,
             child_id=post.child_id,
-            ref_type="circle_post",
-            ref_id=str(post.id),
+            ref_type="child" if liker_child_id else "circle_post",
+            ref_id=str(liker_child_id or post.id),
             dedup_key=dedup_key,
         )
 

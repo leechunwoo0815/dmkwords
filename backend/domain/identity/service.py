@@ -48,6 +48,20 @@ class ParentService:
             raise NotFoundError("家长不存在")
         return parent
 
+    @staticmethod
+    def validate_avatar(avatar: str | None) -> str | None:
+        """WM15-R3：头像 id 白名单校验（防任意值注入；空=清空头像）。"""
+        if avatar is None:
+            return None
+        v = (avatar or "").strip()
+        if not v:
+            return None
+        from backend.domain.reading_circle.art import AVATAR_IDS
+
+        if v not in AVATAR_IDS:
+            raise ValidationError("头像不在可选范围内")
+        return v
+
     def update_display_name(self, parent: Parent, display_name: str) -> dict:
         """家长自助改展示称呼（WM14-B Q11 清偿）：只允许该字段，空串=回退真实姓名。
 
@@ -182,6 +196,7 @@ class ChildService:
             gender=req.gender,
             birthday=req.birthday,
             grade=req.grade,
+            avatar=ParentService.validate_avatar(getattr(req, "avatar", None)),
             member_status=Child.MEMBER_NONE,
         )
         self.db.add(child)
@@ -230,6 +245,7 @@ class ChildService:
         name: str | None = None,
         gender: int | None = None,
         birthday=None,
+        avatar: str | None = None,
     ) -> Child:
         """维护孩子资料（C19 + WM3-B1 扩展：姓名/性别/生日全开）；AR 只升不降 + 订单守卫。"""
         child = self._get_child(child_id)
@@ -259,6 +275,10 @@ class ChildService:
         if grade is not None:
             child.grade = grade
             changed.append("grade")
+        if avatar is not None:
+            # WM15-R3：头像 id 白名单（"__clear__" 语义：显式清空）
+            child.avatar = None if avatar == "__clear__" else ParentService.validate_avatar(avatar)
+            changed.append("avatar")
         if ar_level is not None:
             current = child.ar_level
             try:

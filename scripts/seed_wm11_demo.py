@@ -1422,6 +1422,49 @@ def _ensure_demo_circle_rank(db: Session) -> None:
     print(f"c 阅读圈周榜快照：上上周 {n_prev} 条 / 上周 {n_last} 条", flush=True)
 
 
+def _ensure_demo_circle_visuals(db: Session) -> None:
+    """WM15 演示：① 演示孩子内置头像（avatar_id）② 旧帖缩略图一次性回填（B3）。
+
+    真链路纪律：头像只写白名单 id；缩略图由 card_engine 用**冻结的 card_data 快照**
+    重渲无字版（不动原大图，非"全量回溯重渲"）。幂等：头像已设即跳、thumb_path 已有即跳。
+    """
+    import json
+
+    from backend.domain.identity.models import Child
+    from backend.domain.reading_circle import card_engine
+    from backend.domain.reading_circle.models import CirclePost
+
+    # ① 头像（让演示账号进页面就能看到新头像库；按名字稳定定位）
+    avatar_plan = {
+        "演示孩": "cat_sun",
+        "观察期孩": "panda_sun",
+        "押金孩": "dino_mint",
+        "小红": "bunny_sun",
+        "退会孩": "owl_sun",
+        "退款演示孩": "fox_mint",
+    }
+    n_avatar = 0
+    for name, aid in avatar_plan.items():
+        child = db.query(Child).filter(Child.name == name, Child.is_deleted == 0).first()
+        if child and not child.avatar:
+            child.avatar = aid
+            n_avatar += 1
+
+    # ② 旧帖缩略图回填（card_data 快照在 → 可重渲无字版；失败则跳过不阻塞 seed）
+    n_thumb = 0
+    for post in db.query(CirclePost).filter(CirclePost.is_deleted == 0).all():
+        if post.thumb_path:
+            continue
+        try:
+            data = json.loads(post.card_data or "{}")
+            post.thumb_path = card_engine.render_thumb(data)
+            n_thumb += 1
+        except Exception as exc:  # 单帖失败不影响整批
+            print(f"  缩略图回填跳过 post {post.id}: {type(exc).__name__}")
+    db.commit()
+    print(f"c 阅读圈视觉：头像设置 {n_avatar} 个 / 旧帖缩略图回填 {n_thumb} 张", flush=True)
+
+
 def _ensure_demo_circle(db: Session) -> None:
     """WM14-A 阅读圈演示帖：3 帖覆盖三类卡 + 金色态/置顶样例（验收步骤 13/18 用）。
 
@@ -1588,6 +1631,8 @@ def seed() -> None:
         _ensure_demo_circle(db)
         # WM14-B 周榜快照演示（依赖：上述孩子档案 + 书目；词账 → 快照任务真跑）
         _ensure_demo_circle_rank(db)
+        # WM15 视觉演示（依赖：上述帖子 + 孩子档案；白名单头像 + 缩略图回填）
+        _ensure_demo_circle_visuals(db)
         now = datetime.now()
         _upsert_notification(
             db,

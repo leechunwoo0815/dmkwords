@@ -53,8 +53,18 @@ PAPER = "#FFFDF8"
 
 #: 12 动物 × 2 配色 = 24 枚头像（Child.avatar 存 avatar_id，如 "cat_sun"）
 ANIMALS = (
-    "cat", "dog", "panda", "fox", "bunny", "lion",
-    "bear", "penguin", "owl", "deer", "hedgehog", "dino",
+    "cat",
+    "dog",
+    "panda",
+    "fox",
+    "bunny",
+    "lion",
+    "bear",
+    "penguin",
+    "owl",
+    "deer",
+    "hedgehog",
+    "dino",
 )
 #: scheme → (显示名, 染色基准, 圆币底色)
 SCHEMES: dict[str, tuple[str, str, str]] = {
@@ -63,9 +73,15 @@ SCHEMES: dict[str, tuple[str, str, str]] = {
 }
 AVATAR_IDS: tuple[str, ...] = tuple(f"{a}_{s}" for a in ANIMALS for s in SCHEMES)
 BADGE_IDS: tuple[str, ...] = (
-    "milestone_m1", "milestone_m2", "milestone_m3",
-    "milestone_m4", "milestone_m5", "milestone_m6",
-    "level_template", "streak_7", "streak_30",
+    "milestone_m1",
+    "milestone_m2",
+    "milestone_m3",
+    "milestone_m4",
+    "milestone_m5",
+    "milestone_m6",
+    "level_template",
+    "streak_7",
+    "streak_30",
 )
 #: 各动物的基础配色（生成器按配色方案做染色）
 KIND_BASE: dict[str, dict[str, str]] = {
@@ -182,7 +198,15 @@ def glow(cv: Canvas, cx: float, cy: float, radius: float, color: str, max_alpha:
     cv.img.paste(Image.new("RGB", cv.img.size, hex2rgb(color)), (0, 0), mask)
 
 
-def cloud(cv: Canvas, cx: float, cy: float, w: float, fill: str = "#FFFFFF", alpha: int = 210, jitter: float = 0.08) -> None:
+def cloud(
+    cv: Canvas,
+    cx: float,
+    cy: float,
+    w: float,
+    fill: str = "#FFFFFF",
+    alpha: int = 210,
+    jitter: float = 0.08,
+) -> None:
     """云朵：几个交叠圆 + 底部圆角矩形。
 
     jitter：按坐标派生的确定性抖动（0=完全对称的数学圆形）——轻微不对称才像手绘，
@@ -195,8 +219,15 @@ def cloud(cv: Canvas, cx: float, cy: float, w: float, fill: str = "#FFFFFF", alp
     for i, (dx, dy, k) in enumerate(lobes):
         j = 1 + jitter * (((seed + i * 37) % 11) / 10 - 0.5)
         rr = w * k * j
-        d.ellipse(cv.box(cx + w * dx * j - rr, cy + h * dy - rr, cx + w * dx * j + rr, cy + h * dy + rr), fill=rgb)
-    d.rounded_rectangle(cv.box(cx - w * 0.52, cy + h * 0.02, cx + w * 0.52, cy + h * 0.40), radius=h * 0.2 * SS, fill=rgb)
+        d.ellipse(
+            cv.box(cx + w * dx * j - rr, cy + h * dy - rr, cx + w * dx * j + rr, cy + h * dy + rr),
+            fill=rgb,
+        )
+    d.rounded_rectangle(
+        cv.box(cx - w * 0.52, cy + h * 0.02, cx + w * 0.52, cy + h * 0.40),
+        radius=h * 0.2 * SS,
+        fill=rgb,
+    )
 
 
 def paper_grain(cv: Canvas, alpha: int = 15) -> None:
@@ -209,7 +240,15 @@ def paper_grain(cv: Canvas, alpha: int = 15) -> None:
 
 
 def star(
-    cv: Canvas, cx: float, cy: float, r: float, fill: str, *, outline: str | None = None, width: float = 0.0, rotate: float = 0.0
+    cv: Canvas,
+    cx: float,
+    cy: float,
+    r: float,
+    fill: str,
+    *,
+    outline: str | None = None,
+    width: float = 0.0,
+    rotate: float = 0.0,
 ) -> None:
     """胖五角星（圆润感：内径偏大）。"""
     pts = []
@@ -225,26 +264,46 @@ def star(
     )
 
 
-def sparkle(cv: Canvas, cx: float, cy: float, r: float, color: str = "#FFFFFF", alpha: int = 230) -> None:
+def sparkle(
+    cv: Canvas, cx: float, cy: float, r: float, color: str = "#FFFFFF", alpha: int = 230
+) -> None:
     """四角闪光（小十字星）。"""
     d = cv.d
     rgb = hex2rgb(color) + (alpha,)
-    d.polygon([cv.p(cx, cy - r), cv.p(cx + r * 0.26, cy - r * 0.26), cv.p(cx + r, cy), cv.p(cx + r * 0.26, cy + r * 0.26),
-               cv.p(cx, cy + r), cv.p(cx - r * 0.26, cy + r * 0.26), cv.p(cx - r, cy), cv.p(cx - r * 0.26, cy - r * 0.26)], fill=rgb)
+    d.polygon(
+        [
+            cv.p(cx, cy - r),
+            cv.p(cx + r * 0.26, cy - r * 0.26),
+            cv.p(cx + r, cy),
+            cv.p(cx + r * 0.26, cy + r * 0.26),
+            cv.p(cx, cy + r),
+            cv.p(cx - r * 0.26, cy + r * 0.26),
+            cv.p(cx - r, cy),
+            cv.p(cx - r * 0.26, cy - r * 0.26),
+        ],
+        fill=rgb,
+    )
 
 
-def rainbow(cv: Canvas, cx: float, cy: float, r: float, width: float = 9.0, alpha: int = 200) -> None:
+def rainbow(
+    cv: Canvas, cx: float, cy: float, r: float, width: float = 9.0, alpha: int = 200
+) -> None:
     """彩虹弧（半圆，3 道）。"""
     colors = ["#FF9BB3", "#FFD166", "#7ED0C1"]
     for i, c in enumerate(colors):
         rr = r - i * width * 1.5
         cv.d.arc(
             cv.box(cx - rr, cy - rr, cx + rr, cy + rr),
-            start=180, end=360, fill=hex2rgb(c) + (alpha,), width=int(width * SS),
+            start=180,
+            end=360,
+            fill=hex2rgb(c) + (alpha,),
+            width=int(width * SS),
         )
 
 
-def dotted_arc(cv: Canvas, cx: float, cy: float, r: float, color: str = "#FFFFFF", alpha: int = 150, n: int = 9) -> None:
+def dotted_arc(
+    cv: Canvas, cx: float, cy: float, r: float, color: str = "#FFFFFF", alpha: int = 150, n: int = 9
+) -> None:
     """珠点弧（装饰）。"""
     for k in range(n):
         a = math.pi * (0.15 + 0.7 * k / (n - 1))
@@ -281,17 +340,33 @@ def flame_outline(cx: float, cy: float, w: float, h: float, n: int = 14) -> list
     r_valley = (cx + w * 0.30, cy - h * 0.46)
     l_valley = (cx - w * 0.30, cy - h * 0.46)
     pts: list[tuple] = []
-    pts += bezier3(bottom, (cx + w * 1.00, cy + h * 0.42), (cx + w * 0.98, cy - h * 0.02), right_tip, n)
-    pts += bezier3(right_tip, (cx + w * 0.62, cy - h * 0.34), (cx + w * 0.44, cy - h * 0.40), r_valley, n)
+    pts += bezier3(
+        bottom, (cx + w * 1.00, cy + h * 0.42), (cx + w * 0.98, cy - h * 0.02), right_tip, n
+    )
+    pts += bezier3(
+        right_tip, (cx + w * 0.62, cy - h * 0.34), (cx + w * 0.44, cy - h * 0.40), r_valley, n
+    )
     pts += bezier3(r_valley, (cx + w * 0.26, cy - h * 0.72), (cx + w * 0.10, cy - h * 0.86), top, n)
     pts += bezier3(top, (cx - w * 0.10, cy - h * 0.86), (cx - w * 0.26, cy - h * 0.72), l_valley, n)
-    pts += bezier3(l_valley, (cx - w * 0.44, cy - h * 0.40), (cx - w * 0.62, cy - h * 0.34), left_tip, n)
-    pts += bezier3(left_tip, (cx - w * 0.98, cy - h * 0.02), (cx - w * 1.00, cy + h * 0.42), bottom, n)
+    pts += bezier3(
+        l_valley, (cx - w * 0.44, cy - h * 0.40), (cx - w * 0.62, cy - h * 0.34), left_tip, n
+    )
+    pts += bezier3(
+        left_tip, (cx - w * 0.98, cy - h * 0.02), (cx - w * 1.00, cy + h * 0.42), bottom, n
+    )
     return pts
 
 
 def _ears(
-    cv: Canvas, cx: float, cy: float, r: float, kind: str, ear_rgb: tuple, ink_rgb: tuple, blush_rgb: tuple, lw: float
+    cv: Canvas,
+    cx: float,
+    cy: float,
+    r: float,
+    kind: str,
+    ear_rgb: tuple,
+    ink_rgb: tuple,
+    blush_rgb: tuple,
+    lw: float,
 ) -> None:
     """耳朵/头部特征（画在头之前）：内耳用**实色**同步缩放，杜绝描边与内层之间露白缝。"""
     d = cv.d
@@ -315,13 +390,28 @@ def _ears(
             bx = cx + sx * r * 0.30
             tx = bx + sx * r * 0.22
             ty = cy - r * 1.30
-            d.ellipse(cv.box(min(bx, tx) - r * 0.27, ty, max(bx, tx) + r * 0.27, cy - r * 0.16), fill=ear_rgb, outline=ink_rgb, width=int(lw * SS))
-            d.ellipse(cv.box(min(bx, tx) - r * 0.13, ty + r * 0.22, max(bx, tx) + r * 0.13, cy - r * 0.34), fill=blush_rgb)
+            d.ellipse(
+                cv.box(min(bx, tx) - r * 0.27, ty, max(bx, tx) + r * 0.27, cy - r * 0.16),
+                fill=ear_rgb,
+                outline=ink_rgb,
+                width=int(lw * SS),
+            )
+            d.ellipse(
+                cv.box(
+                    min(bx, tx) - r * 0.13, ty + r * 0.22, max(bx, tx) + r * 0.13, cy - r * 0.34
+                ),
+                fill=blush_rgb,
+            )
     elif kind == "dog":
         # 垂耳：向外下挂出头部轮廓（此前贴在头内侧被头盖住 → 认不出狗）
         for sx in (-1, 1):
             d.rounded_rectangle(
-                cv.box(cx + sx * r * 0.92 - r * 0.34, cy - r * 0.74, cx + sx * r * 0.92 + r * 0.34, cy + r * 0.62),
+                cv.box(
+                    cx + sx * r * 0.92 - r * 0.34,
+                    cy - r * 0.74,
+                    cx + sx * r * 0.92 + r * 0.34,
+                    cy + r * 0.62,
+                ),
                 radius=r * 0.32 * SS,
                 fill=ear_rgb,
                 outline=ink_rgb,
@@ -330,7 +420,12 @@ def _ears(
     elif kind == "panda":
         for sx in (-1, 1):
             d.ellipse(
-                cv.box(cx + sx * r * 0.72 - r * 0.33, cy - r * 0.84 - r * 0.33, cx + sx * r * 0.72 + r * 0.33, cy - r * 0.84 + r * 0.33),
+                cv.box(
+                    cx + sx * r * 0.72 - r * 0.33,
+                    cy - r * 0.84 - r * 0.33,
+                    cx + sx * r * 0.72 + r * 0.33,
+                    cy - r * 0.84 + r * 0.33,
+                ),
                 fill=hex2rgb("#3B3B3B") + (255,),
                 outline=ink_rgb,
                 width=int(lw * 0.6 * SS),
@@ -340,11 +435,20 @@ def _ears(
         for k in range(14):
             a = 2 * math.pi * k / 14
             mx, my = cx + math.cos(a) * r * 1.02, cy + math.sin(a) * r * 1.02
-            d.ellipse(cv.box(mx - r * 0.34, my - r * 0.34, mx + r * 0.34, my + r * 0.34), fill=ear_rgb, outline=ink_rgb, width=int(lw * 0.7 * SS))
+            d.ellipse(
+                cv.box(mx - r * 0.34, my - r * 0.34, mx + r * 0.34, my + r * 0.34),
+                fill=ear_rgb,
+                outline=ink_rgb,
+                width=int(lw * 0.7 * SS),
+            )
     elif kind == "owl":
         for sx in (-1, 1):
             d.polygon(
-                [cv.p(cx + sx * r * 0.30, cy - r * 0.86), cv.p(cx + sx * r * 0.86, cy - r * 1.34), cv.p(cx + sx * r * 0.94, cy - r * 0.60)],
+                [
+                    cv.p(cx + sx * r * 0.30, cy - r * 0.86),
+                    cv.p(cx + sx * r * 0.86, cy - r * 1.34),
+                    cv.p(cx + sx * r * 0.94, cy - r * 0.60),
+                ],
                 fill=ear_rgb,
                 outline=ink_rgb,
                 width=int(lw * SS),
@@ -353,7 +457,11 @@ def _ears(
         for sx in (-1, 1):
             a = cv.p  # 鹿角：两段折线
             d.line(
-                [a(cx + sx * r * 0.34, cy - r * 0.78), a(cx + sx * r * 0.44, cy - r * 1.00), a(cx + sx * r * 0.68, cy - r * 1.14)],
+                [
+                    a(cx + sx * r * 0.34, cy - r * 0.78),
+                    a(cx + sx * r * 0.44, cy - r * 1.00),
+                    a(cx + sx * r * 0.68, cy - r * 1.14),
+                ],
                 fill=ink_rgb,
                 width=int(lw * 2.8 * SS),
                 joint="curve",
@@ -364,7 +472,12 @@ def _ears(
                 width=int(lw * 2.4 * SS),
             )
             d.ellipse(
-                cv.box(cx + sx * r * 0.74 - r * 0.22, cy - r * 0.66 - r * 0.26, cx + sx * r * 0.74 + r * 0.22, cy - r * 0.66 + r * 0.26),
+                cv.box(
+                    cx + sx * r * 0.74 - r * 0.22,
+                    cy - r * 0.66 - r * 0.26,
+                    cx + sx * r * 0.74 + r * 0.22,
+                    cy - r * 0.66 + r * 0.26,
+                ),
                 fill=ear_rgb,
                 outline=ink_rgb,
                 width=int(lw * 0.8 * SS),
@@ -385,7 +498,11 @@ def _ears(
         for k, ox in enumerate((-0.56, -0.04, 0.48)):
             h = (1.30, 1.46, 1.26)[k]
             d.polygon(
-                [cv.p(cx + r * ox, cy - r * 0.82), cv.p(cx + r * (ox + 0.26), cy - r * h), cv.p(cx + r * (ox + 0.50), cy - r * 0.78)],
+                [
+                    cv.p(cx + r * ox, cy - r * 0.82),
+                    cv.p(cx + r * (ox + 0.26), cy - r * h),
+                    cv.p(cx + r * (ox + 0.50), cy - r * 0.78),
+                ],
                 fill=ear_rgb,
                 outline=ink_rgb,
                 width=int(lw * 0.9 * SS),
@@ -395,38 +512,110 @@ def _ears(
             return  # 企鹅无耳
         for sx in (-1, 1):
             d.ellipse(
-                cv.box(cx + sx * r * 0.74 - r * 0.31, cy - r * 0.80 - r * 0.31, cx + sx * r * 0.74 + r * 0.31, cy - r * 0.80 + r * 0.31),
+                cv.box(
+                    cx + sx * r * 0.74 - r * 0.31,
+                    cy - r * 0.80 - r * 0.31,
+                    cx + sx * r * 0.74 + r * 0.31,
+                    cy - r * 0.80 + r * 0.31,
+                ),
                 fill=ear_rgb,
                 outline=ink_rgb,
                 width=int(lw * SS),
             )
             d.ellipse(
-                cv.box(cx + sx * r * 0.74 - r * 0.16, cy - r * 0.80 - r * 0.16, cx + sx * r * 0.74 + r * 0.16, cy - r * 0.80 + r * 0.16),
+                cv.box(
+                    cx + sx * r * 0.74 - r * 0.16,
+                    cy - r * 0.80 - r * 0.16,
+                    cx + sx * r * 0.74 + r * 0.16,
+                    cy - r * 0.80 + r * 0.16,
+                ),
                 fill=blush_rgb,
             )
 
 
-def _feature(cv: Canvas, cx: float, cy: float, r: float, kind: str, ink_rgb: tuple, alpha: int = 255) -> None:
+def _feature(
+    cv: Canvas, cx: float, cy: float, r: float, kind: str, ink_rgb: tuple, alpha: int = 255
+) -> None:
     """物种特征（眼睛之后画）：企鹅白脸/橙喙、猫头鹰喙、狐狸白口鼻。"""
     d = cv.d
     if kind == "penguin":
-        d.ellipse(cv.box(cx - r * 0.62, cy - r * 0.30, cx + r * 0.62, cy + r * 0.74), fill=(255, 255, 255, alpha))
-        d.polygon([cv.p(cx - r * 0.20, cy + r * 0.16), cv.p(cx + r * 0.20, cy + r * 0.16), cv.p(cx, cy + r * 0.44)], fill=hex2rgb("#F59E42") + (alpha,), outline=ink_rgb, width=int(max(1.2, r * 0.02) * SS))
+        d.ellipse(
+            cv.box(cx - r * 0.62, cy - r * 0.30, cx + r * 0.62, cy + r * 0.74),
+            fill=(255, 255, 255, alpha),
+        )
+        d.polygon(
+            [
+                cv.p(cx - r * 0.20, cy + r * 0.16),
+                cv.p(cx + r * 0.20, cy + r * 0.16),
+                cv.p(cx, cy + r * 0.44),
+            ],
+            fill=hex2rgb("#F59E42") + (alpha,),
+            outline=ink_rgb,
+            width=int(max(1.2, r * 0.02) * SS),
+        )
     elif kind == "owl":
         for sx in (-1, 1):
             d.ellipse(
-                cv.box(cx + sx * r * 0.34 - r * 0.40, cy - r * 0.12 - r * 0.42, cx + sx * r * 0.34 + r * 0.40, cy - r * 0.12 + r * 0.42),
+                cv.box(
+                    cx + sx * r * 0.34 - r * 0.40,
+                    cy - r * 0.12 - r * 0.42,
+                    cx + sx * r * 0.34 + r * 0.40,
+                    cy - r * 0.12 + r * 0.42,
+                ),
                 fill=(255, 250, 238, 235),
             )
-        d.polygon([cv.p(cx - r * 0.22, cy + r * 0.18), cv.p(cx + r * 0.22, cy + r * 0.18), cv.p(cx, cy + r * 0.58)], fill=hex2rgb("#F59E42") + (alpha,), outline=ink_rgb, width=int(max(1.2, r * 0.022) * SS))
+        d.polygon(
+            [
+                cv.p(cx - r * 0.22, cy + r * 0.18),
+                cv.p(cx + r * 0.22, cy + r * 0.18),
+                cv.p(cx, cy + r * 0.58),
+            ],
+            fill=hex2rgb("#F59E42") + (alpha,),
+            outline=ink_rgb,
+            width=int(max(1.2, r * 0.022) * SS),
+        )
     elif kind == "fox":
-        d.ellipse(cv.box(cx - r * 0.56, cy + r * 0.06, cx + r * 0.56, cy + r * 0.72), fill=(255, 253, 246, alpha))
-        d.polygon([cv.p(cx - r * 0.58, cy + r * 0.20), cv.p(cx - r * 0.96, cy + r * 0.30), cv.p(cx - r * 0.54, cy + r * 0.46)], fill=(255, 253, 246, alpha))
-        d.polygon([cv.p(cx + r * 0.58, cy + r * 0.20), cv.p(cx + r * 0.96, cy + r * 0.30), cv.p(cx + r * 0.54, cy + r * 0.46)], fill=(255, 253, 246, alpha))
+        d.ellipse(
+            cv.box(cx - r * 0.56, cy + r * 0.06, cx + r * 0.56, cy + r * 0.72),
+            fill=(255, 253, 246, alpha),
+        )
+        d.polygon(
+            [
+                cv.p(cx - r * 0.58, cy + r * 0.20),
+                cv.p(cx - r * 0.96, cy + r * 0.30),
+                cv.p(cx - r * 0.54, cy + r * 0.46),
+            ],
+            fill=(255, 253, 246, alpha),
+        )
+        d.polygon(
+            [
+                cv.p(cx + r * 0.58, cy + r * 0.20),
+                cv.p(cx + r * 0.96, cy + r * 0.30),
+                cv.p(cx + r * 0.54, cy + r * 0.46),
+            ],
+            fill=(255, 253, 246, alpha),
+        )
     elif kind == "hedgehog":
-        d.ellipse(cv.box(cx - r * 0.50, cy + r * 0.04, cx + r * 0.50, cy + r * 0.70), fill=hex2rgb("#FBE3CB") + (alpha,))
-        d.polygon([cv.p(cx - r * 0.30, cy + r * 0.30), cv.p(cx - r * 0.86, cy + r * 0.14), cv.p(cx - r * 0.30, cy + r * 0.52)], fill=hex2rgb("#FBE3CB") + (alpha,))
-        d.polygon([cv.p(cx + r * 0.30, cy + r * 0.30), cv.p(cx + r * 0.86, cy + r * 0.14), cv.p(cx + r * 0.30, cy + r * 0.52)], fill=hex2rgb("#FBE3CB") + (alpha,))
+        d.ellipse(
+            cv.box(cx - r * 0.50, cy + r * 0.04, cx + r * 0.50, cy + r * 0.70),
+            fill=hex2rgb("#FBE3CB") + (alpha,),
+        )
+        d.polygon(
+            [
+                cv.p(cx - r * 0.30, cy + r * 0.30),
+                cv.p(cx - r * 0.86, cy + r * 0.14),
+                cv.p(cx - r * 0.30, cy + r * 0.52),
+            ],
+            fill=hex2rgb("#FBE3CB") + (alpha,),
+        )
+        d.polygon(
+            [
+                cv.p(cx + r * 0.30, cy + r * 0.30),
+                cv.p(cx + r * 0.86, cy + r * 0.14),
+                cv.p(cx + r * 0.30, cy + r * 0.52),
+            ],
+            fill=hex2rgb("#FBE3CB") + (alpha,),
+        )
 
 
 def mascot(
@@ -454,13 +643,20 @@ def mascot(
     _ears(cv, cx, cy, r, kind, ear_rgb, ink_rgb, blush_rgb, lw)
 
     # 头
-    d.ellipse(cv.box(cx - r, cy - r, cx + r, cy + r), fill=fur_rgb, outline=ink_rgb, width=int(lw * SS))
+    d.ellipse(
+        cv.box(cx - r, cy - r, cx + r, cy + r), fill=fur_rgb, outline=ink_rgb, width=int(lw * SS)
+    )
 
     # 熊猫黑眼圈（大眼窝）
     if kind == "panda":
         for sx in (-1, 1):
             d.ellipse(
-                cv.box(cx + sx * r * 0.36 - r * 0.29, cy - r * 0.14 - r * 0.33, cx + sx * r * 0.36 + r * 0.29, cy - r * 0.14 + r * 0.33),
+                cv.box(
+                    cx + sx * r * 0.36 - r * 0.29,
+                    cy - r * 0.14 - r * 0.33,
+                    cx + sx * r * 0.36 + r * 0.29,
+                    cy - r * 0.14 + r * 0.33,
+                ),
                 fill=hex2rgb("#3B3B3B") + (alpha,),
             )
 
@@ -471,31 +667,71 @@ def mascot(
     for sx in (-1, 1):
         ex, ey = cx + sx * r * 0.33, cy - r * 0.10
         er = r * 0.21
-        d.ellipse(cv.box(ex - er, ey - er * 1.12, ex + er, ey + er * 1.12), fill=(255, 255, 255, alpha), outline=ink_rgb, width=int(max(1.5, r * 0.028) * SS))
+        d.ellipse(
+            cv.box(ex - er, ey - er * 1.12, ex + er, ey + er * 1.12),
+            fill=(255, 255, 255, alpha),
+            outline=ink_rgb,
+            width=int(max(1.5, r * 0.028) * SS),
+        )
         pr = er * 0.58
-        d.ellipse(cv.box(ex - pr, ey - pr * 0.92, ex + pr, ey + pr * 1.08), fill=hex2rgb(ink) + (alpha,))
+        d.ellipse(
+            cv.box(ex - pr, ey - pr * 0.92, ex + pr, ey + pr * 1.08), fill=hex2rgb(ink) + (alpha,)
+        )
         hr = er * 0.30
-        d.ellipse(cv.box(ex + pr * 0.10, ey - pr * 0.80, ex + pr * 0.10 + hr * 2, ey - pr * 0.80 + hr * 2), fill=(255, 255, 255, alpha))
+        d.ellipse(
+            cv.box(
+                ex + pr * 0.10, ey - pr * 0.80, ex + pr * 0.10 + hr * 2, ey - pr * 0.80 + hr * 2
+            ),
+            fill=(255, 255, 255, alpha),
+        )
 
     # 鼻子（物种辨识度关键）
     if nose:
         ny = cy + r * 0.20
         if kind == "panda":
-            d.ellipse(cv.box(cx - r * 0.15, ny - r * 0.10, cx + r * 0.15, ny + r * 0.11), fill=hex2rgb("#3B3B3B") + (alpha,))
+            d.ellipse(
+                cv.box(cx - r * 0.15, ny - r * 0.10, cx + r * 0.15, ny + r * 0.11),
+                fill=hex2rgb("#3B3B3B") + (alpha,),
+            )
         elif kind == "bunny":
-            d.polygon([cv.p(cx - r * 0.12, ny - r * 0.07), cv.p(cx + r * 0.12, ny - r * 0.07), cv.p(cx, ny + r * 0.11)], fill=blush_rgb)
+            d.polygon(
+                [
+                    cv.p(cx - r * 0.12, ny - r * 0.07),
+                    cv.p(cx + r * 0.12, ny - r * 0.07),
+                    cv.p(cx, ny + r * 0.11),
+                ],
+                fill=blush_rgb,
+            )
         else:
-            d.ellipse(cv.box(cx - r * 0.11, ny - r * 0.08, cx + r * 0.11, ny + r * 0.09), fill=hex2rgb(ink) + (alpha,))
-            d.arc(cv.box(cx - r * 0.11, ny - r * 0.02, cx + r * 0.11, ny + r * 0.20), start=20, end=160, fill=hex2rgb(ink) + (alpha,), width=int(max(1.4, r * 0.026) * SS))
+            d.ellipse(
+                cv.box(cx - r * 0.11, ny - r * 0.08, cx + r * 0.11, ny + r * 0.09),
+                fill=hex2rgb(ink) + (alpha,),
+            )
+            d.arc(
+                cv.box(cx - r * 0.11, ny - r * 0.02, cx + r * 0.11, ny + r * 0.20),
+                start=20,
+                end=160,
+                fill=hex2rgb(ink) + (alpha,),
+                width=int(max(1.4, r * 0.026) * SS),
+            )
 
     # 腮红
     for sx in (-1, 1):
         bx, by = cx + sx * r * 0.64, cy + r * 0.32
-        d.ellipse(cv.box(bx - r * 0.21, by - r * 0.13, bx + r * 0.21, by + r * 0.13), fill=hex2rgb(blush) + (int(alpha * 0.6),))
+        d.ellipse(
+            cv.box(bx - r * 0.21, by - r * 0.13, bx + r * 0.21, by + r * 0.13),
+            fill=hex2rgb(blush) + (int(alpha * 0.6),),
+        )
 
     # 嘴：小 w 弧（熊猫/兔已有鼻，嘴下移）
     my = cy + r * 0.40 if kind in ("panda", "bunny") else cy + r * 0.44
-    d.arc(cv.box(cx - r * 0.20, my - r * 0.18, cx + r * 0.20, my + r * 0.14), start=18, end=162, fill=ink_rgb, width=int(max(1.5, r * 0.034) * SS))
+    d.arc(
+        cv.box(cx - r * 0.20, my - r * 0.18, cx + r * 0.20, my + r * 0.14),
+        start=18,
+        end=162,
+        fill=ink_rgb,
+        width=int(max(1.5, r * 0.034) * SS),
+    )
 
 
 # ---------------- 文字与容器 ----------------
@@ -552,7 +788,11 @@ def sticker_pair(
     uw = cv.d.textlength(unit, font=fu)
     gap = gap_ratio * fn.size
     left = center[0] * SS - (nw + gap + uw) / 2
-    kw = dict(fill=hex2rgb(fill) + (alpha,), stroke_width=int(stroke_w * SS) if stroke_w else 0, stroke_fill=hex2rgb(stroke) + (alpha,))
+    kw = dict(
+        fill=hex2rgb(fill) + (alpha,),
+        stroke_width=int(stroke_w * SS) if stroke_w else 0,
+        stroke_fill=hex2rgb(stroke) + (alpha,),
+    )
     cv.d.text((left + nw / 2, center[1] * SS), num, font=fn, anchor="mm", **kw)
     cv.d.text((left + nw + gap, center[1] * SS + dy_unit * SS), unit, font=fu, anchor="lm", **kw)
 
@@ -577,7 +817,14 @@ def bubble(
     )
 
 
-def soft_shadow(cv: Canvas, box: tuple[float, float, float, float], *, radius: float = 40, blur: float = 9, alpha: int = 55) -> None:
+def soft_shadow(
+    cv: Canvas,
+    box: tuple[float, float, float, float],
+    *,
+    radius: float = 40,
+    blur: float = 9,
+    alpha: int = 55,
+) -> None:
     """柔和投影（贴纸浮起来）。"""
     layer = Image.new("L", cv.img.size, 0)
     ImageDraw.Draw(layer).rounded_rectangle(cv.box(*box), radius=radius * SS, fill=alpha)
