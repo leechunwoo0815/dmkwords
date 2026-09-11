@@ -1,0 +1,17 @@
+/* 头像框叠层容器：头像定尺寸，框绝对定位并溢出到四周（不参与布局，避免撑开列表行高） */
+.ring {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.ring-avatar {
+  display: block;
+  border-radius: 50%;
+  background: #fffdf7;
+}
+
+.ring-frame {
+  position: absolute;
+  pointer-events: none;
+}

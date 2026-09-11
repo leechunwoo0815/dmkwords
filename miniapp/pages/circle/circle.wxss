@@ -96,13 +96,6 @@
   align-items: center;
   gap: 18rpx;
 }
-.avatar {
-  width: 84rpx;
-  height: 84rpx;
-  border-radius: 50%;
-  background: #fff;
-  flex-shrink: 0;
-}
 .head-main {
   flex: 1;
   min-width: 0;
@@ -191,13 +184,13 @@
   align-items: center;
   gap: -10rpx;
 }
-.liker-avatar {
-  width: 46rpx;
-  height: 46rpx;
-  border-radius: 50%;
+/* fix34 R4：点赞头像墙改用 avatar-ring 组件（等级头像框）——负外边距做叠压 */
+.liker-slot {
   margin-left: -10rpx;
-  background: #fff;
-  border: 2rpx solid #fffdf7;
+  line-height: 0;
+}
+.liker-slot:first-child {
+  margin-left: 0;
 }
 .liker-more {
   margin-left: 6rpx;
@@ -228,4 +221,84 @@
   font-size: 30rpx;
   color: var(--fg-muted, #8a7d72);
   line-height: 1.5;
+}
+
+/* fix34 R0：顶部「谁赞了你」通知条 + 展开列表（朋友圈式：未读出现，看完即消） */
+.likes-bar {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  margin: 18rpx 24rpx 0;
+  padding: 18rpx 22rpx;
+  border-radius: 20rpx;
+  background: linear-gradient(135deg, #fff2e6, #ffe8f0);
+  border: 2rpx solid rgba(242, 147, 91, 0.35);
+  box-shadow: 0 4rpx 14rpx rgba(242, 147, 91, 0.14);
+}
+.likes-bar.open {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.likes-bar-avatars {
+  display: flex;
+  align-items: center;
+}
+.likes-bar-slot {
+  margin-left: -12rpx;
+  line-height: 0;
+}
+.likes-bar-slot:first-child {
+  margin-left: 0;
+}
+.likes-bar-text {
+  flex: 1;
+  font-size: 26rpx;
+  color: #8a4d21;
+  font-weight: 600;
+}
+.likes-bar-arrow {
+  font-size: 24rpx;
+  color: #b3743f;
+}
+
+.likes-panel {
+  margin: 0 24rpx;
+  padding: 8rpx 22rpx 4rpx;
+  border-radius: 0 0 20rpx 20rpx;
+  background: #fffdf9;
+  border: 2rpx solid rgba(242, 147, 91, 0.35);
+  border-top: none;
+}
+.likes-item {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  padding: 18rpx 0;
+  border-top: 1rpx solid rgba(90, 74, 58, 0.08);
+}
+.likes-item:first-child {
+  border-top: none;
+}
+.likes-item-body {
+  flex: 1;
+}
+.likes-item-name {
+  font-size: 28rpx;
+  color: #4a3b2c;
+  font-weight: 600;
+}
+.likes-item-time {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #9a8c80;
+}
+.likes-item-go {
+  font-size: 24rpx;
+  color: #f2935b;
+}
+.likes-panel-done {
+  padding: 12rpx 0 18rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: #b9ada3;
 }

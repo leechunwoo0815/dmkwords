@@ -1,5 +1,7 @@
 {
   "navigationBarTitleText": "阅读圈",
   "enablePullDownRefresh": true,
-  "usingComponents": {}
+  "usingComponents": {
+    "avatar-ring": "/components/avatar-ring/avatar-ring"
+  }
 }

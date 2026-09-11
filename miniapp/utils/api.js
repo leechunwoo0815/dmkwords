@@ -210,9 +210,11 @@ module.exports = {
   },
 
   // 消息中心（WM11）
-  notifications(page = 1, pageSize = 20, category = '') {
+  // fix34 R0：scene 过滤——阅读圈顶部「谁赞了你」通知条只拉 circle.liked
+  notifications(page = 1, pageSize = 20, category = '', scene = '') {
     const params = { page, page_size: pageSize }
     if (category) params.category = category
+    if (scene) params.scene = scene
     return req.get('/api/miniapp/notifications', null, { params })
   },
   markNotificationsRead(ids = [], all = false) {

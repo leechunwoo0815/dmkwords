@@ -11,6 +11,31 @@
     <text class="share-entry-arrow">›</text>
   </view>
 
+  <!-- fix34 R0：朋友圈式「谁赞了你」——未读才出现；点开看到是谁，看完即消 -->
+  <view wx:if="{{unreadLikes > 0 || likesOpen}}" class="likes-bar {{likesOpen ? 'open' : ''}}"
+    bindtap="onOpenLikes">
+    <view class="likes-bar-avatars">
+      <view wx:for="{{likes}}" wx:key="id" class="likes-bar-slot">
+        <avatar-ring src="{{item.avatarUrl}}" level="{{item.level}}" size="48" />
+      </view>
+    </view>
+    <text class="likes-bar-text">{{likesText || '谁赞了你'}}</text>
+    <text class="likes-bar-arrow">{{likesOpen ? '︿' : '﹀'}}</text>
+  </view>
+
+  <view wx:if="{{likesOpen && likes.length}}" class="likes-panel">
+    <view wx:for="{{likes}}" wx:key="id" class="likes-item"
+      data-child="{{item.childId}}" bindtap="onLikeItem">
+      <avatar-ring src="{{item.avatarUrl}}" level="{{item.level}}" size="56" />
+      <view class="likes-item-body">
+        <view class="likes-item-name">{{item.name}} 赞了你的成就</view>
+        <view class="likes-item-time">{{item.relTime}}</view>
+      </view>
+      <text class="likes-item-go">看名片 ›</text>
+    </view>
+    <view class="likes-panel-done">看完了，不再提醒 ✓</view>
+  </view>
+
   <!-- 社区横幅（WM14-B）：本周全馆共读 -->
   <view wx:if="{{bannerWordsText}}" class="banner">
     <text class="banner-emoji">🌏</text>
@@ -37,7 +62,7 @@
       <!-- 头部：点头像/名字 → 名片页 -->
       <view class="post-head" bindtap="onChildProfile"
         data-child="{{item.child_id}}" data-name="{{item.child_name}}">
-        <image class="avatar" src="{{item.avatarUrl}}" mode="aspectFill" />
+        <avatar-ring src="{{item.avatarUrl}}" level="{{item.level}}" size="84" />
         <view class="head-main">
           <view class="name-row">
             <text class="child-name">{{item.child_name}}</text>
@@ -64,8 +89,9 @@
           <text class="like-count">{{item.like_count}}</text>
         </view>
         <view wx:if="{{item.likers.length}}" class="liker-wall">
-          <image wx:for="{{item.likers}}" wx:for-item="lk" wx:key="child_id" class="liker-avatar"
-            src="{{lk.avatarUrl}}" mode="aspectFill" />
+          <view wx:for="{{item.likers}}" wx:for-item="lk" wx:key="child_id" class="liker-slot">
+            <avatar-ring src="{{lk.avatarUrl}}" level="{{lk.level}}" size="46" />
+          </view>
           <text wx:if="{{item.like_count > item.likers.length}}" class="liker-more">+{{item.like_count - item.likers.length}}</text>
         </view>
       </view>

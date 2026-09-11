@@ -18,8 +18,9 @@
     <view wx:for="{{board.entries}}" wx:key="child_id"
       class="rank-item {{item.is_me ? 'rank-item-me' : ''}}">
       <view class="rank-num">{{index + 1}}</view>
-      <image class="rank-avatar-img" mode="aspectFill"
-        src="{{item.avatar ? '/icons/avatars/' + item.avatar + '.png' : '/icons/avatars/cat_sun.png'}}" />
+      <avatar-ring size="72"
+        src="{{item.avatar ? '/icons/avatars/' + item.avatar + '.png' : '/icons/avatars/cat_sun.png'}}"
+        level="{{item.level}}" />
       <view class="rank-info">
         <view class="rank-name">
           {{item.name}}

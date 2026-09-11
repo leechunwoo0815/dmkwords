@@ -51,17 +51,23 @@ Page({
     // WM14-B 社区横幅
     bannerWordsText: '',
     bannerKids: 0,
+    // fix34 R0：朋友圈式「谁赞了你」（顶部通知条 + 展开列表；看过即消）
+    likes: [],
+    unreadLikes: 0,
+    likesOpen: false,
+    likesText: '',
   },
 
   onShow() {
     if (!session.ensureLogin()) return
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 3 })
-      this.getTabBar().refreshBadge && this.getTabBar().refreshBadge()
+      // 红点由组件 pageLifetimes.show 自刷新（fix34 R0：组件自治，本页不再手动调）
     }
     // fix33 R2 状态隔离：每次进页都带「当前孩子」重载——在会员页切了孩子再回来，
     // liked_by_me / 点赞主体随之切换（不缓存上一个孩子的点赞态）
     this.reload()
+    this.loadLikes() // fix34 R0：顶部「谁赞了你」（未读才显示）
   },
 
   onPullDownRefresh() {
@@ -126,6 +132,57 @@ Page({
   },
 
   onRetryLoad() { this.reload() },
+
+  // fix34 R0：拉「谁赞了你」——数据源=消息中心 circle.liked 未读（**同一张表同一口径**，
+  // 与 tab 红点同源，禁自建第二套计数）
+  async loadLikes() {
+    try {
+      const r = await api.notifications(1, 10, '', 'circle.liked')
+      const unread = (r.unread_by_scene && r.unread_by_scene.circle_liked) || 0
+      const items = (r.items || []).filter((i) => !i.read).map((i) => ({
+        id: i.id,
+        // 行为主体：ref_type=child 时 ref_id=点赞孩子 id（点进 TA 的名片）
+        childId: i.ref_type === 'child' ? Number(i.ref_id) : 0,
+        name: (i.content || '').split(' 赞了')[0] || '小伙伴',
+        avatarUrl: _avatarUrl(i.actor_avatar),
+        level: i.actor_level || 'A',
+        relTime: _relTime(i.created_at),
+      }))
+      this.setData({
+        likes: items,
+        unreadLikes: items.length ? unread : 0,
+        likesText: items.length
+          ? items.length > 1
+            ? `${items[0].name} 等 ${items.length} 位小伙伴赞了你的成就`
+            : `${items[0].name} 赞了你的成就`
+          : '',
+      })
+    } catch (e) {
+      // 通知条失败不影响信息流（静默降级：不显示条）
+      this.setData({ likes: [], unreadLikes: 0, likesText: '' })
+    }
+  },
+
+  // 展开 = 看过了 → 立刻标记本场景全部已读 → 条与 tab 红点同时消失（"看完不再提示"）
+  onOpenLikes() {
+    const opening = !this.data.likesOpen
+    this.setData({ likesOpen: opening })
+    if (!opening) return
+    const ids = this.data.likes.map((i) => i.id)
+    if (!ids.length) return
+    api.markNotificationsRead(ids, false).then(() => {
+      this.setData({ unreadLikes: 0 })
+      const tb = typeof this.getTabBar === 'function' && this.getTabBar()
+      if (tb && tb.refreshBadge) tb.refreshBadge()
+    }).catch(() => { /* request.js 已 toast */ })
+  },
+
+  // 列表项 → 点赞者名片页（深链同消息中心）
+  onLikeItem(e) {
+    const childId = Number(e.currentTarget.dataset.child)
+    if (!childId) return
+    wx.navigateTo({ url: `/pages/circle/profile?child_id=${childId}` })
+  },
 
   // 点卡片 → 全屏预览大图（长按保存）
   onPreviewCard(e) {

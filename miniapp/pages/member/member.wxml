@@ -1,8 +1,11 @@
 <scroll-view class="page-bg" scroll-y enhanced show-scrollbar="{{false}}">
   <view class="profile-header">
     <view class="profile-main">
-      <image class="profile-avatar-img" src="{{currentChild && currentChild.avatar ? '/icons/avatars/' + currentChild.avatar + '.png' : '/icons/avatars/cat_sun.png'}}"
-        mode="aspectFill" bindtap="openAvatarPicker" />
+      <view bindtap="openAvatarPicker">
+        <avatar-ring size="104"
+          src="{{currentChild && currentChild.avatar ? '/icons/avatars/' + currentChild.avatar + '.png' : '/icons/avatars/cat_sun.png'}}"
+          level="{{currentChild.level}}" />
+      </view>
       <view class="profile-info">
         <view class="profile-name" bindtap="onEditDisplayName">
           {{parent.display_name || parent.name || '家长'}}

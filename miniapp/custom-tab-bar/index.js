@@ -42,7 +42,17 @@ Component({
   },
 
   attached() {
+    // 首次引导（首页实例在 App 启动时创建）
     this.refreshBadge()
+  },
+
+  // fix34 R0：微信自定义 tabBar **每个 tab 页各持一个实例**，只在 attached 拉一次会让
+  // 红点只活在首页那个实例上（切到别的 tab 就没数据、回首页又"恢复"）。
+  // pageLifetimes.show 随**宿主页面每次显示**触发 → 每个实例各自刷新，与实例模型无关。
+  pageLifetimes: {
+    show() {
+      this.refreshBadge()
+    },
   },
 
   methods: {
@@ -53,7 +63,10 @@ Component({
         const r = await api.notifications(1, 1)
         const n = (r.unread_by_scene && r.unread_by_scene.circle_liked) || 0
         this.setData({ circleDot: n > 99 ? 99 : n })
-      } catch (e) { /* 静默：红点失败不影响导航 */ }
+      } catch (e) {
+        // fix34 R0：失败**保留旧值**（原先静默且不清值，导致"到底拉没拉到"无法判断）
+        console.warn('[tabbar] 红点刷新失败', e)
+      }
     },
 
     switchTab(e) {

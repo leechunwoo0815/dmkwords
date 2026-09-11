@@ -1,6 +1,7 @@
 {
   "navigationBarTitleText": "TA 的阅读名片",
   "usingComponents": {
-    "error-view": "/components/error-view/error-view"
+    "error-view": "/components/error-view/error-view",
+    "avatar-ring": "/components/avatar-ring/avatar-ring"
   }
 }
