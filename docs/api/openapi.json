@@ -11771,6 +11771,24 @@
             }
           },
           {
+            "description": "按场景过滤（fix34 R0：如 circle.liked）",
+            "in": "query",
+            "name": "scene",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "按场景过滤（fix34 R0：如 circle.liked）",
+              "title": "Scene"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": true,
