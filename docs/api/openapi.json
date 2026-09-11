@@ -1584,17 +1584,13 @@
         "additionalProperties": false,
         "properties": {
           "child_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Child Id"
+            "title": "Child Id",
+            "type": "integer"
           }
         },
+        "required": [
+          "child_id"
+        ],
         "title": "CircleLikeRequest",
         "type": "object"
       },
@@ -10649,6 +10645,24 @@
             }
           },
           {
+            "description": "观看方当前选中的孩子（liked_by_me 口径）",
+            "in": "query",
+            "name": "child_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "观看方当前选中的孩子（liked_by_me 口径）",
+              "title": "Child Id"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": true,
@@ -10836,7 +10850,7 @@
     },
     "/api/miniapp/circle/posts/{post_id}/like": {
       "delete": {
-        "description": "取消点赞。",
+        "description": "取消点赞（按孩子主体定位行；DELETE 走 query 而非 body——客户端不友好先例）。",
         "operationId": "circle_unlike_api_miniapp_circle_posts__post_id__like_delete",
         "parameters": [
           {
@@ -10846,6 +10860,24 @@
             "schema": {
               "title": "Post Id",
               "type": "integer"
+            }
+          },
+          {
+            "description": "点赞主体孩子（定位取消的赞）",
+            "in": "query",
+            "name": "child_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "点赞主体孩子（定位取消的赞）",
+              "title": "Child Id"
             }
           },
           {
@@ -10884,7 +10916,7 @@
         ]
       },
       "post": {
-        "description": "点赞（一心一赞；like_count 原子更新；被赞通知同事务）。\n\nWM15-R6：body.child_id 可选（点赞方当前孩子）——记录为展示名义快照，\n通知文案随之为「Tommy 赞了你的成就」；缺省则降级家长显示名（老版本端兼容）。",
+        "description": "点赞（fix33 R2：**社交主体=孩子**，child_id 必填；一孩一赞；被赞通知同事务）。\n\n缺 child_id → 422「请先选择孩子」（连带覆盖「整包 body 都不带」的老端）。",
         "operationId": "circle_like_api_miniapp_circle_posts__post_id__like_post",
         "parameters": [
           {
