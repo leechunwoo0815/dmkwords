@@ -341,3 +341,51 @@ def test_admin_like_shows_curator_first_in_wall(client: TestClient):
         if p["id"] == post_id
     )
     assert all(not x["is_admin"] for x in item["likers"]) and item["like_count"] == 1
+
+
+def test_admin_like_notification_ref_type_and_per_post_dedup(client: TestClient):
+    """fix34e：馆长赞通知 ref_type=circle_admin（前端凭此弹金光播报）；且**逐帖**各发一条。
+
+    去重键 = parent+scene+ref_type+ref_id+dedup_key：馆长赞 ref_id=帖子 id → 两帖各一条；
+    孩子赞的 ref_id 是"点赞孩子"（供深链），帖子维度只能落在 dedup_key 上
+    （旧键只含孩子 id → 同一孩子赞你两帖只通知一条，已修）。
+    """
+    h = _h(client)
+    # 一个家长 + 两个孩子（两帖同属一位家长，才能在同一份通知列表里核对）
+    c1, m1, pid = _mk_parent_with_child(client, h, "13800000961", "播报孩甲", "CastA")
+    c2 = client.post(
+        f"/api/admin/members/parents/{pid}/children",
+        json={"name": "播报孩乙", "english_name": "CastB"},
+        headers=h,
+    ).json()
+    o = client.post(
+        "/api/admin/orders", json={"child_id": c2["id"], "order_type": "observation_fee"}, headers=h
+    ).json()
+    client.post(
+        f"/api/admin/orders/{o['id']}/confirm-payment", json={"pay_method": "scan"}, headers=h
+    )
+    p1 = _share(client, m1, c1, _award_milestone(c1, 100000)).json()["post_id"]
+    p2 = _share(client, m1, c2["id"], _award_milestone(c2["id"], 200000)).json()["post_id"]
+
+    # 馆长赞两帖 → 该家长各收一条，ref_type 指明是馆长、ref_id 是帖子
+    for pid_ in (p1, p2):
+        assert (
+            client.post(f"/api/admin/circle/posts/{pid_}/admin-like", headers=h).status_code == 200
+        )
+    notes = client.get("/api/miniapp/notifications?scene=circle.liked", headers=m1).json()["items"]
+    admin_notes = [n for n in notes if n["ref_type"] == "circle_admin"]
+    assert {n["ref_id"] for n in admin_notes} == {str(p1), str(p2)}, admin_notes
+    assert all("馆长" in n["content"] for n in admin_notes)
+
+    # 另一个家长的孩子**连赞这两帖** → 帖主各收一条（旧键会被吞掉第二条）
+    c3, m3, _ = _mk_parent_with_child(client, h, "13800000963", "连赞孩", "TwoKid")
+    for pid_ in (p1, p2):
+        assert (
+            client.post(
+                f"/api/miniapp/circle/posts/{pid_}/like", json={"child_id": c3}, headers=m3
+            ).status_code
+            == 200
+        )
+    notes = client.get("/api/miniapp/notifications?scene=circle.liked", headers=m1).json()["items"]
+    kid_notes = [n for n in notes if n["ref_type"] == "child"]
+    assert len(kid_notes) == 2, [n["content"] for n in kid_notes]  # 两帖各一条（去重键含 post）

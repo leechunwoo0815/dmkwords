@@ -141,12 +141,46 @@
 }
 
 /* 缩略配图：约 60% 宽、圆角；点开看含字完整大图 */
-.post-thumb {
+.thumb-wrap {
   margin-top: 18rpx;
   width: 60%;
+  position: relative;
+  border-radius: 20rpx;
+  overflow: hidden;
+  background: #fffdf7;
+}
+.post-thumb {
+  display: block;
+  width: 100%;
   border-radius: 20rpx;
   border: 2rpx solid rgba(90, 74, 58, 0.18);
   background: #fffdf7;
+}
+/* fix34e 羡慕杀②：馆长赞过 → 金色描边 + 外发光 + 一道循环流光（只动 transform，GPU 友好） */
+.thumb-gold {
+  border: 4rpx solid #f0b54a;
+  box-shadow: 0 0 20rpx rgba(255, 192, 64, 0.7);
+}
+.thumb-gold .post-thumb {
+  border-color: transparent;
+}
+.thumb-shine {
+  position: absolute;
+  top: -50%;
+  bottom: -50%;
+  width: 38%;
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.85) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shineSweep 2.8s linear infinite;
+  pointer-events: none;
+}
+@keyframes shineSweep {
+  0% { transform: translateX(-180%) rotate(10deg); }
+  55%, 100% { transform: translateX(430%) rotate(10deg); }
 }
 
 /* 点赞 + 头像墙 */
@@ -343,4 +377,79 @@
   text-align: center;
   font-size: 24rpx;
   color: #b9ada3;
+}
+
+/* fix34e 羡慕杀①：馆长亲赞金光播报（居中金卡 + 弹入动效 + 光晕） */
+.gm-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(46, 32, 12, 0.55);
+}
+.gm-card {
+  position: relative;
+  width: 580rpx;
+  padding: 56rpx 44rpx 36rpx;
+  border-radius: 40rpx;
+  text-align: center;
+  background: linear-gradient(160deg, #fff8de 0%, #ffe9a8 52%, #f7c552 100%);
+  border: 4rpx solid #b87a12;
+  box-shadow: 0 24rpx 70rpx rgba(120, 70, 10, 0.5);
+  animation: gmPop 0.44s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes gmPop {
+  from { transform: scale(0.55); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.gm-glow {
+  position: absolute;
+  left: 50%;
+  top: 70rpx;
+  width: 420rpx;
+  height: 420rpx;
+  margin-left: -210rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(255, 240, 180, 0) 70%);
+  animation: gmGlow 2.6s ease-in-out infinite;
+}
+@keyframes gmGlow {
+  0%, 100% { opacity: 0.65; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+.gm-avatar {
+  position: relative;
+  line-height: 0;
+}
+.gm-title {
+  margin-top: 16rpx;
+  font-size: 48rpx;
+  font-weight: 800;
+  color: #8a4d21;
+  letter-spacing: 2rpx;
+}
+.gm-text {
+  margin-top: 12rpx;
+  font-size: 28rpx;
+  color: #a0662c;
+}
+.gm-sub {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #bb8b4a;
+}
+.gm-btn {
+  margin-top: 30rpx;
+  padding: 20rpx 0;
+  border-radius: 999rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #fff8de;
+  background: linear-gradient(135deg, #d99a24, #b87a12);
+  box-shadow: 0 8rpx 20rpx rgba(184, 122, 18, 0.45);
 }

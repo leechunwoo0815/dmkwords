@@ -1475,6 +1475,46 @@ def _ensure_demo_circle_visuals(db: Session) -> None:
         .update({CirclePost.like_count: 1}, synchronize_session=False)
     )
 
+    # ②c fix34e：馆长赞的「金光播报」演示——演示帖带 admin_liked 但库里没有对应通知
+    # （seed 直接写标志位，不走 admin_like 真链路）→ 按真链路口径补一条馆长赞通知，
+    # 进阅读圈即会弹一次金光播报（幂等：唯一键 parent+scene+ref_type+ref_id+dedup_key）
+    n_admin_note = 0
+    for post in (
+        db.query(CirclePost).filter(CirclePost.is_deleted == 0, CirclePost.admin_liked == 1).all()
+    ):
+        owner = db.query(Parent).filter(Parent.id == post.parent_id).first()
+        if not owner:
+            continue
+        child = db.query(Child).filter(Child.id == post.child_id).first()
+        before = (
+            db.query(Notification)
+            .filter(
+                Notification.parent_id == owner.id,
+                Notification.scene == "circle.liked",
+                Notification.ref_type == "circle_admin",
+                Notification.ref_id == str(post.id),
+                Notification.is_deleted == 0,
+            )
+            .count()
+        )
+        _upsert_notification(
+            db,
+            owner,
+            scene="circle.liked",
+            category="其他",
+            title="馆长为你点赞",
+            content=f"馆长赞了 {child.english_name or f'小朋友{child.id:03d}'} 的成就"
+            if child
+            else "馆长赞了孩子的成就",
+            child_id=post.child_id,
+            ref_type="circle_admin",
+            ref_id=str(post.id),
+            dedup_key="admin",
+        )
+        if not before:
+            n_admin_note += 1
+    db.commit()
+
     # ③ fix34 R5：演示里程碑帖补齐「全馆第 N 位」快照（老 card_data 无此字段 →
     # 副标题/卡面都缺播报）。演示数据专享的一次性补齐：重算 + 重渲双规格 + 删旧图；
     # 补齐后字段已在快照里 → 重跑即跳（幂等）。**生产历史帖按"无字段不显示"容错，不动。**
@@ -1482,7 +1522,7 @@ def _ensure_demo_circle_visuals(db: Session) -> None:
     print(
         f"c 阅读圈视觉：头像设置 {n_avatar} 个 / 缩略图重渲 {thumbs['rendered']} 张"
         f"（跳过 {thumbs['skipped']}）/ 里程碑播报补齐 {n_hall} 帖 / 生日彩蛋对齐 {n_bday} 人"
-        f" / 馆长赞计数对齐 {n_admin} 帖",
+        f" / 馆长赞计数对齐 {n_admin} 帖 / 馆长赞通知补 {n_admin_note} 条",
         flush=True,
     )
 

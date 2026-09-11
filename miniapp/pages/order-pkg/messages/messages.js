@@ -44,6 +44,9 @@ function refTarget(n) {
   if (n.scene === 'circle.liked' && n.ref_type === 'child' && n.ref_id) {
     return { label: '去看 TA 的阅读名片 ›', type: 'child', id: Number(n.ref_id) }
   }
+  if (n.scene === 'circle.liked' && n.ref_type === 'circle_admin') {
+    return { label: '馆长亲赞！去阅读圈看看 ›', type: 'circle', id: 0 }
+  }
   if (n.scene === 'circle.liked') {
     return { label: '去阅读圈看看 ›', type: 'circle', id: 0 }
   }

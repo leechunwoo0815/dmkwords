@@ -359,10 +359,13 @@ class CircleService:
         self.db.flush()
         # 被赞通知（同事务；自家帖不打扰——同一家长名下多孩互赞也不提醒）
         if post.parent_id != parent.id:
+            # 去重键含 post：同一孩子赞了你**两帖**应各通知一次
+            # （send() 的去重键 = parent+scene+ref_type+ref_id+dedup_key，而 ref_id 是点赞孩子
+            #   用于深链，故帖子维度只能落在 dedup_key 上）
             self._notify_liked(
                 post,
                 liker_name=_display_name(child),
-                dedup_key=f"child:{child.id}",
+                dedup_key=f"child:{child.id}:post:{post.id}",
                 liker_child_id=child.id,
             )
         self.db.commit()
@@ -419,6 +422,14 @@ class CircleService:
         else:
             content = f"{liker_name} 赞了 {child_name} 的成就"
             title = "收到点赞"
+        # fix34e：深链类型显式化——馆长赞单独一个 ref_type，前端才能认出"馆长亲赞"
+        # （弹金光播报、消息中心换文案）；孩子赞仍指名片页
+        if admin:
+            ref_type, ref_id = "circle_admin", str(post.id)
+        elif liker_child_id:
+            ref_type, ref_id = "child", str(liker_child_id)
+        else:
+            ref_type, ref_id = "circle_post", str(post.id)  # 兼容历史（无名义的老赞）
         NotificationService(self.db).send(
             parent_id=post.parent_id,
             scene=SCENE_CIRCLE_LIKED,
@@ -426,8 +437,8 @@ class CircleService:
             content=content,
             category=Notification.CATEGORY_OTHER,
             child_id=post.child_id,
-            ref_type="child" if liker_child_id else "circle_post",
-            ref_id=str(liker_child_id or post.id),
+            ref_type=ref_type,
+            ref_id=ref_id,
             dedup_key=dedup_key,
         )
 

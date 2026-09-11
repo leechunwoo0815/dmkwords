@@ -86,8 +86,12 @@
       <view class="post-body">
         <view class="ach-title">{{item.title}}</view>
         <view wx:if="{{item.subtitle}}" class="ach-sub">{{item.subtitle}}</view>
-        <image wx:if="{{item.thumbUrl}}" class="post-thumb" src="{{item.thumbUrl}}" mode="widthFix"
-          data-url="{{item.imageUrlFull}}" bindtap="onPreviewCard" />
+        <view wx:if="{{item.thumbUrl}}" class="thumb-wrap {{item.admin_liked ? 'thumb-gold' : ''}}">
+          <image class="post-thumb" src="{{item.thumbUrl}}" mode="widthFix"
+            data-url="{{item.imageUrlFull}}" bindtap="onPreviewCard" />
+          <!-- fix34e 羡慕杀②：被馆长赞过的帖子，缩略图上一道金色流光循环扫过 -->
+          <view wx:if="{{item.admin_liked}}" class="thumb-shine"></view>
+        </view>
       </view>
 
       <!-- 点赞 + 谁赞过（头像墙） -->
@@ -108,6 +112,20 @@
           <text wx:if="{{item.like_count > item.likers.length}}" class="liker-more">+{{item.like_count - item.likers.length}}</text>
         </view>
       </view>
+    </view>
+  </view>
+
+  <!-- fix34e 羡慕杀①：馆长亲赞金光播报（未读即弹一次，关掉标记已读） -->
+  <view wx:if="{{celebrate}}" class="gm-mask" bindtap="onCloseCelebrate">
+    <view class="gm-card">
+      <view class="gm-glow"></view>
+      <view class="gm-avatar">
+        <avatar-ring gm="{{true}}" src="/icons/special/gm_avatar.png" size="{{170}}" />
+      </view>
+      <view class="gm-title">馆长亲赞！</view>
+      <view class="gm-text">{{celebrate}}</view>
+      <view class="gm-sub">馆内最高荣誉 · 已点缀在你的帖子上 ✨</view>
+      <view class="gm-btn">太棒了 ✨</view>
     </view>
   </view>
 
