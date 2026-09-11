@@ -84,6 +84,19 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
   判定）；`GET /api/miniapp/quiz/status-batch`（书架角标批量，IN 查询禁 N+1）；
   `GET /api/miniapp/activities/carousel`（首页轮播，有封面优先）；
   admin 活动 CRUD 扩展（detail/update/cover 上传——activity_type 禁改、名额下限 422）。
+- **2026-09-12 增补端点族（WM15-A/B + fix33，路径与参数均为代码实取）**：
+  `GET /api/miniapp/circle/posts`（`child_id` 必传 → `liked_by_me` 随当前孩子；`likers[].level`；
+  帖 1 的 `likers` 含**合成的馆长条目** `{child_id:0, level:"GM", is_admin:true}`）；
+  `POST|DELETE /api/miniapp/circle/posts/{post_id}/like`（**破坏性变更**：`child_id` 必传，
+  缺失 → 422「请先选择孩子」，Pydantic 层 `child_required`；唯一索引 `(post_id, child_id)`，兄弟可各赞各的）；
+  `GET /api/miniapp/circle/children/{child_id}/profile`（孩子名片页，隐私红线：无中文名/家长名/手机号/生日，
+  只回 `is_birthday` 布尔）；`GET /api/miniapp/circle/children/{child_id}/poster`（分享海报，
+  **`image/jpeg`**，PNG 723KB → JPEG ~57KB，覆盖写并清旧 `.png`）；
+  `GET /api/miniapp/circle/posts/{post_id}/thumb|image`（双规格媒体，走 `?token=` 拼装）；
+  `PUT /api/miniapp/children/{child_id}/avatar`（内置头像白名单 `AVATAR_IDS`，空串=清空回默认；
+  馆方专属 `gm_*` 资产**不在**白名单）；
+  `GET /api/miniapp/notifications?scene=circle.liked`（场景过滤 + 深链数据面 `ref_type`/`ref_id`/`actor_name`；
+  `ref_type=circle_admin` 标识馆长亲赞）。
 
 ## 五、契约工作流（改接口三步链，缺一步 gate 红或前端断）
 

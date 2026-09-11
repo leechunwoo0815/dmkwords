@@ -219,6 +219,21 @@
 
 ---
 
+### 2.7 头像与等级头像框（WM15-A/B 引入）
+
+- **系统内置头像 24 枚**：12 动物 × 2 配色，白名单常量 `AVATAR_IDS`（后端校验，非法值拒收）；
+  三端同源（小程序本地包 `miniapp/icons/avatars/`、管理端 `public/`、后端 `assets/`）；
+  家长在「我的」页自助选择，管理端建档/编辑亦可选。
+- **等级头像框四档**（越高越华丽，服务收集欲）：A-B **星芒** / C-E **银环** / F-H **金冠** / I+ **彩虹**；
+  资产 `miniapp/icons/frames/*`（由 `scripts/gen_fix34_frames.py` 生成），
+  规格常量在 `miniapp/utils/frames.js`（含 `FRAME_SCALE` 缩放基准）。
+- **统一叠层组件** `miniapp/components/avatar-ring`：入参 `src` / `level` / `size` / `gm`；
+  **五端消费点**（信息流、名片页、点赞墙、榜单、我的页）一律复用它，禁止各自拼图。
+- **馆方专属资产** `miniapp/icons/special/gm_{avatar,frame}.png`：馆长金光头像 + 鎏金冠冕外框，
+  **不进 `AVATAR_IDS` 白名单**（孩子不可冒用馆方身份）。
+  画法约束：金冠/光晕只用**同心环**叠加，禁止在透明画布上做整片光晕填充
+  （`art.glow` 走 `paste(mask)`，会在中央糊出一个实心色块）。
+
 ## 三、色彩系统（绘本调色板）
 
 ### 3.1 当前问题
