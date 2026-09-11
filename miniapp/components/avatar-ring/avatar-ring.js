@@ -22,6 +22,8 @@ Component({
     size: { type: Number, value: 72 },
     /** false = 只要头像不要框（如头像选择器宫格） */
     frame: { type: Boolean, value: true },
+    /** true = 馆长（GM）：固定用最高档「鎏金冠冕框」，不走等级映射（fix34d） */
+    gm: { type: Boolean, value: false },
   },
 
   data: {
@@ -37,7 +39,7 @@ Component({
   },
 
   observers: {
-    'level, size, frame': function () {
+    'level, size, frame, gm': function () {
       this._apply()
     },
   },
@@ -49,7 +51,8 @@ Component({
         return
       }
       const size = Number(this.data.size) || 72
-      const f = frameForLevel(this.data.level)
+      // 馆长：固定最高档「鎏金冠冕框」（资产仅小程序端；几何与四档框一致）
+      const f = this.data.gm ? { file: '/icons/special/gm_frame.png' } : frameForLevel(this.data.level)
       const frameSize = Math.round(size * FRAME_SCALE)
       this.setData({
         frameUrl: f && f.file ? f.file : '',

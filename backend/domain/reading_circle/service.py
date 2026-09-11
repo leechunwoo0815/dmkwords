@@ -32,6 +32,17 @@ def _display_name(child: Child) -> str:
     return child.english_name or f"小朋友{child.id:03d}"
 
 
+#: 馆长赞的合成头像墙条目（fix34d）——child_id=0 为哨兵（无对应 Child 行），
+#: 前端凭 is_admin 换成 `/icons/special/gm_*` 的金光馆长头像 + 鎏金冠冕框。
+ADMIN_LIKER = {
+    "child_id": 0,
+    "name": "馆长",
+    "avatar": None,
+    "level": "GM",
+    "is_admin": True,
+}
+
+
 def _parent_display(parent: Parent) -> str:
     """家长署名（WM14-B/Q11 清偿）：display_name（如「Tommy妈妈」）优先，
     空则回退真实姓名。**三消费端必须走这里**：信息流署名 / 管理端列表 / 被赞通知文案
@@ -197,12 +208,26 @@ class CircleService:
 
     def _likers_map(self, post_ids: list[int], limit: int = 8) -> dict[int, list]:
         """点赞头像墙（批查，禁 N+1）：按社交主体 child_id 关联（fix33 R2）。
-        每帖最多 limit 个，按点赞先后 id 升序；含等级（fix34 R4 头像框数据面）。"""
+        每帖最多 limit 个，按点赞先后 id 升序；含等级（fix34 R4 头像框数据面）。
+
+        fix34d：**馆长排第一**。馆长的赞只落在 `CirclePost.admin_liked`（不建 CircleLike 行），
+        所以此处按 admin_liked 合成一个条目（is_admin=True）——前端据此换成
+        「金光馆长头像 + 鎏金冠冕框」，孩子点赞墙不再"只见数字不见人"。
+        """
         from backend.domain.growth.service import levels_map
         from backend.domain.reading_circle.models import CircleLike
 
         if not post_ids:
             return {}
+        out: dict[int, list] = {}
+        admin_ids = [
+            pid
+            for (pid,) in self.db.query(CirclePost.id)
+            .filter(CirclePost.id.in_(post_ids), CirclePost.admin_liked == 1)
+            .all()
+        ]
+        for pid in admin_ids:
+            out.setdefault(pid, []).append(dict(ADMIN_LIKER))
         rows = (
             self.db.query(CircleLike.post_id, Child.id, Child.english_name, Child.avatar)
             .join(Child, Child.id == CircleLike.child_id)
@@ -215,7 +240,6 @@ class CircleService:
             .all()
         )
         lv = levels_map(self.db, [cid for _, cid, _, _ in rows])
-        out: dict[int, list] = {}
         for pid, cid, en, av in rows:
             bucket = out.setdefault(pid, [])
             if len(bucket) < limit:
@@ -225,6 +249,7 @@ class CircleService:
                         "name": en or f"小朋友{cid:03d}",
                         "avatar": av,
                         "level": lv.get(cid, "A"),
+                        "is_admin": False,  # 形状统一（馆长那条为 True，前端一处判断）
                     }
                 )
         return out

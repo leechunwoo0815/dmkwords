@@ -285,3 +285,59 @@ def test_poster_jpeg_and_under_250kb(client: TestClient):
     root = os.path.abspath(get_settings().UPLOADS_DIR)
     assert os.path.isfile(os.path.join(root, "posters", f"poster_{c1}.jpg"))
     assert not os.path.isfile(os.path.join(root, "posters", f"poster_{c1}.png"))  # 旧 png 已清
+
+
+# ---------- fix34d：馆长（GM）进点赞墙 ----------
+
+
+def test_admin_like_shows_curator_first_in_wall(client: TestClient):
+    """馆长赞 → 头像墙第一位是「馆长」（is_admin，金光段），且计数与墙上人数口径一致。
+
+    馆长的赞不建 CircleLike 行（只落 admin_liked），故此处验证"合成条目"确实补上了墙。
+    """
+    h = _h(client)
+    c1, m1, _ = _mk_parent_with_child(client, h, "13800000951", "被赞孩甲", "GmKid")
+    c2, m2, _ = _mk_parent_with_child(client, h, "13800000952", "点赞孩乙", "FanKid2")
+    post_id = _share(client, m1, c1, _award_milestone(c1, 100000)).json()["post_id"]
+
+    # 馆长行内赞
+    assert (
+        client.post(f"/api/admin/circle/posts/{post_id}/admin-like", headers=h).status_code == 200
+    )
+    item = next(
+        p
+        for p in client.get(f"/api/miniapp/circle/posts?child_id={c1}", headers=m1).json()["items"]
+        if p["id"] == post_id
+    )
+    assert item["like_count"] == 1
+    assert len(item["likers"]) == 1
+    gm = item["likers"][0]
+    assert gm["is_admin"] is True and gm["name"] == "馆长" and gm["level"] == "GM"
+    assert gm["avatar"] is None  # 前端凭 is_admin 换 /icons/special/gm_avatar.png
+
+    # 孩子再赞 → 馆长仍排第一，计数与墙上人数口径一致（like_count = 墙上人数 ≤8 时）
+    assert (
+        client.post(
+            f"/api/miniapp/circle/posts/{post_id}/like", json={"child_id": c2}, headers=m2
+        ).status_code
+        == 200
+    )
+    item = next(
+        p
+        for p in client.get(f"/api/miniapp/circle/posts?child_id={c1}", headers=m1).json()["items"]
+        if p["id"] == post_id
+    )
+    assert item["like_count"] == 2
+    assert [x["is_admin"] for x in item["likers"]] == [True, False]
+    assert item["likers"][1]["child_id"] == c2
+
+    # 取消馆长赞 → 合成条目随之消失（不残留）
+    assert (
+        client.delete(f"/api/admin/circle/posts/{post_id}/admin-like", headers=h).status_code == 200
+    )
+    item = next(
+        p
+        for p in client.get(f"/api/miniapp/circle/posts?child_id={c1}", headers=m1).json()["items"]
+        if p["id"] == post_id
+    )
+    assert all(not x["is_admin"] for x in item["likers"]) and item["like_count"] == 1

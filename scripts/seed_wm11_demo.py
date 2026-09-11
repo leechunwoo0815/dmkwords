@@ -1430,6 +1430,7 @@ def _ensure_demo_circle_visuals(db: Session) -> None:
     """
     from backend.domain.identity.models import Child
     from backend.domain.reading_circle import card_engine
+    from backend.domain.reading_circle.models import CirclePost
 
     # ① 头像（让演示账号进页面就能看到新头像库；按名字稳定定位）
     avatar_plan = {
@@ -1466,13 +1467,22 @@ def _ensure_demo_circle_visuals(db: Session) -> None:
 
     # ② 缩略图对齐当前规格（fix33 R1：缺图补渲 / 旧规格重渲并删旧文件；幂等）
     thumbs = card_engine.ensure_circle_thumbs(db)
+    # ②b fix34d：馆长赞与计数对齐——`admin_liked=1` 必须计入 like_count（真链路
+    # `admin_like()` 就是这么 +1 的），否则点赞墙出现「馆长头像 + 计数 0」的自相矛盾
+    n_admin = (
+        db.query(CirclePost)
+        .filter(CirclePost.is_deleted == 0, CirclePost.admin_liked == 1, CirclePost.like_count == 0)
+        .update({CirclePost.like_count: 1}, synchronize_session=False)
+    )
+
     # ③ fix34 R5：演示里程碑帖补齐「全馆第 N 位」快照（老 card_data 无此字段 →
     # 副标题/卡面都缺播报）。演示数据专享的一次性补齐：重算 + 重渲双规格 + 删旧图；
     # 补齐后字段已在快照里 → 重跑即跳（幂等）。**生产历史帖按"无字段不显示"容错，不动。**
     n_hall = _backfill_demo_hall_rank(db)
     print(
         f"c 阅读圈视觉：头像设置 {n_avatar} 个 / 缩略图重渲 {thumbs['rendered']} 张"
-        f"（跳过 {thumbs['skipped']}）/ 里程碑播报补齐 {n_hall} 帖 / 生日彩蛋对齐 {n_bday} 人",
+        f"（跳过 {thumbs['skipped']}）/ 里程碑播报补齐 {n_hall} 帖 / 生日彩蛋对齐 {n_bday} 人"
+        f" / 馆长赞计数对齐 {n_admin} 帖",
         flush=True,
     )
 

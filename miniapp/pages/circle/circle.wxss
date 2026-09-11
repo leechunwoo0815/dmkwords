@@ -192,6 +192,18 @@
 .liker-slot:first-child {
   margin-left: 0;
 }
+/* fix34d：馆长条——单独站位（不与孩子叠压）+ 金色光晕，视觉上"高一档" */
+.liker-slot-gm {
+  margin-left: 0;
+  margin-right: 4rpx;
+  filter: drop-shadow(0 0 8rpx rgba(255, 209, 102, 0.85));
+}
+.admin-like-label {
+  margin-left: 12rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #c98a1c;
+}
 .liker-more {
   margin-left: 6rpx;
   font-size: 24rpx;

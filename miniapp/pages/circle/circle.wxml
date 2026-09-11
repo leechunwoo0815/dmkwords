@@ -97,9 +97,13 @@
           <text class="like-icon">{{item.liked_by_me ? '❤️' : '🤍'}}</text>
           <text class="like-count">{{item.like_count}}</text>
         </view>
+        <text wx:if="{{item.admin_liked}}" class="admin-like-label">馆长亲赞 ✨</text>
         <view wx:if="{{item.likers.length}}" class="liker-wall">
-          <view wx:for="{{item.likers}}" wx:for-item="lk" wx:key="child_id" class="liker-slot">
-            <avatar-ring src="{{lk.avatarUrl}}" level="{{lk.level}}" size="{{46}}" />
+          <view wx:for="{{item.likers}}" wx:for-item="lk" wx:key="child_id"
+            class="liker-slot {{lk.is_admin ? 'liker-slot-gm' : ''}}">
+            <avatar-ring wx:if="{{lk.is_admin}}" gm="{{true}}" size="{{60}}"
+              src="/icons/special/gm_avatar.png" />
+            <avatar-ring wx:else src="{{lk.avatarUrl}}" level="{{lk.level}}" size="{{46}}" />
           </view>
           <text wx:if="{{item.like_count > item.likers.length}}" class="liker-more">+{{item.like_count - item.likers.length}}</text>
         </view>
