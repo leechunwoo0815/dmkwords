@@ -59,6 +59,8 @@ Page({
       this.getTabBar().setData({ selected: 3 })
       this.getTabBar().refreshBadge && this.getTabBar().refreshBadge()
     }
+    // fix33 R2 状态隔离：每次进页都带「当前孩子」重载——在会员页切了孩子再回来，
+    // liked_by_me / 点赞主体随之切换（不缓存上一个孩子的点赞态）
     this.reload()
   },
 
@@ -73,8 +75,10 @@ Page({
 
   async reload() {
     this.setData({ loading: true, loadError: false })
+    // fix33 R2：请求带当前孩子 → liked_by_me 按孩子算（无孩子则为浏览态，全 false）
+    this._childId = (session.getCurrentChild() || {}).id || null
     try {
-      const res = await api.circlePosts(1, PAGE_SIZE)
+      const res = await api.circlePosts(1, PAGE_SIZE, this._childId)
       const banner = res.banner || null
       this.setData({
         posts: this._decorate(res.items || []),
@@ -95,7 +99,7 @@ Page({
     const next = this.data.page + 1
     this.setData({ loading: true })
     try {
-      const res = await api.circlePosts(next, PAGE_SIZE)
+      const res = await api.circlePosts(next, PAGE_SIZE, this._childId)
       const items = this._decorate(res.items || [])
       this.setData({
         posts: this.data.posts.concat(items),
@@ -139,6 +143,7 @@ Page({
   },
 
   // 点赞/取消 + 弹跳动效（wxss transform，低成本高感知）
+  // fix33 R2：点赞主体=当前孩子（未选孩子由后端 422「请先选择孩子」提示）
   async onToggleLike(e) {
     const id = e.currentTarget.dataset.id
     const post = this.data.posts.find((p) => p.id === id)
@@ -146,7 +151,7 @@ Page({
     const child = session.getCurrentChild()
     try {
       const res = post.liked_by_me
-        ? await api.circleUnlike(id)
+        ? await api.circleUnlike(id, child ? child.id : null)
         : await api.circleLike(id, child ? child.id : null)
       this.setData({
         posts: this.data.posts.map((p) =>
@@ -159,7 +164,9 @@ Page({
         this.setData({
           posts: this.data.posts.map((p) => (p.id === id ? { ...p, pop: false } : p)),
         })
-        if (!post.liked_by_me) this.reload() // 点赞后刷新头像墙
+        // fix33 R3：**两个分支都刷新**——取消点赞后头像墙必须同步消失
+        // （原实现在取消分支不刷新：人头像仍挂在墙上）；同时以服务端 liked_by_me 收口
+        this.reload()
       }, 320)
     } catch (err) { /* request.js 已 toast */ }
   },

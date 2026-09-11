@@ -449,6 +449,18 @@ export default function MemberManage() {
             rowKey="id" loading={loading} dataSource={children} size="middle"
             pagination={false}
             columns={[
+              // fix33 R4：头像列（与建档/编辑弹窗同源，走 public/avatars 本地资产零 token）
+              { title: "头像", key: "avatar", width: 64, render: (_, r) => (
+                r.avatar ? (
+                  <img
+                    src={`/avatars/${r.avatar}.png`}
+                    alt={r.avatar}
+                    width={32}
+                    height={32}
+                    style={{ borderRadius: "50%", display: "block" }}
+                  />
+                ) : <Typography.Text type="secondary">—</Typography.Text>
+              ) },
               { title: "孩子", key: "child", width: 170, render: (_, r) => (
                 <div>
                   <div>{r.name}{r.english_name ? `（${r.english_name}）` : ""}</div>

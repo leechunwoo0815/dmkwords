@@ -225,8 +225,11 @@ module.exports = {
   },
 
   // 阅读圈（WM14-A）
-  circlePosts(page = 1, pageSize = 10) {
-    return req.get('/api/miniapp/circle/posts', null, { params: { page, page_size: pageSize } })
+  // fix33 R2：带 child_id=当前孩子——后端据此算 liked_by_me（兄弟状态互不串味）
+  circlePosts(page = 1, pageSize = 10, childId = null) {
+    return req.get('/api/miniapp/circle/posts', null, {
+      params: { page, page_size: pageSize, child_id: childId },
+    })
   },
   circleMyCards(childId) {
     return req.get('/api/miniapp/circle/my-cards', null, { params: { child_id: childId } })
@@ -236,9 +239,9 @@ module.exports = {
       child_id: childId, card_type: cardType, ref_id: refId,
     })
   },
-  // WM15-R6：点赞带展示名义（家长当前选中的孩子）；childId 为空则后端降级家长显示名
+  // fix33 R2：点赞主体=孩子（后端必填；缺 → 422「请先选择孩子」）
   circleLike(postId, childId) {
-    return req.post(`/api/miniapp/circle/posts/${postId}/like`, { child_id: childId || null })
+    return req.post(`/api/miniapp/circle/posts/${postId}/like`, { child_id: childId })
   },
   // WM15-R3：孩子内置头像（白名单 id；空串=清空）
   updateChildAvatar(childId, avatar) {
@@ -252,8 +255,11 @@ module.exports = {
   circleChildPosterUrl(childId) {
     return `/api/miniapp/circle/children/${childId}/poster`
   },
-  circleUnlike(postId) {
-    return req.del(`/api/miniapp/circle/posts/${postId}/like`)
+  // fix33 R2/R3：取消点赞同样按孩子主体定位（DELETE 走 query——body 客户端不友好）
+  circleUnlike(postId, childId) {
+    return req.del(`/api/miniapp/circle/posts/${postId}/like`, null, {
+      params: { child_id: childId },
+    })
   },
   circleDeletePost(postId) {
     return req.del(`/api/miniapp/circle/posts/${postId}`)
