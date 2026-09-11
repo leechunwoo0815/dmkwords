@@ -17,7 +17,9 @@
     bindtap="onOpenLikes">
     <view class="likes-bar-avatars">
       <view wx:for="{{likesUnread}}" wx:key="id" class="likes-bar-slot">
-        <avatar-ring src="{{item.avatarUrl}}" level="{{item.level}}" size="{{48}}" />
+        <avatar-ring wx:if="{{item.refType === 'circle_admin'}}" gm="{{true}}" size="{{52}}"
+          src="/icons/special/gm_avatar.png" />
+        <avatar-ring wx:else src="{{item.avatarUrl}}" level="{{item.level}}" size="{{48}}" />
       </view>
     </view>
     <text class="likes-bar-text">{{likesText}}</text>
@@ -33,7 +35,11 @@
     <view wx:if="{{!likes.length}}" class="likes-panel-empty">还没有人给你点赞，晒张成就卡试试～</view>
     <view wx:for="{{likes}}" wx:key="id" class="likes-item"
       data-child="{{item.childId}}" bindtap="onLikeItem">
-      <avatar-ring src="{{item.avatarUrl}}" level="{{item.level}}" size="{{56}}" />
+      <!-- fix34e5：馆长条目的头像必须与下方点赞墙一致（金光馆长 + 鎏金冠冕框），
+           不能回落到默认孩子头像 -->
+      <avatar-ring wx:if="{{item.refType === 'circle_admin'}}" gm="{{true}}" size="{{60}}"
+        src="/icons/special/gm_avatar.png" />
+      <avatar-ring wx:else src="{{item.avatarUrl}}" level="{{item.level}}" size="{{56}}" />
       <view class="likes-item-body">
         <view class="likes-item-name">{{item.name}} 赞了你的成就</view>
         <view class="likes-item-time">{{item.relTime}}</view>

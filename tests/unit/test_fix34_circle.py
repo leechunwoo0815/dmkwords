@@ -414,3 +414,30 @@ def test_admin_like_notification_actor_name_is_curator(client: TestClient):
         if n["ref_type"] == "circle_admin"
     )
     assert note["actor_name"] == "馆长"
+
+
+def test_admin_note_not_given_child_avatar_on_id_collision(client: TestClient):
+    """fix34e5：馆长赞通知的 ref_id 是**帖子 id**，不能被当成孩子 id 去配头像。
+
+    回归背景：演示现场帖子 1 / 孩子 1 同号 → 通知列表里馆长条目显示成"别人的头像"
+    （用户实测："馆长赞了我的成就，头像用我自己的不合适"）。
+    约定：孩子维度字段（actor_avatar/actor_level/actor_name）**只对 ref_type=child 生效**；
+    馆长条目的头像由前端凭 ref_type 换成金光馆长资产。
+    """
+    h = _h(client)
+    c1, m1, _ = _mk_parent_with_child(client, h, "13800000981", "撞号孩甲", "ClashA")
+    c2, m2, _ = _mk_parent_with_child(client, h, "13800000982", "撞号孩乙", "ClashB")
+    p1 = _share(client, m1, c1, _award_milestone(c1, 100000)).json()["post_id"]
+    # 让"孩子 id"与"帖子 id"撞上：先把帖子 id 记下，再拿同号的孩子去点赞（同号未必可得，
+    # 故直接断言"馆长条目永远不带孩子维度字段"这一条不变量）
+    client.post(f"/api/miniapp/circle/posts/{p1}/like", json={"child_id": c2}, headers=m2)
+    assert client.post(f"/api/admin/circle/posts/{p1}/admin-like", headers=h).status_code == 200
+    items = client.get("/api/miniapp/notifications?scene=circle.liked", headers=m1).json()["items"]
+    admin_note = next(n for n in items if n["ref_type"] == "circle_admin")
+    assert admin_note["actor_name"] == "馆长"
+    assert admin_note["actor_avatar"] is None  # 绝不配孩子头像（前端换金光馆长资产）
+    assert admin_note["actor_level"] is None
+    kid_note = next(n for n in items if n["ref_type"] == "child")
+    # 孩子赞：展示名=英文名，且等级字段有值（本用例孩子未设头像，故 avatar 合法为 None）
+    assert kid_note["actor_name"] == "ClashB"
+    assert kid_note["actor_level"] == "A"

@@ -51,9 +51,16 @@ def attach_actor_profiles(db: Session, data: dict) -> dict:
         for cid, en in db.query(Child.id, Child.english_name).filter(Child.id.in_(ids)).all()
     }
     for i in items:
-        # fix34e4：行为主体的**展示名**由后端给（前端不再靠 split 通知文案猜——
-        # 馆长文案是「馆长赞了 X 的成就」(无空格)，孩子文案是「Tommy 赞了 X 的成就」，
-        # 揉在文案里解析必然出错：实测横幅显示成「馆长赞了 Demo 的成就 赞了你的成就」）
+        # **只对 ref_type=child 的项做孩子维度查找**（fix34e5）：馆长赞的 ref_id 是
+        # "帖子 id"，若恰与某个孩子 id 相同，会被误配上那个孩子的头像/等级
+        # —— 演示现场"帖子 1 / 孩子 1"就能撞上，通知里就会冒出别人的头像。
+        # 展示名（fix34e4）同样只在这里给：馆长已在上面统一置为「馆长」。
+        if i.get("ref_type") != "child":
+            # 形状统一：非孩子主体（馆长赞）显式给空值——前端凭 ref_type 换金光馆长资产，
+            # 不靠"字段缺失"来判断（字段缺失型契约会逼前端写防御代码）
+            i["actor_avatar"] = None
+            i["actor_level"] = None
+            continue
         key = int(i["ref_id"]) if str(i.get("ref_id") or "").isdigit() else 0
         if key in keys:
             i["actor_name"] = names.get(key, "")
