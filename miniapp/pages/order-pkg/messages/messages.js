@@ -38,12 +38,25 @@ const CAT_KEY = {
   活动: 'activity', 预约: 'reserve', 报告: 'report', 其他: 'other',
 }
 
+// WM15-A1：scene + ref → 路由（小程序侧此前**完全无跳转机制**，本表从零建）
+// 目前只接 circle.liked（被赞 → TA 的名片页）；其余 scene 留白不跳（前端无页面可去）
+function refTarget(n) {
+  if (n.scene === 'circle.liked' && n.ref_type === 'child' && n.ref_id) {
+    return { label: '去看 TA 的阅读名片 ›', type: 'child', id: Number(n.ref_id) }
+  }
+  if (n.scene === 'circle.liked') {
+    return { label: '去阅读圈看看 ›', type: 'circle', id: 0 }
+  }
+  return null
+}
+
 function decorate(items) {
   return (items || []).map((i) => ({
     ...i,
     categoryLabel: CAT_LABEL[i.category] || i.category || '通知',
     catKey: CAT_KEY[i.category] || 'other',
     timeText: timeText(i.created_at),
+    ref: refTarget(i),
   }))
 }
 
@@ -115,6 +128,18 @@ Page({
       })
     } catch (e) {
       this.setData({ loading: false, error: !reset })
+    }
+  },
+
+  // WM15-R6：通知深链——circle.liked 点「去看名片」→ 孩子名片页；
+  // 历史通知（无 liker_child_id → ref_type=circle_post）降级跳阅读圈列表页
+  onGoRef(e) {
+    const ref = e.currentTarget.dataset.ref
+    if (!ref) return
+    if (ref.type === 'child') {
+      wx.navigateTo({ url: `/pages/circle/profile?child_id=${ref.id}` })
+    } else {
+      wx.switchTab({ url: '/pages/circle/circle' })
     }
   },
 

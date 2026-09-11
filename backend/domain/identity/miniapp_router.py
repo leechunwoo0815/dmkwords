@@ -34,6 +34,26 @@ class ParentProfileRequest(BaseSchema):
     display_name: str = ""
 
 
+class ChildAvatarRequest(BaseSchema):
+    avatar: str = ""
+
+
+# ---------- 孩子头像（WM15-R3：系统内置头像库，家长自助选择） ----------
+@router.put("/children/{child_id}/avatar")
+def update_child_avatar(
+    child_id: int,
+    body: ChildAvatarRequest,
+    auth: Any = Depends(get_current_parent),
+):
+    """家长给孩子选内置头像（只允许该字段；空串=清空回默认）。白名单校验在 service。"""
+    from backend.domain.identity.service import ChildService
+
+    parent, db = auth
+    child_of_parent(db, parent.id, child_id)  # 归属红线：只能改自己孩子的
+    ChildService(db).update_avatar(child_id, body.avatar)
+    return {"child_id": child_id, "avatar": body.avatar or ""}
+
+
 # ---------- 家长资料（WM14-B：展示称呼，双署名/被赞通知取它） ----------
 @router.put("/parent/profile")
 def update_parent_profile(

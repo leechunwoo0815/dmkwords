@@ -26,13 +26,13 @@ from backend.domain.reading_circle.art import (
     flame_outline,
     font_round,
     hex2rgb,
-    mascot,
     paper_grain,
     sparkle,
     star,
     sticker_text,
 )
 from backend.domain.reading_circle.art import INK as _INK
+from backend.domain.reading_circle.art_mascot import mascot as art_mascot
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 AVATAR_DIRS = [
@@ -87,7 +87,7 @@ def avatar_img(avatar_id: str) -> Image.Image:
         fill=(255, 255, 255, 90),
         width=int(AVATAR_SIZE * 0.019 * 3),
     )
-    mascot(cv, cx, cy, r * 0.95, kind=kind, fur=fur, ear=ear, blush=base["blush"])
+    art_mascot(cv, cx, cy, r * 0.95, kind=kind, fur=fur, ear=ear, blush=base["blush"])
     paper_grain(cv, 11)
     return cv.img.resize((AVATAR_SIZE, AVATAR_SIZE), Image.LANCZOS)
 
@@ -203,11 +203,43 @@ def build_all() -> None:
         for d in BADGE_DIRS:
             im.save(os.path.join(d, f"{bid}.png"), "PNG")
 
+    write_manifests()
+
     print(
         f"头像 {len(AVATAR_IDS)} 枚 × {len(AVATAR_DIRS)} 端；勋章 {len(BADGE_IDS)} 枚 × {len(BADGE_DIRS)} 端"
     )
     for d in AVATAR_DIRS + BADGE_DIRS:
         print(f"  {len(os.listdir(d)):3d} 个文件  {os.path.relpath(d, ROOT)}")
+
+
+def write_manifests() -> None:
+    """产出两端清单文件（**唯一事实源仍是 art.AVATAR_IDS/BADGE_IDS**）。
+
+    为什么生成而不是手写：手写必然多份漂移（test_wm15_assets 会把清单也一起对拍）。
+    """
+    import json
+
+    admin_dir = os.path.join(ROOT, "admin-web", "src", "constants")
+    os.makedirs(admin_dir, exist_ok=True)
+    with open(os.path.join(admin_dir, "avatars.json"), "w", encoding="utf-8") as f:
+        json.dump(
+            {"avatars": list(AVATAR_IDS), "badges": list(BADGE_IDS)},
+            f,
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    lines = [
+        "// miniapp/utils/avatars.js — WM15 内置头像/勋章清单（**生成物，勿手改**）",
+        "// 源：backend/domain/reading_circle/art.py 的 AVATAR_IDS/BADGE_IDS",
+        "// 重新生成：python -m scripts.gen_wm15_visuals",
+        f"const AVATAR_IDS = {list(AVATAR_IDS)!r}",
+        f"const BADGE_IDS = {list(BADGE_IDS)!r}",
+        "module.exports = { AVATAR_IDS, BADGE_IDS }",
+        "",
+    ]
+    with open(os.path.join(ROOT, "miniapp", "utils", "avatars.js"), "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
 
 
 if __name__ == "__main__":

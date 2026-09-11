@@ -1,14 +1,43 @@
-// pages/circle/circle.js — 阅读圈信息流（WM14-A）
-// 时间倒序真分页 + 下拉刷新 + 点卡全屏预览（长按保存）+ 点赞 + 馆长赞金色态
+// pages/circle/circle.js — 阅读圈信息流（WM15-R1：朋友圈式布局重构）
+// 头像+名字+相对时间 → 成就文字（原生）→ 卡片缩略图 → 点赞（含头像墙 + 弹跳动效）
 const api = require('../../utils/api')
 const media = require('../../utils/media')
 const session = require('../../utils/session')
 
 const PAGE_SIZE = 10
+const DEFAULT_AVATAR = '/icons/avatars/cat_sun.png'
 
-// 千分位（横幅数字可读性：384000 → 384,000）
+// 千分位（横幅/词数可读性）
 function _fmt(n) {
   return String(n || 0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+// C6 相对时间口径（写死）：<1min 刚刚 / <1h X 分钟前 / <24h X 小时前 /
+// 自然日昨天「昨天 HH:mm」/ 今年「MM-DD」/ 跨年「YYYY-MM-DD」。
+// 时区：created_at 为服务端 naive 本地串，JS Date 按本地解析 → 与 Asia/Shanghai 锚定一致。
+function _relTime(s) {
+  if (!s) return ''
+  const t = new Date(String(s).replace(/-/g, '/')).getTime()
+  if (Number.isNaN(t)) return ''
+  const now = Date.now()
+  const diff = now - t
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return '刚刚'
+  if (mins < 60) return `${mins} 分钟前`
+  const hours = Math.floor(mins / 60)
+  const d = new Date(t)
+  const today = new Date()
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+  if (t >= startOfToday) return `${hours} 小时前`
+  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  if (t >= startOfToday - 86400000) return `昨天 ${hm}`
+  const mmdd = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return d.getFullYear() === today.getFullYear() ? mmdd : `${d.getFullYear()}-${mmdd}`
+}
+
+// 头像 id → 本地包路径（零加载零 token；无头像用默认）
+function _avatarUrl(id) {
+  return id ? `/icons/avatars/${id}.png` : DEFAULT_AVATAR
 }
 
 Page({
@@ -19,7 +48,7 @@ Page({
     loading: true,
     loadError: false,
     finished: false,
-    // WM14-B 社区横幅（本周全馆共读词数/人数；空则不显示）
+    // WM14-B 社区横幅
     bannerWordsText: '',
     bannerKids: 0,
   },
@@ -28,6 +57,7 @@ Page({
     if (!session.ensureLogin()) return
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 3 })
+      this.getTabBar().refreshBadge && this.getTabBar().refreshBadge()
     }
     this.reload()
   },
@@ -77,37 +107,60 @@ Page({
     finally { this.setData({ loading: false }) }
   },
 
-  // 卡片图 URL 走 fullUrl 拼 token（媒体消费点纪律——image 组件无 Authorization）
+  // 媒体消费点：缩略图（信息流小图）+ 大图（预览）都走 fullUrl 拼 token
+  // 头像走**本地包**（不进 token 清单——A2 裁决）
   _decorate(items) {
     return items.map((p) => ({
       ...p,
-      image_url: p.image_url ? media.fullUrl(p.image_url, true) : '',
+      thumbUrl: p.thumb_url ? media.fullUrl(p.thumb_url, true) : '',
+      imageUrlFull: p.image_url ? media.fullUrl(p.image_url, true) : '',
+      avatarUrl: _avatarUrl(p.avatar),
+      relTime: _relTime(p.created_at),
+      likers: (p.likers || []).map((l) => ({ ...l, avatarUrl: _avatarUrl(l.avatar) })),
+      pop: false,
     }))
   },
 
   onRetryLoad() { this.reload() },
 
-  // 点卡片全屏预览（wx.previewImage 长按自然支持保存）
+  // 点卡片 → 全屏预览大图（长按保存）
   onPreviewCard(e) {
     const url = e.currentTarget.dataset.url
-    if (!url) return
-    wx.previewImage({ urls: [url] })
+    if (url) wx.previewImage({ urls: [url] })
   },
 
-  // 点赞/取消（一心一赞）
+  // 点头像/名字 → 孩子名片页（R4 社交枢纽入口）
+  onChildProfile(e) {
+    const { child, name } = e.currentTarget.dataset
+    if (!child) return
+    wx.navigateTo({
+      url: `/pages/circle/profile?child_id=${child}&child_name=${encodeURIComponent(name || '')}`,
+    })
+  },
+
+  // 点赞/取消 + 弹跳动效（wxss transform，低成本高感知）
   async onToggleLike(e) {
     const id = e.currentTarget.dataset.id
     const post = this.data.posts.find((p) => p.id === id)
     if (!post) return
+    const child = session.getCurrentChild()
     try {
       const res = post.liked_by_me
         ? await api.circleUnlike(id)
-        : await api.circleLike(id)
+        : await api.circleLike(id, child ? child.id : null)
       this.setData({
         posts: this.data.posts.map((p) =>
-          p.id === id ? { ...p, liked_by_me: !post.liked_by_me, like_count: res.like_count } : p,
+          p.id === id
+            ? { ...p, liked_by_me: !post.liked_by_me, like_count: res.like_count, pop: true }
+            : p,
         ),
       })
+      setTimeout(() => {
+        this.setData({
+          posts: this.data.posts.map((p) => (p.id === id ? { ...p, pop: false } : p)),
+        })
+        if (!post.liked_by_me) this.reload() // 点赞后刷新头像墙
+      }, 320)
     } catch (err) { /* request.js 已 toast */ }
   },
 

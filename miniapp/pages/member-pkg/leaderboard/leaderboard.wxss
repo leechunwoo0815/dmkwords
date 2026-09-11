@@ -424,3 +424,12 @@
 .list, .grid, .list-container {
   gap: 16rpx;
 }
+
+/* WM15-A2：榜单头像改用系统内置头像图（此前硬编码 🧒/👤，Child.avatar 字段形同虚设） */
+.rank-avatar-img {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: #fff;
+  border: 2rpx solid rgba(90, 74, 58, 0.18);
+}

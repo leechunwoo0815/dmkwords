@@ -588,6 +588,7 @@ CARD_W, CARD_H = 750, 1000
 def _render_full(card_data: dict, pal: dict, kind: str, base: dict, out_dir: str, tag: str) -> str:
     """含字完整版（预览/保存转发用）：标题胶囊 + 主数字 + 说明行 + 吉祥物 + 页脚。"""
     from backend.domain.reading_circle import art
+    from backend.domain.reading_circle.art_mascot import mascot as art_mascot
 
     cv = art.Canvas(CARD_W, CARD_H, pal)
     # 页面级装饰只放安全边距（卡片框外），杜绝首版"被边框裁切"
@@ -635,7 +636,7 @@ def _render_full(card_data: dict, pal: dict, kind: str, base: dict, out_dir: str
     if label:
         art.sticker_text(cv, (375, 518), label, art.font_cn(32), pal["deep"])
 
-    art.mascot(cv, 190, 650, 82, kind=kind, fur=base["fur"], ear=base["ear"], blush=base["blush"])
+    art_mascot(cv, 190, 650, 82, kind=kind, fur=base["fur"], ear=base["ear"], blush=base["blush"])
     art.star(cv, 520, 636, 26, "#FFE08A", outline=pal["accent"], width=3.2, rotate=0.22)
     art.star(cv, 604, 700, 17, "#FFF3C4", outline=pal["accent"], width=2.4, rotate=-0.24)
     art.sparkle(cv, 486, 566, 15, "#FFFFFF", 235)
@@ -660,6 +661,7 @@ def _render_full(card_data: dict, pal: dict, kind: str, base: dict, out_dir: str
 def _render_thumb(card_data: dict, pal: dict, kind: str, base: dict, out_dir: str, tag: str) -> str:
     """无字缩略版（信息流小图）：插画 + 主数字，无任何文字（文字由列表原生渲染）。"""
     from backend.domain.reading_circle import art
+    from backend.domain.reading_circle.art_mascot import mascot as art_mascot
 
     cv = art.Canvas(CARD_W, CARD_H, pal)
     art.glow(cv, 375, 400, 260, "#FFFFFF", 120)
@@ -679,7 +681,7 @@ def _render_thumb(card_data: dict, pal: dict, kind: str, base: dict, out_dir: st
         stroke="#FFFFFF",
         stroke_w=13,
     )
-    art.mascot(cv, 375, 720, 104, kind=kind, fur=base["fur"], ear=base["ear"], blush=base["blush"])
+    art_mascot(cv, 375, 720, 104, kind=kind, fur=base["fur"], ear=base["ear"], blush=base["blush"])
     art.paper_grain(cv)
     return _save(cv, out_dir, f"thumb_{card_data.get('card_type', 'x')}_{tag}.png")
 

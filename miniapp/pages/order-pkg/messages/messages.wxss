@@ -129,3 +129,11 @@
   font-size: 28rpx;
 }
 .load-end { text-align: center; color: var(--muted); font-size: 22rpx; padding: 32rpx 0; }
+
+/* WM15-R6：通知深链入口（circle.liked → 名片页） */
+.msg-ref {
+  margin-top: 12rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #f2935b;
+}

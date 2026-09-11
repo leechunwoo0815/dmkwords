@@ -1,7 +1,8 @@
 <scroll-view class="page-bg" scroll-y enhanced show-scrollbar="{{false}}">
   <view class="profile-header">
     <view class="profile-main">
-      <view class="profile-avatar">👩</view>
+      <image class="profile-avatar-img" src="{{currentChild && currentChild.avatar ? '/icons/avatars/' + currentChild.avatar + '.png' : '/icons/avatars/cat_sun.png'}}"
+        mode="aspectFill" bindtap="openAvatarPicker" />
       <view class="profile-info">
         <view class="profile-name" bindtap="onEditDisplayName">
           {{parent.display_name || parent.name || '家长'}}
@@ -13,6 +14,21 @@
     <view wx:if="{{currentChild}}" class="profile-child">
       <text class="pc-name">正在陪伴：{{currentChild.name}}</text>
       <text class="pc-status {{expireWarn ? 'warn' : ''}}">{{statusText}}</text>
+    </view>
+  </view>
+
+  <!-- WM15-R3：内置头像宫格选择 -->
+  <view wx:if="{{showAvatarPicker}}" class="avatar-mask" bindtap="closeAvatarPicker">
+    <view class="avatar-panel" catchtap="noop">
+      <view class="avatar-panel-title">选一个头像</view>
+      <view class="avatar-grid">
+        <view wx:for="{{avatarOptions}}" wx:key="id"
+          class="avatar-cell {{item.active ? 'active' : ''}}"
+          data-id="{{item.id}}" bindtap="onPickAvatar">
+          <image class="avatar-cell-img" src="{{item.url}}" mode="aspectFill" />
+        </view>
+      </view>
+      <view class="avatar-cancel" bindtap="closeAvatarPicker">取消</view>
     </view>
   </view>
 

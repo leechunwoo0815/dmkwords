@@ -13,6 +13,9 @@ Page({
     children: [],
     currentChild: null,
     statusText: '',
+    // WM15-R3：内置头像库（与后端 AVATAR_IDS 同源的展示副本）+ 宫格选择弹层
+    avatarOptions: [],
+    showAvatarPicker: false,
   },
 
   onShow() {
@@ -30,6 +33,19 @@ Page({
       statusText: MEMBER_STATUS_TEXT[c.member_status] || c.member_status,
     }))
     const currentChild = session.getCurrentChild()
+    if (!this.data.avatarOptions.length) {
+      // 清单为生成物（源：backend .../art.py AVATAR_IDS）——不手写，防三端漂移
+      const opts = require('../../utils/avatars').AVATAR_IDS.map((id) => ({
+        id,
+        url: `/icons/avatars/${id}.png`,
+        active: !!currentChild && currentChild.avatar === id,
+      }))
+      this.setData({ avatarOptions: opts })
+    } else if (currentChild) {
+      this.setData({
+        avatarOptions: this.data.avatarOptions.map((o) => ({ ...o, active: o.id === currentChild.avatar })),
+      })
+    }
     const expireLine = this._expireLine(currentChild)
     this.setData({
       parent,
@@ -157,6 +173,34 @@ Page({
         } catch (e) { /* request.js 已 toast */ }
       },
     })
+  },
+
+  noop() {},
+
+  // WM15-R3：点孩子头像 → 宫格选择内置头像（24 枚：12 动物 × 2 配色）
+  openAvatarPicker() {
+    const c = this.data.currentChild
+    if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return }
+    this.setData({ showAvatarPicker: true })
+  },
+
+  closeAvatarPicker() {
+    this.setData({ showAvatarPicker: false })
+  },
+
+  async onPickAvatar(e) {
+    const id = e.currentTarget.dataset.id
+    const c = this.data.currentChild
+    if (!c || !id) return
+    try {
+      await api.updateChildAvatar(c.id, id)
+      // 本地缓存同步（session 里 children 是数组，逐项替换）
+      const children = session.getChildren().map((x) => (x.id === c.id ? { ...x, avatar: id } : x))
+      wx.setStorageSync('children', children)
+      this.setData({ showAvatarPicker: false })
+      this.refresh()
+      wx.showToast({ title: '头像已更新', icon: 'success' })
+    } catch (err) { /* request.js 已 toast */ }
   },
 
   onLogout() {

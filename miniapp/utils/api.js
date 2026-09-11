@@ -236,8 +236,21 @@ module.exports = {
       child_id: childId, card_type: cardType, ref_id: refId,
     })
   },
-  circleLike(postId) {
-    return req.post(`/api/miniapp/circle/posts/${postId}/like`)
+  // WM15-R6：点赞带展示名义（家长当前选中的孩子）；childId 为空则后端降级家长显示名
+  circleLike(postId, childId) {
+    return req.post(`/api/miniapp/circle/posts/${postId}/like`, { child_id: childId || null })
+  },
+  // WM15-R3：孩子内置头像（白名单 id；空串=清空）
+  updateChildAvatar(childId, avatar) {
+    return req.put(`/api/miniapp/children/${childId}/avatar`, { avatar: avatar || '' })
+  },
+  // WM15-R4：孩子名片页（英文名/头像/成就数据 + 勋章墙 + TA 的帖子）
+  circleChildProfile(childId) {
+    return req.get(`/api/miniapp/circle/children/${childId}/profile`)
+  },
+  // WM15-R5：名片海报相对路径（前端自己拼 token——image 组件无法带头）
+  circleChildPosterUrl(childId) {
+    return `/api/miniapp/circle/children/${childId}/poster`
   },
   circleUnlike(postId) {
     return req.del(`/api/miniapp/circle/posts/${postId}/like`)

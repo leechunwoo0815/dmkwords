@@ -1518,7 +1518,8 @@ def _ensure_demo_circle(db: Session) -> None:
         if exists:
             return False
         card_data = card_engine.assemble_card_data(db, child, card_type, ref_id)
-        image_path = card_engine.render_card(card_data)
+        # WM15-R2：render_card 返回**双规格 dict**（含字大图 + 无字缩略图）——两列都落
+        rendered = card_engine.render_card(card_data)
         db.add(
             CirclePost(
                 parent_id=parent_id,
@@ -1526,7 +1527,8 @@ def _ensure_demo_circle(db: Session) -> None:
                 card_type=card_type,
                 ref_id=ref_id,
                 card_data=card_engine.card_data_json(card_data),
-                image_path=image_path,
+                image_path=rendered["image_path"],
+                thumb_path=rendered["thumb_path"],
                 admin_liked=admin_liked,
                 is_pinned=is_pinned,
             )

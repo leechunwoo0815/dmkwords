@@ -219,6 +219,13 @@ class ChildService:
             )
         child.member_status = new_status
 
+    def update_avatar(self, child_id: int, avatar: str) -> Child:
+        """WM15-R3：家长自助设置孩子内置头像（白名单；空串=清空）。"""
+        child = self._get_child(child_id)
+        child.avatar = ParentService.validate_avatar(avatar)
+        self.db.commit()
+        return child
+
     def _get_child(self, child_id: int) -> Child:
         child = self.db.query(Child).filter(Child.id == child_id, Child.is_deleted == 0).first()
         if not child:

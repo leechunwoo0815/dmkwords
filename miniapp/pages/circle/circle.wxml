@@ -11,7 +11,7 @@
     <text class="share-entry-arrow">›</text>
   </view>
 
-  <!-- 社区横幅（WM14-B）：本周全馆共读——口径同周榜（在会且本周有入账） -->
+  <!-- 社区横幅（WM14-B）：本周全馆共读 -->
   <view wx:if="{{bannerWordsText}}" class="banner">
     <text class="banner-emoji">🌏</text>
     <text class="banner-text">本周全馆共读 {{bannerWordsText}} 词 · {{bannerKids}} 位小朋友在坚持</text>
@@ -29,30 +29,44 @@
     </view>
   </block>
 
-  <view class="post-list">
-    <view wx:for="{{posts}}" wx:key="id" class="post-card {{item.admin_liked ? 'admin-liked' : ''}}">
-      <!-- 馆方推荐角标（置顶帖） -->
+  <!-- WM15-R1 朋友圈式信息流：头像+名字+时间 / 成就文字原生 / 缩略图 / 点赞头像墙 / 分隔线 -->
+  <view class="feed">
+    <view wx:for="{{posts}}" wx:key="id" class="post {{item.admin_liked ? 'admin-liked' : ''}} {{item.is_pinned ? 'pinned' : ''}}">
       <view wx:if="{{item.is_pinned}}" class="pin-badge">馆方推荐</view>
-      <view class="post-header">
-        <view class="post-avatar">{{item.avatar || '🧒'}}</view>
-        <view class="post-names">
-          <view class="post-dual-name">
-            {{item.parent_name}} · {{item.child_name}}
-            <text wx:if="{{item.admin_liked}}" class="admin-like-mark">🌟</text>
+
+      <!-- 头部：点头像/名字 → 名片页 -->
+      <view class="post-head" bindtap="onChildProfile"
+        data-child="{{item.child_id}}" data-name="{{item.child_name}}">
+        <image class="avatar" src="{{item.avatarUrl}}" mode="aspectFill" />
+        <view class="head-main">
+          <view class="name-row">
+            <text class="child-name">{{item.child_name}}</text>
+            <text wx:if="{{item.admin_liked}}" class="admin-mark">🌟</text>
           </view>
-          <view class="post-time">{{item.card_type_label}} · {{item.created_at}}</view>
+          <text class="meta">{{item.parent_name}} · {{item.card_type_label}} · {{item.relTime}}</text>
         </view>
-        <text wx:if="{{item.is_mine}}" class="delete-link" data-id="{{item.id}}"
-          catchtap="onDeletePost">删除</text>
+        <text wx:if="{{item.is_mine}}" class="del" data-id="{{item.id}}" catchtap="onDeletePost">删除</text>
       </view>
-      <!-- 卡片图：点卡片全屏预览（长按保存） -->
-      <image class="post-card-img {{item.admin_liked ? 'img-gold' : ''}}" src="{{item.image_url}}"
-        mode="widthFix" data-url="{{item.image_url}}" bindtap="onPreviewCard" />
-      <view class="post-footer">
-        <view class="like-btn {{item.liked_by_me ? 'liked' : ''}}" data-id="{{item.id}}"
-          bindtap="onToggleLike">
+
+      <!-- 成就文字：原生渲染（card_data 快照；文字不再烧在图片里） -->
+      <view class="post-body">
+        <view class="ach-title">{{item.title}}</view>
+        <view wx:if="{{item.subtitle}}" class="ach-sub">{{item.subtitle}}</view>
+        <image wx:if="{{item.thumbUrl}}" class="post-thumb" src="{{item.thumbUrl}}" mode="widthFix"
+          data-url="{{item.imageUrlFull}}" bindtap="onPreviewCard" />
+      </view>
+
+      <!-- 点赞 + 谁赞过（头像墙） -->
+      <view class="post-foot">
+        <view class="like-btn {{item.liked_by_me ? 'liked' : ''}} {{item.pop ? 'pop' : ''}}"
+          data-id="{{item.id}}" bindtap="onToggleLike">
           <text class="like-icon">{{item.liked_by_me ? '❤️' : '🤍'}}</text>
           <text class="like-count">{{item.like_count}}</text>
+        </view>
+        <view wx:if="{{item.likers.length}}" class="liker-wall">
+          <image wx:for="{{item.likers}}" wx:for-item="lk" wx:key="child_id" class="liker-avatar"
+            src="{{lk.avatarUrl}}" mode="aspectFill" />
+          <text wx:if="{{item.like_count > item.likers.length}}" class="liker-more">+{{item.like_count - item.likers.length}}</text>
         </view>
       </view>
     </view>

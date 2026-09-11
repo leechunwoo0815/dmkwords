@@ -775,3 +775,35 @@
 .bottom-spacer {
   height: 160rpx;
 }
+
+/* WM15-R3：孩子头像（可点改）+ 宫格选择弹层 */
+.profile-avatar-img {
+  width: 104rpx; height: 104rpx; border-radius: 50%;
+  background: #fff; border: 3rpx solid rgba(90, 74, 58, 0.18);
+}
+.avatar-mask {
+  position: fixed; left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(59, 47, 47, 0.5); z-index: 99;
+  display: flex; align-items: flex-end;
+}
+.avatar-panel {
+  width: 100%; max-height: 76vh; padding: 28rpx 24rpx 36rpx;
+  background: var(--surface, #fffdf8);
+  border-radius: 28rpx 28rpx 0 0;
+}
+.avatar-panel-title {
+  font-family: var(--font-display); font-size: 32rpx; font-weight: 800;
+  color: var(--fg); text-align: center; margin-bottom: 20rpx;
+}
+.avatar-grid { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.avatar-cell {
+  width: 108rpx; height: 108rpx; border-radius: 50%;
+  padding: 4rpx;
+}
+.avatar-cell.active { border: 4rpx solid #f2935b; }
+.avatar-cell-img { width: 100rpx; height: 100rpx; border-radius: 50%; }
+.avatar-cancel {
+  margin-top: 24rpx; padding: 22rpx 0; text-align: center;
+  font-size: 30rpx; font-weight: 700; color: var(--fg);
+  border: 2rpx solid rgba(90, 74, 58, 0.25); border-radius: 999rpx;
+}

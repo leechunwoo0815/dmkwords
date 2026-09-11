@@ -29,7 +29,6 @@ from backend.domain.reading_circle.art import (
     font_round,
     glow,
     hex2rgb,
-    mascot,
     paper_grain,
     rainbow,
     soft_shadow,
@@ -38,6 +37,7 @@ from backend.domain.reading_circle.art import (
     sticker_pair,
     sticker_text,
 )
+from backend.domain.reading_circle.art_mascot import mascot as art_mascot
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "uploads", "wm15-samples")
 W, H = 750, 1000  # 卡片规格（与现有卡片同尺寸，便于替换）
@@ -111,7 +111,7 @@ def _card(
     sticker_text(cv, (375, 518), line2, font_cn(32), pal["deep"])
 
     # 吉祥物放在卡内左下沉底（消除下半空带）
-    mascot(cv, 190, 650, 82, kind=kind, fur=fur, ear=ear, blush=blush)
+    art_mascot(cv, 190, 650, 82, kind=kind, fur=fur, ear=ear, blush=blush)
     # 卡内右侧装饰（x<=656 / y<=742，留 28px 安全边）
     star(cv, 520, 636, 26, "#FFE08A", outline=pal["accent"], width=3.2, rotate=0.22)
     star(cv, 604, 700, 17, "#FFF3C4", outline=pal["accent"], width=2.4, rotate=-0.24)
@@ -143,7 +143,7 @@ def card_thumb(
     for cx, cy, r in ((238, 300, 14), (534, 288, 12), (300, 520, 11), (620, 700, 13)):
         sparkle(cv, cx, cy, r, "#FFFFFF", 235)
     sticker_text(cv, (375, 412), big, font_round(168), pal["deep"], stroke="#FFFFFF", stroke_w=13)
-    mascot(cv, 375, 720, 104, kind=kind, fur=fur, ear=ear, blush=blush)
+    art_mascot(cv, 375, 720, 104, kind=kind, fur=fur, ear=ear, blush=blush)
     paper_grain(cv)
     return cv.finish(path)
 
@@ -178,7 +178,7 @@ def avatar(
         fill=(255, 255, 255, 120),
         width=int(size * 0.021 * 3),
     )
-    mascot(cv, cx, cy, r * 0.95, kind=kind, fur=fur, ear=ear, blush=blush)
+    art_mascot(cv, cx, cy, r * 0.95, kind=kind, fur=fur, ear=ear, blush=blush)
     return cv.finish(path)
 
 

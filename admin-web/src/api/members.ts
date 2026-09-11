@@ -38,6 +38,8 @@ export function apiOrderCounts(): Promise<OrderCounts> {
 
 export function apiCreateChild(parentId: number, body: {
   name: string; english_name?: string; gender?: number; birthday?: string; grade?: string;
+  /** WM15-R3：系统内置头像 id（AVATAR_IDS 白名单，后端校验） */
+  avatar?: string;
 }): Promise<{ id: number }> {
   return request(`/api/admin/members/parents/${parentId}/children`, { method: "POST", body: JSON.stringify(body) });
 }
@@ -83,6 +85,8 @@ export function apiUpdateChild(
   body: {
     name?: string; english_name?: string; gender?: number;
     birthday?: string; grade?: string; ar_level?: string;
+    /** WM15-R3：内置头像 id；空串=清空回默认 */
+    avatar?: string;
   },
 ): Promise<Child> {
   return request(`/api/admin/members/children/${childId}`, {

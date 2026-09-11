@@ -32,6 +32,8 @@
         <text class="msg-time">{{item.timeText}}</text>
       </view>
       <view wx:if="{{expandedId === item.id}}" class="msg-content expanded">{{item.content}}</view>
+      <view wx:if="{{expandedId === item.id && item.ref}}" class="msg-ref"
+        data-ref="{{item.ref}}" catchtap="onGoRef">{{item.ref.label}}</view>
       <view wx:else class="msg-content one-line">{{item.content}}</view>
     </view>
   </view>

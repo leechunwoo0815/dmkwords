@@ -23,6 +23,7 @@ import { Tooltip, Upload } from "antd";
 import type { UploadFile } from "antd";
 
 import { useAuth } from "../auth";
+import AvatarPicker from "../components/AvatarPicker";
 import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
 
@@ -512,6 +513,7 @@ export default function MemberManage() {
                         name: r.name, english_name: r.english_name || "",
                         gender: r.gender ?? undefined, birthday: r.birthday || undefined,
                         grade: r.grade || "", ar_level: r.ar_level || "",
+                        avatar: r.avatar || "",
                       });
                     }}>编辑</Button>
                     {/* WM3-B1 删除（订单守卫禁用+tooltip） */}
@@ -722,6 +724,7 @@ export default function MemberManage() {
             await apiCreateChild(v.parent_id, {
               name: v.name, english_name: v.english_name || undefined,
               gender: v.gender, grade: v.grade ?? "",
+              avatar: v.avatar || undefined,
             });
             message.success(`孩子 ${v.name} 建档成功（会员状态：未入会）`);
             setChildOpen(false);
@@ -752,6 +755,9 @@ export default function MemberManage() {
           </Form.Item>
           <Form.Item name="grade" label="年级">
             <Input placeholder="如：一年级" />
+          </Form.Item>
+          <Form.Item name="avatar" label="头像（系统内置，可后改）">
+            <AvatarPicker />
           </Form.Item>
         </Form>
       </Modal>
@@ -978,6 +984,7 @@ export default function MemberManage() {
               english_name: v.english_name || undefined,
               grade: v.grade || undefined,
               ar_level: v.ar_level || undefined,
+              avatar: v.avatar ?? "",
             });
             message.success("已保存");
             setEditChild(null);
@@ -1009,6 +1016,9 @@ export default function MemberManage() {
           </Form.Item>
           <Form.Item name="grade" label="年级">
             <Input maxLength={50} />
+          </Form.Item>
+          <Form.Item name="avatar" label="头像（系统内置）">
+            <AvatarPicker />
           </Form.Item>
           <Form.Item
             name="ar_level"

@@ -8,6 +8,7 @@
     bindtap="switchTab"
   >
     <image class="tab-bar-icon" src="{{selected === index ? item.selectedIconPath : item.iconPath}}" />
+    <view wx:if="{{item.pagePath === '/pages/circle/circle' && circleDot > 0}}" class="tab-dot">{{circleDot}}</view>
     <text class="tab-bar-text">{{item.text}}</text>
   </view>
 </view>

@@ -1,6 +1,10 @@
+const api = require('../utils/api')
+
 Component({
   data: {
     selected: 0,
+    // WM15-R7：阅读圈红点（= 消息中心 circle.liked 未读数，同源；0=不显示）
+    circleDot: 0,
     color: '#6B5B5B',
     selectedColor: '#FF6B35',
     list: [
@@ -37,7 +41,21 @@ Component({
     ],
   },
 
+  attached() {
+    this.refreshBadge()
+  },
+
   methods: {
+    // 红点刷新：口径同消息中心未读（后端 unread_by_scene.circle_liked）——禁自建第二套计数
+    async refreshBadge() {
+      if (!wx.getStorageSync('token')) return
+      try {
+        const r = await api.notifications(1, 1)
+        const n = (r.unread_by_scene && r.unread_by_scene.circle_liked) || 0
+        this.setData({ circleDot: n > 99 ? 99 : n })
+      } catch (e) { /* 静默：红点失败不影响导航 */ }
+    },
+
     switchTab(e) {
       const { path, index } = e.currentTarget.dataset
       wx.switchTab({ url: path })

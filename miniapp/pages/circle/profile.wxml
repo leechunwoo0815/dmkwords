@@ -1,0 +1,60 @@
+<view class="page">
+  <view wx:if="{{loading && !profile}}" class="loading-wrap">加载中…</view>
+  <error-view wx:if="{{loadError}}" type="network" title="加载失败"
+    desc="名片加载失败，请重试" bind:onRetry="onRetryLoad" />
+
+  <block wx:if="{{profile}}">
+    <!-- 名片头 -->
+    <view class="card">
+      <view wx:if="{{profile.is_history}}" class="history-tag">历史小读者</view>
+      <image class="big-avatar" src="{{profile.avatarUrl}}" mode="aspectFill" />
+      <view class="name">{{profile.english_name}}</view>
+      <view class="level-chip">{{profile.level}} 级小读者</view>
+
+      <view class="stats">
+        <view class="stat">
+          <text class="stat-num">{{profile.wordsText}}</text>
+          <text class="stat-lab">总词数</text>
+        </view>
+        <view class="stat">
+          <text class="stat-num">{{profile.books}}</text>
+          <text class="stat-lab">读本数</text>
+        </view>
+        <view class="stat">
+          <text class="stat-num">{{profile.checkin_days}}</text>
+          <text class="stat-lab">打卡天数</text>
+        </view>
+      </view>
+
+      <view class="share-btn" bindtap="onSharePoster">分享名片</view>
+    </view>
+
+    <!-- 勋章墙 -->
+    <view class="section">
+      <view class="section-title">勋章墙</view>
+      <view wx:if="{{profile.badges.length}}" class="badge-wall">
+        <view wx:for="{{profile.badges}}" wx:key="badge_id" class="badge">
+          <image class="badge-icon" src="{{item.iconUrl}}" mode="aspectFit" />
+          <text class="badge-lab">{{item.label}}</text>
+        </view>
+      </view>
+      <view wx:else class="empty-hint">还没有勋章，读完一本书就能解锁啦～</view>
+    </view>
+
+    <!-- TA 晒过的成就 -->
+    <view class="section">
+      <view class="section-title">TA 晒过的成就</view>
+      <view wx:if="{{posts.length}}" class="mini-feed">
+        <view wx:for="{{posts}}" wx:key="id" class="mini-post">
+          <view class="mini-text">
+            <text class="mini-title">{{item.title}}</text>
+            <text class="mini-sub">{{item.subtitle}}</text>
+          </view>
+          <image wx:if="{{item.thumbUrl}}" class="mini-thumb" src="{{item.thumbUrl}}" mode="widthFix"
+            data-url="{{item.imageUrlFull}}" bindtap="onPreviewPost" />
+        </view>
+      </view>
+      <view wx:else class="empty-hint">还没有晒过成就</view>
+    </view>
+  </block>
+</view>

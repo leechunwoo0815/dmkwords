@@ -6,6 +6,7 @@
     "pages/member/member",
     "pages/login/login",
     "pages/circle/circle",
+    "pages/circle/profile",
     "pages/circle/share"
   ],
   "subPackages": [

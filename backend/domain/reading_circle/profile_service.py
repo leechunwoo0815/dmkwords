@@ -21,6 +21,7 @@ from backend.common.exceptions import NotFoundError
 from backend.domain.growth.models import CheckinStreakRecord, MilestoneAward, WordsLedger
 from backend.domain.identity.models import Child
 from backend.domain.reading_circle import art
+from backend.domain.reading_circle.art_mascot import mascot as art_mascot
 from backend.domain.reading_circle.models import CirclePost
 
 POSTER_W, POSTER_H = 750, 1150
@@ -209,7 +210,7 @@ class CircleProfileService:
             bi = Image.open(bp).convert("RGBA").resize((96, 96), Image.LANCZOS)
             cv.img.alpha_composite(bi, (int((66 + i * 110) * art.SS), int(830 * art.SS)))
 
-        art.mascot(
+        art_mascot(
             cv, 375, 1010, 74, kind=base_key, fur=base["fur"], ear=base["ear"], blush=base["blush"]
         )
         art.bubble(cv, (48, 1090, 702, 1140), radius=26, fill=pal["accent"], outline=None)

@@ -1,30 +1,9 @@
-/* pages/circle/circle.wxss — 阅读圈信息流（绘本风设计令牌） */
+/* pages/circle/circle.wxss — 阅读圈信息流（WM15-R1 朋友圈式布局，绘本风令牌） */
 .page {
   background: var(--bg);
 }
 
-/* 社区横幅（WM14-B）：本周全馆共读——暖色横条，与晒成就入口区分 */
-.banner {
-  margin: 24rpx 24rpx 0;
-  padding: 22rpx 28rpx;
-  background: var(--accent, #fcd34d);
-  border: 3rpx solid var(--fg);
-  border-radius: 24rpx;
-  box-shadow: var(--shadow-hard);
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-.banner-emoji {
-  font-size: 40rpx;
-}
-.banner-text {
-  font-size: 28rpx;
-  font-weight: 700;
-  color: var(--fg);
-  line-height: 1.4;
-}
-
+/* 顶部晒成就入口 */
 .share-entry {
   margin: 24rpx;
   padding: 28rpx 32rpx;
@@ -50,150 +29,203 @@
   color: var(--fg);
 }
 .share-entry-sub {
+  margin-top: 6rpx;
   font-size: 24rpx;
-  color: var(--muted);
-  margin-top: 4rpx;
+  color: var(--fg-muted, #8a7d72);
 }
 .share-entry-arrow {
-  font-size: 40rpx;
-  color: var(--muted);
+  font-size: 44rpx;
+  color: var(--fg-muted, #8a7d72);
 }
 
-.loading-wrap {
-  text-align: center;
-  color: var(--muted);
-  padding: 40rpx 0;
-  font-size: 26rpx;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 120rpx 60rpx;
-}
-.empty-icon {
-  font-size: 100rpx;
-  margin-bottom: 24rpx;
-}
-.empty-text {
-  color: var(--muted);
-  font-size: 28rpx;
-  line-height: 1.6;
-}
-
-.post-list {
-  padding: 0 24rpx;
-}
-.post-card {
-  background: var(--surface);
+/* 社区横幅（WM14-B） */
+.banner {
+  margin: 24rpx 24rpx 0;
+  padding: 22rpx 28rpx;
+  background: var(--accent, #fcd34d);
   border: 3rpx solid var(--fg);
   border-radius: 24rpx;
   box-shadow: var(--shadow-hard);
-  margin-bottom: 28rpx;
-  padding: 24rpx;
-  position: relative;
-  overflow: hidden;
-}
-/* 馆长赞特殊态：金色边框 */
-.post-card.admin-liked {
-  border-color: var(--gold);
-  box-shadow: 6rpx 6rpx 0 rgba(245, 158, 11, 0.45);
-}
-.pin-badge {
-  position: absolute;
-  top: 0;
-  right: 0;
-  background: var(--accent);
-  color: #fff;
-  font-size: 20rpx;
-  padding: 6rpx 18rpx;
-  border-radius: 0 20rpx 0 20rpx;
-  z-index: 2;
-}
-
-.post-header {
   display: flex;
   align-items: center;
   gap: 16rpx;
-  margin-bottom: 20rpx;
 }
-.post-avatar {
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 50%;
-  background: var(--sun-soft);
-  border: 3rpx solid var(--fg);
+.banner-emoji { font-size: 40rpx; }
+.banner-text {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--fg);
+  line-height: 1.4;
+}
+
+/* ===== WM15-R1 信息流：帖子之间用淡灰分隔线（朋友圈观感）===== */
+.feed {
+  padding: 0 24rpx;
+}
+.post {
+  position: relative;
+  padding: 28rpx 0;
+  border-bottom: 1rpx solid rgba(90, 74, 58, 0.14);
+}
+.post:last-child { border-bottom: none; }
+
+/* 置顶/馆长赞态 */
+.post.pinned {
+  margin: 16rpx -12rpx;
+  padding: 24rpx 12rpx 28rpx;
+  background: rgba(255, 253, 247, 0.86);
+  border-radius: 22rpx;
+  border-bottom: 1rpx solid rgba(90, 74, 58, 0.14);
+}
+.pin-badge {
+  position: absolute;
+  top: 10rpx;
+  right: 0;
+  padding: 4rpx 16rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #3b2f2f;
+  background: #fcd34d;
+  border: 2rpx solid var(--fg);
+  border-radius: 999rpx;
+}
+
+/* 头部：头像 + 名字 + 时间 */
+.post-head {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 40rpx;
-  overflow: hidden;
+  gap: 18rpx;
 }
-.post-names {
+.avatar {
+  width: 84rpx;
+  height: 84rpx;
+  border-radius: 50%;
+  background: #fff;
+  flex-shrink: 0;
+}
+.head-main {
   flex: 1;
   min-width: 0;
 }
-.post-dual-name {
-  font-size: 30rpx;
-  font-weight: 700;
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+.child-name {
+  font-family: var(--font-display);
+  font-size: 32rpx;
+  font-weight: 800;
   color: var(--fg);
 }
-.admin-like-mark {
-  color: var(--gold);
-  font-size: 28rpx;
-}
-.post-time {
-  font-size: 22rpx;
-  color: var(--muted);
-  margin-top: 4rpx;
-}
-.delete-link {
+.admin-mark { font-size: 26rpx; }
+.meta {
+  display: block;
+  margin-top: 6rpx;
   font-size: 24rpx;
-  color: var(--error);
+  color: var(--fg-muted, #8a7d72);
+}
+.del {
+  font-size: 24rpx;
+  color: #d0555f;
   padding: 8rpx 12rpx;
 }
 
-.post-card-img {
-  width: 100%;
-  border-radius: 16rpx;
-  border: 2rpx solid var(--border);
-  display: block;
+/* 成就文字（原生渲染，缩放不受图片影响） */
+.post-body { margin-top: 16rpx; }
+.ach-title {
+  font-family: var(--font-display);
+  font-size: 36rpx;
+  font-weight: 800;
+  color: var(--fg);
+  line-height: 1.35;
 }
-/* 馆长赞卡片图金色描边（与管理端金色 Tag 呼应） */
-.post-card-img.img-gold {
-  border-color: var(--gold);
+.ach-sub {
+  margin-top: 8rpx;
+  font-size: 28rpx;
+  color: #7a6650;
+  line-height: 1.4;
 }
 
-.post-footer {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16rpx;
+/* 缩略配图：约 60% 宽、圆角；点开看含字完整大图 */
+.post-thumb {
+  margin-top: 18rpx;
+  width: 60%;
+  border-radius: 20rpx;
+  border: 2rpx solid rgba(90, 74, 58, 0.18);
+  background: #fffdf7;
 }
-.like-btn {
+
+/* 点赞 + 头像墙 */
+.post-foot {
+  margin-top: 18rpx;
   display: flex;
   align-items: center;
-  gap: 10rpx;
-  padding: 10rpx 28rpx;
-  border-radius: 40rpx;
-  border: 3rpx solid var(--fg);
+  justify-content: space-between;
+  gap: 16rpx;
+}
+.like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 8rpx 22rpx;
+  border: 2rpx solid rgba(90, 74, 58, 0.25);
+  border-radius: 999rpx;
   background: var(--surface);
-  min-height: 88rpx; /* MP-018 触控区 */
 }
-.like-btn.liked {
-  background: var(--accent-soft);
-  border-color: var(--accent);
+.like-btn.liked { border-color: #ef7a86; background: #fff0f3; }
+.like-icon { font-size: 30rpx; }
+.like-count { font-size: 26rpx; font-weight: 700; color: var(--fg); }
+
+/* 点赞弹跳动效（交互完美感：低成本高感知） */
+.like-btn.pop { animation: likePop 0.32s ease-out; }
+@keyframes likePop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.18); }
+  100% { transform: scale(1); }
 }
-.like-icon {
-  font-size: 32rpx;
+.admin-liked .post-thumb { border-color: #e8a93b; }
+
+.liker-wall {
+  display: flex;
+  align-items: center;
+  gap: -10rpx;
 }
-.like-count {
-  font-size: 28rpx;
-  font-weight: 700;
-  color: var(--fg);
+.liker-avatar {
+  width: 46rpx;
+  height: 46rpx;
+  border-radius: 50%;
+  margin-left: -10rpx;
+  background: #fff;
+  border: 2rpx solid #fffdf7;
+}
+.liker-more {
+  margin-left: 6rpx;
+  font-size: 24rpx;
+  color: var(--fg-muted, #8a7d72);
 }
 
-.list-end {
+/* 状态块 */
+.loading-wrap {
+  padding: 60rpx 0;
   text-align: center;
-  color: var(--muted);
-  font-size: 24rpx;
-  padding: 30rpx 0;
+  font-size: 26rpx;
+  color: var(--fg-muted, #8a7d72);
+}
+.list-end {
+  padding: 36rpx 0 60rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: var(--fg-muted, #8a7d72);
+}
+.empty-state {
+  padding: 120rpx 60rpx;
+  text-align: center;
+}
+.empty-icon { font-size: 96rpx; }
+.empty-text {
+  margin-top: 20rpx;
+  font-size: 30rpx;
+  color: var(--fg-muted, #8a7d72);
+  line-height: 1.5;
 }

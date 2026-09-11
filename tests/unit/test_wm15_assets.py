@@ -38,6 +38,26 @@ def test_avatar_ids_match_all_three_ends() -> None:
         assert _ids_in(d) == expect, f"{os.path.relpath(d, ROOT)} 与 AVATAR_IDS 不一致"
 
 
+def test_frontend_manifests_match_backend_constant() -> None:
+    """两端清单文件（生成物）也必须与后端常量一致——防第 4/5 份手写副本漂移。"""
+    import json
+
+    admin = os.path.join(ROOT, "admin-web", "src", "constants", "avatars.json")
+    with open(admin, encoding="utf-8") as f:
+        data = json.load(f)
+    assert set(data["avatars"]) == set(AVATAR_IDS)
+    assert set(data["badges"]) == set(BADGE_IDS)
+
+    mini = os.path.join(ROOT, "miniapp", "utils", "avatars.js")
+    text = open(mini, encoding="utf-8").read()
+    import re
+
+    ids = set(re.findall(r"'([a-z]+_(?:sun|mint))'", text))
+    assert ids == set(AVATAR_IDS), "miniapp/utils/avatars.js 与后端常量不一致"
+    badges = set(re.findall(r"'(milestone_m\d|level_template|streak_\d+)'", text))
+    assert badges == set(BADGE_IDS), "miniapp 勋章清单与后端常量不一致"
+
+
 def test_badge_ids_match_all_three_ends() -> None:
     expect = set(BADGE_IDS)
     assert len(expect) == 9, "里程碑 6 + 等级模板 1 + 连击 2 = 9"

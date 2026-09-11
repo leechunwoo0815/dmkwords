@@ -989,6 +989,18 @@
         "title": "CheckOutResponse",
         "type": "object"
       },
+      "ChildAvatarRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "avatar": {
+            "default": "",
+            "title": "Avatar",
+            "type": "string"
+          }
+        },
+        "title": "ChildAvatarRequest",
+        "type": "object"
+      },
       "ChildCardResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1210,6 +1222,18 @@
             ],
             "title": "Ar Level"
           },
+          "avatar": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "WM15 系统内置头像 id（空=默认头像）",
+            "title": "Avatar"
+          },
           "birthday": {
             "anyOf": [
               {
@@ -1419,6 +1443,18 @@
               }
             ],
             "title": "Ar Level"
+          },
+          "avatar": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "WM15 系统内置头像 id（空=默认头像）",
+            "title": "Avatar"
           },
           "birthday": {
             "anyOf": [
@@ -10370,6 +10406,66 @@
         "summary": "Checkin Calendar",
         "tags": [
           "miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/children/{child_id}/avatar": {
+      "put": {
+        "description": "家长给孩子选内置头像（只允许该字段；空串=清空回默认）。白名单校验在 service。",
+        "operationId": "update_child_avatar_api_miniapp_children__child_id__avatar_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "child_id",
+            "required": true,
+            "schema": {
+              "title": "Child Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChildAvatarRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Child Avatar",
+        "tags": [
+          "identity-miniapp"
         ]
       }
     },

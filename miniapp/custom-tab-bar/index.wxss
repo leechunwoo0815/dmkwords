@@ -60,3 +60,21 @@
   color: #FF6B35;
   font-weight: 800;
 }
+
+/* WM15-R7：阅读圈红点（有新被赞未读时亮；进消息中心读掉后自然消） */
+.tab-bar-item { position: relative; }
+.tab-dot {
+  position: absolute;
+  top: -6rpx;
+  right: 50%;
+  transform: translateX(38rpx);
+  min-width: 30rpx;
+  height: 30rpx;
+  padding: 0 6rpx;
+  font-size: 20rpx;
+  line-height: 30rpx;
+  text-align: center;
+  color: #fff;
+  background: #ef5b6b;
+  border-radius: 999rpx;
+}

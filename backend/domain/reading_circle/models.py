@@ -56,9 +56,7 @@ class CirclePost(BaseModel):
     card_type = Column(String(30), nullable=False, comment="卡片类型")
     ref_id = Column(Integer, nullable=False, comment="成就关联ID（按类型语义见常量注释）")
     card_data = Column(Text, nullable=False, default="{}", comment="卡片数据 JSON 快照（冻结）")
-    image_path = Column(
-        String(255), nullable=True, comment="卡片大图（含字完整版，uploads/circle/）"
-    )
+    image_path = Column(String(255), nullable=True, comment="卡片图（uploads/circle/）")
     thumb_path = Column(
         String(255), nullable=True, comment="卡片缩略图（无字纯图版，信息流小图用）"
     )
