@@ -1,8 +1,12 @@
 # backend/domain/reading_circle/card_engine.py — 成就卡片引擎（WM14-A）
-"""6 类模板（milestone/books_count/level_up/perfect_quiz/streak/finish_book）：
+"""10 类模板（milestone/books_count/level_up/perfect_quiz/streak/finish_book/
+rank_top/rank_up/weekly_report/breakthrough）：
 数据装配（从 WordsLedger/MilestoneAward/ChildGrowthState/QuizAttempt/
-CheckinStreakRecord 聚合）→ card_data 快照 dict → Pillow 渲染绘本风卡片图
-（复用 report_service 字体链 + gen_cover 配色风格，落 uploads/circle/）。
+CheckinStreakRecord/CircleRankSnapshot 聚合）→ card_data 快照 dict。
+
+渲染段已外置（fix34 R3 拆 god file）：本模块只负责**数据装配 + 标签/配色表**，
+卡片图/缩略图的绘制、落盘、取图、存量缩略图对齐全在 `card_render`（下方 re-export
+保持既有调用方零改动）。
 
 零 UGC 红线：卡片全部后端生成（无用户文字/图片），不触发微信内容安全审查。
 """
@@ -10,14 +14,12 @@ CheckinStreakRecord 聚合）→ card_data 快照 dict → Pillow 渲染绘本�
 from __future__ import annotations
 
 import json
-import os
-import uuid
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from backend.common.exceptions import NotFoundError, ValidationError
+from backend.common.exceptions import ValidationError
 from backend.domain.growth.models import (
     CheckinStreakRecord,
     ChildGrowthState,
@@ -26,8 +28,39 @@ from backend.domain.growth.models import (
     WordsLedger,
 )
 from backend.domain.identity.models import Child
+from backend.domain.reading_circle.card_render import (
+    CARD_H,
+    CARD_MASCOT,
+    CARD_W,
+    THUMB_SPEC_VERSION,
+    ensure_circle_thumbs,
+    post_card_image,
+    post_thumb_image,
+    render_card,
+    render_thumb,
+)
 from backend.domain.reading_circle.models import CirclePost, CircleRankSnapshot
 from backend.domain.reading_circle.snapshot_service import CircleSnapshotService
+
+__all__ = [
+    "CARD_H",
+    "CARD_MASCOT",
+    "CARD_PALETTES",
+    "CARD_TYPE_LABELS",
+    "CARD_W",
+    "FONT_CANDIDATES",
+    "LEVEL_LETTERS",
+    "RANK_TOP_N",
+    "THUMB_SPEC_VERSION",
+    "assemble_card_data",
+    "card_data_json",
+    "enumerate_cards",
+    "ensure_circle_thumbs",
+    "post_card_image",
+    "post_thumb_image",
+    "render_card",
+    "render_thumb",
+]
 
 LEVEL_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -565,230 +598,7 @@ def enumerate_cards(db: Session, child: Child) -> list[dict]:
     return cards
 
 
-# ---------- Pillow 渲染 ----------
-
-
-# 卡片类型 → 吉祥物（每类卡一个动物，形成系列感；与本批头像库同一套美术语言）
-CARD_MASCOT = {
-    CirclePost.CARD_MILESTONE: "lion",
-    CirclePost.CARD_BOOKS_COUNT: "bear",
-    CirclePost.CARD_LEVEL_UP: "fox",
-    CirclePost.CARD_PERFECT_QUIZ: "bunny",
-    CirclePost.CARD_STREAK: "panda",
-    CirclePost.CARD_FINISH_BOOK: "cat",
-    CirclePost.CARD_RANK_TOP: "deer",
-    CirclePost.CARD_RANK_UP: "owl",
-    CirclePost.CARD_WEEKLY_REPORT: "hedgehog",
-    CirclePost.CARD_BREAKTHROUGH: "dino",
-}
-
-CARD_W, CARD_H = 750, 1000
-
-# 缩略图规格版本（fix33 R1）：v2 = 与完整版**同构图**（复用同一绘制管线，仅跳文字层）。
-# 版本号进文件名 → `ensure_circle_thumbs` 能识别旧规格缩略图并重渲（幂等：已是 v2 即跳过），
-# 重渲后删旧文件，不留无主残留。
-THUMB_SPEC_VERSION = "v2"
-
-
-def _paint_card(card_data: dict, pal: dict, kind: str, base: dict, *, with_text: bool):
-    """卡片共绘画布（fix33 R1）：完整版与缩略图**走同一条管线、坐标完全一致**。
-
-    唯一差异是文字层——`with_text=False`（缩略图）跳过标题胶囊/成就文字/署名/日期/馆标
-    （这些信息由信息流原生文字渲染），插画、主数字、吉祥物、星闪、纸纹全留。
-    """
-    from backend.domain.reading_circle import art
-    from backend.domain.reading_circle.art_mascot import mascot as art_mascot
-
-    cv = art.Canvas(CARD_W, CARD_H, pal)
-    # 页面级装饰只放安全边距（卡片框外），杜绝首版"被边框裁切"
-    art.glow(cv, 628, 92, 165, "#FFFFFF", 100)
-    art.glow(cv, 120, 78, 120, "#FFFFFF", 70)
-    art.cloud(cv, 112, 104, 128, "#FFFFFF", 205)
-    art.cloud(cv, 646, 116, 96, "#FFFFFF", 165)
-    art.star(cv, 40, 330, 11, "#FFFFFF", outline=pal["accent"], width=2.0, rotate=0.3)
-    art.star(cv, 710, 566, 10, "#FFFFFF", outline=pal["accent"], width=1.8, rotate=-0.2)
-    art.sparkle(cv, 28, 466, 12, "#FFFFFF", 225)
-    art.sparkle(cv, 722, 258, 11, "#FFFFFF", 215)
-
-    # 标题胶囊（accent 填充 + 白字）——纯文字容器，缩略图略去（空胶囊是视觉噪声）
-    if with_text:
-        art.bubble(cv, (196, 64, 554, 146), radius=41, fill=pal["accent"], outline=None)
-        art.sticker_text(
-            cv, (375, 105), str(card_data.get("label", "")), art.font_cn(44), "#FFFFFF"
-        )
-
-    # 卡面
-    art.soft_shadow(cv, (66, 176, 684, 770), radius=46, blur=12, alpha=58)
-    art.bubble(cv, (66, 176, 684, 770), radius=46, fill=art.PAPER, outline=pal["accent"], width=6)
-    art.glow(cv, 375, 340, 190, "#FFFFFF", 90)
-
-    # 主数字：**两规格都画**（信息流原生文字只渲染 title/value_label，数值只在图上）
-    big = str(card_data.get("value_text", ""))
-    num, _, unit = big.partition(" ")
-    if unit:
-        art.sticker_pair(
-            cv,
-            (375, 330),
-            num,
-            art.font_round(150),
-            unit,
-            art.font_cn(74),
-            pal["deep"],
-            stroke="#FFFFFF",
-            stroke_w=10,
-            dy_unit=26,
-        )
-    else:
-        art.sticker_text(
-            cv, (375, 330), big, art.font_round(142), pal["deep"], stroke="#FFFFFF", stroke_w=9
-        )
-    if with_text:
-        title = str(card_data.get("title", ""))
-        label = str(card_data.get("value_label", ""))
-        if title:
-            art.sticker_text(cv, (375, 462), title, art.font_cn(36), art.INK)
-        if label:
-            art.sticker_text(cv, (375, 518), label, art.font_cn(32), pal["deep"])
-
-    art_mascot(cv, 190, 650, 82, kind=kind, fur=base["fur"], ear=base["ear"], blush=base["blush"])
-    art.star(cv, 520, 636, 26, "#FFE08A", outline=pal["accent"], width=3.2, rotate=0.22)
-    art.star(cv, 604, 700, 17, "#FFF3C4", outline=pal["accent"], width=2.4, rotate=-0.24)
-    art.sparkle(cv, 486, 566, 15, "#FFFFFF", 235)
-
-    if with_text:
-        art.bubble(
-            cv, (268, 800, 482, 856), radius=28, fill=art.PAPER, outline=pal["deep"], width=4
-        )
-        art.sticker_text(
-            cv, (375, 829), str(card_data.get("english_name", "")), art.font_cn(28), art.INK
-        )
-        art.bubble(cv, (48, 876, 702, 936), radius=26, fill=pal["accent"], outline=None)
-        art.sticker_text(
-            cv,
-            (375, 907),
-            f"{card_data.get('date', '')} · 保存分享这份成长",
-            art.font_cn(26),
-            "#FFFFFF",
-        )
-        art.sticker_text(cv, (375, 966), "DmkWords 少儿英语阅读馆", art.font_cn(23), art.INK)
-    art.paper_grain(cv)
-    return cv
-
-
-def _render_full(card_data: dict, pal: dict, kind: str, base: dict, out_dir: str, tag: str) -> str:
-    """含字完整版（预览/保存转发用）：标题胶囊 + 主数字 + 说明行 + 吉祥物 + 页脚。"""
-    cv = _paint_card(card_data, pal, kind, base, with_text=True)
-    return _save(cv, out_dir, f"card_{card_data.get('card_type', 'x')}_{tag}.png")
-
-
-def _render_thumb(card_data: dict, pal: dict, kind: str, base: dict, out_dir: str, tag: str) -> str:
-    """无字缩略版（信息流小图）：**同构图**（fix33 R1）——同一管线去掉文字层。"""
-    cv = _paint_card(card_data, pal, kind, base, with_text=False)
-    return _save(
-        cv, out_dir, f"thumb_{THUMB_SPEC_VERSION}_{card_data.get('card_type', 'x')}_{tag}.png"
-    )
-
-
-def _save(cv, out_dir: str, filename: str) -> str:
-    from PIL import Image
-
-    img = cv.img.resize((cv.w, cv.h), Image.LANCZOS)
-    img.save(os.path.join(out_dir, filename), "PNG")
-    return f"circle/{filename}"
-
-
-def render_thumb(card_data: dict) -> str:
-    """只渲染无字缩略图（WM15-B3：旧帖回填用，不重渲大图；规格随 _render_thumb 走）。"""
-    from backend.domain.reading_circle import art
-
-    card_type = card_data.get("card_type", CirclePost.CARD_FINISH_BOOK)
-    pal = art.PALETTES.get(card_type, art.PALETTES[CirclePost.CARD_FINISH_BOOK])
-    kind = CARD_MASCOT.get(card_type, "cat")
-    out_dir = os.path.join(_uploads_root(), "circle")
-    os.makedirs(out_dir, exist_ok=True)
-    return _render_thumb(card_data, pal, kind, art.KIND_BASE[kind], out_dir, uuid.uuid4().hex[:8])
-
-
-def ensure_circle_thumbs(db: Session) -> dict:
-    """把存量帖缩略图对齐到**当前规格**（fix33 R1）：缺图则补渲、旧规格则重渲。
-
-    幂等：文件名已含当前 `THUMB_SPEC_VERSION` 即跳过（重跑零渲染）；
-    重渲成功后删旧缩略图文件（避免无主残留），**大图 image_path 一律不动**。
-    单帖失败跳过不阻塞整批（返回 skipped 计数供调用方显式报告）。
-    """
-    from backend.domain.reading_circle.models import CirclePost as Post
-
-    marker = f"thumb_{THUMB_SPEC_VERSION}_"
-    rows = db.query(Post).filter(Post.is_deleted == 0).all()
-    root = _uploads_root()
-    circle_dir = os.path.join(root, "circle") + os.sep
-    rendered = skipped = 0
-    for post in rows:
-        if post.thumb_path and marker in os.path.basename(post.thumb_path):
-            continue
-        old_rel = post.thumb_path or ""
-        try:
-            post.thumb_path = render_thumb(json.loads(post.card_data or "{}"))
-        except Exception:  # 单帖失败不影响整批
-            skipped += 1
-            continue
-        if old_rel:
-            old_full = os.path.abspath(os.path.join(root, old_rel))
-            if old_full.startswith(circle_dir) and os.path.isfile(old_full):
-                try:
-                    os.remove(old_full)
-                except OSError:
-                    pass  # 删不掉只留孤儿文件，不影响正确性（清理任务可兜底）
-        rendered += 1
-    db.commit()
-    return {"rendered": rendered, "skipped": skipped}
-
-
-def render_card(card_data: dict) -> dict:
-    """渲染**双规格**卡片图（WM15-R2）→ {"image_path": 含字完整版, "thumb_path": 无字缩略版}。
-
-    两规格同为 uploads/circle/ 下的运行时产物，生命周期绑定同一帖
-    （删帖由 CircleImageCleanupService 两列一起清）。
-    """
-    from backend.domain.reading_circle import art
-
-    card_type = card_data.get("card_type", CirclePost.CARD_FINISH_BOOK)
-    pal = art.PALETTES.get(card_type, art.PALETTES[CirclePost.CARD_FINISH_BOOK])
-    kind = CARD_MASCOT.get(card_type, "cat")
-    base = art.KIND_BASE[kind]
-    out_dir = os.path.join(_uploads_root(), "circle")
-    os.makedirs(out_dir, exist_ok=True)
-    tag = uuid.uuid4().hex[:8]
-    return {
-        "image_path": _render_full(card_data, pal, kind, base, out_dir, tag),
-        "thumb_path": _render_thumb(card_data, pal, kind, base, out_dir, tag),
-    }
-
-
-def _uploads_root() -> str:
-    from backend.config import get_settings
-
-    return os.path.abspath(get_settings().UPLOADS_DIR)
-
-
-def post_thumb_image(db: Session, post_id: int) -> str:
-    """取帖子缩略图相对路径（信息流小图；旧帖无缩略图 → 回落大图，前端仍留 wx:if 防空）。"""
-    from backend.domain.reading_circle.models import CirclePost as Post
-
-    p = db.query(Post).filter(Post.id == post_id, Post.is_deleted == 0).first()
-    if not p:
-        raise NotFoundError("帖子不存在")
-    return p.thumb_path or p.image_path
-
-
-def post_card_image(db: Session, post_id: int) -> str:
-    """取帖子的卡片图相对路径（双端 image 端点共用；ORM 不进 Router）。"""
-    from backend.domain.reading_circle.models import CirclePost as Post
-
-    p = db.query(Post).filter(Post.id == post_id, Post.is_deleted == 0).first()
-    if not p:
-        raise NotFoundError("帖子不存在")
-    return p.image_path
+# ---------- 数据侧小工具 ----------
 
 
 def card_data_json(card_data: dict) -> str:
