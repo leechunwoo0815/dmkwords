@@ -158,6 +158,11 @@ EXTERNAL_SYMBOLS = {
 # 反引号里带这些形态的一律不校验（占位/通配/示例/正则）
 SKIP_TOKEN_RE = re.compile(r"[*|<>]|xxx|\.\.\.|^\d+$", re.I)
 
+# 本地生成产物前缀：**不保证存在于 CI / 新克隆**（uploads 被 gitignore、gate-runs 是本地产物），
+# 因此不纳入"文件必须存在"的校验——否则 CI 必红（E-20260912-05 实证：本地绿/CI 红首例）。
+# 需要强制入库的是"源码与文档类引用"，见上行 PATH_RE 的白名单前缀。
+ARTIFACT_PREFIXES = ("uploads/", "gate-runs/", ".dev-logs/", "backups/")
+
 PATH_RE = re.compile(
     r"^(backend|admin-web|miniapp|scripts|tests|features|alembic|docs|PRD|error_list|uploads"
     r"|外部专家意见)/[\w./\-{}$]+\.\w+$"
@@ -267,6 +272,8 @@ def main() -> int:
                     continue
                 rel = str(doc.relative_to(ROOT))
                 # ① 文件路径
+                if tok.startswith(ARTIFACT_PREFIXES):
+                    continue  # 产物类引用：本地生成，CI 不保证存在（见 ARTIFACT_PREFIXES 注释）
                 if PATH_RE.match(tok):
                     glob = re.sub(r"\{[^}]*\}", "*", tok)
                     if not list(ROOT.glob(glob)):
