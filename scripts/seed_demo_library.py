@@ -302,11 +302,15 @@ def make_questions(book: Book):
     for i, (qtype, text, opts) in enumerate(QUIZ_TEMPLATES):
         if qtype == "boolean":
             opts = ["对", "错"]
+        # 占位符必须与题干同口径替换到**选项**（E-20260912-04：早期只替换题干，
+        # 选项与答案字面留着 {author}/{topic} —— 孩子看到模板串，且"正确答案"就是它）
+        ctx = {"title_short": short, "topic": book.topic, "author": book.author}
+        opts = [o.format(**ctx) for o in opts]
         qs.append(
             QuizQuestion(
                 book_id=book.id,
                 question_type=qtype,
-                question_text=text.format(title_short=short, topic=book.topic, author=book.author),
+                question_text=text.format(**ctx),
                 options=__import__("json").dumps(opts, ensure_ascii=False),
                 answer=opts[0],
                 sort_order=i + 1,
@@ -314,6 +318,35 @@ def make_questions(book: Book):
             )
         )
     return qs
+
+
+def repair_placeholder_questions(db) -> int:
+    """修复历史占位符题（E-20260912-04）。
+
+    main() 对已存在的书**整本跳过**，所以修好模板也治不了库里已有的题；
+    这里只挑"选项或答案里还含 `{`"的行按同款模板重算，其余一行不碰。"""
+    import json as _json
+
+    fixed = 0
+    rows = db.query(QuizQuestion).filter(QuizQuestion.is_deleted == 0).all()
+    for q in rows:
+        if "{" not in (q.options or "") and "{" not in (q.answer or ""):
+            continue
+        book = db.query(Book).filter(Book.id == q.book_id).first()
+        if book is None:
+            continue
+        ctx = {"title_short": book.title[:34], "topic": book.topic, "author": book.author}
+        try:
+            opts = _json.loads(q.options or "[]")
+        except ValueError:
+            continue
+        opts = [str(o).format(**ctx) for o in opts]
+        q.options = _json.dumps(opts, ensure_ascii=False)
+        if opts:
+            q.answer = opts[0]
+        fixed += 1
+    db.flush()
+    return fixed
 
 
 def main() -> int:
@@ -396,6 +429,10 @@ def main() -> int:
             f"\n完成：新增 {added} 本，跳过 {skipped} 本，旧书封面补齐见上。总计书目 "
             f"{db.query(B).filter(B.is_deleted == 0).count()} 本。"
         )
+        n_fixed = repair_placeholder_questions(db)
+        if n_fixed:
+            db.commit()
+            print(f"修复历史占位符题：{n_fixed} 道（选项/答案含 {{author}}/{{topic}}）", flush=True)
         return 0
     finally:
         db.close()
