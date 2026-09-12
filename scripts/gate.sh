@@ -67,6 +67,8 @@ fi
 run python -m scripts.check_fake_assertions
 # E-20260912-01 防复发：小程序数据面断链（wxml 读的顶层变量必须真的进过 data）
 run python scripts/check_miniapp_bindings.py
+# E-20260912-05 防复发：文档引用悬空（文件路径/接口/配置键/表名/函数名必须真实存在）
+run python scripts/check_docs_code_alignment.py
 
 step 6 "数据库迁移一致性"
 # 首个迁移文件创建后启用：
