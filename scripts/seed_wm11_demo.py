@@ -1044,6 +1044,28 @@ def _seed_passed_book(db: Session, child, book, words_at: datetime) -> None:
     db.flush()
 
 
+def _resync_all_growth_states(db: Session) -> None:
+    """收尾全量重算成长汇总（防漂移，WM4-10 验收盘点发现）。
+
+    seed 各阶段（测验旅程 / 榜单对比 / 阅读圈里程碑演示）会**直插** `WordsLedger`，
+    而 `ChildGrowthState` 只在早期 `_ensure_demo_growth` 同步过一次，
+    于是 words_total 落后于流水（演示孩 0 vs 流水 78220、观察期孩 660 vs 78760），
+    使读 state 的判定失效——「里程碑核对补发」（growth/service 按 state.words_total 比节点）
+    在演示孩身上空转。口径同 `_sync_growth_state`：以词账流水为唯一事实源。"""
+    from backend.domain.growth.models import WordsLedger
+    from backend.domain.identity.models import Child
+
+    child_ids = [
+        r[0]
+        for r in db.query(WordsLedger.child_id).filter(WordsLedger.is_deleted == 0).distinct().all()
+    ]
+    for cid in child_ids:
+        child = db.query(Child).filter(Child.id == cid).first()
+        if child is not None:
+            _sync_growth_state(db, child)
+    print(f"c 成长汇总收尾重算：{len(child_ids)} 个孩子（以词账流水为准）", flush=True)
+
+
 def _sync_growth_state(db: Session, child) -> None:
     """成长汇总与流水对齐（words/books/points 均按真实入账求和——禁手拍数字）。"""
     from backend.domain.growth.models import ChildGrowthState, PointLedger, WordsLedger
@@ -2031,6 +2053,8 @@ def seed() -> None:
         ]
         for item in demo_notifs:
             _upsert_notification(db, parent, **item)
+        # 收尾：全量重算成长汇总（此后不再插词账——保证 state 与流水一致）
+        _resync_all_growth_states(db)
         db.commit()
         print(
             "WM11 演示数据重建完成：通知 19 条（未读 10 / 已读 9；8 分类全覆盖；"
