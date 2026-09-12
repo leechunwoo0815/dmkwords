@@ -214,10 +214,23 @@ def collect_api_paths() -> set[tuple[str, ...]]:
 
 
 def collect_config_keys() -> set[str]:
-    f = ROOT / "backend/seeds/seed_configs.py"
-    if not f.exists():
-        return set()
-    return set(re.findall(r"""["']([a-z][a-z0-9_]{3,40})["']""", _read(f)))
+    """配置目录唯一来源：`CONFIG_SEEDS`（元组首元素）。
+
+    ⚠️ 不要用正则扫该文件——它是元组列表，正则会把非键字符串也数进来
+    （2026-09-12 实证：正则得 45，实际 40，一度让本检查器误报文档"配置键数不符"）。"""
+    sys.path.insert(0, str(ROOT))
+    try:
+        from backend.seeds.seed_configs import CONFIG_SEEDS
+
+        return {row[0] for row in CONFIG_SEEDS}
+    except Exception as exc:  # pragma: no cover - CI 依赖缺失时降级为正则
+        print(f"[docs-code] ⚠ CONFIG_SEEDS 导入失败（{type(exc).__name__}），降级正则取键")
+        f = ROOT / "backend/seeds/seed_configs.py"
+        return (
+            set(re.findall(r'^\s{4,8}"([a-z][a-z0-9_]{3,40})",', _read(f), re.M))
+            if f.exists()
+            else set()
+        )
 
 
 def collect_task_keys() -> set[str]:
@@ -230,7 +243,7 @@ def collect_task_keys() -> set[str]:
 
 def collect_table_names() -> set[str]:
     out = set()
-    for f in (ROOT / "backend").rglob("models.py"):
+    for f in (ROOT / "backend").rglob("*.py"):  # 含 common/system_models.py 等非 models.py 命名
         out |= set(re.findall(r"""__tablename__\s*=\s*["']([a-z_]+)["']""", _read(f)))
     return out
 
@@ -250,6 +263,50 @@ def collect_symbols() -> set[str]:
         for f in list((ROOT / "miniapp").rglob("*")) + list((ROOT / "admin-web/src").rglob("*")):
             if f.suffix in exts and f.is_file():
                 out |= set(re.findall(pat, _read(f), re.M))
+    return out
+
+
+ARCHIVE_HEADING_RE = re.compile(r"^##\s*v\d+·")
+
+# 数量断言只在"当前规格类"文档校验：这些文档的数字声称描述**当前事实**。
+# 其余文档（docs/01 阶段表 / LEDGER 时序行 / PRD 签署稿+历史注 / error_list 叙事）
+# 的数字属于"当时或阶段叙述"，机器无从判断时点 → 不校验（宪法 §〇.3 亦要求文档少手抄数字）。
+QUANTITY_CHECKED = (
+    "CLAUDE.md",  # 宪法：当前法律
+    "docs/02",
+    "docs/03",
+    "docs/04",
+    "docs/18",  # 当前规格类
+    "docs/项目交接-",  # 交接卡：只查当前层（归档层由 ARCHIVE_HEADING_RE 截断）
+)
+# 不查：docs/01（阶段规划表，数字是里程碑时点快照）、LEDGER（时序行）、PRD（签署稿+历史注）、error_list（叙事）
+# 历史对比表述（"旧 7 域"/"原 12 项"）不校验
+HISTORICAL_PREFIX_RE = re.compile(r"(旧|原|早期|曾|previous)")
+
+
+def check_quantity_claims(
+    doc: pathlib.Path, text: str, actual: dict[str, int]
+) -> list[tuple[int, str, str]]:
+    """数量类断言校验（"任务数 N / 配置键 N / N 张表 / N 域"）。
+
+    边界规则：交接卡类文件的历史归档层（首个 `## vNN·` 标题起）**是当时真值**，
+    机器无法判断其属于哪个时点，故一律跳过；只校验"当前层"的数字。"""
+    out: list[tuple[int, str, str]] = []
+    for ln, line in enumerate(text.split("\n"), 1):
+        if ARCHIVE_HEADING_RE.match(line):
+            break
+        for pat, key in (
+            (r"(?:任务数|定时任务)\s*\**\s*(\d+)", "任务"),
+            (r"配置键\s*\**\s*(\d+)", "配置键"),
+            (r"(\d+)\s*张表", "表"),
+            (r"(\d+)\s*域", "域"),
+        ):
+            for m in re.finditer(pat, line):
+                got = int(m.group(1))
+                if HISTORICAL_PREFIX_RE.search(line[: m.start(1)]):
+                    continue  # 历史对比表述（"vs 旧 7 域"）非当前事实
+                if got != actual[key]:
+                    out.append((ln, f"{key}数不符", f"文档写 {got}，实际 {actual[key]}"))
     return out
 
 
@@ -301,9 +358,23 @@ def main() -> int:
                     if name not in symbols and name not in EXTERNAL_SYMBOLS:
                         findings.append((rel, ln, "函数/类不存在", tok))
 
+    actual = {
+        "任务": len(collect_task_keys()),
+        "配置键": len(configs),
+        "表": len(tables),
+        "域": len([p for p in (ROOT / "backend/domain").iterdir() if p.is_dir()]),
+    }
+    for doc in collect_docs():
+        rel = str(doc.relative_to(ROOT))
+        if not rel.startswith(QUANTITY_CHECKED):
+            continue
+        for ln, kind, detail in check_quantity_claims(doc, _read(doc), actual):
+            findings.append((str(doc.relative_to(ROOT)), ln, kind, detail))
+
     print(
         f"[docs-code] 文档 {len(collect_docs())} 份 | 接口 {len(api)} 条 | "
-        f"配置键 {len(configs)} 个 | 表 {len(tables)} 张 | 符号 {len(symbols)} 个"
+        f"配置键 {len(configs)} 个 | 表 {len(tables)} 张 | 符号 {len(symbols)} 个 | "
+        f"任务 {actual['任务']} | 域 {actual['域']}"
     )
     if not findings:
         print("[docs-code] ✓ 文档引用全部落到真实文件/接口/配置键/符号")

@@ -75,7 +75,7 @@ Router (参数校验/HTTP状态码/依赖注入，🚫不含 try/except、不抛
 
 ---
 
-## 四、域边界（8 域，2026-08-22 定）
+## 四、域边界（9 域，2026-08-22 定；2026-09-12 增 reading_circle）
 
 ```text
 backend/domain/identity/     家长账号、孩子档案、会员生命周期(6态)、同意记录、权益转让    ← F0,F3,F10
@@ -87,6 +87,8 @@ backend/domain/billing/      订单(5类7态)、支付(线上+人工确认)、�
 backend/domain/reading/      播放进度与防刷、打卡、Quiz、有效词数、生词本               ← F5,F6,F8
 backend/domain/growth/       A-Z等级、积分、五榜单、里程碑、护照、周报月报图片           ← F7,F8
 backend/domain/activity/     活动发布、报名、名额、签到、活动退款                       ← F9
+backend/domain/reading_circle/ 阅读圈：成就卡生成、信息流、点赞、周榜快照            ← FEAT-084/085
+                             （只读聚合 growth+reading+identity；**不反向依赖**）
 backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志、通知中心           ← F0,F11
 ```
 
