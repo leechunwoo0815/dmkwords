@@ -206,3 +206,76 @@ def test_overdue_deduction_and_list(client: TestClient, db):
     r = client.post("/api/admin/circulation/renew", json={"record_id": record["id"]}, headers=h)
     assert r.status_code == 422
     assert "逾期" in r.json()["detail"]
+
+
+def test_unpaid_temp_borrow_creates_member_followup(client: TestClient):
+    """R-313：未入会临时借书放行 → 生成「入会跟进任务」；孩子入会后自动审结（E-20260912-08）。
+
+    此前该规则**未实现**（全仓无落点；BDD 场景挂在 @draft 永不执行）——
+    本测试补上机器判定的那一环。"""
+    h = _h(client)
+    client.put(
+        "/api/admin/configs/allow_unpaid_offline_borrow",
+        json={"value": "true", "reason": "测试：开未入会临时借书"},
+        headers=h,
+    )
+    p = client.post(
+        "/api/admin/members/parents", json={"name": "跟进家长", "phone": "13800000777"}, headers=h
+    ).json()
+    c = client.post(
+        f"/api/admin/members/parents/{p['id']}/children", json={"name": "跟进孩"}, headers=h
+    ).json()
+    book = client.post(
+        "/api/admin/books",
+        json={"isbn": "9780000000777", "title": "Follow Me", "word_count": 100},
+        headers=h,
+    ).json()
+
+    # 未入会硬拦截（开关已开但未放行）→ 仍拒
+    r0 = client.post(
+        "/api/admin/circulation/borrow", json={"child_id": c["id"], "isbn": book["isbn"]}, headers=h
+    )
+    assert r0.status_code == 422 and "未入会" in r0.json()["detail"]
+
+    # 超管放行 → 借出 + 生成跟进任务
+    r = client.post(
+        "/api/admin/circulation/borrow",
+        json={"child_id": c["id"], "isbn": book["isbn"], "override_reason": "家长明日来办入会"},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    assert any("未入会临时借书" in w for w in r.json()["warnings"])
+
+    counts = client.get("/api/admin/todo-counts", headers=h).json()
+    assert counts["member_follow_up"] == 1, counts
+
+    inbox = client.get("/api/admin/admin-notifications", headers=h).json()
+    items = inbox.get("items", inbox) if isinstance(inbox, dict) else inbox
+    hit = [n for n in items if n.get("scene") == "admin.member_follow_up"]
+    assert len(hit) == 1, items
+    assert hit[0]["ref_type"] == "child" and str(hit[0]["ref_id"]) == str(c["id"])
+    assert "入会" in hit[0]["title"] + hit[0]["content"]
+
+    # 幂等：再次放行借书不产生第二条（dedup_key 固定）
+    book2 = client.post(
+        "/api/admin/books",
+        json={"isbn": "9780000000778", "title": "Follow Me 2", "word_count": 100},
+        headers=h,
+    ).json()
+    client.post(
+        "/api/admin/circulation/borrow",
+        json={"child_id": c["id"], "isbn": book2["isbn"], "override_reason": "再来一本"},
+        headers=h,
+    )
+    inbox2 = client.get("/api/admin/admin-notifications", headers=h).json()
+    items2 = inbox2.get("items", inbox2) if isinstance(inbox2, dict) else inbox2
+    assert len([n for n in items2 if n.get("scene") == "admin.member_follow_up"]) == 1
+
+    # 家长入会（观察期费确认收款）→ 待办自动归零（显示态实时推导）
+    o = client.post(
+        "/api/admin/orders", json={"child_id": c["id"], "order_type": "observation_fee"}, headers=h
+    ).json()
+    client.post(
+        f"/api/admin/orders/{o['id']}/confirm-payment", json={"pay_method": "scan"}, headers=h
+    )
+    assert client.get("/api/admin/todo-counts", headers=h).json()["member_follow_up"] == 0

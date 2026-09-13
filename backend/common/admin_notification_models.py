@@ -42,12 +42,16 @@ class AdminNotification(BaseModel):
     # T6（插修 13）：活动报名待确认（fee>0 报名→待人工收款确认，运营动作入口）
     SCENE_ACTIVITY_ENROLL_MANUAL = "admin.activity_enroll_manual"
     SCENE_TRANSFER_EXPIRING = "admin.transfer_expiring"
+    # R-313：未入会临时借书（馆员放行）→ 生成「入会跟进任务」。
+    # 2026-09-12 全维度审查发现该规则此前**未实现**（全仓无任何落点，BDD 场景又挂在 @draft 永不跑）。
+    SCENE_MEMBER_FOLLOW_UP = "admin.member_follow_up"
 
     # ref_type 取值
     REF_REFUND_REQUEST = "refund_request"
     REF_WITHDRAWAL_REQUEST = "withdrawal_request"
     REF_TRANSFER = "transfer"
     REF_ACTIVITY = "activity"
+    REF_CHILD = "child"
 
     scene = Column(String(64), nullable=False, index=True, comment="场景标识（admin.*）")
     title = Column(String(100), nullable=False, comment="事项标题")

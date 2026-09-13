@@ -62,6 +62,7 @@ class AdminTodoService:
         transfer_states = self._state_map("transfer", by_type, self._transfer_states())
         activity_states = self._activity_states(by_type.get("activity", []))
         enroll_states = self._enroll_states(by_type.get("activity_enrollment", []))
+        child_states = self._child_states(by_type.get("child", []))
 
         for n in notifications:
             if n.ref_type == "refund_request":
@@ -81,6 +82,9 @@ class AdminTodoService:
                 result[n.id] = self._decide_transfer(transfer_states.get(n.ref_id))
             elif n.ref_type == "activity":
                 result[n.id] = self._decide_activity(activity_states.get(n.ref_id, False))
+            elif n.ref_type == "child":
+                # R-313：入会跟进——按孩子会员状态实时推导（入会即自动审结）
+                result[n.id] = self._decide_member_followup(child_states.get(n.ref_id))
             elif n.ref_type == "activity_enrollment":
                 # T6：报名待确认——pending_payment→待处理；enrolled/checked_in/
                 # refund_pending→已审结（收款/流转完成）；cancelled→已失效
@@ -164,6 +168,31 @@ class AdminTodoService:
         if status == "cancelled":
             return {"effective_status": ST_INVALID, "status_text": TEXT_INVALID_CANCELLED}
         return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
+
+    @staticmethod
+    def _decide_member_followup(member_status: str | None) -> dict:
+        """R-313 入会跟进：孩子仍**未入会**（none）→ 待处理；一旦入会 → 自动审结。
+
+        孩子被物理清理等极端情况 → 已审结兜底（不挂待办墙，与其它场景同款防御）。"""
+        from backend.domain.identity.models import Child
+
+        if member_status is None:
+            return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
+        if member_status == Child.MEMBER_NONE:
+            return {"effective_status": ST_PENDING, "status_text": TEXT_PENDING}
+        return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
+
+    def _child_states(self, notifications: list) -> dict[str, str]:
+        """R-313：{child_id: member_status}（ref_type=child 批量查，零 N+1）。"""
+        if not notifications:
+            return {}
+        from backend.domain.identity.models import Child
+
+        ids = [int(n.ref_id) for n in notifications]
+        rows = self.db.query(Child.id, Child.member_status).filter(
+            Child.id.in_(ids), Child.is_deleted == 0
+        )
+        return {str(i): s for i, s in rows}
 
     @staticmethod
     def _decide_enroll(status: str | None) -> dict:
@@ -400,6 +429,8 @@ class AdminTodoService:
             "parent_unread": 0,
             # T6：活动报名待确认（R10 裁定后 admin_total 也含——细分值仍供活动徽标）
             "activity_enroll_pending": 0,
+            # R-313：入会跟进待办（member.manage 角色可见可处理；计入 admin_total）
+            "member_follow_up": 0,
             # WM14-A：阅读圈今日新帖未馆长赞数（冷启动巡场动线——单独口径
             # 不进 admin_total，侧边栏阅读圈徽标+页顶胶囊共用同一源）
             "circle_unliked": 0,
@@ -471,6 +502,22 @@ class AdminTodoService:
             # 废弃；T6 旧裁定"单独口径不进 admin_total"推翻）；tab 数字
             # （list_inbox.pending_count 全场景）与徽标自此严格同源
             counts["admin_total"] += counts["activity_enroll_pending"]
+            # R-313：入会跟进（同一 resolver 口径：显示态 pending 才计入；
+            # 孩子入会/被清理后自动归零）
+            followup_rows = (
+                self.db.query(AdminNotification)
+                .filter(
+                    AdminNotification.scene == AdminNotification.SCENE_MEMBER_FOLLOW_UP,
+                    AdminNotification.is_deleted == 0,
+                )
+                .all()
+            )
+            counts["member_follow_up"] = sum(
+                1
+                for n in followup_rows
+                if self.resolve_many([n])[n.id]["effective_status"] == ST_PENDING
+            )
+            counts["admin_total"] += counts["member_follow_up"]
             # WM14-A：阅读圈未赞数（member.manage 角色可赞——徽标语义是"你能处理的"）
             from backend.domain.reading_circle.admin_service import AdminCircleService
 

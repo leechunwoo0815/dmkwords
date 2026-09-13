@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.common.admin_notification_models import AdminNotification
 from backend.common.config_service import ConfigService
 from backend.common.events import BookBorrowedEvent, BookReturnedEvent, event_bus
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
@@ -290,6 +291,7 @@ class CirculationService:
 
         # ---- 写入 ----
         borrow_days = int(ConfigService(self.db).get_value("borrow_days"))
+        due_hint = "72 小时内归还或入会"
         due_at = now + timedelta(days=borrow_days)
         if unpaid_override:
             due_at = now + timedelta(hours=72)  # R-313：未入会放行借阅 72 小时内归还或入会
@@ -320,6 +322,23 @@ class CirculationService:
             },
             reason=override_reason or "正常借书",
         )
+        # R-313：未入会临时借书 → 生成「入会跟进任务」（管理端待办，馆员跟进家长入会）。
+        # 幂等：同孩子 dedup_key 固定 → 多次放行只留一条；显示态由 todo_service 按
+        # 孩子会员状态实时推导（一旦入会即自动审结）。
+        if unpaid_override:
+            from backend.common.admin_notifications import AdminNotifyService
+
+            AdminNotifyService(self.db).send(
+                scene=AdminNotification.SCENE_MEMBER_FOLLOW_UP,
+                title="入会跟进",
+                content=(
+                    f"{child.name} 未入会临时借书《{book.title}》（{due_hint}）"
+                    f"，放行原因：{override_reason}。请跟进家长办理入会。"
+                ),
+                ref_type=AdminNotification.REF_CHILD,
+                ref_id=child.id,
+                applicant_name=child.name,
+            )
         event_bus.publish(
             BookBorrowedEvent(
                 child_id=child_id,

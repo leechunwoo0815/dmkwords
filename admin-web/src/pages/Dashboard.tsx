@@ -83,7 +83,11 @@ function TodoCard({
   const rows = [
     ...(isSuper ? TODO_ROWS : []),
     ...(hasPermission(permissions, "member.manage")
-      ? [{ key: "order_pending_manual" as const, label: "待确认收款", route: "/members?tab=orders" }]
+      ? [
+          { key: "order_pending_manual" as const, label: "待确认收款", route: "/members?tab=orders" },
+          // R-313：未入会临时借书 → 入会跟进（点进去到会员管理跟进家长入会）
+          { key: "member_follow_up" as const, label: "入会跟进", route: "/members" },
+        ]
       : []),
   ];
   const total = counts ? rows.reduce((s, r) => s + (counts[r.key] || 0), 0) : 0;

@@ -183,6 +183,8 @@ export interface TodoCounts {
   activity_enroll_pending: number;
   /** WM14-A：阅读圈今日新帖未馆长赞数（侧边栏徽标+页顶胶囊共用） */
   circle_unliked: number;
+  /** R-313：未入会临时借书产生的入会跟进待办（孩子入会后自动归零） */
+  member_follow_up: number;
 }
 
 export function apiTodoCounts(): Promise<TodoCounts> {
