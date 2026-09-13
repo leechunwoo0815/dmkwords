@@ -168,7 +168,11 @@ PATH_RE = re.compile(
     r"|外部专家意见)/[\w./\-{}$]+\.\w+$"
 )
 API_RE = re.compile(r"^/api/[\w/{}\-]+$")
-CONFIG_CTX_RE = re.compile(r"配置键|SystemConfig|开关|阈值|config_key")
+# 配置键语境：必须**紧邻 token**（前置 10 字内出现语境词），而不是"整行出现过"——
+# 否则一行里只要提到"配置键"一词，同行的测试模块名等就会被误判（E-20260912-05 调参实证）。
+CONFIG_CTX_RE = re.compile(
+    r"(配置键|配置项|开关|阈值|config_key|SystemConfig)[^，。；、）)]{0,10}$"
+)
 TABLE_SUFFIX = (
     "_s",
     "_records",
@@ -239,6 +243,22 @@ def collect_task_keys() -> set[str]:
     if not f.exists():
         return set()
     return set(re.findall(r"""["']([a-z][a-z0-9_]{3,40})["']\s*:\s*TaskSpec""", _read(f)))
+
+
+def collect_todo_keys() -> set[str]:
+    """管理端待办计数键（todo_service.todo_counts 的 counts 字典键）。
+
+    与配置键同形（snake_case），但命名空间不同——E-20260912-08 新增 `member_follow_up` 时，
+    检查器把它当配置键误报了（同行含"开关"字样触发配置语境）。故显式纳入"已声明键"集合。"""
+    f = ROOT / "backend/domain/admin/todo_service.py"
+    if not f.exists():
+        return set()
+    txt = _read(f)
+    start = txt.find("def todo_counts")
+    if start < 0:
+        return set()
+    body = txt[start : txt.find("\n    def ", start + 10)]
+    return set(re.findall(r'^\s{8,12}"([a-z][a-z0-9_]{3,40})":', body, re.M))
 
 
 def collect_table_names() -> set[str]:
@@ -314,7 +334,7 @@ def main() -> int:
     api = collect_api_paths()
     configs = collect_config_keys()
     tables = collect_table_names()
-    symbols = collect_symbols() | collect_task_keys()
+    symbols = collect_symbols() | collect_task_keys() | collect_todo_keys()
 
     findings: list[tuple[str, int, str, str]] = []
     for doc in collect_docs():
@@ -342,8 +362,8 @@ def main() -> int:
                     )
                     if len(segs) == 0 or segs not in api:
                         findings.append((rel, ln, "接口路径不存在", tok))
-                # ③ 配置键（仅配置语境行，避免把字段名误判）
-                elif CONFIG_CTX_RE.search(line) and re.fullmatch(
+                # ③ 配置键（仅"语境词紧邻"时判定，避免把字段名/模块名误判）
+                elif CONFIG_CTX_RE.search(line[: m.start()]) and re.fullmatch(
                     r"[a-z][a-z0-9]*(?:_[a-z0-9]+){1,4}", tok
                 ):
                     if tok not in configs and tok not in symbols and tok not in tables:

@@ -71,7 +71,7 @@
 | FEAT-034 | 逾期扣减 | 温和治理 | P0 | 031 | 每逾期 1 本上限减 1（最低 0）；不扣积分不冻结；逾期名单催还；小程序预约/续借自动拦截〔V1.1 §5.4〕 | borrowing.feature | DRAFTED |
 | FEAT-035 | 人工放行留痕 | 线下兜底哲学 | P0 | 031 | 异常提示+馆员可放行+必填原因+记录操作人/时间/异常快照；只适用线下操作；线上自助硬校验无人可放行〔红线：人工放行边界〕 | borrowing.feature | DRAFTED |
 | FEAT-036 | 小程序预约 | 到店前锁书 | P0 | 031 | 校验（有效会员+押金+无逾期+额度）；reserved 锁 72h（占额度=在借+预约≤30）；到期自动释放+通知；家长可取消；同孩子同书单预约；副本异常自动换/转异常〔V1.1 §5.5〕 | reservation.feature | DRAFTED |
-| FEAT-037 | 未入会临时借书开关 | 体验家庭 | P1 | 031,004 | 默认关；开启后限 1 本/72h 归还或入会/仅超管放行留痕/生成入会跟进〔R-313〕 | borrowing.feature | DRAFTED |
+| FEAT-037 | 未入会临时借书开关 | 体验家庭 | P1 | 031,004 | 默认关；开启后限 1 本/72h 归还或入会/仅超管放行留痕/生成入会跟进〔R-313〕。**2026-09-13 补齐**「生成入会跟进任务」：管理端待办场景 `admin.member_follow_up`（幂等，孩子入会后显示态自动审结）+ 待办计数 `member_follow_up` 进 admin_total + Dashboard「入会跟进」项；72h 时限由既有 到期/逾期提醒 承接（放行单 due_at=now+72h 同管道）| borrowing.feature（**仍 @draft**，该 feature 含多个未定义步骤，解封需独立批次）+ tests/unit/test_wm5_circulation.py::test_unpaid_temp_borrow_creates_member_followup | **IMPLEMENTED**（2026-09-13；pytest 覆盖 硬拦截→放行→生成任务→幂等→入会归零）|
 
 ## F5 音频播放与阅读进度（reading，对应 P6）
 
