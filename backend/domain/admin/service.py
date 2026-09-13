@@ -49,6 +49,21 @@ STAFF_PERMISSIONS = [
 ]
 SUPER_ADMIN_PERMISSIONS = ["*"]
 
+# 仅超管可持有的权限码（**显式目录 = 单一事实源**）。
+# E-20260912-09：此前 `config.update` / `audit.view` 被 require_perm 引用却不出现在任何目录里——
+# 属于"没人持有的权限码"：staff 恒 403（行为上等于仅超管），但语义不可机械判定，
+# 前端按码显隐也无从对齐；且宪法承诺的「RBAC 三方一致对账」当时并不存在。
+# 现把这类码显式登记在此：staff 目录不含它们 → 行为不变；声明完整 → 可被门禁对账。
+SUPER_ADMIN_ONLY_PERMISSIONS = [
+    "config.update",  # 系统配置变更（价格规则/阈值调整）
+    "audit.view",  # 审计日志查看
+]
+
+
+def all_permission_codes() -> list[str]:
+    """全部已声明权限码（staff 目录 + 仅超管目录）——供 RBAC 对账门禁使用。"""
+    return [*STAFF_PERMISSIONS, *SUPER_ADMIN_ONLY_PERMISSIONS]
+
 
 def permissions_for_role(role: str) -> list[str]:
     if role == AdminUser.ROLE_SUPER_ADMIN:

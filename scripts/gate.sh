@@ -69,6 +69,8 @@ run python -m scripts.check_fake_assertions
 run python scripts/check_miniapp_bindings.py
 # E-20260912-05 防复发：文档引用悬空（文件路径/接口/配置键/表名/函数名必须真实存在）
 run python scripts/check_docs_code_alignment.py
+# E-20260912-09：RBAC 三方一致对账（宪法 §五.2 承诺项——声明/后端引用/前端引用）
+run python scripts/check_rbac_consistency.py
 
 step 6 "数据库迁移一致性"
 # 首个迁移文件创建后启用：
