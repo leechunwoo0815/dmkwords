@@ -95,6 +95,10 @@ module.exports = {
   myWithdrawals(childId) {
     return req.get('/api/miniapp/withdrawals', null, { params: { child_id: childId } })
   },
+  // E-20260912-11：撤销进行中的退会申请（applying → cancelled；后端早就绪，此前无前端调用）
+  cancelWithdrawal(requestId, childId) {
+    return req.post(`/api/miniapp/withdrawals/${requestId}/cancel`, { child_id: childId })
+  },
   transferConditions(sourceChildId, targetChildId) {
     return req.get('/api/miniapp/transfers/conditions', null, {
       params: { source_child_id: sourceChildId, target_child_id: targetChildId },

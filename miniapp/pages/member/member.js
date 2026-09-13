@@ -101,6 +101,12 @@ Page({
     if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return } // F-L17/T34
     wx.navigateTo({ url: `/pages/order-pkg/refund-apply/refund-apply?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
+  // E-20260912-11：退会申请入口（跳退款页并直接展开退会表单）
+  goWithdraw() {
+    const c = this.data.currentChild
+    if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return }
+    wx.navigateTo({ url: `/pages/order-pkg/refund-apply/refund-apply?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}&focus=withdraw` })
+  },
   goTransfer() {
     wx.navigateTo({ url: '/pages/order-pkg/benefit-transfer/benefit-transfer' })
   },

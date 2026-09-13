@@ -115,6 +115,10 @@
         <text class="fi-icon">💰</text>
         <text class="fi-label">退款申请</text>
       </view>
+      <view class="func-item" bindtap="goWithdraw">
+        <text class="fi-icon">🚪</text>
+        <text class="fi-label">退会申请</text>
+      </view>
       <view class="func-item" bindtap="goTransfer">
         <text class="fi-icon">🔁</text>
         <text class="fi-label">权益转让</text>

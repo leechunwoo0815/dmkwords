@@ -51,4 +51,37 @@
       </view>
     </view>
   </view>
+
+  <!-- R-313/E-20260912-11：家长端退会入口（此前 api 已有 applyWithdrawal/myWithdrawals 但全仓零调用
+       → 家长根本发不起退会，docs/04 WM10 第 2 步只能靠脚本） -->
+  <view class="tip-card">
+    <view class="card-h3">退会</view>
+    <view style="font-size:24rpx;color:var(--muted);margin-bottom:12rpx;">
+      退会后会员权益终止；审核期间借书/预约等功能冻结。押金按实际余额退还，已产生的赔偿优先扣除。
+    </view>
+    <view wx:if="{{!wdOpen}}" style="display:flex;justify-content:flex-end;">
+      <button class="cancel-refund-btn" size="mini" bindtap="onOpenWithdraw">申请退会</button>
+    </view>
+    <view wx:else>
+      <textarea class="reason-textarea" placeholder="退会原因（必填）" value="{{wdReason}}"
+        bindinput="onWdReason" maxlength="200" />
+      <view class="submit-wrap">
+        <button class="submit-btn" bindtap="onSubmitWithdraw">提交退会申请</button>
+      </view>
+    </view>
+    <view wx:if="{{withdrawals.length}}" style="margin-top:16rpx;">
+      <view wx:for="{{withdrawals}}" wx:key="id" style="padding:14rpx 0;border-bottom:1rpx solid var(--border);">
+        <view style="display:flex;justify-content:space-between;align-items:center;">
+          <text>退会申请</text>
+          <text style="color:{{item.status === 'completed' ? 'var(--success)' : (item.status === 'rejected' || item.status === 'cancelled') ? 'var(--muted)' : 'var(--warning)'}};">{{item.statusText}}</text>
+        </view>
+        <view wx:if="{{item.review_remark}}" style="font-size:24rpx;color:var(--muted);margin-top:6rpx;">
+          审核意见：{{item.review_remark}}
+        </view>
+        <view wx:if="{{item.status === 'applying'}}" style="margin-top:12rpx;display:flex;justify-content:flex-end;">
+          <button class="cancel-refund-btn" size="mini" data-id="{{item.id}}" bindtap="onCancelWithdrawal">撤销申请</button>
+        </view>
+      </view>
+    </view>
+  </view>
 </view>

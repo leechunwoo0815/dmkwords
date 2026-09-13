@@ -2,6 +2,12 @@
 const api = require('../../../utils/api')
 const session = require('../../../utils/session')
 
+// E-20260912-11：退会状态文案（后端 6 态全枚举，禁裸输出）
+const WD_TEXT = {
+  applying: '审核中', pending_settle: '待结算', refunding: '退款中',
+  completed: '已退会', rejected: '已拒绝', cancelled: '已撤销',
+}
+
 const TYPE_TEXT = {
   observation_fee: '观察期费', formal_fee: '年费',
   first_activity_fee: '首场活动', activity_fee: '活动费',
@@ -17,10 +23,17 @@ Page({
     preview: null,
     reason: '',
     loading: true,
+    // R-313/E-20260912-11：退会申请（此前家长端无入口，只能靠脚本）
+    withdrawals: [],
+    wdOpen: false,
+    wdReason: '',
   },
 
   onLoad(options) {
-    this.setData({ childName: decodeURIComponent(options.child_name || '') })
+    this.setData({
+      childName: decodeURIComponent(options.child_name || ''),
+      wdOpen: options.focus === 'withdraw',
+    })
     this._childId = Number(options.child_id)
   },
 
@@ -29,9 +42,10 @@ Page({
   async load() {
     this.setData({ loading: true })
     try {
-      const [orders, refunds] = await Promise.all([
+      const [orders, refunds, withdrawals] = await Promise.all([
         api.myOrders(this._childId),
         api.myRefunds(this._childId),
+        api.myWithdrawals(this._childId),
       ])
       this.setData({
         // T4 sweep：订单状态兜底裸输出（wxml else 分支）→ statusText 全枚举映射
@@ -47,6 +61,7 @@ Page({
             : '状态更新中',
         })),
         refunds: refunds || [],
+        withdrawals: (withdrawals || []).map((w) => ({ ...w, statusText: WD_TEXT[w.status] || '状态更新中' })),
         selected: null, preview: null,
       })
     } catch (e) { /* toast 已弹 */ }
@@ -90,6 +105,46 @@ Page({
         if (!res.confirm) return
         try {
           await api.cancelRefund(id, this._childId)
+          wx.showToast({ title: '已撤销', icon: 'success' })
+          this.load()
+        } catch (e) { /* toast 已弹 */ }
+      },
+    })
+  },
+
+  // ---------- 退会申请（R-313 / E-20260912-11） ----------
+  onOpenWithdraw() { this.setData({ wdOpen: true, wdReason: '' }) },
+  onWdReason(e) { this.setData({ wdReason: e.detail.value }) },
+
+  async onSubmitWithdraw() {
+    const reason = (this.data.wdReason || '').trim()
+    if (!reason) { wx.showToast({ title: '请填写退会原因', icon: 'none' }); return }
+    wx.showModal({
+      title: '确认申请退会',
+      content: '退会后会员权益终止、审核期间借书等功能冻结；押金按实际余额退还。确定提交？',
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          await api.applyWithdrawal(this._childId, reason)
+          wx.showToast({ title: '已提交，等待审核', icon: 'success' })
+          this.setData({ wdOpen: false, wdReason: '' })
+          this.load()
+        } catch (e) { /* toast 已弹 */ }
+      },
+    })
+  },
+
+  onCancelWithdrawal(e) {
+    const id = Number(e.currentTarget.dataset.id)
+    wx.showModal({
+      title: '撤销退会申请',
+      content: '撤销后如仍需退会，需要重新申请。确定撤销？',
+      confirmText: '撤销',
+      confirmColor: '#d46b08',
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          await api.cancelWithdrawal(id, this._childId)
           wx.showToast({ title: '已撤销', icon: 'success' })
           this.load()
         } catch (e) { /* toast 已弹 */ }
