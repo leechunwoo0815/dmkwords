@@ -148,13 +148,6 @@ def _ensure_demo_books(db: Session) -> None:
     from backend.domain.catalog.models import Book, BookCopy, QuizQuestion
     from scripts.seed_demo_library import make_questions
 
-    # 演示书缺题则补（测验链路可测；幂等：只给 0 题的书补）
-    demo_isbns = [row[0] for row in DEMO_BOOKS]
-    for b in db.query(Book).filter(Book.isbn.in_(demo_isbns), Book.is_deleted == 0).all():
-        if db.query(QuizQuestion).filter(QuizQuestion.book_id == b.id).count() == 0:
-            db.add_all(make_questions(b))
-            db.flush()
-
     for isbn, title, author, words, ar, grade, topic, audio_isbn in DEMO_BOOKS:
         # 查重含软删行（ISBN 唯一索引不含 is_deleted，软删行会挡 INSERT——C50 同族）：
         # 命中软删行直接复活，不重复建书
@@ -196,6 +189,15 @@ def _ensure_demo_books(db: Session) -> None:
                 )
             )
         db.flush()
+
+    # 演示书缺题则补（测验链路可测；幂等：只给 0 题的书补）。
+    # ⚠️ 必须在**建书循环之后**跑（E-20260912-07）——原实现放在循环之前，全新 seed 时
+    # 这些书还不存在 → 建出来的书 0 题，只有"第二次跑 seed"才会被补上（演示环境长期缺题）。
+    demo_isbns = [row[0] for row in DEMO_BOOKS]
+    for b in db.query(Book).filter(Book.isbn.in_(demo_isbns), Book.is_deleted == 0).all():
+        if db.query(QuizQuestion).filter(QuizQuestion.book_id == b.id).count() == 0:
+            db.add_all(make_questions(b))
+            db.flush()
 
 
 def _ensure_demo_deposit(db: Session, child) -> None:
