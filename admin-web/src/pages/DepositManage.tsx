@@ -1,4 +1,5 @@
 import PaintEmpty from "../components/PaintEmpty";
+import { cfgNum, money, useConfigs } from "../hooks/useConfigs";
 import PaintPagination from "../components/PaintPagination";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -43,6 +44,7 @@ const ENTRY_LABEL: Record<string, string> = {
 };
 
 export default function DepositManage() {
+  const configs = useConfigs();
   const { message } = AntdApp.useApp();
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [total, setTotal] = useState(0);
@@ -79,7 +81,7 @@ export default function DepositManage() {
         押金与赔偿
       </Typography.Title>
       <Typography.Paragraph type="secondary">
-        押金按孩子独立（1200 元/人）；遗失损坏按原价赔偿、优先扣本人押金；不足部分记「待结清」并持续提醒。
+        押金按孩子独立（${money(cfgNum(configs, "deposit_amount", 1200))} 元/人）；遗失损坏按原价赔偿、优先扣本人押金；不足部分记「待结清」并持续提醒。
       </Typography.Paragraph>
 
       <Space style={{ marginBottom: 12 }}>

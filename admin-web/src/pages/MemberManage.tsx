@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { cfgNum, money, useConfigs } from "../hooks/useConfigs";
 import {
   App as AntdApp,
   Button,
@@ -87,6 +88,7 @@ const PAY_METHOD_OPTIONS = [
 ];
 
 export default function MemberManage() {
+  const configs = useConfigs();
   const { message } = AntdApp.useApp();
   const { user } = useAuth();
   // W5 URL 状态镜像：tab/keyword/page 进 URL（replaceState 不堆栈），刷新还原
@@ -255,7 +257,7 @@ export default function MemberManage() {
       content: (
         <div>
           <div style={{ marginBottom: 8 }}>
-            {o.order_no} · ￥{Number(o.amount).toLocaleString()}（仅超管；99 元资格随退款恢复）
+            {o.order_no} · ￥{Number(o.amount).toLocaleString()}（仅超管；${cfgNum(configs, "first_activity_fee", 99)} 元资格随退款恢复）
           </div>
           <Input.TextArea rows={2} onChange={(e) => { remarkInput = e.target.value; }} placeholder="退款说明（留痕）" />
         </div>
@@ -804,10 +806,28 @@ export default function MemberManage() {
           </Form.Item>
           <Form.Item name="order_type" label="订单类型" rules={[{ required: true }]} extra="年费金额自动判定二孩折扣；观察期/活动费不打折">
             <Select options={[
-              { value: "observation_fee", label: "观察期会员费（500 元/月）" },
-              { value: "formal_fee", label: "正式年费（6000 元，二孩自动 5400）" },
-              { value: "first_activity_fee", label: "首场亲子活动（99 元，每账号一次）" },
-              { value: "deposit", label: "押金（1200 元，标准配置）" },
+              // E-20260912-10：金额一律读后端配置（禁硬编码），调价后文案自动跟随
+              {
+                value: "observation_fee",
+                label: `观察期会员费（${money(cfgNum(configs, "observation_fee", 500))} 元/月）`,
+              },
+              {
+                value: "formal_fee",
+                label: `正式年费（${money(cfgNum(configs, "formal_fee", 6000))} 元，二孩自动 ${money(
+                  Math.round(
+                    cfgNum(configs, "formal_fee", 6000) *
+                      (1 - cfgNum(configs, "second_child_discount_percent", 10) / 100),
+                  ),
+                )}）`,
+              },
+              {
+                value: "first_activity_fee",
+                label: `首场亲子活动（${cfgNum(configs, "first_activity_fee", 99)} 元，每账号一次）`,
+              },
+              {
+                value: "deposit",
+                label: `押金（${money(cfgNum(configs, "deposit_amount", 1200))} 元，标准配置）`,
+              },
               { value: "activity_fee", label: "活动费（选活动带出金额）" },
               { value: "custom", label: "自定义（自输说明与金额）" },
             ]} />
@@ -834,7 +854,7 @@ export default function MemberManage() {
                   </Form.Item>
                 </>
               ) : getFieldValue("order_type") === "deposit" ? (
-                <Typography.Text type="secondary">押金金额按标准配置（1200 元），确认收款后自动激活押金账户。</Typography.Text>
+                <Typography.Text type="secondary">押金金额按标准配置（${money(cfgNum(configs, "deposit_amount", 1200))} 元），确认收款后自动激活押金账户。</Typography.Text>
               ) : null}
             </Form.Item>
           <Form.Item name="remark" label="备注">
