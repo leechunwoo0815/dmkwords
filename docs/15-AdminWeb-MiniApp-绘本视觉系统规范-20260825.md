@@ -65,12 +65,12 @@
 
 | 组件 | 当前 | 建议 | 代码位置 |
 |---|---|---|---|
-| Button | `borderRadius: 10` | `borderRadius: 16`（大胶囊） | theme.ts |
-| Card | `borderRadius: 14` | `borderRadius: 20` | theme.ts |
-| Modal | `borderRadius: 14` | `borderRadius: 24` | theme.ts |
+| Button | `borderRadius: 10` | `borderRadius: 16`（大胶囊） | `admin-web/src/theme-paint.ts` |
+| Card | `borderRadius: 14` | `borderRadius: 20` | `admin-web/src/theme-paint.ts` |
+| Modal | `borderRadius: 14` | `borderRadius: 24` | `admin-web/src/theme-paint.ts` |
 | Table 行 | `borderRadius: 0` | 每行独立卡片 `borderRadius: 12` | 自定义 Table 组件 |
-| Input | `borderRadius: 10` | `borderRadius: 12` | theme.ts |
-| Tag | `borderRadius: 10` | `borderRadius: 999px`（pill） | theme.ts |
+| Input | `borderRadius: 10` | `borderRadius: 12` | `admin-web/src/theme-paint.ts` |
+| Tag | `borderRadius: 10` | `borderRadius: 999px`（pill） | `admin-web/src/theme-paint.ts` |
 | Avatar | `borderRadius: 50%` | 保留，但加 2px 手绘边框 | 自定义 Avatar 组件 |
 | 图片/封面 | `borderRadius: 4` | `borderRadius: 12` | 全局 CSS |
 
@@ -273,6 +273,28 @@
 }
 ```
 
+### 3.4 规范 Token 名 ↔ wxss 变量名对照（**以 `miniapp/app.wxss` 为准**）
+
+> §3.2 的 Token 名是设计稿口径；小程序实现统一用 `miniapp/app.wxss` 的变量名——**值相同、名字不同**。落笔写代码以本表右列为准。
+
+| 规范 Token（§3.2） | 值 | `miniapp/app.wxss` 变量 | 备注 |
+|---|---|---|---|
+| `canvas` | `#FDF8F0` | `--bg` | 规范名 `canvas` 在 wxss 中无同名变量 |
+| `paper` | `#FFFDF7` | `--surface` | 同上 |
+| `ink` | `#3B2F2F` | `--fg` | 同上 |
+| `ink-light` | `#6B5B5B` | `--muted` | 同上 |
+| `primary` | `#FF6B35` | `--accent` | wxss 保留兼容别名 `--primary: var(--accent)` |
+| `secondary` | `#4ADE80` | `--secondary` | 名字一致 |
+| `accent-yellow` | `#FCD34D` | `--sun` | 规范名在 wxss 中无同名变量 |
+| `accent-blue` | `#60A5FA` | `--sky` | 同上 |
+| `accent-pink` | `#F472B6` | `--sakura` | 同上 |
+| `accent-purple` | `#A78BFA` | `--lavender` | 同上 |
+| `danger` | `#EF4444` | `--error` | 同上 |
+
+**说明**：
+- §3.2 的 11 个 Token 在 `app.wxss` 中均有等价变量（值逐一相同）；规范侧名字 `canvas`/`paper`/`ink`/`ink-light`/`accent-yellow`/`accent-blue`/`accent-pink`/`accent-purple`/`danger` **不作为 wxss 变量存在**。
+- `app.wxss` 另有规范表未列的扩展令牌（如 `--gold` / `--success` / `--warning` / `--border` / `--radius-*` 等），同以 `app.wxss` 为准。
+
 ---
 
 ## 四、字体系统
@@ -417,7 +439,7 @@
 - 色彩系统一致
 - 角色插画一致
 - 圆角/边框/阴影规范一致
-- 字体栈一致（miniapp 用 `ZCOOL KuaiLe` + `PingFang SC`）
+- 字体栈一致（miniapp `--font-display`: `ZCOOL KuaiLe` / `Yuanti SC` / `YouYuan` / `PingFang SC`；`--font-body`: `Nunito` 系统栈；见 `miniapp/app.wxss`）
 
 ### 7.2 admin-web 特有
 
@@ -444,7 +466,7 @@
 
 **目标**：改组件形态，不加插画。
 
-1. **新建 `theme-paint.ts`**：基于当前 `theme.ts`，覆盖：
+1. **新建 `theme-paint.ts`**：基于当前 ``admin-web/src/theme-paint.ts``，覆盖：
    - 圆角系统（Button 16、Card 20、Modal 24、Tag 999px）
    - 边框系统（所有组件加粗边框 token）
    - 阴影系统（硬边偏移）
@@ -535,9 +557,10 @@ admin-web 端未按本规范原定的 4 个迭代分阶段实施，而是一次�
 | 菜单图标颜色随权限错位 | 用 `.ant-menu-item:nth-child(N)` 匹配颜色，但 `Layout.tsx` 按权限过滤后菜单数量变化 | 改为 `Layout.tsx` 按 route key 传 `iconBgMap` + `iconColorMap` |
 | 字体硬编码难维护 | 16 处内联 `fontFamily: "'ZCOOL KuaiLe', ..."` | 统一改为 `var(--font-display)` |
 
-### 未实施项
+### miniapp 小程序端绘本风（2026-08-30 已落地）
 
-- **miniapp 小程序端绘本风**：本规范同样适用，但尚未在小程序端实施，需单独安排迭代。
+- **已实施**：`miniapp/app.wxss` 落地整套绘本令牌（改值不改名，43 个页面 wxss 零改动继承）；`miniapp/components/avatar-ring/` 等级头像框叠层组件；`miniapp/icons/frames/` 四档头像框资产。
+- **机械门禁**：`scripts/check_miniapp_style.py`（R1-R11 规则 + S1-S3 三重自证），已进 `scripts/gate.sh` 第 5 步「契约与反假绿」。
 
 ---
 

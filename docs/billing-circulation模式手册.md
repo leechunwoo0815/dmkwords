@@ -37,6 +37,17 @@
 订单：PENDING → PAID → REFUND_PROCESSING → REFUND_DONE / REFUND_FAILED
       PENDING → CLOSED（取消/超时）；PAID ← 迟到支付可从 CLOSED 激活
 ```
+
+> ⚠️ **新项目实际值域（2026-09-15 对齐代码，与上面旧项目大写枚举不是同一套）**
+>
+> | 对象 | 新项目状态值（小写） | 落点 |
+> |---|---|---|
+> | 押金 | `unpaid / paid / partially_deducted / fully_deducted / refunding / refunded` | `backend/domain/billing/models.py` |
+> | 订单 | `pending_payment / pending_manual_confirm / paid / cancelled / refunded`，**退款状态独立成列** `refund_status`（不再塞进订单状态机） | `backend/domain/identity/models.py` |
+> | 报名 | `pending_payment / enrolled / checked_in / refund_pending / refunded / cancelled` | `backend/domain/activity/models.py` |
+>
+> 已接入 `ALLOWED_TRANSITIONS` 转移矩阵的是 **5 张表**（Child / Order / RefundRequest / WithdrawalRequest / BookCopy）；
+> 押金、借阅、预约、测验、报名**尚未**接入矩阵——这是待迁项，别按"全部已接入"理解（见 `docs/02-架构蓝图.md`）。
 - 每次转移前：`with_for_update()` 重取记录 + `if record.status != 期望态: raise ConflictError`
 - **非法转移必须显式拒绝**（不是静默跳过），报错文案带当前状态
 - **双状态镜像**：DepositRecord.status 与 Child.deposit_status 同步更新（同一事务内），
@@ -156,8 +167,14 @@ if existing: raise ConflictError("已有待支付订单")
 3. 未归还图书 > 0 → 拒绝（BorrowRecord BORROWING/OVERDUE 计数，**带行锁**）
 4. 年度滥用拦截：365 天内同孩子已退过（APPROVED + COMPLETED 都算，F51/F25；
    用 `timedelta(days=365)` 不用 `replace(year-1)`——闰年 2/29 抛 ValueError）
+   ⚠️ **新项目现状（2026-09-15 核实）：这一闸没有实现**——`wm10_service.py` 的
+   `RefundService.apply` 里查不到任何 365 天拦截，全库 grep 零命中。
+   **要么补实现，要么明确不做**（现在文档说"五道闸"、代码只有四道，属文档与代码不一致，
+   本轮按"如实标注"处理，不假装已实现）。
 5. 金额计算：服务端算 used_days（不信任前端）；未缴罚款自动抵扣退余额（B11）；
    可退金额 ≤ 0 → 拒绝创建 0 元退款单（F-009）
+   ⚠️ 新项目现状：按剩余天数比例算已落地；**"未缴罚款自动抵扣退余额"未实现**
+   （押金退的是"可用余额"本身，语义等价，但不要再宣称有独立的罚款抵扣步骤）。
 
 小额自动审核（E1）走同一套闸，只是免人工。审核动作本身要行锁防双审
 （`status != PENDING 则 ConflictError`）。
@@ -222,6 +239,51 @@ if not updated: raise ValidationError("该书暂无库存")
 条码已存在 → 直接借；不存在 → 校验必填字段（title/author/isbn/ar/age）→
 按 ISBN 找书或建书 → 建副本 → 原子递增库存 → 走统一 `borrow_book`。
 NOT NULL 列显式写入（F47），避免依赖 DB 默认值在迁移后漂移。
+
+---
+
+### P9b 退款与退会**分家**（新项目独有，2026-09-15 用户拍板）
+
+**问题**：一个页面同时提供"退款"和"退会"，家长分不清点哪个；而两者对资金的影响完全不同。
+
+**解法：两个入口各管一件事**
+- 「退款申请」只办退款（观察期费/年费/活动费/自定义单等**任意已支付订单**，押金除外）；
+- 「退会申请」独立成页，只提交申请、**不预先罗列任何费用**；
+- 后端收到退会申请后**自动排查规则内可退费用**（`_settle_items`：按费用类型白名单扫全部订单 +
+  排除已存在退款单的订单，**防重复退**），但**只在审核通过后**把明细交给家长看
+  （`GET /api/miniapp/withdrawals/{id}/settlement`）；
+- 审核前的"预估"仅管理端可见（`settle-preview`），且与家长端明细**同源同函数**（不许两处各算）。
+
+**为什么"通过后才给看"**：审核前的金额是预估，审核结论一变（部分通过/驳回某项），
+家长会觉得"说好的钱变了"；先给状态、后给账，是客诉设计而不是技术偷懒。
+
+**双表示陷阱（踩过）**：押金在库里**同时**是 `Order(order_type='deposit')` 和 `Deposit` 实体，
+退会排查如果"扫全部已支付订单"，押金会被算两次（一次订单、一次押金余额）。
+白名单排除型扫法 + 既存退款单排除，才是安全写法（本坑由既有测试
+`test_withdrawal_flow_and_deposit_refund` 抓到，不是靠人眼）。
+
+**测试背书**：`tests/unit/test_wm10_transfer_refund.py`（含越权守卫、非本孩拒绝、双退拦截）。
+
+### P9c 活动签到与退款资格（新项目独有）
+
+- 券状态机：`pending_payment → enrolled → checked_in`；退款另走 `refund_pending → refunded`；
+- **已签到不退**（`signin` 后报名态变 `checked_in`，退款申请直接被拒 422）——这条是"到场闭环"的
+  资金护栏：不然家长可以参加完再退全款；
+- 门店侧「扫码枪连扫」是**交互模式**而非资金规则：扫码即提交、防重复、失败四类不静默、
+  **成功与失败都回焦**（否则一次失败打断整队人）；重复扫同一张券必须幂等
+  （只提示"已签到过"，**不得重写签到时间/审计**）；
+- 活动取消 → 已付未签到批量转「退款待审」，逐单人工审（不自动全退）。
+
+**测试背书**：`tests/unit/test_wm9_activity.py`、`features/activity.feature`。
+
+### P9d 封面/媒体 URL **破缓存**（新项目独有，2026-09-15）
+
+**问题**：小程序 `<image>` 按 URL 缓存，封面重新生成后 URL 不变 → 用户永远看到旧图
+（管理端换封面也是同样症状）。
+
+**解法**：媒体 URL 一律带 `?v=<文件名片段>`（`backend/common/file_utils.py` 的
+`media_version` / `book_cover_url` / `activity_cover_url`）；重生成脚本**写新文件名并删旧文件**，
+让 token 变化而不是原地覆盖。
 
 ---
 
@@ -299,6 +361,10 @@ C 端用户报错带行动指引（下一步做什么）。
 | billing（押金/收费/退款） | P1-P9 全部（P1 状态机 + P2 三段式是骨架） |
 | circulation（借还/库存） | P10-P14 + P15 |
 | identity（儿童合规删除/同意） | P16、P17 + P15 |
+| growth（词账/护照/书架可见性） | P7（快照冻结：有效词数按快照算，不实时重算） |
+| activity（活动报名/签到/退款） | P9c（签到与退款资格）+ P2（三段式） |
+| identity 退会链（新） | P9b（退款退会分家 + 通过后展示明细 + 双表示陷阱） |
+| 全端媒体（封面/音频） | P9d（URL 破缓存） |
 | report/admin（对账/告警） | P4（僵尸单监控）、P18（告警文案） |
 
 **实施顺序建议**：先建状态机表（P1 矩阵直接进代码常量 + 单测穷举合法/非法转移，

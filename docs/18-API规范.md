@@ -71,14 +71,19 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
 响应：PaginatedResponse{items, total, page, page_size}
 ```
 
-  ⚠️ miniapp 侧（reading/miniapp_router L57-58）为裸默认值（`page: int = 1`，无 Query 约束）
-  ——不一致项已登记，归 T29 sweep 处置。
+  ⚠️ miniapp 侧**部分清偿，仅剩 reading 一处**：`identity/miniapp_router.py:91`、
+  `reading_circle/miniapp_router.py:44` 均已改 `Query(ge=1)`；`reading/miniapp_router.py:58`
+  仍为裸默认值（`page: int = 1`，无 Query 约束）——归 T29 sweep 处置。
 - 媒体流（音频/封面/报告图）：query token 传鉴权（`?token=`），组件无法带
   Authorization 头的历史约束；归属校验见 P0-F1/T25。
 - **媒体消费点纪律（2026-09-09 增补，封面三断链教训）**：新增媒体字段（cover_url 类）
   的全部消费端（管理端 `<img>`/小程序 `<image>` 各页面）必须逐一接 token 拼 URL——
   miniapp 走 `media.fullUrl()`（utils/media.js），admin-web 走对应 `xxxUrl()` helper 拼
   query token。交付时附消费点清单（错误记忆库锚定）。
+  **破缓存**：媒体 URL 现自带 `?v=<文件名片段>`（`backend/common/file_utils.py` 的
+  `media_version`/`book_cover_url`/`activity_cover_url`）——`<image>` 按 URL 缓存，换图后
+  不带 v 用户永远看旧图；消费端新增小程序 `miniapp/libs/qrcode.js`、`miniapp/libs/code128.js`、
+  `miniapp/utils/ticket-code.js`。
 - **2026-09 增补端点族**（契约快照执法，改动必须走 contract-change 两步显形）：
   `GET /api/miniapp/books/{id}/audio-permission`（播放入口预检，与 audio 流共享 guards
   判定）；`GET /api/miniapp/quiz/status-batch`（书架角标批量，IN 查询禁 N+1）；
@@ -97,6 +102,11 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
   馆方专属 `gm_*` 资产**不在**白名单）；
   `GET /api/miniapp/notifications?scene=circle.liked`（场景过滤 + 深链数据面 `ref_type`/`ref_id`/`actor_name`；
   `ref_type=circle_admin` 标识馆长亲赞）。
+- **其他已上线端点（2026-09-12 补充，均在契约快照 openapi.json 内）**：
+  `GET /api/miniapp/growth/passed-books`（书架「已通过」页签，`child_id` 必传；源
+  `backend/domain/growth/miniapp_router.py:75`，服务 `passed_books_service.py`）；
+  `GET /api/miniapp/withdrawals/{request_id}/settlement`（退会审核通过后家长查看可退明细，
+  `child_id` 必传；源 `backend/domain/identity/miniapp_router.py:172`）。
 
 ## 五、契约工作流（改接口三步链，缺一步 gate 红或前端断）
 

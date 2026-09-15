@@ -1,8 +1,9 @@
 # DmkWords 少儿英语分级阅读系统 — 项目宪法（CLAUDE.md）
 
 > **本文件 = 新项目最高法律，每次 AI 会话开工第一件必读。**
-> 版本：v1.3（2026-08-28，新增功能闭环必更文档纪律）
-> 来源：业务需求文档定稿 V1.1 + 需求决策链 V1.0.1（R-300 系规则）+ 旧项目血泪教训（错误记忆库 8 条红线 + 模式手册）+ 旧宪法 v0.3。
+> 版本：v1.5（2026-09-15：门禁清单按实际 9 步重写 + 知识库索引死链修正 + 技术栈文件名更正）
+> 版本沿革：v1.4（门禁后现场恢复入 DoD）← v1.3（2026-08-28，新增功能闭环必更文档纪律）
+> 来源：业务需求文档定稿 V1.1 + 需求决策链 V1.0.1（R-300 系规则，**该文件未入库**）+ 旧项目血泪教训（错误记忆库 8 条红线 + 模式手册）+ 旧宪法 v0.3。
 > 边界声明：本宪法只写"**什么不能做**"与"**必须怎么做**"；业务数值以业务需求文档 V1.1 为准，宪法不锁死数值，但**锁死"数值必须配置化"**。
 
 ---
@@ -139,15 +140,16 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 | 文件 | 用途 |
 | :--- | :--- |
 | `PRD/业务需求文档-定稿V1.1.md` | **业务需求唯一事实源**（甲方签字版） |
-| `PRD/需求决策链 V0.1→V1.0.1` | 决策过程与规则全文（R-100~R-323），冲突以 V1.0.1 为准 |
-| `docs/billing-circulation模式手册.md` | 资金/借阅 18 个模式 + 反模式清单（旧项目知识提炼） |
-| `docs/02-架构蓝图.md` + `docs/ADR/` | 架构与关键决策记录 |
+| `PRD/需求决策链 V0.1→V1.0.1` | ⚠️ **该文件未入库**（R-100~R-323 规则条文散见需求文档与错误记忆库）——引用它时按"缺失"处理，**别当成可查的事实源** |
+| `docs/billing-circulation模式手册.md` | 资金/借阅模式 + 反模式清单（旧项目知识提炼 + 2026-09-15 补退会/签到/活动链） |
+| `docs/02-架构蓝图.md` | 架构与关键决策记录（ADR-001~008 摘要内嵌本文；全文目录 `docs/ADR/` **尚未创建**） |
 | `docs/07-按图施工手册.md` | 后续开发大模型施工标准（Demo 验证后产出） |
 | `error_list/错误记忆库-*.md` | 错误记忆库（开工必读最新版 §三） |
 | `docs/19-门禁后现场恢复手册.md` | gate/pytest 后标准收尾流程（DoD 第 2 条细则，换模型必读） |
 | `docs/LEDGER.md` | 任务台账（唯一进度事实源，流转需证据） |
 
-**冲突裁决顺序**：本宪法 > 业务需求文档 V1.1 > 需求决策链 V1.0.1 > 架构蓝图/ADR > 全局 AGENTS.md。
+**冲突裁决顺序**：本宪法 > 业务需求文档 V1.1 > 错误记忆库根因模式族 > 架构蓝图/ADR > 全局 AGENTS.md。
+（原第 3 顺位的"需求决策链 V1.0.1"**未入库**，其效力条文已散落进需求文档与错误记忆库，故由错误记忆库承接该顺位。）
 **宪法修改**：走"提案 + 甲方/架构师确认"，禁止 AI 自行改宪法。
 
 ---
@@ -172,34 +174,23 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 
 ### 全量门禁命令（C 级或 CI 使用）
 
-```bash
-# 1 lint
-ruff check backend/ tests/ features/ scripts/
-ruff format --check .
+**唯一入口**：`bash scripts/gate.sh full`（退出码 0 才算数）。下表是它的 9 步实况（2026-09-15 对齐 `scripts/gate.sh`；**别照抄旧版的七组命令，其中两条已是死命令**）：
 
-# 2 单测与验收（真实 MySQL；开发机 OrbStack = CI = 生产同构）
-python -m pytest tests/ -x -q --tb=short
-python -m behave features/ --no-capture -q
+| 步 | 内容 | 命令（gate.sh 内部） |
+| :--- | :--- | :--- |
+| 1 | lint | `ruff check .` + `ruff format --check .` |
+| 2 | 单测 + 覆盖率 | `pytest tests/ -q --cov=backend --cov-fail-under=25`（**当前实测 464 passed / 84%**；阈值 25% 是"防覆盖率塌方"下限，不是目标值） |
+| 3 | BDD | `behave features/ --no-capture -q`（当前 8 features / 30 scenarios / 103 steps） |
+| 4 | 架构关 | `python -m scripts.verify_architecture`（Router 违规 0 / 单文件 ≤800 行 / 域四件套 / import 白名单 / 锁定读 `populate_existing` / 无 sqlite） |
+| 5 | 契约与反假绿 | `check_fake_assertions` + `check_miniapp_bindings` + `check_docs_code_alignment` + `check_rbac_consistency` + **`check_miniapp_style`**（R1–R11 + S1–S3 自证） |
+| 6 | 数据库迁移一致性 | `alembic check`（"No new upgrade operations detected"） |
+| 7 | 前端类型检查 | `pnpm exec tsc --noEmit`（admin-web） |
+| 8 | 契约快照（T27） | `python scripts/export_openapi.py --check`（端点变更必须"改代码 + 重导快照"两步显形） |
+| 9 | 交付完整性 | 引用目录（外部专家意见/docs/error_list）不得有 untracked |
 
-# 3 架构关（每条规则对应一个检查）
-python -m scripts.verify_architecture
-#    Router 违规==0；函数内 import<阈值；单文件<=800行；域四件套完整；
-#    import 白名单；事件发布/订阅双向对账
-
-# 4 契约与反假绿
-python -m scripts.verify_api_contract
-python -m scripts.check_model_consistency
-python -m scripts.check_fake_assertions     # 扫描 tests+scripts+features
-
-# 5 数据库
-alembic upgrade head && alembic check
-
-# 6 覆盖率（整体≥85%，billing/circulation≥90%）
-python -m pytest tests/ --cov=backend --cov-fail-under=85
-
-# 7 全量门禁（退出码 0 才算数）
-bash scripts/gate.sh full
-```
+> 已归档/停用（**别再当门禁命令跑**）：`verify_api_contract`、`check_model_consistency` —— 两份脚本已移入 `docs/legacy-attic/`，gate 第 5 步只做 skip 判断。
+>
+> `gate.sh` PASS 且检测到本地 dev 环境时，会**自动** `dev.sh restart` 恢复现场；仍需按 `docs/19` 做三项核验（自动恢复可能失败）。
 
 ---
 
@@ -211,7 +202,7 @@ bash scripts/gate.sh full
 | 数据库 | **MySQL 8.0 (utf8mb4) only**；alembic 管全部 schema（禁 create_all）；开发 OrbStack / CI service / 生产 Compose 同构 |
 | 缓存/锁 | **第一版不引入 Redis**（ADR-005：单机进程内锁 + JWT 无状态；预留演进） |
 | 定时任务 | 进程内 APScheduler（ADR-008；任务逻辑放域 service，调度器只做注册表） |
-| 前端 | 小程序原生（家长微信登录）+ React 18 + TS + Vite + AntD（theme.ts 暖纸书房） |
+| 前端 | 小程序原生（家长微信登录）+ React 18 + TS + Vite + AntD（`admin-web/src/theme-paint.ts` 暖纸书房） |
 | 文件存储 | 本地磁盘 `uploads/`（ADR-004；音频上百 GB，预留存储抽象层） |
 | 支付 | 微信支付 V3（安卓线上）+ 企微人工确认（苹果）+ 线下收款登记（复用 design-reuse 集成资产） |
 | 测试 | pytest + behave（中文 Gherkin）；覆盖率门禁见第八节 |
