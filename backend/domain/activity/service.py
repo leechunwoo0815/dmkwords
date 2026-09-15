@@ -16,6 +16,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
+from backend.common.file_utils import activity_cover_url
 from backend.common.notification_models import Notification
 from backend.common.notifications import (
     SCENE_ACTIVITY_CANCEL,
@@ -137,7 +138,7 @@ class ActivityService:
             "status": a.status,
             "description": a.description,
             # T45：封面 URL（管理端 cover-media token 双通道；miniapp 公开端点）
-            "cover_url": f"/api/miniapp/activities/{a.id}/cover" if a.cover_path else None,
+            "cover_url": activity_cover_url(a.id, a.cover_path),
         }
         if with_quota:
             used = self._quota_used(a.id)
@@ -353,6 +354,7 @@ class ActivityService:
         a = self._get(e.activity_id)
         if a.status != Activity.STATUS_PUBLISHED:
             raise ValidationError("活动已取消或结束")
+        child = self.db.query(Child).filter(Child.id == e.child_id).first()
         e.status = ActivityEnrollment.STATUS_CHECKED_IN
         e.checked_in_at = datetime.now()
         e.checked_in_by = admin.id
@@ -369,6 +371,10 @@ class ActivityService:
         return {
             "enrollment_id": e.id,
             "child_id": e.child_id,
+            # 门店连扫：回执要能当场确认"签的是谁、哪场活动"（PRD §9.2.1）
+            "child_name": child.name if child else None,
+            "activity_title": a.title,
+            "ticket_code": code,
             "checked_in_at": str(e.checked_in_at),
         }
 

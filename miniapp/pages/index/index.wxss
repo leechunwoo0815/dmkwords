@@ -1,6 +1,7 @@
 /* pages/index/index.wxss — 首页 v5：任务台布局 */
 .page-root {
-  height: 100vh;
+  /* 2026-09-15 修复：固定高度导致长内容跑不出视口、底部被 tabBar 挡死 → 改 min-height */
+  min-height: 100vh;
   background: var(--bg);
   box-sizing: border-box;
   padding: 24rpx 24rpx calc(160rpx + env(safe-area-inset-bottom));
@@ -11,12 +12,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(135deg, var(--accent) 0%, #ff8c53 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
   border: 4rpx solid var(--fg);
   border-radius: var(--radius);
   box-shadow: var(--shadow-hard);
   padding: 36rpx 32rpx;
-  color: #fff;
+  color: var(--surface);
 }
 .hero-greeting {
   font-family: var(--font-display);
@@ -33,10 +34,10 @@
   font-size: 22rpx;
   padding: 6rpx 18rpx;
   border-radius: 999rpx;
-  border: 2rpx solid rgba(255, 255, 255, 0.8);
-  background: rgba(255, 255, 255, 0.18);
+  border: 2rpx solid var(--surface);
+  background: var(--white-soft);
 }
-.badge-done { background: var(--secondary); border-color: var(--fg); color: #fff; }
+.badge-done { background: var(--secondary); border-color: var(--fg); color: var(--surface); }
 .badge-todo { background: var(--sun); border-color: var(--fg); color: var(--fg); font-weight: 700; }
 .streak-sticker {
   display: flex;
@@ -74,7 +75,7 @@
   font-size: 26rpx;
   color: var(--muted);
 }
-.chip-on { background: var(--accent); border-color: var(--fg); color: #fff; font-weight: 700; }
+.chip-on { background: var(--accent); border-color: var(--fg); color: var(--surface); font-weight: 700; }
 
 /* ---------- 提醒条 ---------- */
 .notice-row { display: flex; gap: 16rpx; margin-top: 20rpx; flex-wrap: wrap; }
@@ -95,13 +96,6 @@
 /* ---------- 区块通用 ---------- */
 .section { margin-top: 36rpx; }
 .section-head { display: flex; align-items: center; justify-content: space-between; }
-.section-title {
-  font-family: var(--font-display);
-  font-size: 34rpx;
-  font-weight: 800;
-  color: var(--fg);
-  margin-bottom: 20rpx;
-}
 .section-more { font-size: 26rpx; color: var(--accent); font-weight: 600; margin-bottom: 20rpx; }
 
 /* ---------- 续听卡 ---------- */
@@ -150,7 +144,7 @@
   background: var(--accent);
   border: 4rpx solid var(--fg);
   box-shadow: var(--shadow-hard-sm);
-  color: #fff;
+  color: var(--surface);
   font-size: 36rpx;
   display: flex;
   align-items: center;
@@ -235,7 +229,7 @@
   color: var(--accent);
   font-weight: 700;
 }
-.rec-tag-words { background: rgba(74, 222, 128, 0.14); color: var(--success); }
+.rec-tag-words { background: var(--secondary-soft); color: var(--success); }
 
 /* ---------- 快捷入口 2x4 ---------- */
 .entry-grid { display: flex; flex-wrap: wrap; gap: 20rpx; }
@@ -263,12 +257,12 @@
   font-size: 44rpx;
 }
 .e-orange { background: var(--accent-soft); }
-.e-green { background: rgba(74, 222, 128, 0.18); }
-.e-blue { background: rgba(96, 165, 250, 0.18); }
-.e-gold { background: rgba(252, 211, 77, 0.28); }
-.e-pink { background: rgba(244, 114, 182, 0.16); }
-.e-purple { background: rgba(167, 139, 250, 0.18); }
-.e-cyan { background: rgba(94, 234, 212, 0.2); }
+.e-green { background: var(--secondary-soft); }
+.e-blue { background: var(--sky-soft); }
+.e-gold { background: var(--sun-soft); }
+.e-pink { background: var(--sakura-soft); }
+.e-purple { background: var(--lavender-soft); }
+.e-cyan { background: var(--secondary-soft); }
 .entry-name { font-size: 26rpx; font-weight: 700; color: var(--fg); }
 
 .page-footer {
@@ -292,9 +286,12 @@
   position: absolute;
   left: 0; right: 0; bottom: 0;
   padding: 16rpx 20rpx;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.55));
+  background: linear-gradient(transparent, rgba(var(--fg-rgb), 0.55));
   display: flex;
   flex-direction: column;
 }
-.carousel-title { color: #fff; font-size: 28rpx; font-weight: 600; }
-.carousel-sub { color: rgba(255, 255, 255, 0.85); font-size: 22rpx; margin-top: 4rpx; }
+.carousel-title { color: var(--surface); font-size: 28rpx; font-weight: 600; }
+.carousel-sub { color: var(--surface); opacity: 0.85; font-size: 22rpx; margin-top: 4rpx; }
+
+/* ===== 2026-09-14 回归修复（对照 HEAD 逐条核回被批处理误删的声明）===== */
+.h-section { font-size: 34rpx; margin-bottom: 20rpx; }

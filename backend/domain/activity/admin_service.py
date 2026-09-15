@@ -25,6 +25,8 @@ class AdminActivityService(ActivityService):
         if not a:
             raise NotFoundError("活动不存在")
         v = self._activity_view(a, with_quota=True)
+        # 只读详情（领导视角）：把"这个活动什么时候建的"也摆出来，方便回溯
+        v["created_at"] = str(a.create_time) if a.create_time else None
 
         v["enrolled_count"] = (
             self.db.query(func.count(ActivityEnrollment.id))

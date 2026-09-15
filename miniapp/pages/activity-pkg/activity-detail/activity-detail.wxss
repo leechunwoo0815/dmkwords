@@ -1,152 +1,113 @@
-.top-bar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  height: 112rpx;
-  padding: 0 32rpx;
-  background: var(--surface);
-  border-bottom: 2rpx solid var(--border);
+/* pages/activity-pkg/activity-detail/activity-detail.wxss — 活动详情
+   2026-09-13 按统一模板契约重做：删除不在 wxml 中的死规则（top-bar/faq/teacher/
+   bring-box/toast 等，原 536 行 → 精简）；渐变/遮罩全部令牌化；
+   修复两处遮挡：info-card 负 margin 上滑盖住「活动信息」标题、action-bar 压住内容。 */
+.page-bg {
+  min-height: 100vh;
+  background: var(--bg);
+  box-sizing: border-box;
+  /* 底部留白 ≥ action-bar（约 170rpx）+ 安全区：内容不被固定底栏遮挡 */
+  padding-bottom: calc(220rpx + env(safe-area-inset-bottom));
 }
-.top-bar .back-btn {
-  background: none;
-  border: none;
-  font-size: 40rpx;
-  color: var(--fg);
-  padding: 8rpx 16rpx;
-  border-radius: var(--radius-sm);
-}
-.top-bar .back-btn:active { background: var(--accent-soft); }
-.top-bar .title {
-  flex: 1;
-  text-align: center;
-  font-family: var(--font-display);
-  font-size: 34rpx;
-  font-weight: 600;
-}
-.top-bar .share-btn {
-  background: none;
-  border: none;
-  font-size: 36rpx;
-  color: var(--muted);
-  padding: 8rpx 16rpx;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  margin: 0;
-  border-radius: 0;
-}
-.share-btn::after { border: none; }
 
+/* ---------- hero 封面 ---------- */
 .hero {
   height: 400rpx;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--accent) 0%, #3d6494 45%, #5d7ba1 75%, #8fa6c4 100%);
+  /* on-palette 渐变：原裸值 #3d6494/#5d7ba1/#8fa6c4 收编为令牌组合 */
+  background: linear-gradient(135deg, var(--accent) 0%, var(--sky) 55%, var(--lavender) 100%);
 }
-.hero::before {
+.hero::before,
+.hero::after {
   content: '';
   position: absolute;
+  border-radius: 50%;
+  background: var(--surface);
+}
+.hero::before {
   top: -80rpx;
   right: -80rpx;
   width: 320rpx;
   height: 320rpx;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
+  opacity: 0.08;
 }
 .hero::after {
-  content: '';
-  position: absolute;
   bottom: -40rpx;
   left: -40rpx;
   width: 200rpx;
   height: 200rpx;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
+  opacity: 0.06;
 }
-.hero .hero-emoji {
-  font-size: 128rpx;
-  z-index: 1;
+.hero-cover {
+  overflow: hidden;
 }
-.hero .hero-tag {
+.hero-img {
   position: absolute;
-  top: 32rpx;
-  left: 32rpx;
-  background: rgba(255, 255, 255, 0.2);
-  color: var(--surface);
-  font-size: 22rpx;
-  font-weight: 600;
-  padding: 8rpx 20rpx;
-  border-radius: 40rpx;
-  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
-.hero .hero-status {
+/* 深色遮罩保文字：原 rgba(0,0,0,渐变) 改 fg+透明度
+   2026-09-15：封面换成浅色绘本插画后，均匀 0.45 深棕把整幅画压成灰绿（用户：像毛坯）。
+   改纵向渐变——顶部留画、文字所在的中段压深、底部回浅，既保住白字对比度也不糊画面。 */
+.hero-mask {
   position: absolute;
-  top: 32rpx;
-  right: 32rpx;
-  background: var(--success);
-  color: var(--surface);
-  font-size: 22rpx;
-  font-weight: 600;
-  padding: 8rpx 20rpx;
-  border-radius: 40rpx;
-  z-index: 1;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(var(--fg-rgb), 0.10) 0%,
+    rgba(var(--fg-rgb), 0.44) 42%,
+    rgba(var(--fg-rgb), 0.52) 68%,
+    rgba(var(--fg-rgb), 0.26) 100%
+  );
 }
-
-.info-card {
-  background: var(--surface);
-  margin: -48rpx 32rpx 0;
+.hero-content {
   position: relative;
-  z-index: 2;
-  border-radius: var(--radius-lg);
-  padding: 40rpx;
-  box-shadow: 0 8rpx 32rpx rgba(38, 36, 25, 0.08);
+  z-index: 1;
+  text-align: center;
+  padding: 0 40rpx;
 }
-.info-card .activity-title {
-  font-family: var(--font-display);
-  font-size: 36rpx;
+.hero-title {
+  font-size: 40rpx;
   font-weight: 700;
-  line-height: 1.4;
-  margin-bottom: 32rpx;
+  color: var(--surface);
 }
-.info-card .info-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 24rpx;
+.hero-sub {
+  color: var(--gold-light);
+  margin-top: 12rpx;
+  font-size: 26rpx;
 }
 
-.info-row {
+/* ---------- 活动信息卡 ---------- */
+.section {
+  background: var(--surface);
+  margin: 24rpx 32rpx 0;
+  border: 3rpx solid var(--fg);
+  border-radius: var(--radius);
+  padding: 32rpx 40rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+.sec-head {
+  font-size: 30rpx;
+  margin-bottom: 24rpx;
   display: flex;
-  align-items: flex-start;
-  gap: 20rpx;
+  align-items: center;
+  gap: 12rpx;
 }
-.info-row .info-icon {
-  font-size: 36rpx;
-  flex-shrink: 0;
-  width: 48rpx;
-  text-align: center;
-}
-.info-row .info-content {
-  flex: 1;
-}
-.info-row .info-label {
-  font-size: 22rpx;
-  color: var(--muted);
-  margin-bottom: 4rpx;
-}
-.info-row .info-value {
+.section-body {
   font-size: 26rpx;
-  font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.8;
+  color: var(--fg);
 }
-.info-row .info-value .highlight {
-  color: var(--accent);
-  font-weight: 600;
+/* 信息卡：不再负 margin 上滑（原 -48rpx 盖住「活动信息」标题=遮挡缺陷）。
+   2026-09-15：补内边距 —— 它靠 app.wxss 的卡片组拿到边框/底色，那条规则没有 padding，
+   于是「费用/名额/介绍」全部左右贴着内框（用户截图）。 */
+.info-card {
+  position: relative;
+  padding: 24rpx 28rpx;
 }
 
 .capacity-wrap {
@@ -160,24 +121,15 @@
   align-items: center;
   margin-bottom: 12rpx;
 }
-.capacity-header .cap-label {
-  font-size: 26rpx;
-  font-weight: 500;
-}
-.capacity-header .cap-count {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: var(--accent);
-}
 .capacity-bar {
   height: 16rpx;
   background: var(--border);
   border-radius: 16rpx;
   overflow: hidden;
 }
-.capacity-bar .cap-fill {
+.cap-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), #5d7ba1);
+  background: linear-gradient(90deg, var(--accent), var(--sky));
   border-radius: 16rpx;
   transition: width 0.8s ease;
 }
@@ -191,9 +143,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 32rpx;
-  padding-top: 32rpx;
-  border-top: 2rpx solid var(--border);
+  padding-top: 8rpx;
 }
 .price-label {
   font-size: 24rpx;
@@ -204,332 +154,116 @@
   font-weight: 700;
   color: var(--success);
 }
-.price-value .original {
-  font-size: 24rpx;
-  font-weight: 400;
+
+/* 键值行：布局走页内定义（.kv-row），卡片化外观走 app.wxss 公共类 .info-row（全站统一） */
+.kv-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 20rpx;
+  margin-top: 24rpx;
+  padding: 20rpx 24rpx;
+}
+.kv-label {
+  font-size: 22rpx;
   color: var(--muted);
-  text-decoration: line-through;
-  margin-right: 12rpx;
+  flex-shrink: 0;
 }
-
-.section {
-  background: var(--surface);
-  margin: 24rpx 32rpx 0;
-  border-radius: var(--radius);
-  padding: 32rpx 40rpx;
-  box-shadow: 0 2rpx 6rpx rgba(38, 36, 25, 0.04);
-}
-.section-title {
-  font-family: var(--font-display);
-  font-size: 30rpx;
-  font-weight: 700;
-  margin-bottom: 24rpx;
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-.section-body {
+.kv-value {
   font-size: 26rpx;
-  line-height: 1.8;
-  color: var(--fg);
-}
-.section-body .highlight-list {
-  list-style: none;
-  padding: 0;
-}
-.section-body .highlight-list view {
-  padding: 12rpx 0;
-  padding-left: 40rpx;
-  position: relative;
+  font-weight: 500;
+  line-height: 1.5;
+  flex: 1;
 }
 
-.bring-box {
-  background: var(--warning-soft);
-  border-radius: var(--radius-sm);
-  padding: 24rpx 28rpx;
-}
-.bring-box .bring-title {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: var(--fg);
-  margin-bottom: 12rpx;
-}
-.bring-box .bring-items {
-  font-size: 24rpx;
-  color: var(--fg);
-  line-height: 1.7;
-}
-
+/* ---------- 我的报名 / 入场券 ---------- */
 .qr-section {
-  background: var(--surface);
-  margin: 24rpx 32rpx 0;
-  border-radius: var(--radius);
-  padding: 40rpx;
-  text-align: center;
-  box-shadow: 0 2rpx 6rpx rgba(38, 36, 25, 0.04);
-}
-.qr-section .qr-title {
-  font-family: var(--font-display);
-  font-size: 30rpx;
-  font-weight: 700;
-  margin-bottom: 24rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12rpx;
-}
-.qr-placeholder {
-  width: 320rpx;
-  height: 320rpx;
-  margin: 0 auto 24rpx;
-  background: var(--bg);
-  border-radius: var(--radius);
-  border: 4rpx dashed var(--border);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  font-size: 24rpx;
-  color: var(--muted);
-  gap: 16rpx;
+  gap: 8rpx;
 }
-.qr-placeholder .qr-icon {
-  font-size: 80rpx;
+/* 二维码画布：440rpx ≈ 220px，25 模块版本下每模块 6px，扫码枪读取余量充足 */
+.qr-canvas-wrap {
+  width: 440rpx;
+  height: 440rpx;
+  margin-bottom: 16rpx;
+  background: var(--surface);
+  border: 4rpx solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.qr-canvas {
+  width: 420rpx;
+  height: 420rpx;
+}
+/* 出图画布：移出可视区。它只是"渲染后端"，展示一律走 <image>（见 wxml 注释）。
+   尺寸与对应 <image> 同比例 —— 不同比例会被拉伸（条形码变糊）。 */
+.draw-canvas {
+  position: fixed;
+  left: -9999rpx;
+  top: 0;
+}
+.draw-canvas-qr {
+  width: 420rpx;
+  height: 420rpx;
+}
+.draw-canvas-bc {
+  width: 620rpx;
+  height: 120rpx;
+}
+.qr-fallback {
+  font-size: 30rpx;
+  color: var(--fg);
+  letter-spacing: 2rpx;
+  padding: 0 24rpx;
+  text-align: center;
+}
+/* 条形码画布：券码 16 字符 → 231 模块，按屏宽 1 CSS px/模块（高 DPR 下 =2~3 设备像素） */
+.bc-canvas-wrap {
+  width: 640rpx;
+  height: 140rpx;
+  margin-bottom: 8rpx;
+  background: var(--surface);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.bc-canvas {
+  width: 620rpx;
+  height: 120rpx;
+}
+.qr-code-line {
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 2rpx;
+  color: var(--fg);
+}
+.qr-copy-hint {
+  text-decoration: underline;
 }
 .qr-hint {
   font-size: 22rpx;
   color: var(--muted);
   line-height: 1.5;
 }
-.qr-image { width: 320rpx; height: 320rpx; margin: 0 auto 24rpx; display: block; border-radius: var(--radius); }
-.self-checkin-btn { margin-top: 24rpx; padding: 20rpx 48rpx; background: var(--accent); color: var(--surface); border-radius: var(--radius); font-size: 28rpx; font-weight: 600; display: inline-block; }
-.self-checkin-btn:active { opacity: 0.85; }
 
-.faq-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-.faq-item {
-  border-bottom: 2rpx solid var(--border);
-  padding: 24rpx 0;
-}
-.faq-item:last-child {
-  border-bottom: none;
-}
-.faq-question {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 26rpx;
-  font-weight: 600;
-}
-.faq-question .faq-arrow {
-  font-size: 24rpx;
-  color: var(--muted);
-  transition: transform 0.2s ease;
-}
-.faq-item.open .faq-arrow {
-  transform: rotate(90deg);
-}
-.faq-answer {
-  font-size: 24rpx;
-  color: var(--muted);
-  line-height: 1.7;
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.3s ease, padding 0.3s ease;
-}
-.faq-item.open .faq-answer {
-  max-height: 400rpx;
-  padding-top: 16rpx;
-}
-
+/* ---------- 固定底栏（z ≤99 档；自带安全区） ---------- */
 .action-bar {
   position: fixed;
-    box-sizing: border-box;
   bottom: 0;
   left: 0;
   right: 0;
+  box-sizing: border-box;
   background: var(--surface);
-  border-top: 2rpx solid var(--border);
+  border-top: 3rpx solid var(--fg);
   padding: 24rpx 32rpx calc(env(safe-area-inset-bottom, 16rpx) + 24rpx);
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  z-index: 200;
-  box-sizing: border-box;
+  z-index: 99;
 }
-.action-bar .action-info {
-  flex: 1;
-}
-.action-bar .action-price {
-  font-size: 36rpx;
-  font-weight: 700;
-  color: var(--accent);
-}
-.action-bar .action-price-label {
-  font-size: 22rpx;
-  color: var(--muted);
-}
-.action-bar .action-btn {
-  flex-shrink: 0;
-  padding: 24rpx 64rpx;
-  border-radius: var(--radius);
-  font-family: var(--font-body);
-  font-size: 30rpx;
-  font-weight: 700;
-  text-align: center;
-}
-.action-bar .action-btn.register {
-  background: var(--accent);
-  color: var(--surface);
-  box-shadow: 0 8rpx 24rpx rgba(44, 74, 110, 0.3);
-}
-.action-bar .action-btn.registered {
-  background: var(--success-soft);
-  color: var(--success);
-  box-shadow: none;
-}
-.action-bar .cancel-link {
-  font-size: 24rpx;
-  color: var(--muted);
-  margin-left: 16rpx;
-  white-space: nowrap;
-}
-
-.teacher-card {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  padding: 24rpx 28rpx;
-  background: var(--accent-soft);
-  border-radius: var(--radius-sm);
-}
-.teacher-avatar {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #5d7ba1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 44rpx;
-  flex-shrink: 0;
-}
-.teacher-info {
-  flex: 1;
-}
-.teacher-info .teacher-name {
-  font-size: 26rpx;
-  font-weight: 600;
-  margin-bottom: 4rpx;
-}
-.teacher-info .teacher-desc {
-  font-size: 22rpx;
-  color: var(--muted);
-}
-
-.toast {
-  position: fixed;
-    box-sizing: border-box;
-  top: 140rpx;
-  left: 50%;
-  transform: translateX(-50%) translateY(-40rpx);
-  background: rgba(38, 36, 25, 0.88);
-  color: var(--surface);
-  font-size: 26rpx;
-  font-weight: 500;
-  padding: 20rpx 40rpx;
-  border-radius: var(--radius);
-  z-index: 999;
-  opacity: 0;
-  pointer-events: none;
-  box-sizing: border-box;
-  transition: opacity 0.25s, transform 0.25s;
-  white-space: nowrap;
-}
-.toast.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-.loading-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 120rpx 0;
-  color: var(--muted);
-  font-size: 28rpx;
-}
-
-/* ============================================
-   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
-   ============================================ */
-/* 卡片：粗黑边 + 硬阴影 + 手绘圆角 */
-.card, .section-card, .card-wrapper, .section, .panel, .info-card, .form-card {
-  background: var(--surface);
-  border: 3rpx solid var(--fg);
-  border-radius: 28rpx 32rpx 24rpx 36rpx;
-  box-shadow: var(--shadow-hard-sm);
-}
-
-/* 按钮：胶囊贴纸 */
-.btn, button, .primary-btn, .secondary-btn, .submit-btn, .action-btn {
-  border: 3rpx solid var(--fg) !important;
-  border-radius: 999rpx !important;
-  box-shadow: var(--shadow-hard-sm) !important;
-  font-weight: 700;
-}
-.btn-primary, .primary, button[type="primary"], .primary-btn {
-  background: var(--accent) !important;
-  color: #FFFDF7 !important;
-}
-.btn-secondary, .secondary, .secondary-btn {
-  background: var(--surface) !important;
-  color: var(--fg) !important;
-}
-.btn:active, button:active, .primary-btn:active, .secondary-btn:active {
-  transform: translate(2rpx, 2rpx);
-  box-shadow: none !important;
-}
-
-/* 标签/徽章：圆角贴纸 */
-.tag, .badge, .pill, .tag-primary, .tag-secondary, .tag-success, .tag-warning {
-  border: 2rpx solid rgba(59, 47, 47, 0.6);
-  border-radius: 999rpx;
-  font-weight: 700;
-}
-.tag-primary, .badge-primary { background: var(--accent-soft); color: var(--accent-dark); }
-.tag-secondary, .badge-secondary { background: var(--secondary-soft); color: var(--secondary-ink); }
-.tag-success, .badge-success { background: var(--success-soft); color: var(--success); }
-.tag-warning, .badge-warning { background: var(--warning-soft); color: var(--warning-dark); }
-
-/* 标题圆体 */
-.page-title, .section-title, .card-title, .header-title, .title, .name {
-  font-family: var(--font-display);
-  font-weight: 700;
-}
-
-/* 列表项：卡片化 */
-.list-item, .item, .row, .cell, .info-row {
-  background: var(--surface);
-  border: 2rpx solid var(--fg);
-  border-radius: 24rpx 28rpx 20rpx 30rpx;
-  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
-}
-
-/* RB（插修 17）：hero 封面（有图铺满+遮罩保文字；无图走原纯色渐变降级） */
-.hero-cover { position: relative; overflow: hidden; }
-.hero-img {
-  position: absolute;
-  inset: 0;
+.action-bar .btn-primary,
+.action-bar .btn-outline {
   width: 100%;
-  height: 100%;
 }
-.hero-mask {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.55));
-}
-.hero-content { position: relative; z-index: 1; }

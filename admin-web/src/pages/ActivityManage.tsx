@@ -5,17 +5,18 @@ import PaintPagination from "../components/PaintPagination";
 // 活动管理（WM9：发布/取消/报名/签到/退款审核）
 import { useCallback, useEffect, useState } from "react";
 import {
-  App as AntdApp, Button, DatePicker, Drawer, Form, Input, InputNumber,
+  App as AntdApp, Button, DatePicker, Descriptions, Drawer, Form, Input, InputNumber,
   Modal, Select, Space, Switch, Table, Tabs, Tag, Typography, Upload,
 } from "antd";
 
 import {
   activityCoverUrl, apiCancelActivity, apiCreateActivity, apiGetActivityDetail,
-  apiListActivities, apiListEnrollments, apiSignin, apiUpdateActivity, apiUploadActivityCover,
-  type ActivityItem, type EnrollmentItem,
+  apiListActivities, apiListEnrollments, apiUpdateActivity, apiUploadActivityCover,
+  type ActivityDetail, type ActivityItem, type EnrollmentItem,
 } from "../api/activities";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
+import ScanCheckin from "../components/ScanCheckin";
 
 const TYPE_OPTIONS = [
   { value: "lecture", label: "宣讲会" },
@@ -56,7 +57,6 @@ export default function ActivityManage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [enrollActivity, setEnrollActivity] = useState<ActivityItem | null>(null);
   const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
-  const [signinCode, setSigninCode] = useState("");
   const [form] = Form.useForm();
 
   const load = useCallback(() => {
@@ -169,17 +169,13 @@ export default function ActivityManage() {
       .catch((e: Error) => message.error(e.message));
   };
 
-  const onSignin = async () => {
-    const code = signinCode.trim().toUpperCase();
-    if (!code) return;
-    try {
-      const r = await apiSignin(code);
-      message.success(`签到成功（${r.checked_in_at.replace("T", " ").slice(0, 19)}）`);
-      setSigninCode("");
-      if (enrollActivity) openEnrollments(enrollActivity);
-    } catch (e) {
-      message.error((e as Error).message);
-    }
+  // 只读活动详情（2026-09-15 用户需求）：点活动名称看封面/内容/报名与签到人数。
+  // 领导视角 = 只看不改——编辑仍走「编辑」按钮（另有权限与状态门禁）。
+  const [detailView, setDetailView] = useState<ActivityDetail | null>(null);
+  const openDetail = (a: ActivityItem) => {
+    apiGetActivityDetail(a.id)
+      .then(setDetailView)
+      .catch((e: Error) => message.error(e.message));
   };
 
   return (
@@ -198,11 +194,6 @@ export default function ActivityManage() {
         >
           发布活动
         </Button>
-        <Input.Search
-          placeholder="输入入场券码签到" style={{ width: 260 }} value={signinCode}
-          onChange={(e) => setSigninCode(e.target.value)} onSearch={onSignin}
-          enterButton="签到"
-        />
         {/* T3：活动列表三件套——搜索+类型/状态筛选（B7 预约先例同款） */}
         <Input.Search
           placeholder="按活动标题搜索" style={{ width: 220 }} allowClear
@@ -229,7 +220,13 @@ export default function ActivityManage() {
                   rowKey="id" loading={loading} dataSource={activities.slice((activityPg.page - 1) * activityPg.pageSize, activityPg.page * activityPg.pageSize)} size="middle"
                   pagination={false}
                   columns={[
-                    { title: "活动", dataIndex: "title", width: 200 },
+                    {
+                      title: "活动", dataIndex: "title", width: 200,
+                      // 用户需求：点活动名称看只读详情（领导看封面/内容/人数），不弹编辑
+                      render: (t: string, r) => (
+                        <Typography.Link onClick={() => openDetail(r)}>{t}</Typography.Link>
+                      ),
+                    },
                     { title: "类型", dataIndex: "activity_type", width: 110, render: (t) => TYPE_OPTIONS.find((o) => o.value === t)?.label ?? t },
                     { title: "开始时间", dataIndex: "start_at", width: 170, render: (v) => v.replace("T", " ").slice(0, 16) },
                     { title: "地点", dataIndex: "location", width: 130 },
@@ -276,6 +273,13 @@ export default function ActivityManage() {
         width={640} open={!!enrollActivity}
         onClose={() => setEnrollActivity(null)}
       >
+        {/* PRD §9.2.1：扫码签到面板放报名抽屉顶部——馆员"先打开这场活动、再连着扫"，
+            抽屉限制焦点范围（工具栏旁就是发布表单/搜索/筛选，自动聚焦会互相抢） */}
+        <ScanCheckin
+          open={!!enrollActivity}
+          activityTitle={enrollActivity?.title}
+          onSignedIn={() => { if (enrollActivity) openEnrollments(enrollActivity); }}
+        />
         <Table<EnrollmentItem> locale={{ emptyText: <PaintEmpty character="star" /> }}
           rowKey="id" dataSource={enrollments} size="small" pagination={false}
           columns={[
@@ -287,6 +291,83 @@ export default function ActivityManage() {
           ]}
          scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
+      </Drawer>
+
+      {/* 只读活动详情（2026-09-15）：领导视角——封面/内容/人数一眼看全，不改任何东西 */}
+      <Drawer
+        title={detailView ? `活动详情：${detailView.title}` : "活动详情"}
+        width={720} open={!!detailView}
+        onClose={() => setDetailView(null)}
+        extra={detailView && (
+          <Space>
+            <Button size="small" onClick={() => { const d = detailView; setDetailView(null); openEnrollments(d); }}>
+              报名名单
+            </Button>
+            <Button size="small" onClick={() => { const d = detailView; setDetailView(null); openEdit(d); }}>
+              编辑
+            </Button>
+          </Space>
+        )}
+      >
+        {detailView && (
+          <>
+            {detailView.cover_url ? (
+              <img
+                src={activityCoverUrl(detailView.id)} alt="活动封面"
+                style={{
+                  width: "100%", height: 200, objectFit: "cover",
+                  borderRadius: "var(--paint-radius)", border: "2px solid var(--paint-border)",
+                  marginBottom: 12,
+                }}
+              />
+            ) : (
+              <div style={{
+                width: "100%", height: 90, display: "flex", alignItems: "center",
+                justifyContent: "center", marginBottom: 12, color: "var(--paint-ink-light)",
+                background: "var(--paint-paper-dim)", borderRadius: "var(--paint-radius)",
+                border: "2px dashed var(--paint-border)",
+              }}>
+                未上传封面
+              </div>
+            )}
+
+            <Space style={{ marginBottom: 12 }} wrap>
+              <Tag color={detailView.status === "published" ? "green" : detailView.status === "cancelled" ? "default" : "blue"}>
+                {detailView.status === "published" ? "报名中" : detailView.status === "cancelled" ? "已取消" : "已结束"}
+              </Tag>
+              <Tag>{TYPE_OPTIONS.find((o) => o.value === detailView.activity_type)?.label ?? detailView.activity_type}</Tag>
+              {detailView.member_only && <Tag color="purple">仅限会员</Tag>}
+              {detailView.full && <Tag color="red">名额已满</Tag>}
+            </Space>
+
+            <Descriptions column={2} size="small" bordered style={{ marginBottom: 16 }}>
+              <Descriptions.Item label="开始时间">{detailView.start_at.replace("T", " ").slice(0, 16)}</Descriptions.Item>
+              <Descriptions.Item label="报名截止">
+                {detailView.enroll_deadline ? detailView.enroll_deadline.replace("T", " ").slice(0, 16) : "未设置"}
+              </Descriptions.Item>
+              <Descriptions.Item label="地点">{detailView.location || "—"}</Descriptions.Item>
+              <Descriptions.Item label="费用">{detailView.fee_display}</Descriptions.Item>
+              <Descriptions.Item label="名额">
+                {detailView.max_quota} 人（已占 {detailView.quota_used}，剩余 {detailView.quota_left}）
+              </Descriptions.Item>
+              <Descriptions.Item label="创建时间">
+                {detailView.created_at ? detailView.created_at.replace("T", " ").slice(0, 16) : "—"}
+              </Descriptions.Item>
+            </Descriptions>
+
+            {/* 人数口径写清楚，避免"报名人数"三种算法各说各话 */}
+            <Descriptions column={3} size="small" bordered style={{ marginBottom: 16 }}>
+              <Descriptions.Item label="已缴费待参加">{detailView.enrolled_count} 人</Descriptions.Item>
+              <Descriptions.Item label="已签到">{detailView.checked_in_count} 人</Descriptions.Item>
+              <Descriptions.Item label="待收款">{detailView.pending_count} 人</Descriptions.Item>
+            </Descriptions>
+
+            <Typography.Title level={5} style={{ fontFamily: "var(--font-display)" }}>活动介绍</Typography.Title>
+            <Typography.Paragraph style={{ whiteSpace: "pre-wrap" }}>
+              {detailView.description || "（未填写活动介绍）"}
+            </Typography.Paragraph>
+          </>
+        )}
       </Drawer>
 
       <Modal

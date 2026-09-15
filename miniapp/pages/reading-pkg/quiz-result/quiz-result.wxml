@@ -23,8 +23,10 @@
         <view class="stat-val">+{{result.words_added}}</view>
         <view class="stat-label">有效词数</view>
       </view>
+      <!-- 2026-09-15：没发积分时不要显示「+0」（看着像扣了/漏发了）——显示「—」 -->
       <view class="stat-item">
-        <view class="stat-val">+{{result.points_detail.length ? result.points_detail[0].points : 0}}</view>
+        <view class="stat-val" wx:if="{{result.points_detail.length}}">+{{result.points_detail[0].points}}</view>
+        <view class="stat-val" wx:else>—</view>
         <view class="stat-label">积分</view>
       </view>
       <view class="stat-item">

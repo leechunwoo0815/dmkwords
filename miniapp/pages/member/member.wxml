@@ -36,7 +36,7 @@
   </view>
 
   <view wx:if="{{children.length > 1}}" class="section-card no-padding">
-    <view class="section-title">切换孩子</view>
+    <view class="section-title sec-title">切换孩子</view>
     <view class="child-switcher-scroll">
       <view wx:for="{{children}}" wx:key="id"
         class="child-switcher-chip {{currentChild && currentChild.id === item.id ? 'active' : ''}}"
@@ -49,7 +49,7 @@
   </view>
 
   <view wx:if="{{currentChild}}" class="section-card">
-    <view class="section-title">会员信息</view>
+    <view class="section-title sec-title">会员信息</view>
     <view class="member-info-row">
       <view class="mi-item">
         <text class="mi-label">会员状态</text>
@@ -63,7 +63,7 @@
   </view>
 
   <view class="section-card">
-    <view class="section-title">成长中心</view>
+    <view class="section-title sec-title">成长中心</view>
     <view class="func-grid">
       <view class="func-item" bindtap="goCheckin">
         <text class="fi-icon">📅</text>
@@ -97,7 +97,7 @@
   </view>
 
   <view class="section-card">
-    <view class="section-title">借阅服务</view>
+    <view class="section-title sec-title">借阅服务</view>
     <view class="func-grid">
       <view class="func-item" bindtap="goReservation">
         <text class="fi-icon">🔖</text>
@@ -114,6 +114,10 @@
       <view class="func-item" bindtap="goRefund">
         <text class="fi-icon">💰</text>
         <text class="fi-label">退款申请</text>
+      </view>
+      <view class="func-item" bindtap="goPurchase">
+        <text class="fi-icon">💎</text>
+        <text class="fi-label">会员购买/续费</text>
       </view>
       <view class="func-item" bindtap="goWithdraw">
         <text class="fi-icon">🚪</text>
@@ -138,4 +142,22 @@
   </view>
 
   <view class="bottom-spacer"></view>
+
+  <!-- 2026-09-15：原先「关于」卡写在 </scroll-view> **之外**，滚动容器之后的兄弟节点
+       永远落在视口外、被 tabBar 切掉（用户实测：只见标题、滑不下去）。
+       移进滚动容器，并把占位放到它**后面**（占位在它前面等于没占）。 -->
+  <view class="section-card">
+    <view class="section-title sec-title">关于</view>
+    <view class="link-row" bindtap="goServiceAgreement">
+      <text class="link-text">用户服务协议</text>
+      <text class="link-arrow">›</text>
+    </view>
+    <view class="link-row" bindtap="goPrivacy">
+      <text class="link-text">隐私政策</text>
+      <text class="link-arrow">›</text>
+    </view>
+  </view>
+
+  <!-- 末尾占位：防「关于」区块被自定义 tabBar 压住 -->
+  <view class="safe-bottom"></view>
 </scroll-view>

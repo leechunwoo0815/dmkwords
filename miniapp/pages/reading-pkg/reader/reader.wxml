@@ -4,7 +4,7 @@
     <view class="book-author">{{childName}} 正在听 · {{book.author || '佚名'}}</view>
     <view class="book-meta">
       <text class="meta-tag">已覆盖 {{coveragePercent}}%</text>
-      <text wx:if="{{finished}}" class="meta-tag" style="color: var(--success)">✅ 已读完</text>
+      <text wx:if="{{finished}}" class="meta-tag x-691250">✅ 已读完</text>
     </view>
   </view>
 
@@ -20,7 +20,7 @@
     <view class="playback-controls">
       <view class="ctrl-skip" bindtap="onSkipBack">↺ 15s</view>
       <view class="ctrl-play" bindtap="onTogglePlay">{{playing ? '⏸' : '▶'}}</view>
-      <view class="ctrl-skip" style="opacity:0.3">15s ↻</view>
+      <view class="ctrl-skip x-aa01b4">15s ↻</view>
     </view>
 
     <view class="speed-row">
@@ -48,10 +48,10 @@
         <view class="dr-word">{{dictResult.word}}</view>
         <view class="dr-phonetic">{{dictResult.phonetic}}</view>
         <view class="dr-def">{{dictResult.translation}}</view>
-        <view wx:if="{{dictResult.definition}}" class="dr-def" style="color:var(--muted);font-size:24rpx;">{{dictResult.definition}}</view>
+        <view wx:if="{{dictResult.definition}}" class="dr-def x-e83e61">{{dictResult.definition}}</view>
       </block>
       <block wx:elif="{{dictError}}">
-        <view class="dr-def" style="color:var(--error);">{{dictError}}</view>
+        <view class="dr-def x-f15519">{{dictError}}</view>
       </block>
     </view>
   </view>

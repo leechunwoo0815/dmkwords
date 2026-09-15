@@ -1,11 +1,7 @@
 // pages/order-pkg/order-history/order-history.js — 我的订单（插修4-X7 补齐幽灵页）
 const api = require('../../../utils/api')
+const labels = require('../../../utils/labels')
 
-const TYPE_TEXT = {
-  observation_fee: '观察期费', formal_fee: '年费',
-  first_activity_fee: '首场活动', activity_fee: '活动费',
-  deposit: '押金', deposit_supplement: '押金补缴',
-}
 
 // 状态中文映射对齐管理端 RefundCenter STATUS_LABEL 口径
 const STATUS_TEXT = {
@@ -57,7 +53,7 @@ Page({
       const rows = await api.myOrders(this._childId)
       const orders = (rows || []).map((o) => ({
         ...o,
-        typeText: TYPE_TEXT[o.order_type] || o.order_type,
+        typeText: labels.orderTypeText(o.order_type),  // 唯一映射源（custom 也翻成中文）
         statusText: STATUS_TEXT[o.status] || o.status,
         icon: TYPE_ICON[o.order_type] || 'type1',
         refundText: o.refund_status ? (REFUND_STATUS_TEXT[o.refund_status] || o.refund_status) : '',

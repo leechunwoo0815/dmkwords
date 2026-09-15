@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
 from backend.common.exceptions import NotFoundError
+from backend.common.file_utils import book_cover_url
 from backend.database import get_db
 from backend.domain.catalog.models import Book
 from backend.domain.identity import guards
@@ -155,7 +156,7 @@ def _book_view(b: Book) -> dict:
         "topic": b.topic,
         "grade": b.grade,
         "description": b.description,
-        "cover_url": f"/api/miniapp/covers/{b.id}" if b.cover_path else None,
+        "cover_url": book_cover_url(b.id, b.cover_path),
         "has_audio": bool(b.audio_path),
         "audio_duration": b.audio_duration_seconds,
         "audio_url": f"/api/miniapp/books/{b.id}/audio" if b.audio_path else None,

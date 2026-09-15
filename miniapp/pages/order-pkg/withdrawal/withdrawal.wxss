@@ -1,0 +1,226 @@
+/* withdrawal.wxss — 退会申请（独立页，2026-09-15） */
+.page-bg.wd-page {
+  /* 与「押金」页同一套留白口径（用户认可的那一版）：正文不贴边框 */
+  padding: 24rpx 24rpx calc(60rpx + env(safe-area-inset-bottom));
+}
+
+.wd-head {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 20rpx;
+  padding: 0 8rpx;
+}
+
+/* 顶部说明：图标 + 文字横排 */
+.tip-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+  padding: 24rpx 28rpx;
+  background: var(--warning-soft);
+  border: 2rpx solid var(--warning-soft-strong);
+  border-radius: 20rpx;
+}
+
+.tip-icon {
+  font-size: 36rpx;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.tip-text {
+  flex: 1;
+  font-size: 26rpx;
+  color: var(--warning-dark);
+  line-height: 1.5;
+}
+
+/* 卡片（.card/.card-h3/.btn-primary 走 app.wxss 公共类） */
+.card {
+  margin-bottom: 24rpx;
+}
+
+.reason-textarea {
+  width: 100%;
+  min-height: 200rpx;
+  box-sizing: border-box;
+  margin-top: 20rpx;
+  padding: 24rpx;
+  background: var(--bg);
+  border: 2rpx solid var(--border);
+  border-radius: var(--radius);
+  font-size: 28rpx;
+  color: var(--fg);
+}
+
+.submit-wrap {
+  margin-top: 24rpx;
+}
+
+.submit-wrap .btn-primary {
+  width: 100%;
+}
+
+/* ---------- 申请列表 ---------- */
+.wd-item {
+  padding: 24rpx 0;
+  border-top: 2rpx solid var(--border);
+}
+
+.wd-item:first-child {
+  border-top: none;
+  padding-top: 8rpx;
+}
+
+.wd-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wd-status {
+  font-size: 24rpx;
+  font-weight: 700;
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+  background: var(--warning-soft);
+  color: var(--warning-dark);
+}
+
+.wd-status.wd-completed {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.wd-status.wd-rejected,
+.wd-status.wd-cancelled {
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.wd-time {
+  font-size: 22rpx;
+  color: var(--muted);
+}
+
+.wd-reason {
+  margin-top: 14rpx;
+  font-size: 26rpx;
+  color: var(--fg);
+  line-height: 1.5;
+}
+
+.wd-remark {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ---------- 可退费用明细（审核通过后展示） ---------- */
+.wd-settle {
+  margin-top: 20rpx;
+  padding: 20rpx 24rpx;
+  background: var(--bg);
+  border: 2rpx solid var(--border);
+  border-radius: 20rpx;
+}
+
+.wd-settle-title {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--fg);
+  margin-bottom: 8rpx;
+}
+
+.wd-settle-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 16rpx 0;
+  border-bottom: 2rpx dashed var(--border);
+}
+
+.wd-fee-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.wd-fee-rule {
+  display: block;
+  font-size: 26rpx;
+  color: var(--fg);
+  line-height: 1.45;
+}
+
+.wd-fee-no {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--muted);
+}
+
+.wd-fee-right {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.wd-fee-amount {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--success);
+}
+
+.wd-fee-status {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--muted);
+}
+
+.wd-settle-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: var(--fg);
+}
+
+.wd-total-amount {
+  font-family: var(--font-display);
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--accent-dark);
+}
+
+.wd-settle-hint {
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+.wd-actions {
+  margin-top: 20rpx;
+}
+
+.cancel-refund-btn {
+  font-size: 24rpx;
+  padding: 8rpx 24rpx;
+  border-radius: 999rpx;
+  border: 2rpx solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.loading-tip {
+  padding: 60rpx 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 26rpx;
+}

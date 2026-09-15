@@ -1,21 +1,21 @@
-<view class="page-bg" style="min-height:100vh;padding:24rpx;">
+<view class="page-bg x-cb307e">
   <view class="dp-head">
     <text class="dp-title">{{childName}} · 押金</text>
     <text class="dp-status">{{statusText}}</text>
   </view>
 
-  <view class="section-card" wx:if="{{dep}}" style="margin-top: 24rpx;">
+  <view class="section-card x-c92966" wx:if="{{dep}}">
     <view class="dp-amounts">
       <view class="dp-amt">
         <text class="dp-num">￥{{dep.available_amount}}</text>
         <text class="dp-label">可用余额</text>
       </view>
       <view class="dp-amt">
-        <text class="dp-num" style="color:#b45309;">￥{{dep.deducted_amount}}</text>
+        <text class="dp-num x-0c118e">￥{{dep.deducted_amount}}</text>
         <text class="dp-label">已扣除</text>
       </view>
       <view class="dp-amt">
-        <text class="dp-num" style="color:#FF6B35;">￥{{dep.standard_amount}}</text>
+        <text class="dp-num x-5a091f">￥{{dep.standard_amount}}</text>
         <text class="dp-label">标准押金</text>
       </view>
     </view>
@@ -27,7 +27,7 @@
     <view wx:if="{{supplementHint}}" class="dp-hint">{{supplementHint}}</view>
   </view>
 
-  <view class="section-card" style="margin-top: 24rpx;">
+  <view class="section-card x-c92966">
     <view class="section-title">押金流水</view>
     <view wx:if="{{ledger.length === 0}}" class="dp-empty">暂无流水记录</view>
     <view wx:for="{{ledger}}" wx:key="index" class="dp-row">

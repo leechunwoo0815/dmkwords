@@ -11576,6 +11576,56 @@
         ]
       }
     },
+    "/api/miniapp/growth/passed-books": {
+      "get": {
+        "description": "已通过测验的书（书架「已通过」页签：封面 + 词数 + 最佳成绩）。",
+        "operationId": "passed_books_api_miniapp_growth_passed_books_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "child_id",
+            "required": true,
+            "schema": {
+              "title": "Child Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Passed Books",
+        "tags": [
+          "growth-miniapp"
+        ]
+      }
+    },
     "/api/miniapp/growth/summary": {
       "get": {
         "operationId": "growth_summary_api_miniapp_growth_summary_get",
@@ -13420,6 +13470,65 @@
           }
         },
         "summary": "Withdrawal Cancel",
+        "tags": [
+          "identity-miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/withdrawals/{request_id}/settlement": {
+      "get": {
+        "description": "本次退会「能退哪些费用」（2026-09-15 用户需求）。\n\n家长端退会页只提退会申请；**审核通过后**由后端把自动排查出的可退费用明细\n展示给家长（数据来自审核时真实生成的退款单，不是估算）。",
+        "operationId": "withdrawal_settlement_api_miniapp_withdrawals__request_id__settlement_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "child_id",
+            "required": true,
+            "schema": {
+              "title": "Child Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Withdrawal Settlement",
         "tags": [
           "identity-miniapp"
         ]

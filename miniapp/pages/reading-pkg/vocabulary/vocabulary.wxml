@@ -1,6 +1,26 @@
-<view class="page-bg" style="min-height:100vh;padding:24rpx;">
-  <view style="font-size:28rpx;color:var(--muted);margin-bottom:20rpx;">
-    {{childName}} 的生词本 · 听书时查过的词自动记录，配合原书语境复习
+<view class="page-bg vocab-page">
+  <view class="vocab-hint">
+    <text class="vh-title">{{childName}} 的生词本</text>
+    <text class="vh-sub">听书时查过的词自动收录 · 点单词看闪卡释义</text>
+  </view>
+
+  <view class="stats-row" wx:if="{{!loading && !loadError && words.length}}">
+    <view class="st">
+      <text class="st-val">{{words.length}}</text>
+      <text class="st-label">收录生词</text>
+    </view>
+    <view class="st learning">
+      <text class="st-val">{{totalLookups}}</text>
+      <text class="st-label">累计查词</text>
+    </view>
+    <view class="st mastered">
+      <text class="st-val">{{bookCount}}</text>
+      <text class="st-label">来源书目</text>
+    </view>
+  </view>
+
+  <view class="sort-bar" wx:if="{{!loading && !loadError && words.length}}">
+    <text class="count">共 {{words.length}} 个词 · 最近收录在前</text>
   </view>
 
   <view wx:if="{{loading && !loadError}}" class="loading">加载中…</view>
@@ -8,19 +28,44 @@
   <error-view wx:if="{{loadError}}" type="network" title="加载失败"
     desc="生词本加载失败，请重试" bind:onRetry="onRetryLoad" />
 
-  <view wx:if="{{!loading && !words.length && !loadError}}" class="empty-state">
-    <view class="empty-icon">📖</view>
-    <view style="color:var(--muted);">还没有生词，播放页下半屏查词会自动收录</view>
+  <view wx:if="{{!loading && !loadError && !words.length}}" class="empty-state">
+    <view class="emoji">📖</view>
+    <view class="text">还没有生词</view>
+    <view class="text-sub">播放页下半屏查词会自动收录</view>
   </view>
 
   <view class="word-list" wx:if="{{words.length}}">
-    <view wx:for="{{words}}" wx:key="id" class="word-item">
+    <view class="word-item" wx:for="{{words}}" wx:key="id" data-index="{{index}}"
+      bindtap="onOpenCard">
       <view class="word-main">
-        <text class="word-tag" wx:if="{{item.source_title}}">{{item.source_title}}</text>
-        <text>{{item.word}}</text>
+        <view class="w-head">
+          <text class="w-word">{{item.word}}</text>
+          <text class="word-tag learning" wx:if="{{item.lookup_count > 1}}">查 {{item.lookup_count}} 次</text>
+        </view>
+        <text class="w-phonetic" wx:if="{{item.phonetic}}">{{item.phonetic}}</text>
+        <text class="w-def" wx:if="{{item.translation}}">{{item.translation}}</text>
+        <text class="w-src" wx:if="{{item.source_title}}">来自《{{item.source_title}}》</text>
       </view>
       <view class="word-actions">
-        <text class="action-btn" data-id="{{item.id}}" data-word="{{item.word}}" bindtap="onRemove">删除</text>
+        <text class="action-btn" data-id="{{item.id}}" data-word="{{item.word}}"
+          catchtap="onRemove">删除</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="flashcard-overlay {{cardWord ? 'show' : ''}}" bindtap="onCloseCard">
+    <view class="flashcard" catchtap="noop">
+      <view class="fc-close" catchtap="onCloseCard">
+        <text class="fc-close-icon">✕</text>
+      </view>
+      <text class="fc-word">{{cardWord}}</text>
+      <text class="fc-phonetic" wx:if="{{cardPhonetic}}">{{cardPhonetic}}</text>
+      <text class="fc-def" wx:if="{{cardTranslation}}">{{cardTranslation}}</text>
+      <text class="fc-def-en" wx:if="{{cardDefinition}}">{{cardDefinition}}</text>
+      <text class="fc-hint" wx:if="{{cardSource}}">来自《{{cardSource}}》</text>
+      <view class="fc-actions">
+        <view class="fc-btn again" catchtap="onCloseCard">知道了</view>
+        <view class="fc-btn got" catchtap="onRemoveCard">移出生词本</view>
       </view>
     </view>
   </view>

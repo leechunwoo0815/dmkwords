@@ -1,5 +1,8 @@
 /* pages/circle/circle.wxss — 阅读圈信息流（WM15-R1 朋友圈式布局，绘本风令牌） */
 .page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
   background: var(--bg);
 }
 
@@ -31,18 +34,18 @@
 .share-entry-sub {
   margin-top: 6rpx;
   font-size: 24rpx;
-  color: var(--fg-muted, #8a7d72);
+  color: var(--muted-light);
 }
 .share-entry-arrow {
   font-size: 44rpx;
-  color: var(--fg-muted, #8a7d72);
+  color: var(--muted-light);
 }
 
 /* 社区横幅（WM14-B） */
 .banner {
   margin: 24rpx 24rpx 0;
   padding: 22rpx 28rpx;
-  background: var(--accent, #fcd34d);
+  background: var(--accent);
   border: 3rpx solid var(--fg);
   border-radius: 24rpx;
   box-shadow: var(--shadow-hard);
@@ -65,7 +68,7 @@
 .post {
   position: relative;
   padding: 28rpx 0;
-  border-bottom: 1rpx solid rgba(90, 74, 58, 0.14);
+  border-bottom: 1rpx solid rgba(var(--fg-rgb), 0.14);
 }
 .post:last-child { border-bottom: none; }
 
@@ -73,9 +76,9 @@
 .post.pinned {
   margin: 16rpx -12rpx;
   padding: 24rpx 12rpx 28rpx;
-  background: rgba(255, 253, 247, 0.86);
+  background: rgba(var(--surface-rgb), 0.86);
   border-radius: 22rpx;
-  border-bottom: 1rpx solid rgba(90, 74, 58, 0.14);
+  border-bottom: 1rpx solid rgba(var(--fg-rgb), 0.14);
 }
 .pin-badge {
   position: absolute;
@@ -84,8 +87,8 @@
   padding: 4rpx 16rpx;
   font-size: 22rpx;
   font-weight: 700;
-  color: #3b2f2f;
-  background: #fcd34d;
+  color: var(--fg);
+  background: var(--sun);
   border: 2rpx solid var(--fg);
   border-radius: 999rpx;
 }
@@ -116,11 +119,11 @@
   display: block;
   margin-top: 6rpx;
   font-size: 24rpx;
-  color: var(--fg-muted, #8a7d72);
+  color: var(--muted-light);
 }
 .del {
   font-size: 24rpx;
-  color: #d0555f;
+  color: var(--error);
   padding: 8rpx 12rpx;
 }
 
@@ -136,7 +139,7 @@
 .ach-sub {
   margin-top: 8rpx;
   font-size: 28rpx;
-  color: #7a6650;
+  color: var(--muted);
   line-height: 1.4;
 }
 
@@ -147,19 +150,19 @@
   position: relative;
   border-radius: 20rpx;
   overflow: hidden;
-  background: #fffdf7;
+  background: var(--surface);
 }
 .post-thumb {
   display: block;
   width: 100%;
   border-radius: 20rpx;
-  border: 2rpx solid rgba(90, 74, 58, 0.18);
-  background: #fffdf7;
+  border: 2rpx solid rgba(var(--fg-rgb), 0.18);
+  background: var(--surface);
 }
 /* fix34e 羡慕杀②：馆长赞过 → 金色描边 + 外发光 + 一道循环流光（只动 transform，GPU 友好） */
 .thumb-gold {
-  border: 4rpx solid #f0b54a;
-  box-shadow: 0 0 20rpx rgba(255, 192, 64, 0.7);
+  border: 4rpx solid var(--gold);
+  box-shadow: 0 0 20rpx rgba(var(--gold-rgb), 0.7);
 }
 .thumb-gold .post-thumb {
   border-color: transparent;
@@ -171,9 +174,9 @@
   width: 38%;
   background: linear-gradient(
     100deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.85) 50%,
-    rgba(255, 255, 255, 0) 100%
+    rgba(var(--surface-rgb), 0) 0%,
+    rgba(var(--surface-rgb), 0.85) 50%,
+    rgba(var(--surface-rgb), 0) 100%
   );
   animation: shineSweep 2.8s linear infinite;
   pointer-events: none;
@@ -196,11 +199,11 @@
   align-items: center;
   gap: 8rpx;
   padding: 8rpx 22rpx;
-  border: 2rpx solid rgba(90, 74, 58, 0.25);
+  border: 2rpx solid rgba(var(--fg-rgb), 0.25);
   border-radius: 999rpx;
   background: var(--surface);
 }
-.like-btn.liked { border-color: #ef7a86; background: #fff0f3; }
+.like-btn.liked { border-color: var(--error); background: var(--error-soft); }
 .like-icon { font-size: 30rpx; }
 .like-count { font-size: 26rpx; font-weight: 700; color: var(--fg); }
 
@@ -211,7 +214,7 @@
   45% { transform: scale(1.18); }
   100% { transform: scale(1); }
 }
-.admin-liked .post-thumb { border-color: #e8a93b; }
+.admin-liked .post-thumb { border-color: var(--gold); }
 
 .liker-wall {
   display: flex;
@@ -231,7 +234,7 @@
 .liker-slot-gm {
   margin-left: 0;
   margin-right: 6rpx;
-  filter: drop-shadow(0 0 8rpx rgba(255, 209, 102, 0.85));
+  filter: drop-shadow(0 0 8rpx rgba(var(--sun-rgb), 0.85));
   transform-origin: center 60%;
   animation: gmBreath 2.4s ease-in-out infinite;
 }
@@ -243,12 +246,12 @@
   margin-left: 12rpx;
   font-size: 24rpx;
   font-weight: 600;
-  color: #c98a1c;
+  color: var(--warning);
 }
 .liker-more {
   margin-left: 6rpx;
   font-size: 24rpx;
-  color: var(--fg-muted, #8a7d72);
+  color: var(--muted-light);
 }
 
 /* 状态块 */
@@ -256,25 +259,19 @@
   padding: 60rpx 0;
   text-align: center;
   font-size: 26rpx;
-  color: var(--fg-muted, #8a7d72);
+  color: var(--muted-light);
 }
 .list-end {
   padding: 36rpx 0 60rpx;
   text-align: center;
   font-size: 26rpx;
-  color: var(--fg-muted, #8a7d72);
+  color: var(--muted-light);
 }
 .empty-state {
   padding: 120rpx 60rpx;
   text-align: center;
 }
 .empty-icon { font-size: 96rpx; }
-.empty-text {
-  margin-top: 20rpx;
-  font-size: 30rpx;
-  color: var(--fg-muted, #8a7d72);
-  line-height: 1.5;
-}
 
 /* fix34 R0：顶部「谁赞了你」通知条 + 展开列表（朋友圈式：未读出现，看完即消） */
 .likes-bar {
@@ -285,8 +282,8 @@
   padding: 18rpx 22rpx;
   border-radius: 20rpx;
   background: linear-gradient(135deg, #fff2e6, #ffe8f0);
-  border: 2rpx solid rgba(242, 147, 91, 0.35);
-  box-shadow: 0 4rpx 14rpx rgba(242, 147, 91, 0.14);
+  border: 2rpx solid rgba(var(--accent-light-rgb), 0.35);
+  box-shadow: 0 4rpx 14rpx rgba(var(--accent-light-rgb), 0.14);
 }
 .likes-bar.open {
   border-bottom-left-radius: 0;
@@ -306,20 +303,20 @@
 .likes-bar-text {
   flex: 1;
   font-size: 26rpx;
-  color: #8a4d21;
+  color: var(--warning-dark);
   font-weight: 600;
 }
 .likes-bar-arrow {
   font-size: 24rpx;
-  color: #b3743f;
+  color: var(--warning);
 }
 
 .likes-panel {
   margin: 0 24rpx;
   padding: 8rpx 22rpx 4rpx;
   border-radius: 0 0 20rpx 20rpx;
-  background: #fffdf9;
-  border: 2rpx solid rgba(242, 147, 91, 0.35);
+  background: var(--surface);
+  border: 2rpx solid rgba(var(--accent-light-rgb), 0.35);
   border-top: none;
 }
 .likes-item {
@@ -327,7 +324,7 @@
   align-items: center;
   gap: 18rpx;
   padding: 18rpx 0;
-  border-top: 1rpx solid rgba(90, 74, 58, 0.08);
+  border-top: 1rpx solid rgba(var(--fg-rgb), 0.08);
 }
 .likes-item:first-child {
   border-top: none;
@@ -337,23 +334,23 @@
 }
 .likes-item-name {
   font-size: 28rpx;
-  color: #4a3b2c;
+  color: var(--fg);
   font-weight: 600;
 }
 .likes-item-time {
   margin-top: 4rpx;
   font-size: 22rpx;
-  color: #9a8c80;
+  color: var(--muted-light);
 }
 .likes-item-go {
   font-size: 24rpx;
-  color: #f2935b;
+  color: var(--accent-light);
 }
 .likes-panel-done {
   padding: 12rpx 0 18rpx;
   text-align: center;
   font-size: 22rpx;
-  color: #b9ada3;
+  color: var(--muted-light);
 }
 
 /* fix34 R0b：已读态的低调条（小红点消失后仍可回看"谁赞了我"；一行灰字，不抢信息流视觉） */
@@ -366,17 +363,17 @@
 }
 .likes-quiet-text {
   font-size: 24rpx;
-  color: #9a8c80;
+  color: var(--muted-light);
 }
 .likes-quiet .likes-bar-arrow {
   font-size: 22rpx;
-  color: #b3743f;
+  color: var(--warning);
 }
 .likes-panel-empty {
   padding: 26rpx 0 22rpx;
   text-align: center;
   font-size: 24rpx;
-  color: #b9ada3;
+  color: var(--muted-light);
 }
 
 /* fix34e 羡慕杀①：馆长亲赞金光播报（居中金卡 + 弹入动效 + 光晕） */
@@ -390,7 +387,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(46, 32, 12, 0.55);
+  background: rgba(var(--fg-rgb), 0.55);
 }
 .gm-card {
   position: relative;
@@ -399,8 +396,8 @@
   border-radius: 40rpx;
   text-align: center;
   background: linear-gradient(160deg, #fff8de 0%, #ffe9a8 52%, #f7c552 100%);
-  border: 4rpx solid #b87a12;
-  box-shadow: 0 24rpx 70rpx rgba(120, 70, 10, 0.5);
+  border: 4rpx solid var(--warning);
+  box-shadow: 0 24rpx 70rpx rgba(var(--warning-rgb), 0.5);
   /* 只做 scale 弹入、**不淡入**且不设 fill：万一动画没跑，卡片仍是可见的静态金卡 */
   animation: gmPop 0.44s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
@@ -416,7 +413,7 @@
   height: 420rpx;
   margin-left: -210rpx;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(255, 240, 180, 0) 70%);
+  background: radial-gradient(circle, rgba(var(--surface-rgb), 0.9) 0%, rgba(var(--surface-rgb), 0) 70%);
   animation: gmGlow 2.6s ease-in-out infinite;
 }
 @keyframes gmGlow {
@@ -431,18 +428,18 @@
   margin-top: 16rpx;
   font-size: 48rpx;
   font-weight: 800;
-  color: #8a4d21;
+  color: var(--warning-dark);
   letter-spacing: 2rpx;
 }
 .gm-text {
   margin-top: 12rpx;
   font-size: 28rpx;
-  color: #a0662c;
+  color: var(--warning);
 }
 .gm-sub {
   margin-top: 8rpx;
   font-size: 22rpx;
-  color: #bb8b4a;
+  color: var(--gold-dark);
 }
 .gm-btn {
   margin-top: 30rpx;
@@ -450,9 +447,9 @@
   border-radius: 999rpx;
   font-size: 30rpx;
   font-weight: 700;
-  color: #fff8de;
-  background: linear-gradient(135deg, #d99a24, #b87a12);
-  box-shadow: 0 8rpx 20rpx rgba(184, 122, 18, 0.45);
+  color: var(--surface);
+  background: linear-gradient(135deg, var(--gold), var(--warning));
+  box-shadow: 0 8rpx 20rpx rgba(var(--warning-rgb), 0.45);
 }
 
 /* fix34e3：馆长亲赞条目右侧标记（无"看名片"去处，改为金色徽标） */
@@ -461,7 +458,7 @@
   border-radius: 999rpx;
   font-size: 20rpx;
   font-weight: 700;
-  color: #8a4d21;
-  background: linear-gradient(135deg, #fff2c4, #ffd166);
-  border: 2rpx solid rgba(184, 122, 18, 0.5);
+  color: var(--warning-dark);
+  background: linear-gradient(135deg, var(--gold-light), var(--sun));
+  border: 2rpx solid rgba(var(--warning-rgb), 0.5);
 }

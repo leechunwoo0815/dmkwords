@@ -280,13 +280,13 @@
   opacity: 0.4;
 }
 
-.empty-text {
-  font-size: 28rpx;
-  margin-bottom: 8rpx;
-}
 
 .empty-sub {
   font-size: 26rpx;
   color: var(--muted);
 }
 
+
+
+/* ===== 2026-09-13 内联样式迁移（机械生成，勿手改） ===== */
+.x-245e15 { padding: 80rpx 0; text-align: center; color: var(--muted); font-size: 26rpx; }

@@ -40,3 +40,30 @@ def delete_voice_files(audio_urls: list[str], base_dir: Path | None = None) -> i
             deleted_count += 1
 
     return deleted_count
+
+
+def media_version(cover_path: str | None) -> str:
+    """从封面/媒体路径取版本 token（文件名末尾的随机段）。"""
+    if not cover_path:
+        return ""
+    return os.path.splitext(os.path.basename(cover_path))[0].rsplit("_", 1)[-1]
+
+
+def book_cover_url(book_id: int, cover_path: str | None) -> str | None:
+    """书籍封面 URL（带 v 版本参数）。
+
+    [Why] 2026-09-15 实测：活动封面已改成横版重生成，小程序 `<image>` 仍显示旧竖版
+    裁切图 —— `<image>` 按 **URL** 缓存，URL 不变就永远吃旧的。管理端早有
+    「重传后带 v 参数」的处置（LEDGER admin-web-fix 行），小程序端一直缺。
+    版本号取 cover_path 文件名的随机 token：重生成必换 token → URL 必变 → 必然刷新。
+    """
+    if not cover_path:
+        return None
+    return f"/api/miniapp/covers/{book_id}?v={media_version(cover_path)}"
+
+
+def activity_cover_url(activity_id: int, cover_path: str | None) -> str | None:
+    """活动封面 URL（带 v 版本参数，同 book_cover_url 的理由）。"""
+    if not cover_path:
+        return None
+    return f"/api/miniapp/activities/{activity_id}/cover?v={media_version(cover_path)}"

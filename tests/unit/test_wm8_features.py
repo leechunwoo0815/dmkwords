@@ -220,6 +220,11 @@ def test_vocabulary_lookup_and_unique(client: TestClient):
     lst = client.get(f"/api/miniapp/vocabulary?child_id={c['id']}", headers=m).json()
     assert len(lst) == 1
     assert lst[0]["source_title"] == "B051"
+    # 2026-09-15：查词次数（生词本的成就感来源）——首次=1，重复查累加
+    assert lst[0]["lookup_count"] == 2, "重复查同一个词应累加次数"
+    # 列表要带出词典释义/音标/翻译，前端才能做闪卡（此前只有 word + 书名）
+    assert "冒险" in lst[0]["translation"]
+    assert lst[0]["phonetic"]
     # 查不存在词
     r3 = client.get(f"/api/miniapp/vocabulary/lookup?word=zzqqxxpp&child_id={c['id']}", headers=m)
     assert r3.status_code == 404
@@ -341,3 +346,58 @@ def test_b5_double_add_still_409(client: TestClient):
         "/api/miniapp/favorites", json={"child_id": c["id"], "book_id": book["id"]}, headers=m
     )
     assert r.status_code == 409, r.text
+
+
+def test_passed_books_lists_passed_with_best_score(client: TestClient):
+    """书架「已通过」页签（2026-09-15 用户需求）：按词账枚举已通过的书 + 最佳成绩。
+
+    口径与 get_quiz 的 passed 一致（词账入账＝已通过）；成绩取最高分 attempt，
+    无 attempt 时 best_percent=0 由前端显示「成绩待同步」（不得编 0 分）。
+    """
+    from backend.database import get_session
+    from backend.domain.catalog.models import Book
+    from backend.domain.growth.models import QuizAttempt
+
+    h = _h(client)
+    c, m = _mk_child(client, h, "13800000860", "页签孩")
+    b1 = _mk_book(client, h, "9788200000071")
+    b2 = _mk_book(client, h, "9788200000072")
+    b3 = _mk_book(client, h, "9788200000073")
+    _credit_words(client, h, c["id"], b1["isbn"], 1000)
+    _credit_words(client, h, c["id"], b2["isbn"], 2000)
+    with get_session() as db:
+        bk = db.query(Book).filter(Book.isbn == b1["isbn"]).first()
+        db.add(
+            QuizAttempt(
+                child_id=c["id"], book_id=bk.id, score=4, total_questions=5, passed=1, snapshot="[]"
+            )
+        )
+        db.commit()
+    rows = client.get(f"/api/miniapp/growth/passed-books?child_id={c['id']}", headers=m).json()
+    by_id = {r["book_id"]: r for r in rows}
+    ordered = [r["book_id"] for r in rows]
+    assert bk.id in by_id and by_id[bk.id]["best_percent"] == 80
+    assert len(rows) == 2, f"只应列出已通过（词账入账）的书：{ordered}"
+    no_attempt = next(r for r in rows if r["book_id"] != bk.id)
+    assert no_attempt["best_percent"] == 0 and no_attempt["score"] == 0
+    assert no_attempt["cover_url"] is None or no_attempt["cover_url"].startswith("/api/")
+    # 未入账的书不出现
+    assert all(r["book_id"] != b3["id"] for r in rows)
+
+
+def test_quiz_unlocked_when_passed_without_progress(client: TestClient):
+    """2026-09-15：**已通过的书必须视为已解锁**。
+
+    原判定只看 ReadingProgress.finished，而词账/测验记录可能独立于进度存在
+    （榜单/里程碑造数只落词账）→ 书架「已通过」里的书点进详情页反而显示
+    「未开始听 → 已听 0% + 未解锁」，与列表自相矛盾（用户实测 3 本里只有 1 本 PASSED）。
+    通过测验的前提就是听完，所以「有词账」⇒「已解锁 ⇒ passed」。
+    """
+    h = _h(client)
+    c, m = _mk_child(client, h, "13800000870", "无进度已通过孩")
+    b = _mk_book(client, h, "9788200000081")
+    # 只入账词数，不建 ReadingProgress
+    _credit_words(client, h, c["id"], b["isbn"], 500)
+    q = client.get(f"/api/miniapp/quiz/{b['id']}?child_id={c['id']}", headers=m).json()
+    assert q["status"] == "passed", f"有词账却判成 {q['status']}（应为 passed）"
+    assert q["unlocked"] is True

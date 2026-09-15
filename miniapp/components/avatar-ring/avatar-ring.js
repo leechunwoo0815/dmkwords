@@ -40,6 +40,7 @@ Component({
 
   observers: {
     'level, size, frame, gm': function () {
+      if (this.data.level == null) this.setData({ level: 'A' });
       this._apply()
     },
   },

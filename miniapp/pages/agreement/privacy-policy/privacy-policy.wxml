@@ -1,0 +1,37 @@
+<view class="page-bg">
+  <view class="content">
+    <view class="draft-banner">本文本为待法务审阅的占位文本，仅描述当前系统实际收集与使用信息的方式；最终版本以馆方公示为准。</view>
+
+    <view class="agreement-title">我们收集哪些信息</view>
+    <view class="section-content">
+      为提供分级阅读服务，本小程序在您使用时收集以下信息：
+      ① 家长手机号（登录与建档）；
+      ② 孩子的英文名/昵称与头像（馆内展示与榜单展示）；
+      ③ 孩子的阅读数据（听书进度、测验成绩、生词、打卡、积分与等级）；
+      ④ 您主动上传的图片（观察报告、收款凭证等）。
+      我们不收集与位置、通讯录、设备相册权限无关的其他信息。
+    </view>
+
+    <view class="agreement-title">信息如何使用</view>
+    <view class="section-content">
+      上述信息仅用于本馆阅读服务的运营与您孩子的成长记录：
+      生成阅读报告、等级与积分、打卡与勋章，以及馆内阅读圈的成就分享。
+      阅读圈与榜单仅展示孩子的英文名/昵称与头像，不展示真实姓名全名与手机号。
+    </view>
+
+    <view class="agreement-title">信息如何保存与共享</view>
+    <view class="section-content">
+      信息保存在本馆的服务系统中，不向任何第三方提供或出售。
+      退会后孩子的有效词数等成长记录按馆方规则保留，不做对外披露。
+    </view>
+
+    <view class="agreement-title">您的权利</view>
+    <view class="section-content">
+      您可以随时查阅、更正或要求删除孩子的资料与阅读数据，也可以申请注销家长账号。
+      上述权利可通过到店或联系馆员行使，我们将在核实身份后及时处理。
+    </view>
+
+    <view class="agreement-title">联系我们</view>
+    <view class="section-content">如有任何隐私相关疑问，请到店或联系馆员（联系方式以门店公示为准）。</view>
+  </view>
+</view>

@@ -13,6 +13,7 @@ page {
   --surface: #FFFDF7;         /* 绘本纸面 */
   --fg: #3B2F2F;              /* 深棕墨（不是纯黑） */
   --muted: #6B5B5B;           /* 淡墨棕 */
+  --muted-light: #8a7d72;     /* 暖灰次级文字（原页面 var(--fg-muted, #8a7d72) 幻变量收编，2026-09-13） */
   --border: #D4C5B5;          /* 暖沙描边（细线/分隔用） */
 
   /* 主色：活力橙（主按钮、重点、选中） */
@@ -32,15 +33,24 @@ page {
   --success-soft: rgba(74, 222, 128, 0.16);
   --warning: #B45309;          /* 琥珀档：黄系文字/实色用 */
   --warning-soft: rgba(252, 211, 77, 0.22);  /* 太阳黄纸痕 */
+  --warning-soft-strong: rgba(252, 211, 77, 0.45);  /* 太阳黄贴纸衬底（tabBar 选中态专用，2026-09-13 收编裸值） */
+  --white-soft: rgba(255, 255, 255, 0.18);   /* 玻璃白片（彩色底上的半透明贴纸，2026-09-13 收编） */
+  --white-ghost: rgba(255, 255, 255, 0.08);  /* 幽灵白（彩色底上的极淡装饰圆，2026-09-13 收编） */
   --warning-dark: #92400E;
   --error: #EF4444;            /* 番茄红 */
   --error-soft: rgba(239, 68, 68, 0.10);
 
   /* RGB 通道（页面里做渐变/遮罩用） */
+  --fg-rgb: 59, 47, 47;
+  --surface-rgb: 255, 253, 247;
   --error-rgb: 239, 68, 68;
   --success-rgb: 74, 222, 128;
   --warning-rgb: 252, 211, 77;
   --accent-rgb: 255, 107, 53;
+  --accent-light-rgb: 255, 154, 102;
+  --gold-rgb: 245, 158, 11;
+  --sun-rgb: 252, 211, 77;
+  --border-rgb: 212, 197, 181;
 
   /* 绘本金（成就/等级/星标专用） */
   --gold: #F59E0B;
@@ -74,6 +84,7 @@ page {
   --text-secondary: #5C4F4F;
   --text-tertiary: #6B5B5B;
   --secondary-ink: #166534;  /* 嫩芽绿文字档（--secondary 仅装饰） */
+  --sky-ink: #1E40AF;        /* 天空蓝文字档（badge-info 用，--sky 仅装饰） */
 
   /* 字体：标题圆润 = 绘本手写感（系统圆体栈，零网络依赖） */
   --font-display: 'ZCOOL KuaiLe', 'Yuanti SC', 'YouYuan', 'PingFang SC', sans-serif;
@@ -168,7 +179,10 @@ button {
 
 /* 全局安全底部栏 */
 .safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
+  /* 2026-09-15 修复：原仅安全区 padding（≈68rpx），不足以让开自定义 tabBar
+     （100rpx + 安全区≈168rpx）→ 末块被压。scroll-view 根页面必须用「元素占位」。 */
+  min-height: calc(200rpx + env(safe-area-inset-bottom));
+  flex-shrink: 0;
 }
 
 /* 全局 flex 工具 */
@@ -221,7 +235,7 @@ button {
 }
 .btn-success {
   background: var(--success);
-  color: #FFFDF7;
+  color: var(--surface);
   border: 3rpx solid var(--fg);
   border-radius: 999rpx;
   font-size: 28rpx;
@@ -234,7 +248,7 @@ button {
 }
 .btn-danger {
   background: var(--error);
-  color: #FFFDF7;
+  color: var(--surface);
   border: 3rpx solid var(--fg);
   border-radius: 999rpx;
   font-size: 28rpx;
@@ -284,11 +298,11 @@ button {
   font-weight: 700;
   border: 2rpx solid var(--fg);
 }
-.badge-success { background: var(--success-soft); color: var(--secondary-ink); border-color: rgba(59, 47, 47, 0.7); }
-.badge-warning { background: var(--warning-soft); color: var(--warning-dark); border-color: rgba(59, 47, 47, 0.7); }
-.badge-error { background: var(--error-soft); color: var(--accent-darker); border-color: rgba(59, 47, 47, 0.7); }
-.badge-info { background: var(--sky-soft); color: #1E40AF; border-color: rgba(59, 47, 47, 0.7); }
-.badge-gold { background: var(--gold-light); color: var(--gold-dark); border-color: rgba(59, 47, 47, 0.7); }
+.badge-success { background: var(--success-soft); color: var(--secondary-ink); border-color: rgba(var(--fg-rgb), 0.7); }
+.badge-warning { background: var(--warning-soft); color: var(--warning-dark); border-color: rgba(var(--fg-rgb), 0.7); }
+.badge-error { background: var(--error-soft); color: var(--accent-darker); border-color: rgba(var(--fg-rgb), 0.7); }
+.badge-info { background: var(--sky-soft); color: var(--sky-ink); border-color: rgba(var(--fg-rgb), 0.7); }
+.badge-gold { background: var(--gold-light); color: var(--gold-dark); border-color: rgba(var(--fg-rgb), 0.7); }
 
 
 /* ============================================
@@ -325,3 +339,77 @@ button {
 .icon-error   { color: var(--error); }
 .icon-muted   { color: var(--muted); }
 .icon-gold    { color: var(--gold); }
+
+
+/* ============================================
+   卡片与列表公共类（2026-09-13 同义类上收——页面 wxss 禁止重复定义同名类；
+   .submit-btn 弃用，统一用 .btn-primary/.btn-outline/.btn-danger/.btn-disabled）
+   ============================================ */
+/* 列表行卡片化（原各页复制粘贴的"绘本风精修"块收敛于此） */
+.list-item, .info-row {
+  background: var(--surface);
+  border: 2rpx solid var(--fg);
+  border-radius: 24rpx 28rpx 20rpx 30rpx;
+  box-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.55);
+}
+/* 区块标题圆润体基座（页面特色装饰需在页面 wxss 覆盖并登记差异化） */
+.section-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--fg);
+}
+/* 卡片内标题与信息行 */
+.card-h3 {
+  font-family: var(--font-display);
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--fg);
+}
+.info-label { font-size: 24rpx; color: var(--muted); }
+.info-value { font-size: 28rpx; color: var(--fg); font-weight: 600; }
+/* 页内轻空态内文（完整空态用 empty-state 组件） */
+.empty-text {
+  margin-top: 20rpx;
+  font-size: 28rpx;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.5;
+}
+/* 列表到底提示（全站唯一文案：— 到底啦 —） */
+.no-more {
+  text-align: center;
+  color: var(--muted);
+  font-size: 24rpx;
+  padding: 32rpx 0;
+}
+
+/* ============================================================
+   2026-09-15 回归修复：本组曾以「同义类重复」被整体删除，
+   导致 .section-card/.card-wrapper/.panel/.info-card/.form-card 丢失卡片视觉
+   （deposit 押金流水卡、report、book-detail、circle .panel 等实证破损）。
+   按 HEAD 原值复原；页面自有同名定义仍优先（页面 wxss 后加载）。
+   ============================================================ */
+.section-card, .card-wrapper, .panel, .info-card, .form-card {
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+/* 2026-09-15：上面这条复原规则**漏了 padding**，只给了底色+边框 → 依赖它的页面
+   （report「阅读概要/报告图片」、deposit「押金流水」）标题与正文全部贴着边框
+   （用户截图实测）。只给 .section-card 补、不整组补：.info-card 被 activity-detail
+   当「.section 内部区块」用，而 .section 自己已有 32/40rpx 内边距，整组补会双重内边距。
+   member / book-detail 各自本地定义了 .section-card（页面 wxss 后加载、优先），不受影响。 */
+.section-card {
+  padding: 32rpx;
+}
+
+/* 同源删除：.action-btn 等曾获「胶囊贴纸」按钮形态（vocabulary「删除」等）。
+   复原为无 !important 版本，避免压过页面有意样式。 */
+.action-btn, .secondary-btn {
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  box-shadow: var(--shadow-hard-sm);
+  font-weight: 700;
+}

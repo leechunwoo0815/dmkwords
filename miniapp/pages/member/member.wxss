@@ -3,7 +3,9 @@
 
 /* Page bg (tabBar 页预留底部空间) */
 .page-bg {
-  padding-bottom: 160rpx;
+  /* 2026-09-15 修复：根元素是 scroll-view（内部滚动），
+     原 160rpx < 自定义 tabBar 总高（100rpx + 安全区≈168rpx）→ 末行被 tabBar 压住。 */
+  padding-bottom: calc(200rpx + env(safe-area-inset-bottom));
 }
 
 /* ================================================================
@@ -24,12 +26,12 @@
   width: 112rpx;
   height: 112rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-soft), rgba(44, 74, 110, 0.2));
+  background: linear-gradient(135deg, var(--accent-soft), var(--sky-soft));
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 56rpx;
-  border: 4rpx solid rgba(44, 74, 110, 0.15);
+  border: 4rpx solid var(--sky-soft);
 }
 .profile-info {
   flex: 1;
@@ -46,7 +48,7 @@
   padding: 6rpx 20rpx;
   border-radius: 999rpx;
   margin-top: 8rpx;
-  background: rgba(53, 112, 60, 0.1);
+  background: var(--success-soft);
   color: var(--success);
   font-size: 24rpx;
   font-weight: 600;
@@ -72,13 +74,13 @@
   position: relative;
   overflow: hidden;
   color: var(--surface);
-  background: linear-gradient(135deg, var(--muted) 0%, #78716c 100%);
+  background: linear-gradient(135deg, var(--muted) 0%, var(--muted) 100%);
 }
 .member-card.official {
   background: linear-gradient(135deg, var(--accent), var(--accent-dark));
 }
 .member-card.observation {
-  background: linear-gradient(135deg, var(--success), #2da83e);
+  background: linear-gradient(135deg, var(--success), var(--secondary-ink));
 }
 .mc-deco {
   position: absolute;
@@ -87,7 +89,7 @@
   width: 240rpx;
   height: 240rpx;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--white-ghost);
 }
 .mc-top {
   display: flex;
@@ -102,7 +104,7 @@
 .mc-badge {
   padding: 6rpx 20rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--white-soft);
   font-size: 22rpx;
   font-weight: 600;
 }
@@ -154,7 +156,7 @@
 }
 .child-switcher-chip.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--surface);
   border-color: var(--accent);
 }
 
@@ -186,7 +188,7 @@
   top: -8rpx;
   right: 16rpx;
   background: var(--accent);
-  color: #fff;
+  color: var(--surface);
   padding: 4rpx 16rpx;
   border-radius: 999rpx;
   font-size: 20rpx;
@@ -228,7 +230,7 @@
   padding: 16rpx 0;
   border-radius: var(--radius-sm);
   background: var(--accent);
-  color: #fff;
+  color: var(--surface);
   font-size: 24rpx;
   font-weight: 600;
   box-sizing: border-box;
@@ -252,7 +254,7 @@
   border-radius: var(--radius-sm);
   padding: 24rpx 12rpx;
   text-align: center;
-  box-shadow: 0 4rpx 12rpx rgba(38, 36, 25, 0.03);
+  box-shadow: 0 4rpx 12rpx rgba(var(--fg-rgb), 0.03);
   box-sizing: border-box;
 }
 .qs-val {
@@ -274,10 +276,9 @@
 /* ================================================================
    Section Title
    ================================================================ */
-.section-title {
+.sec-title {
   margin: 32rpx 32rpx 20rpx;
   font-size: 30rpx;
-  font-weight: 600;
 }
 
 /* ================================================================
@@ -322,15 +323,15 @@
 }
 /* Icon background colors — order matches prototype */
 .func-item:nth-child(1) .fi-icon { background: var(--accent-soft); }
-.func-item:nth-child(2) .fi-icon { background: rgba(53, 112, 60, 0.1); }
-.func-item:nth-child(3) .fi-icon { background: rgba(53, 112, 60, 0.1); }
-.func-item:nth-child(4) .fi-icon { background: rgba(141, 102, 16, 0.12); }
-.func-item:nth-child(5) .fi-icon { background: rgba(181, 64, 40, 0.08); }
-.func-item:nth-child(6) .fi-icon { background: rgba(111, 104, 90, 0.1); }
-.func-item:nth-child(7) .fi-icon { background: rgba(53, 112, 60, 0.12); }
-.func-item:nth-child(8) .fi-icon { background: rgba(141, 102, 16, 0.1); }
-.func-item:nth-child(9) .fi-icon { background: rgba(44, 74, 110, 0.08); }
-.func-item:nth-child(10) .fi-icon { background: rgba(53, 112, 60, 0.12); }
+.func-item:nth-child(2) .fi-icon { background: var(--success-soft); }
+.func-item:nth-child(3) .fi-icon { background: var(--success-soft); }
+.func-item:nth-child(4) .fi-icon { background: var(--warning-soft); }
+.func-item:nth-child(5) .fi-icon { background: var(--error-soft); }
+.func-item:nth-child(6) .fi-icon { background: var(--accent-soft); }
+.func-item:nth-child(7) .fi-icon { background: var(--success-soft); }
+.func-item:nth-child(8) .fi-icon { background: var(--warning-soft); }
+.func-item:nth-child(9) .fi-icon { background: var(--sky-soft); }
+.func-item:nth-child(10) .fi-icon { background: var(--success-soft); }
 
 /* ================================================================
    Bottom Links
@@ -372,14 +373,14 @@
 .expire-line {
   margin: 12rpx 0 4rpx;
   padding: 12rpx 20rpx;
-  background: #FDF8F0;
+  background: var(--bg);
   border-radius: 10rpx;
   font-size: 24rpx;
-  color: #6B5B5B;
+  color: var(--muted);
 }
 .expire-line.warn {
-  background: #fff3e0;
-  color: #b45309;
+  background: var(--gold-light);
+  color: var(--warning);
   font-weight: 600;
 }
 
@@ -426,13 +427,7 @@
   box-shadow: var(--shadow-hard-sm);
 }
 
-/* 标题圆体 + 橙块装饰 */
-.section-title {
-  font-family: var(--font-display);
-  font-weight: 800;
-  color: var(--fg);
-}
-.section-title::before {
+.sec-title::before {
   content: "";
   display: inline-block;
   width: 14rpx;
@@ -450,7 +445,7 @@
   height: 88rpx;
   border: 3rpx solid var(--fg);
   border-radius: 50%;
-  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
+  box-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -485,7 +480,7 @@
   background: var(--sun);
   color: var(--fg);
   transform: translate(2rpx, 2rpx);
-  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+  box-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.85);
 }
 
 /* 退出登录行：纸面粗边 */
@@ -501,7 +496,8 @@
    ============================================ */
 
 .page-bg {
-  height: 100vh;
+  /* 2026-09-15 修复：固定高度导致长内容跑不出视口、底部被 tabBar 挡死 → 改 min-height */
+  min-height: 100vh;
   background: var(--bg);
 }
 
@@ -531,7 +527,7 @@
   align-items: center;
   justify-content: center;
   font-size: 50rpx;
-  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
+  box-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.55);
 }
 
 .profile-name {
@@ -585,21 +581,12 @@
   padding: 24rpx 0;
 }
 
-.section-card.no-padding .section-title {
+.section-card.no-padding .sec-title {
   padding: 0 24rpx;
 }
 
-.section-title {
-  font-family: var(--font-display);
-  font-size: 30rpx;
-  font-weight: 800;
-  margin-bottom: 20rpx;
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-}
 
-.section-title::before {
+.sec-title::before {
   content: "";
   width: 10rpx;
   height: 28rpx;
@@ -635,7 +622,7 @@
 .child-switcher-chip.active {
   background: var(--sun);
   transform: translate(2rpx, 2rpx);
-  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+  box-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.85);
 }
 
 .chip-avatar {
@@ -699,7 +686,12 @@
 }
 
 .func-item {
-  width: calc(25% - 12rpx);
+  /* 2026-09-15（用户："布局又回到最古老的状态，留白那么大"）：
+     原 calc(25% - 12rpx) + gap 16rpx 让 4 个格子**正好等于容器宽 686rpx**
+     （4*(171.5-12)+48 = 686），浮点误差把第 4 个挤到下一行 → 每行只剩 3 个、
+     卡片被撑高一截、看着满屏留白。留 16rpx 余量 → 稳定 4 列。
+     （同族坑：messages 分类条 calc(25% - 9rpx)、shelf 页签。） */
+  width: calc(25% - 16rpx);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -716,7 +708,7 @@
   border: 3rpx solid var(--fg);
   border-radius: 22rpx;
   background: var(--surface);
-  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
+  box-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.55);
 }
 
 .func-item:nth-child(6n+1) .fi-icon { background: var(--accent-soft); }
@@ -779,16 +771,16 @@
 /* WM15-R3：孩子头像（可点改）+ 宫格选择弹层 */
 .profile-avatar-img {
   width: 104rpx; height: 104rpx; border-radius: 50%;
-  background: #fff; border: 3rpx solid rgba(90, 74, 58, 0.18);
+  background: var(--surface); border: 3rpx solid rgba(var(--fg-rgb), 0.18);
 }
 .avatar-mask {
   position: fixed; left: 0; right: 0; top: 0; bottom: 0;
-  background: rgba(59, 47, 47, 0.5); z-index: 99;
+  background: rgba(var(--fg-rgb), 0.5); z-index: 99;
   display: flex; align-items: flex-end;
 }
 .avatar-panel {
   width: 100%; max-height: 76vh; padding: 28rpx 24rpx 36rpx;
-  background: var(--surface, #fffdf8);
+  background: var(--surface);
   border-radius: 28rpx 28rpx 0 0;
 }
 .avatar-panel-title {
@@ -800,10 +792,23 @@
   width: 108rpx; height: 108rpx; border-radius: 50%;
   padding: 4rpx;
 }
-.avatar-cell.active { border: 4rpx solid #f2935b; }
+.avatar-cell.active { border: 4rpx solid var(--accent-light); }
 .avatar-cell-img { width: 100rpx; height: 100rpx; border-radius: 50%; }
 .avatar-cancel {
   margin-top: 24rpx; padding: 22rpx 0; text-align: center;
   font-size: 30rpx; font-weight: 700; color: var(--fg);
-  border: 2rpx solid rgba(90, 74, 58, 0.25); border-radius: 999rpx;
+  border: 2rpx solid rgba(var(--fg-rgb), 0.25); border-radius: 999rpx;
 }
+
+/* 关于区协议入口（2026-09-13 合规入口补齐） */
+.link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 88rpx;
+  padding: 0 8rpx;
+  border-bottom: 2rpx solid var(--border);
+}
+.link-row:last-child { border-bottom: none; }
+.link-text { font-size: 28rpx; color: var(--fg); }
+.link-arrow { font-size: 32rpx; color: var(--muted-light); }

@@ -1,4 +1,4 @@
-<view class="page-bg" style="min-height:100vh;padding:24rpx;">
+<view class="page-bg x-cb307e">
   <view class="level-card" wx:if="{{summary}}">
     <view class="level-emoji">{{levelEmoji}}</view>
     <view class="level-name">{{summary.level}} 级</view>
@@ -29,7 +29,7 @@
     </view>
   </view>
 
-  <view class="section-label" style="margin:32rpx 0 16rpx;font-size:28rpx;font-weight:600;color:var(--fg);">里程碑勋章</view>
+  <view class="section-label x-03f368">里程碑勋章</view>
   <view class="badges-grid">
     <view wx:for="{{badges}}" wx:key="node" class="badge-card {{item.unlocked ? '' : 'badge-colored-locked'}}">
       <view class="badge-icon">{{item.emoji}}</view>
@@ -38,7 +38,7 @@
     </view>
   </view>
 
-  <view class="section-label" style="margin:32rpx 0 16rpx;font-size:28rpx;font-weight:600;color:var(--fg);">最近积分明细</view>
+  <view class="section-label x-03f368">最近积分明细</view>
   <view class="timeline">
     <view wx:for="{{points}}" wx:key="id" class="tl-item">
       <view class="tl-dot"></view>
@@ -46,8 +46,8 @@
         <view class="tl-name">{{item.detail}}</view>
         <view class="tl-time">{{item.created_at}}</view>
       </view>
-      <view class="tl-desc" style="color:var(--success);font-weight:600;">+{{item.points}}</view>
+      <view class="tl-desc x-f31427">+{{item.points}}</view>
     </view>
-    <view wx:if="{{!points.length}}" style="color:var(--muted);font-size:26rpx;text-align:center;padding:20rpx;">还没有积分记录</view>
+    <view class="x-a0f80c" wx:if="{{!points.length}}">还没有积分记录</view>
   </view>
 </view>

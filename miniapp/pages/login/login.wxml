@@ -12,7 +12,7 @@
         value="{{phone}}" bindinput="onPhoneInput" />
     </view>
     <view class="sms-row">
-      <view class="input-row" style="flex:1">
+      <view class="input-row grow">
         <text class="input-icon">🔑</text>
         <input class="input-field" type="number" maxlength="4" placeholder="验证码（开发期 1234）"
           value="{{code}}" bindinput="onCodeInput" />
@@ -21,5 +21,12 @@
     <button class="phone-login-btn" bindtap="onLogin" disabled="{{submitting}}">
       {{submitting ? '登录中…' : '登录'}}
     </button>
+
+  <view class="agreement-row">
+    登录即代表同意
+    <text class="agreement-link" bindtap="goServiceAgreement">《用户服务协议》</text>
+    与
+    <text class="agreement-link" bindtap="goPrivacy">《隐私政策》</text>
+  </view>
   </view>
 </view>

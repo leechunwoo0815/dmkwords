@@ -1,12 +1,12 @@
-<view class="page-bg" style="min-height:100vh;padding:24rpx;">
+<view class="page-bg x-cb307e">
   <view class="streak-banner">
     <view class="cal-header">
       <text class="cal-nav-btn" bindtap="onPrevMonth">‹</text>
-      <text style="font-size:32rpx;font-weight:600;color:var(--fg)">{{monthText}}</text>
+      <text class="x-f0c0b3">{{monthText}}</text>
       <text class="cal-nav-btn" bindtap="onNextMonth">›</text>
     </view>
     <view class="streak-stats">
-      <view>连续打卡 <text style="font-weight:800;color:#FFFFFF;font-size:40rpx">{{currentStreak}}</text> 天</view>
+      <view>连续打卡 <text class="x-9a915c">{{currentStreak}}</text> 天</view>
       <view>今日：{{todayChecked ? '已打卡 ✓' : '听完一本书即可打卡'}}</view>
     </view>
   </view>
@@ -23,7 +23,7 @@
     </view>
   </view>
 
-  <view style="margin-top:24rpx;color:var(--muted);font-size:24rpx;text-align:center;">
+  <view class="x-43089c">
     {{childName}} · 当天首次完播自动打卡，重复听书不重复计
   </view>
 </view>

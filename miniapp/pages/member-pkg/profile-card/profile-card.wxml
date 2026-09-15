@@ -8,7 +8,7 @@
         <view class="card-date">累计有效阅读 · 永不丢失</view>
       </view>
       <view class="level-badge-icon">
-        <text style="font-size:44rpx;font-weight:700;">{{passport.level}}</text>
+        <text class="x-8928aa">{{passport.level}}</text>
       </view>
     </view>
 
@@ -64,17 +64,17 @@
     <text class="ach-entry-arrow">›</text>
   </view>
 
-  <view wx:if="{{passport.read_only}}" class="tip" style="margin:24rpx;text-align:center;color:var(--muted);">
+  <view wx:if="{{passport.read_only}}" class="tip x-158c51">
     已退会：护照为只读历史（词数等级永不回收）
   </view>
 
-  <view wx:if="{{passport.recent_books.length}}" style="margin:24rpx;">
-    <view style="font-size:28rpx;font-weight:600;margin-bottom:16rpx;color:var(--fg);">最近读完</view>
-    <view wx:for="{{passport.recent_books}}" wx:key="id" style="background:var(--surface);border-radius:16rpx;padding:20rpx 24rpx;margin-bottom:12rpx;display:flex;justify-content:space-between;">
+  <view class="x-1595cd" wx:if="{{passport.recent_books.length}}">
+    <view class="x-bc7dc8">最近读完</view>
+    <view class="x-255591" wx:for="{{passport.recent_books}}" wx:key="id">
       <text>《{{item.title}}》</text>
-      <text style="color:var(--accent);font-weight:600;">+{{item.word_count}} 词</text>
+      <text class="x-0c7277">+{{item.word_count}} 词</text>
     </view>
   </view>
 
-  <button class="btn-primary" style="margin:24rpx;" open-type="share" wx:if="{{!passport.read_only}}">分享这份成长</button>
+  <button class="btn-primary x-1595cd" open-type="share" wx:if="{{!passport.read_only}}">分享这份成长</button>
 </view>

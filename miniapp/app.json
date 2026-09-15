@@ -7,7 +7,9 @@
     "pages/login/login",
     "pages/circle/circle",
     "pages/circle/profile",
-    "pages/circle/share"
+    "pages/circle/share",
+    "pages/agreement/privacy-policy/privacy-policy",
+    "pages/agreement/service-agreement/service-agreement"
   ],
   "subPackages": [
     {
@@ -30,7 +32,8 @@
         "leaderboard/leaderboard",
         "profile-card/profile-card",
         "observation-report/observation-report",
-        "report/report"
+        "report/report",
+        "purchase/purchase"
       ]
     },
     {
@@ -39,6 +42,7 @@
       "pages": [
         "reservation/reservation",
         "refund-apply/refund-apply",
+        "withdrawal/withdrawal",
         "benefit-transfer/benefit-transfer",
         "deposit/deposit",
         "messages/messages",

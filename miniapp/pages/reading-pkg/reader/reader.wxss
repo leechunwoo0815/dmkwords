@@ -14,7 +14,7 @@
   position: fixed;
     box-sizing: border-box;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(var(--fg-rgb), 0.55);
   z-index: 999;
   display: flex;
   align-items: center;
@@ -77,13 +77,13 @@
   position: relative;
   overflow: hidden;
   background: linear-gradient(145deg, rgba(var(--accent-rgb), 0.2), rgba(var(--accent-rgb), 0.5), rgba(var(--accent-rgb), 0.7));
-  box-shadow: 0 8rpx 32rpx rgba(93, 123, 161, 0.25);
+  box-shadow: 0 8rpx 32rpx rgba(var(--fg-rgb), 0.25);
 }
 .book-cover::before {
   content: '';
   position: absolute;
   bottom: 0; left: 0; right: 0; top: 0;
-  background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.15));
+  background: linear-gradient(180deg, transparent 40%, rgba(var(--fg-rgb), 0.15));
 }
 .book-meta {
   display: flex;
@@ -151,7 +151,7 @@
   border-radius: 50%;
   background: var(--accent);
   border: 5rpx solid var(--surface);
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2rpx 8rpx rgba(var(--fg-rgb), 0.15);
 }
 .audio-main-controls {
   display: flex;
@@ -389,7 +389,7 @@
 .checkin-overlay {
   position: fixed; inset: 0; z-index: 9999;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,0.5);
+  background: rgba(var(--fg-rgb), 0.5);
   animation: fadeIn 0.3s ease;
   box-sizing: border-box;
 }
@@ -411,7 +411,7 @@
 .completion-overlay {
   position: fixed; inset: 0; z-index: 9999;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,0.5);
+  background: rgba(var(--fg-rgb), 0.5);
   animation: fadeIn 0.3s ease;
   box-sizing: border-box;
 }
@@ -420,7 +420,7 @@
   padding: 72rpx 48rpx 56rpx;
   width: calc(100% - 80rpx); max-width: 680rpx;
   text-align: center; position: relative; overflow: hidden;
-  box-shadow: 0 40rpx 120rpx rgba(0,0,0,0.15);
+  box-shadow: 0 40rpx 120rpx rgba(var(--fg-rgb), 0.15);
   animation: scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
 }
 .cc-top-gradient {
@@ -518,19 +518,19 @@
   margin-bottom: 32rpx;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 16rpx 48rpx rgba(38, 36, 25, 0.12);
+  box-shadow: 0 16rpx 48rpx rgba(var(--fg-rgb), 0.12);
 }
 .book-info-section .book-cover-img::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.15));
+  background: linear-gradient(180deg, transparent 40%, rgba(var(--fg-rgb), 0.15));
 }
 .book-info-section .cover-emoji {
   font-size: 104rpx;
   position: relative;
   z-index: 1;
-  filter: drop-shadow(0 4rpx 12rpx rgba(0, 0, 0, 0.2));
+  filter: drop-shadow(0 4rpx 12rpx rgba(var(--fg-rgb), 0.2));
 }
 .book-info-section .book-name {
   font-family: var(--font-display);
@@ -648,7 +648,7 @@
 .ctrl-play.playing {
   box-shadow: 0 8rpx 56rpx rgba(var(--accent-rgb), 0.5);
 }
-.ctrl-play svg { width: 52rpx; height: 52rpx; color: white; }
+.ctrl-play svg { width: 52rpx; height: 52rpx; color: var(--surface); }
 
 /* Speed selector */
 .speed-row {
@@ -670,7 +670,7 @@
 .speed-chip:active { transform: scale(0.95); }
 .speed-chip.active {
   background: var(--accent);
-  color: white;
+  color: var(--surface);
   border-color: var(--accent);
 }
 
@@ -700,7 +700,7 @@
   flex: 1;
   min-height: 0;
 }
-.dict-section .section-title {
+.dict-section .sec-head {
   font-family: var(--font-display);
   font-size: 26rpx;
   font-weight: 600;
@@ -730,7 +730,7 @@
 .dict-search-btn {
   padding: 20rpx 36rpx;
   background: var(--accent);
-  color: white;
+  color: var(--surface);
   border-radius: var(--radius);
   font-size: 28rpx;
   font-weight: 600;
@@ -771,7 +771,7 @@
   font-size: 24rpx;
   font-weight: 600;
   background: var(--accent);
-  color: white;
+  color: var(--surface);
   transition: opacity 0.12s;
 }
 .dr-btn:active { opacity: 0.85; }
@@ -823,14 +823,14 @@
   transition: all 0.12s;
 }
 .demo-btn:active { transform: scale(0.95); }
-.demo-btn.active-demo { background: var(--warning); color: white; border-color: var(--warning); }
+.demo-btn.active-demo { background: var(--warning); color: var(--surface); border-color: var(--warning); }
 
 /* ===== OVERDUE LOCK OVERLAY (design prototype) ===== */
 .overdue-overlay {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(var(--fg-rgb), 0.55);
   display: none;
   align-items: center;
   justify-content: center;
@@ -844,7 +844,7 @@
   width: calc(100% - 96rpx);
   max-width: 680rpx;
   text-align: center;
-  box-shadow: 0 40rpx 120rpx rgba(0, 0, 0, 0.15);
+  box-shadow: 0 40rpx 120rpx rgba(var(--fg-rgb), 0.15);
 }
 .overdue-card .od-icon { font-size: 104rpx; margin-bottom: 28rpx; }
 .overdue-card .od-title {
@@ -865,7 +865,7 @@
   padding: 24rpx 72rpx;
   border-radius: 999rpx;
   background: var(--accent);
-  color: white;
+  color: var(--surface);
   font-size: 30rpx;
   font-weight: 600;
   box-shadow: 0 8rpx 32rpx rgba(var(--accent-rgb), 0.3);
@@ -878,7 +878,7 @@
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(var(--fg-rgb), 0.5);
   display: none;
   align-items: center;
   justify-content: center;
@@ -894,7 +894,7 @@
   text-align: center;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 40rpx 120rpx rgba(0, 0, 0, 0.15);
+  box-shadow: 0 40rpx 120rpx rgba(var(--fg-rgb), 0.15);
 }
 .completion-popup::before {
   content: '';
@@ -958,7 +958,7 @@
 .popup-btn:active { transform: scale(0.97); }
 .popup-btn.primary {
   background: var(--accent);
-  color: white;
+  color: var(--surface);
   box-shadow: 0 8rpx 32rpx rgba(var(--accent-rgb), 0.3);
 }
 .popup-btn.secondary { background: var(--border); color: var(--muted); }
@@ -970,8 +970,8 @@
 .simple-toggle {
   padding: 8rpx 24rpx;
   font-size: 24rpx;
-  color: var(--primary, #2f6b8a);
-  background: rgba(47, 107, 138, 0.12);
+  color: var(--primary, var(--sky));
+  background: var(--sky-soft);
   border-radius: 28rpx;
   flex-shrink: 0;
   white-space: nowrap;
@@ -989,20 +989,20 @@
   width: 320rpx;
   height: 320rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary, #2f6b8a), #6a9bff);
-  box-shadow: 0 12rpx 32rpx rgba(47, 107, 138, 0.35);
+  background: linear-gradient(135deg, var(--primary, var(--sky)), var(--sky));
+  box-shadow: 0 12rpx 32rpx var(--sky-soft);
 }
 .simple-play-btn.playing {
-  background: linear-gradient(135deg, #f0932b, #f5b04d);
+  background: linear-gradient(135deg, var(--accent-light), var(--gold));
 }
 .simple-play-icon {
   font-size: 96rpx;
-  color: #fff;
+  color: var(--surface);
   line-height: 1.2;
 }
 .simple-play-text {
   font-size: 32rpx;
-  color: #fff;
+  color: var(--surface);
   font-weight: 600;
   margin-top: 8rpx;
 }
@@ -1027,16 +1027,16 @@
 
 /* 主播放键：活力橙 + 粗黑边 + 硬阴影 */
 .audio-btn-main {
-  border: 3rpx solid var(--fg) !important;
-  box-shadow: var(--shadow-hard) !important;
-  background: var(--accent) !important;
+  border: 3rpx solid var(--fg);
+  box-shadow: var(--shadow-hard);
+  background: var(--accent);
 }
 .audio-btn-main:active {
   transform: translate(3rpx, 3rpx);
-  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85) !important;
+  box-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.85);
 }
 .audio-btn-main.playing {
-  background: var(--success) !important;
+  background: var(--success);
 }
 
 /* 副按钮（快进快退）：纸面贴纸 */
@@ -1057,7 +1057,7 @@
 .speed-item.active {
   background: var(--sun);
   color: var(--fg);
-  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+  box-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.85);
 }
 
 /* 查词区：纸面卡片化 */
@@ -1079,14 +1079,14 @@
 
 /* 绘本风精修补充：查词按钮 */
 .lookup-btn {
-  border: 3rpx solid var(--fg) !important;
-  border-radius: 999rpx !important;
-  box-shadow: var(--shadow-hard-sm) !important;
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  box-shadow: var(--shadow-hard-sm);
   font-weight: 800;
 }
 .lookup-btn:active {
   transform: translate(2rpx, 2rpx);
-  box-shadow: none !important;
+  box-shadow: none;
 }
 
 /* ============================================
@@ -1148,3 +1148,10 @@
   min-width: 60rpx;
   text-align: center;
 }
+
+
+/* ===== 2026-09-13 内联样式迁移（机械生成，勿手改） ===== */
+.x-691250 { color: var(--success); }
+.x-aa01b4 { opacity: 0.3; }
+.x-e83e61 { color: var(--muted); font-size: 24rpx; }
+.x-f15519 { color: var(--error); }

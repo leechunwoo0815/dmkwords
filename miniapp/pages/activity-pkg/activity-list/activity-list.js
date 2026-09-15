@@ -35,12 +35,18 @@ Page({
         api.listActivities(this._childId),
         api.myEnrollments(this._childId),
       ])
-      // R2（插修 16）：卡片封面拼 token（书封面正解同款）
+      // R2（插修 16）：卡片封面拼 token（书封面正解同款）；时间去掉秒级精度
+      const fmt = (t) => (t ? String(t).replace('T', ' ').slice(0, 16) : '')
       const activities = (acts || []).map((a) => ({
         ...a,
         cover_url: a.cover_url ? media.fullUrl(a.cover_url, true) : '',
+        start_at: fmt(a.start_at),
       }))
-      this.setData({ activities, myEnrollments: mine || [] })
+      const myEnrollments = (mine || []).map((m) => ({
+        ...m,
+        activity_start_at: fmt(m.activity_start_at),
+      }))
+      this.setData({ activities, myEnrollments })
     } catch (e) {
       // F-M12/T26：fetch 失败进错误态（点击重试），不再静默空列表
       this.setData({ loadError: true })

@@ -1,99 +1,92 @@
-.top-bar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  height: 112rpx;
-  padding: 0 32rpx;
-  background: var(--surface);
-  border-bottom: 2rpx solid var(--border);
-}
-.top-bar .back-btn {
-  background: none;
-  border: none;
-  font-size: 40rpx;
-  color: var(--fg);
-  padding: 8rpx 16rpx;
-  border-radius: var(--radius-sm);
-}
-.top-bar .back-btn:active { background: var(--accent-soft); }
-.top-bar .title {
-  flex: 1;
-  text-align: center;
-  font-family: var(--font-display);
-  font-size: 34rpx;
-  font-weight: 600;
-}
-.top-bar .share-btn {
-  width: 64rpx;
-  height: 64rpx;
-  flex-shrink: 0;
+/* pages/activity-pkg/activity-list/activity-list.wxss — 活动列表（2026-09-13 按统一模板契约重做）
+   本页特色：无（骨架/状态/控件全部走全局公共类与四件套组件） */
+.page-bg {
+  min-height: 100vh;
+  background: var(--bg);
+  box-sizing: border-box;
+  /* 底部留白 ≥ 安全区：内容不被系统.home indicator 顶住 */
+  padding: 20rpx 0 calc(60rpx + env(safe-area-inset-bottom));
 }
 
+/* ---------- tab 胶囊（触控区 ≥88rpx，MP-018） ---------- */
 .tabs {
   display: flex;
-  background: var(--surface);
-  border-bottom: 2rpx solid var(--border);
-  position: sticky;
-  top: 112rpx;
-  z-index: 9;
+  gap: 16rpx;
+  padding: 8rpx 24rpx 16rpx;
 }
 .tab {
-  flex: 1;
-  padding: 24rpx;
-  text-align: center;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  min-height: 88rpx;
+  box-sizing: border-box;
+  padding: 16rpx 32rpx;
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  background: var(--surface);
+  box-shadow: var(--shadow-hard-sm);
   font-size: 28rpx;
-  font-weight: 500;
+  font-weight: 700;
   color: var(--muted);
-  position: relative;
 }
 .tab.active {
-  color: var(--accent);
-  font-weight: 600;
-}
-.tab.active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 20%;
-  right: 20%;
-  height: 4rpx;
-  background: var(--accent);
-  border-radius: 2rpx;
+  background: var(--sun);
+  color: var(--fg);
+  box-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.85);
 }
 
+/* ---------- 活动卡 ---------- */
 .activity-list {
-  padding: 24rpx 32rpx;
+  padding: 8rpx 32rpx 0;
 }
 .activity-card {
   background: var(--surface);
-  border: 2rpx solid var(--border);
+  border: 3rpx solid var(--fg);
   border-radius: var(--radius);
   overflow: hidden;
   margin-bottom: 24rpx;
+  box-shadow: var(--shadow-hard-sm);
 }
+/* 根修（2026-09-13）：banner 必须是定位锚——此前缺 position:relative，
+   封面图 absolute 一路锚到页面根铺满全屏（用户投诉的"封面糊脸"） */
 .activity-banner {
+  position: relative;
   height: 280rpx;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .banner-0 {
-  background: linear-gradient(135deg, rgba(53, 97, 143, 0.12), rgba(53, 112, 60, 0.1));
+  background: linear-gradient(135deg, var(--sky-soft), var(--secondary-soft));
 }
 .banner-1 {
-  background: linear-gradient(135deg, rgba(53, 112, 60, 0.1), rgba(53, 97, 143, 0.08));
+  background: linear-gradient(135deg, var(--secondary-soft), var(--accent-soft));
 }
 .banner-2 {
-  background: linear-gradient(135deg, rgba(201, 162, 39, 0.12), rgba(53, 97, 143, 0.08));
+  background: linear-gradient(135deg, var(--sun-soft), var(--sky-soft));
 }
+.activity-banner-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* 费用价签（2026-09-15）：原为居中、无底的 --accent 橙字，直接压在绘本封面上
+   ——横条封面是绿色山丘 + 橙红热气球，橙字既看不清、又和气球撞在一起。
+   改左下角实底价签：任何封面上都保证对比度，语义上也更像「价签」而不是标题。 */
 .activity-banner-text {
-  font-size: 40rpx;
+  position: absolute;
+  left: 24rpx;
+  bottom: 24rpx;
+  font-size: 30rpx;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-dark);
   text-align: center;
-  padding: 32rpx;
+  padding: 8rpx 26rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  box-shadow: var(--shadow-hard-sm);
 }
 .activity-body {
   padding: 28rpx 32rpx;
@@ -143,107 +136,13 @@
   color: var(--error);
 }
 .status-past {
-  background: rgba(163, 154, 134, 0.1);
-  color: var(--muted);
-}
-.enroll-btn {
-  padding: 14rpx 32rpx;
-  border-radius: 999rpx;
-  background: var(--accent);
-  font-size: 26rpx;
-  font-weight: 600;
-}
-.enroll-btn text {
-  color: var(--surface);
-}
-.enroll-btn.disabled {
-  opacity: 0.4;
-}
-
-.loading-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 120rpx 0;
-  color: var(--muted);
-  font-size: 28rpx;
-}
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 120rpx 0;
-}
-.empty-icon {
-  font-size: 64rpx;
-  margin-bottom: 16rpx;
-}
-.empty-text {
-  font-size: 28rpx;
+  background: var(--bg);
   color: var(--muted);
 }
 
-/* ============================================
-   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
-   ============================================ */
-/* 卡片：粗黑边 + 硬阴影 + 手绘圆角 */
-.card, .section-card, .card-wrapper, .section, .panel, .info-card, .form-card {
-  background: var(--surface);
-  border: 3rpx solid var(--fg);
-  border-radius: 28rpx 32rpx 24rpx 36rpx;
-  box-shadow: var(--shadow-hard-sm);
-}
-
-/* 标题圆体 */
-.page-title, .section-title, .card-title, .header-title, .title, .name {
-  font-family: var(--font-display);
-  font-weight: 700;
-}
-
-/* 列表项：卡片化 */
-.list-item, .item, .row, .cell, .info-row {
-  background: var(--surface);
-  border: 2rpx solid var(--fg);
-  border-radius: 24rpx 28rpx 20rpx 30rpx;
-  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
-}
-
-/* 列表容器：加间距 */
-.list, .grid, .list-container {
-  gap: 16rpx;
-}
-
-
-/* 绘本风精修补充：tab 胶囊化 + 活动卡 */
-.tabs {
-  border-bottom: none;
-  background: transparent;
-  gap: 16rpx;
-  padding: 0 24rpx;
-}
-.tab {
-  flex: 0 0 auto;
-  padding: 16rpx 32rpx;
-  border: 3rpx solid var(--fg);
-  border-radius: 999rpx;
-  background: var(--surface);
-  box-shadow: var(--shadow-hard-sm);
-  font-weight: 700;
-}
-.tab.active {
-  background: var(--sun);
-  color: var(--fg);
-  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
-}
-.tab.active::after {
-  display: none;
-}
-
-/* T45：活动卡片封面图（banner 区有 cover_url 时显图） */
-.activity-banner-img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
+/* 2026-09-15（用户两轮反馈"活动页还是遮挡，按钮往上挪不行吗"）：
+   原 top:112rpx 是错的 —— 本页用**原生导航栏**且没有自绘导航，页面内容区
+   本来就是从 y=0 起算；再让吸顶条「距顶 112rpx 才吸附」，它一滚动就**往下跳 112rpx**，
+   正好压在第一个活动卡上把卡片上半部分盖住。改为贴内容区顶部吸附（用户说的"往上挪"）。
+   对照：order-history 自绘了 sticky 导航栏，它的 top:96rpx 是对的口径，勿动。 */
+.tabs { background: var(--surface); position: sticky; top: 0; z-index: 9; }

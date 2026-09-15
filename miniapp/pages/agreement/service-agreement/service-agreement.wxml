@@ -1,0 +1,38 @@
+<view class="page-bg">
+  <view class="content">
+    <view class="draft-banner">本文本为待法务审阅的占位文本，仅概述当前服务与规则的实际执行方式；最终版本以馆方公示为准。</view>
+
+    <view class="agreement-title">服务内容</view>
+    <view class="section-content">
+      本馆提供少儿英语分级阅读服务：会员方案、纸质书到店借阅与归还、线上听书、
+      阅读进度记录、配套测验、生词本、打卡与成长报告，以及馆内线下活动。
+    </view>
+
+    <view class="agreement-title">账号与孩子档案</view>
+    <view class="section-content">
+      家长以手机号验证码方式登录，孩子档案由馆方协助建立。
+      请妥善保管登录设备；如更换手机号或转让权益，请到店或联系馆员办理。
+    </view>
+
+    <view class="agreement-title">会员与费用</view>
+    <view class="section-content">
+      会员方案与价格以到店公示为准，本小程序现阶段不提供在线支付；
+      会员的购买、续费与相关费用请到店或联系馆员办理，馆员确认后生效。
+    </view>
+
+    <view class="agreement-title">借阅与押金</view>
+    <view class="section-content">
+      图书借还按馆内公示的借阅制度执行（可借数量、借期、续借与逾期处理）。
+      押金的收取、补缴与退还规则以馆方公示为准，可在小程序内查看押金状态。
+    </view>
+
+    <view class="agreement-title">退款与退会</view>
+    <view class="section-content">
+      会员退款、活动退款与退会可在小程序内按页面指引提交申请，由馆方审核后处理；
+      退款金额按馆方规则计算，规则文案以馆方公示为准。
+    </view>
+
+    <view class="agreement-title">协议的变更</view>
+    <view class="section-content">本服务规则如有调整，以馆内最新公示为准；重大变更我们将通过小程序消息或店内公告告知。</view>
+  </view>
+</view>

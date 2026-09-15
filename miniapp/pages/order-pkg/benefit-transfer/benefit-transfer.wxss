@@ -5,7 +5,8 @@
 .page {
   background: var(--bg);
   min-height: 100vh;
-  padding-bottom: 200rpx;
+  /* 2026-09-15：200rpx 是给已取消的固定底栏留的位，改常规留白 */
+  padding-bottom: calc(60rpx + env(safe-area-inset-bottom));
 }
 
 /* Nav Bar */
@@ -288,7 +289,7 @@
 }
 
 .child-select.selected .check-icon {
-  color: white;
+  color: var(--surface);
 }
 
 /* Records Section */
@@ -361,30 +362,18 @@
   padding: 40rpx 0;
 }
 
-/* Submit Button */
+/* Submit Button
+   2026-09-15：本页 .submit-wrap 用在「转让条件核对」卡片**内部**，样式却是 HTML 稿的
+   固定底栏 → 提交按钮浮在页面底部、盖住最后一条条件（用户截图：按钮被切、条件被压）。
+   回到文档流，跟在条件列表后面。 */
 .submit-wrap {
-  position: fixed;
-    box-sizing: border-box;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  margin-top: 24rpx;
+}
+/* 回到文档流后按钮按内容宽收缩，「条件不全，暂不能提交」被折成两行 → 补满宽 */
+.submit-wrap .btn-primary {
   width: 100%;
-  padding: 24rpx 32rpx 56rpx;
-  padding-bottom: calc(56rpx + env(safe-area-inset-bottom));
-  background: var(--surface);
-  border-top: 2rpx solid var(--border);
-  box-sizing: border-box;
 }
 
-.submit-btn {
-  width: 100%;
-  padding: 28rpx;
-  border-radius: var(--radius);
-  background: var(--accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 
 .submit-btn text {
   color: var(--surface);
@@ -412,11 +401,6 @@
 }
 
 /* 提交按钮文字颜色 */
-.submit-btn {
-  color: var(--surface);
-  font-size: 30rpx;
-  font-weight: 600;
-}
 
 /* 子选项选中勾选样式 */
 .child-select.selected .check-circle {
@@ -426,7 +410,7 @@
 
 /* 提示卡片颜色修正 */
 .tip-card {
-  color: rgba(139, 113, 23, 0.9);
+  color: rgba(var(--gold-rgb), 0.9);
 }
 
 /* 权益信息高亮行 */
@@ -473,7 +457,7 @@
 
 /* 提示卡片文字颜色 */
 .tip-card {
-  color: rgba(139, 113, 23, 0.9);
+  color: rgba(var(--gold-rgb), 0.9);
 }
 
 
@@ -489,37 +473,36 @@
 }
 
 /* 按钮：胶囊贴纸 */
-.btn, button, .primary-btn, .secondary-btn, .submit-btn, .action-btn {
-  border: 3rpx solid var(--fg) !important;
-  border-radius: 999rpx !important;
-  box-shadow: var(--shadow-hard-sm) !important;
+.btn, button, .primary-btn, .secondary-btn, .action-btn {
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  box-shadow: var(--shadow-hard-sm);
   font-weight: 700;
 }
 .btn-primary, .primary, button[type="primary"], .primary-btn {
-  background: var(--accent) !important;
-  color: #FFFDF7 !important;
+  background: var(--accent);
+  color: var(--surface);
 }
 .btn-secondary, .secondary, .secondary-btn {
-  background: var(--surface) !important;
-  color: var(--fg) !important;
+  background: var(--surface);
+  color: var(--fg);
 }
 .btn:active, button:active, .primary-btn:active, .secondary-btn:active {
   transform: translate(2rpx, 2rpx);
-  box-shadow: none !important;
+  box-shadow: none;
 }
 
 /* 标题圆体 */
-.page-title, .section-title, .card-title, .header-title, .title, .name {
+.page-title, .card-title, .header-title, .title, .name {
   font-family: var(--font-display);
   font-weight: 700;
 }
 
-/* 列表项：卡片化 */
-.list-item, .item, .row, .cell, .info-row {
+.item, .row, .cell {
   background: var(--surface);
   border: 2rpx solid var(--fg);
   border-radius: 24rpx 28rpx 20rpx 30rpx;
-  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
+  box-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.55);
 }
 
 
@@ -533,7 +516,7 @@
 .child-select {
   border: 3rpx solid var(--fg);
   border-radius: 24rpx 28rpx 20rpx 30rpx;
-  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
+  box-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.55);
   background: var(--surface);
 }
 .child-select.selected {
@@ -561,3 +544,10 @@
   border-radius: 20rpx 24rpx 18rpx 26rpx;
   background: var(--surface);
 }
+
+
+/* ===== 2026-09-13 内联样式迁移（机械生成，勿手改） ===== */
+.x-faa900 { min-height: 100vh; padding: 24rpx;
+  /* 2026-09-15：固定底栏改回文档流后，末元素不再被盖，但仍贴页面底 → 补留白 */
+  padding-bottom: calc(60rpx + env(safe-area-inset-bottom)); background: var(--bg); }
+

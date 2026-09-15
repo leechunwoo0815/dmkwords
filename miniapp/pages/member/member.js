@@ -1,11 +1,7 @@
 // pages/member/member.js — 我的（WM6：家长信息 + 孩子切换 + 入口 + 退出）
 const api = require('../../utils/api')
 const session = require('../../utils/session')
-
-const MEMBER_STATUS_TEXT = {
-  none: '未入会', observation: '观察期', pending_evaluation: '待评估',
-  formal: '正式会员', expired: '已过期', withdrawn: '已退会',
-}
+const { MEMBER_STATUS_TEXT } = require('../../utils/labels')
 
 Page({
   data: {
@@ -102,10 +98,26 @@ Page({
     wx.navigateTo({ url: `/pages/order-pkg/refund-apply/refund-apply?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
   // E-20260912-11：退会申请入口（跳退款页并直接展开退会表单）
+  goPurchase() {
+    const c = this.data.currentChild
+    wx.navigateTo({
+      url: `/pages/member-pkg/purchase/purchase?child_id=${c ? c.id : ''}&child_name=${encodeURIComponent(c ? c.name : '')}`,
+    })
+  },
+
+  goPrivacy() {
+    wx.navigateTo({ url: '/pages/agreement/privacy-policy/privacy-policy' })
+  },
+
+  goServiceAgreement() {
+    wx.navigateTo({ url: '/pages/agreement/service-agreement/service-agreement' })
+  },
+
   goWithdraw() {
     const c = this.data.currentChild
     if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return }
-    wx.navigateTo({ url: `/pages/order-pkg/refund-apply/refund-apply?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}&focus=withdraw` })
+    // 2026-09-15：退会独立成页——原先跳退款页并展开退会表单，用户面对两个提交按钮分不清
+    wx.navigateTo({ url: `/pages/order-pkg/withdrawal/withdrawal?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
   goTransfer() {
     wx.navigateTo({ url: '/pages/order-pkg/benefit-transfer/benefit-transfer' })

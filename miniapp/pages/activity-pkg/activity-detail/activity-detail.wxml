@@ -1,18 +1,53 @@
-<view class="page-bg" style="min-height:100vh;" wx:if="{{activity}}">
+<loading-skeleton wx:if="{{loading}}" type="rows" rows="{{4}}" />
+<error-view wx:if="{{loadError}}" type="network" title="加载失败"
+  desc="活动详情加载失败，请重试" bind:onRetry="onRetryLoad" />
+
+<view class="page-bg" wx:if="{{!loading && !loadError && activity}}">
   <!-- RB（插修 17）：hero 有封面显图+深色遮罩保文字，无封面降级纯色渐变 -->
   <view class="hero {{activity.cover_url ? 'hero-cover' : ''}}">
     <image wx:if="{{activity.cover_url}}" src="{{activity.cover_url}}" mode="aspectFill" class="hero-img" />
     <view class="hero-mask"></view>
     <view class="hero-content">
-      <view style="font-size:40rpx;font-weight:700;color:#fff;">{{activity.title}}</view>
-      <view style="color:#e8dfc8;margin-top:12rpx;font-size:26rpx;">
-        {{activity.start_at}} · {{activity.location}}
+      <view class="hero-title">{{activity.title}}</view>
+      <view class="hero-sub">{{activity.start_at}} · {{activity.location}}</view>
+    </view>
+  </view>
+
+  <!-- 2026-09-15 用户需求：入场券码放最上面（到店点开详情就能直接出示扫码），
+       活动信息挪到下面。展示期间屏幕自动调到最亮（见 js 的亮度管理）。 -->
+  <view class="section" wx:if="{{activity.my_enrollment}}">
+    <view class="section-title sec-head">我的入场券</view>
+    <view class="section-body">
+      <view class="qr-section">
+        <!-- PRD §9.2.1：二维码（主）+ Code128 条形码（备）。
+             展示用的是 <image>（canvasToTempFilePath 的产物），不是 canvas 本身——
+             `canvas type="2d"` 是原生层，首帧坐标若早于布局稳定会**停在旧位置且不自愈**
+             （实测画到 hero 封面/按钮上，用户报的"遮挡"真因），改成图片后彻底躲开这一类问题。
+             导出失败时露出券码文本兜底。 -->
+        <view class="qr-canvas-wrap">
+          <image wx:if="{{qrImage}}" class="qr-canvas" src="{{qrImage}}" mode="scaleToFill" />
+          <text wx:else class="qr-fallback">{{activity.my_enrollment.ticket_code}}</text>
+        </view>
+        <view class="bc-canvas-wrap" wx:if="{{bcImage}}">
+          <image class="bc-canvas" src="{{bcImage}}" mode="scaleToFill" />
+        </view>
+        <view class="qr-hint qr-code-line" bindtap="copyTicket">入场券码：{{activity.my_enrollment.ticket_code}}</view>
+        <view class="qr-hint" wx:if="{{activity.my_enrollment.status === 'checked_in'}}">
+          已于 {{checkedInTime}} 签到，欢迎参加
+        </view>
+        <view class="qr-hint" wx:else>活动当天出示此码，馆员扫码签到</view>
+        <view class="qr-hint qr-copy-hint" bindtap="copyTicket">条码扫不出时，点此复制券码</view>
+        <view class="qr-hint qr-bright-hint" wx:if="{{brightnessBoosted}}">已把屏幕调到最亮，离开本页自动恢复</view>
       </view>
+      <!-- 出图用画布：移出可视区（不影响布局、不遮挡、不入镜），只用来生成上面两个图片。
+           尺寸**必须与对应 <image> 的显示尺寸同比例**，否则图片会被拉伸（条形码会糊）。 -->
+      <canvas type="2d" id="ticket-qr" class="draw-canvas draw-canvas-qr"></canvas>
+      <canvas type="2d" id="ticket-bc" class="draw-canvas draw-canvas-bc"></canvas>
     </view>
   </view>
 
   <view class="section">
-    <view class="section-title">活动信息</view>
+    <view class="section-title sec-head">活动信息</view>
     <view class="section-body">
       <view class="info-card">
         <view class="price-row">
@@ -25,33 +60,20 @@
             <text>{{activity.quota_used}} / {{activity.max_quota}}</text>
           </view>
           <view class="capacity-bar">
-            <view class="capacity-hint" style="width: {{activity.quota_used * 100 / activity.max_quota}}%"></view>
+            <view class="cap-fill" style="width: {{activity.quota_used * 100 / activity.max_quota}}%"></view>
           </view>
-          <view class="capacity-hint" style="font-size:22rpx;color:var(--muted);">
+          <view class="capacity-hint">
             {{activity.full ? '已满（可到店咨询）' : '剩余 ' + activity.quota_left + ' 个名额'}}
           </view>
         </view>
-        <view wx:if="{{activity.member_only}}" class="info-row">
-          <text class="info-label">限制</text>
-          <text class="info-value">仅限会员报名</text>
+        <view wx:if="{{activity.member_only}}" class="info-row kv-row">
+          <text class="info-label kv-label">限制</text>
+          <text class="info-value kv-value">仅限会员报名</text>
         </view>
-        <view wx:if="{{activity.description}}" class="info-row">
-          <text class="info-label">介绍</text>
-          <text class="info-value">{{activity.description}}</text>
+        <view wx:if="{{activity.description}}" class="info-row kv-row">
+          <text class="info-label kv-label">介绍</text>
+          <text class="info-value kv-value">{{activity.description}}</text>
         </view>
-      </view>
-    </view>
-  </view>
-
-  <view class="section" wx:if="{{activity.my_enrollment}}">
-    <view class="section-title">我的报名</view>
-    <view class="section-body">
-      <view class="qr-section">
-        <view class="qr-placeholder">
-          <text style="font-size:64rpx;">🎟️</text>
-        </view>
-        <view class="qr-hint">入场券码：{{activity.my_enrollment.ticket_code}}</view>
-        <view class="qr-hint">活动当天出示券码，馆员扫码签到</view>
       </view>
     </view>
   </view>
@@ -64,8 +86,7 @@
     </block>
     <block wx:elif="{{activity.my_enrollment.status === 'enrolled'}}">
       <!-- T5（UX）：一屏一主操作，按 fee 二分——付费走退款链（按钮文案=用户语义
-           原话"取消报名并申请退款"），免费直接取消；后端不变（两链已有）。
-           refund_pending 态由 T4 枚举块显示"退款审核中" disabled -->
+           原话"取消报名并申请退款"），免费直接取消；后端不变（两链已有） -->
       <button class="btn-primary" bindtap="onRefund" wx:if="{{activity.fee !== '0.00'}}">
         取消报名并申请退款
       </button>
@@ -73,6 +94,11 @@
     </block>
     <block wx:elif="{{activity.my_enrollment.status === 'pending_payment'}}">
       <button class="btn-primary" disabled>待馆员确认收款（名额已保留）</button>
+    </block>
+    <!-- 2026-09-15 用户反馈：签到的孩子落到了兜底分支，按钮显示「状态更新中」看不懂
+         ——枚举漏了 checked_in（T4 同族第三例：状态枚举必须与后端六态一一对应） -->
+    <block wx:elif="{{activity.my_enrollment.status === 'checked_in'}}">
+      <button class="btn-primary" disabled>已签到 ✓ 欢迎参加</button>
     </block>
     <!-- T4（枚举错配老毛病）：refund_pending/cancelled 原落 wx:else 兜底裸输出
          英文 status——枚举补齐+兜底防御文案（与 js STATUS_TEXT 表对齐） -->
@@ -83,7 +109,8 @@
       <button class="btn-primary" disabled>已取消</button>
     </block>
     <block wx:else>
-      <button class="btn-primary" disabled>状态更新中</button>
+      <!-- 兜底：真出现未知状态时给出"怎么办"，而不是让人看不懂的"状态更新中" -->
+      <button class="btn-primary" disabled>状态未同步，请下拉刷新或联系馆员</button>
     </block>
   </view>
 </view>

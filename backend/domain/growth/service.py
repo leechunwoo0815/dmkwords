@@ -513,7 +513,21 @@ class QuizService:
             )
             .first()
         )
-        unlocked = bool(progress and progress.finished == 1)
+        # 2026-09-15：**已通过的书必须视为已解锁**。原判定只看 ReadingProgress.finished，
+        # 而词账/测验记录可能早于（或独立于）进度存在 —— 例如榜单/里程碑造数只落词账。
+        # 于是书架「已通过」列表里的书点进详情页反而显示「未开始听 → 已听 0% + 未解锁」，
+        # 与列表自相矛盾（用户实测：3 本已通过里只有 1 本显示 PASSED）。
+        # 通过测验的前提就是听完，所以「有词账」⇒「已解锁」。
+        passed_before = (
+            self.db.query(func.count(WordsLedger.id))
+            .filter(
+                WordsLedger.child_id == child.id,
+                WordsLedger.book_id == book_id,
+                WordsLedger.is_deleted == 0,
+            )
+            .scalar()
+        ) > 0
+        unlocked = bool(progress and progress.finished == 1) or passed_before
         max_attempts = int(ConfigService(self.db).get_value("quiz_max_attempts"))
         used = self._attempts_used(child.id, book_id)
         # 插修10：best_score 是答对题数口径（前端金卡曾显示"最佳成绩 5 分"+一星），
@@ -558,15 +572,6 @@ class QuizService:
             .scalar()
             or 0
         )
-        passed_before = (
-            self.db.query(func.count(WordsLedger.id))
-            .filter(
-                WordsLedger.child_id == child.id,
-                WordsLedger.book_id == book_id,
-                WordsLedger.is_deleted == 0,
-            )
-            .scalar()
-        ) > 0
         if not unlocked:
             status = "locked"
         elif passed_before:

@@ -3,7 +3,8 @@
   min-height: 100vh;
   background: var(--bg);
   box-sizing: border-box;
-  padding: 20rpx 24rpx 60rpx;
+  /* 底部留白 ≥ 自定义 tabBar(100rpx)+安全区：防"到底啦"提示被 tabBar 遮挡 */
+  padding: 20rpx 24rpx calc(160rpx + env(safe-area-inset-bottom));
 }
 
 /* ---------- 搜索 ---------- */
@@ -12,6 +13,8 @@
   display: flex;
   align-items: center;
   gap: 12rpx;
+  min-height: 88rpx;
+  box-sizing: border-box;
   background: var(--surface);
   border: 3rpx solid var(--fg);
   border-radius: 999rpx;
@@ -21,8 +24,8 @@
 .search-icon { font-size: 30rpx; }
 .search-input { flex: 1; font-size: 28rpx; color: var(--fg); }
 .search-clear {
-  width: 40rpx;
-  height: 40rpx;
+  width: 64rpx;
+  height: 64rpx;
   border-radius: 50%;
   background: var(--bg);
   border: 2rpx solid var(--border);
@@ -45,6 +48,8 @@
   display: flex;
   align-items: center;
   gap: 8rpx;
+  min-height: 88rpx;
+  box-sizing: border-box;
   background: var(--surface);
   border: 3rpx solid var(--border);
   border-radius: 999rpx;
@@ -66,8 +71,10 @@
   display: flex;
   align-items: center;
   gap: 8rpx;
+  min-height: 88rpx;
+  box-sizing: border-box;
   background: var(--accent);
-  color: #fff;
+  color: var(--surface);
   border: 3rpx solid var(--fg);
   border-radius: 999rpx;
   padding: 6rpx 20rpx;
@@ -76,6 +83,10 @@
 }
 .chip-x-btn { font-size: 20rpx; opacity: 0.85; }
 .chip-clear {
+  display: flex;
+  align-items: center;
+  min-height: 88rpx;
+  box-sizing: border-box;
   padding: 6rpx 20rpx;
   border-radius: 999rpx;
   border: 3rpx dashed var(--border);
@@ -126,13 +137,19 @@
   font-size: 24rpx;
 }
 .card-body { padding: 16rpx 20rpx 20rpx; }
+/* 2026-09-15：原先 nowrap 单行截断，两列宫格里书名只能显示半截
+   （「Harry Potter and the …」「The Very Hungry Cate…」还断在单词中间）。
+   改两行截断 + 固定两行高，单行标题的卡也不会比双行标题的卡矮、宫格底边对齐。 */
 .card-title {
   font-size: 26rpx;
   font-weight: 700;
   color: var(--fg);
+  line-height: 1.32;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-height: 69rpx;
 }
 .card-author {
   font-size: 22rpx;
@@ -149,12 +166,6 @@
   border-radius: 999rpx;
   font-weight: 700;
 }
-.tag-words { background: rgba(74, 222, 128, 0.14); color: var(--success); }
+.tag-words { background: var(--secondary-soft); color: var(--success); }
 .tag-ar { background: var(--accent-soft); color: var(--accent); }
 
-.no-more {
-  text-align: center;
-  color: var(--muted);
-  font-size: 24rpx;
-  padding: 32rpx 0;
-}

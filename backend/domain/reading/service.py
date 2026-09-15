@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from backend.common.config_service import ConfigService
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
+from backend.common.file_utils import book_cover_url
 from backend.common.notification_models import Notification
 from backend.common.notifications import (
     SCENE_RESERVATION_EXPIRING,
@@ -546,7 +547,7 @@ class ReservationService:
                     "book_id": book.id,
                     "title": book.title,
                     "author": book.author,
-                    "cover_url": f"/api/miniapp/covers/{book.id}" if book.cover_path else None,
+                    "cover_url": book_cover_url(book.id, book.cover_path),
                     "has_audio": bool(book.audio_path),
                     "status": res.status,
                     "expires_at": str(res.expires_at),

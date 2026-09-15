@@ -33,7 +33,7 @@
     </view>
   </view>
 
-  <view wx:else style="padding:80rpx 0;text-align:center;color:var(--muted);font-size:26rpx;">
+  <view class="x-245e15" wx:else>
     暂无订单
   </view>
 </view>

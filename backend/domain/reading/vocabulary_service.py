@@ -11,6 +11,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
+from backend.common.file_utils import book_cover_url
 from backend.domain.catalog.models import Book
 from backend.domain.circulation.models import BorrowRecord
 from backend.domain.identity.models import Child
@@ -56,6 +57,8 @@ class VocabularyService:
                 recorded = True
             if book_id and not existing.book_id:
                 existing.book_id = book_id
+            # 重复查同一个词累加次数（生词本的成就感来源；新词由 default=1 起算）
+            existing.lookup_count = (existing.lookup_count or 0) + 1
         self.db.commit()
         return {
             "word": entry.word,
@@ -66,6 +69,12 @@ class VocabularyService:
         }
 
     def list_words(self, child: Child) -> list[dict]:
+        """生词本列表（含释义/音标/查词次数）。
+
+        2026-09-15：原先只回 word + 来源书名，前端因此只能把「书名单行 + 生词」挤在
+        同一行、同色同字号，且点单词没有任何可弹的东西——而词典（DictionaryWord）
+        的音标/释义/翻译本来就在库。这里一次 join 出去，前端才能做闪卡。
+        """
         rows = (
             self.db.query(Vocabulary)
             .filter(Vocabulary.child_id == child.id, Vocabulary.is_deleted == 0)
@@ -78,16 +87,34 @@ class VocabularyService:
             if book_ids
             else {}
         )
-        return [
+        words = [r.word for r in rows]
+        dicts = (
             {
-                "id": r.id,
-                "word": r.word,
-                "book_id": r.book_id,
-                "source_title": books.get(r.book_id, ""),
-                "created_at": str(r.created_at),
+                e.word: e
+                for e in self.db.query(DictionaryWord).filter(
+                    DictionaryWord.word.in_(words), DictionaryWord.is_deleted == 0
+                )
             }
-            for r in rows
-        ]
+            if words
+            else {}
+        )
+        out: list[dict] = []
+        for r in rows:
+            entry = dicts.get(r.word)
+            out.append(
+                {
+                    "id": r.id,
+                    "word": r.word,
+                    "book_id": r.book_id,
+                    "source_title": books.get(r.book_id, ""),
+                    "lookup_count": r.lookup_count or 1,
+                    "phonetic": (entry.phonetic if entry else "") or "",
+                    "definition": (entry.definition if entry else "") or "",
+                    "translation": (entry.translation if entry else "") or "",
+                    "created_at": str(r.created_at),
+                }
+            )
+        return out
 
     def remove(self, child: Child, vocabulary_id: int) -> None:
         row = (
@@ -127,7 +154,7 @@ class FavoriteService:
                 "author": b.author,
                 "word_count": b.word_count,
                 "ar_level": b.ar_level,
-                "cover_url": f"/api/miniapp/covers/{b.id}" if b.cover_path else None,
+                "cover_url": book_cover_url(b.id, b.cover_path),
                 "has_audio": bool(b.audio_path),
                 "off_shelf": b.status != Book.STATUS_ON,
                 "created_at": str(f.created_at),
@@ -199,7 +226,7 @@ class ShelfService:
                 "title": b.title,
                 "author": b.author,
                 "word_count": b.word_count,
-                "cover_url": f"/api/miniapp/covers/{b.id}" if b.cover_path else None,
+                "cover_url": book_cover_url(b.id, b.cover_path),
                 "has_audio": bool(b.audio_path),
                 "borrowed_at": str(r.borrowed_at),
                 "due_at": str(r.due_at),

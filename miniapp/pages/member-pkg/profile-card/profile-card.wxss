@@ -57,7 +57,7 @@
   color: var(--surface);
   position: relative;
   overflow: hidden;
-  box-shadow: 0 16rpx 64rpx rgba(44, 74, 110, 0.25);
+  box-shadow: 0 16rpx 64rpx var(--sky-soft);
 }
 
 /* Decorative circles (replacing CSS pseudo-elements) */
@@ -72,7 +72,7 @@
   right: -60rpx;
   width: 280rpx;
   height: 280rpx;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--white-ghost);
 }
 
 .deco-bottom {
@@ -80,7 +80,7 @@
   left: -40rpx;
   width: 200rpx;
   height: 200rpx;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(var(--surface-rgb), 0.04);
 }
 
 /* Card Header */
@@ -97,8 +97,8 @@
   width: 136rpx;
   height: 136rpx;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
-  border: 6rpx solid rgba(255, 255, 255, 0.3);
+  background: rgba(var(--surface-rgb), 0.15);
+  border: 6rpx solid rgba(var(--surface-rgb), 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -149,7 +149,7 @@
   font-size: 44rpx;
   font-weight: 800;
   color: var(--surface);
-  box-shadow: 0 8rpx 24rpx rgba(141, 102, 16, 0.35);
+  box-shadow: 0 8rpx 24rpx rgba(var(--warning-rgb), 0.35);
 }
 
 .level-text {
@@ -176,7 +176,7 @@
   display: flex;
   gap: 0;
   margin-bottom: 40rpx;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(var(--surface-rgb), 0.1);
   border-radius: 32rpx;
   position: relative;
   z-index: 1;
@@ -186,7 +186,7 @@
   flex: 1;
   text-align: center;
   padding: 28rpx 16rpx;
-  border-right: 2rpx solid rgba(255, 255, 255, 0.1);
+  border-right: 2rpx solid rgba(var(--surface-rgb), 0.1);
 }
 
 .stat-item:last-child {
@@ -222,7 +222,7 @@
   flex: 1;
   text-align: center;
   padding: 20rpx 12rpx;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(var(--surface-rgb), 0.1);
   border-radius: 20rpx;
 }
 
@@ -241,7 +241,7 @@
 /* Divider */
 .card-divider {
   height: 2rpx;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(var(--surface-rgb), 0.12);
   margin-bottom: 32rpx;
   position: relative;
   z-index: 1;
@@ -320,7 +320,7 @@
   width: 48rpx;
   height: 48rpx;
   border-radius: 12rpx;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--white-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -393,7 +393,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: rgba(38, 36, 25, 0.8);
+  background: rgba(var(--fg-rgb), 0.8);
   padding: 28rpx 48rpx;
   border-radius: 32rpx;
   font-size: 28rpx;
@@ -431,28 +431,28 @@
 }
 
 /* 按钮：胶囊贴纸 */
-.btn, button, .primary-btn, .secondary-btn, .submit-btn, .action-btn {
-  border: 3rpx solid var(--fg) !important;
-  border-radius: 999rpx !important;
-  box-shadow: var(--shadow-hard-sm) !important;
+.btn, button, .primary-btn, .secondary-btn, .action-btn {
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  box-shadow: var(--shadow-hard-sm);
   font-weight: 700;
 }
 .btn-primary, .primary, button[type="primary"], .primary-btn {
-  background: var(--accent) !important;
-  color: #FFFDF7 !important;
+  background: var(--accent);
+  color: var(--surface);
 }
 .btn-secondary, .secondary, .secondary-btn {
-  background: var(--surface) !important;
-  color: var(--fg) !important;
+  background: var(--surface);
+  color: var(--fg);
 }
 .btn:active, button:active, .primary-btn:active, .secondary-btn:active {
   transform: translate(2rpx, 2rpx);
-  box-shadow: none !important;
+  box-shadow: none;
 }
 
 /* 标签/徽章：圆角贴纸 */
 .tag, .badge, .pill, .tag-primary, .tag-secondary, .tag-success, .tag-warning {
-  border: 2rpx solid rgba(59, 47, 47, 0.6);
+  border: 2rpx solid rgba(var(--fg-rgb), 0.6);
   border-radius: 999rpx;
   font-weight: 700;
 }
@@ -462,17 +462,16 @@
 .tag-warning, .badge-warning { background: var(--warning-soft); color: var(--warning-dark); }
 
 /* 标题圆体 */
-.page-title, .section-title, .card-title, .header-title, .title, .name {
+.page-title, .card-title, .header-title, .title, .name {
   font-family: var(--font-display);
   font-weight: 700;
 }
 
-/* 列表项：卡片化 */
-.list-item, .item, .row, .cell, .info-row {
+.item, .row, .cell {
   background: var(--surface);
   border: 2rpx solid var(--fg);
   border-radius: 24rpx 28rpx 20rpx 30rpx;
-  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
+  box-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.55);
 }
 
 /* WM14-A：我的成就入口（晒成就常驻入口） */
@@ -509,3 +508,13 @@
   font-size: 40rpx;
   color: var(--muted);
 }
+
+
+/* ===== 2026-09-13 内联样式迁移（机械生成，勿手改） ===== */
+.x-8928aa { font-size: 44rpx; font-weight: 700; }
+.x-158c51 { margin: 24rpx; text-align: center; color: var(--muted); }
+.x-1595cd { margin: 24rpx; }
+.x-bc7dc8 { font-size: 28rpx; font-weight: 600; margin-bottom: 16rpx; color: var(--fg); }
+.x-255591 { background: var(--surface); border-radius: 16rpx; padding: 20rpx 24rpx; margin-bottom: 12rpx; display: flex; justify-content: space-between; }
+.x-0c7277 { color: var(--accent); font-weight: 600; }
+

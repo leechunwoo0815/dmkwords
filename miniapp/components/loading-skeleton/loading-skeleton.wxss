@@ -40,5 +40,32 @@
   background: var(--surface);
   border: 2rpx solid var(--fg);
   border-radius: 24rpx 28rpx 20rpx 30rpx;
-  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
+  box-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.55);
+}
+
+/* 网格变体（2026-09-13 新增）：书目类 2 列卡片页的加载骨架 */
+.skeleton-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+}
+.skeleton-card {
+  width: calc((100% - 20rpx) / 2);
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-hard-sm);
+  overflow: hidden;
+  padding-bottom: 16rpx;
+}
+.skeleton-card-cover {
+  height: 340rpx;
+  margin-bottom: 12rpx;
+  background: linear-gradient(90deg, var(--bg) 25%, #f4efe2 50%, var(--bg) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+.skeleton-card .skeleton-line {
+  margin: 0 20rpx 12rpx;
 }

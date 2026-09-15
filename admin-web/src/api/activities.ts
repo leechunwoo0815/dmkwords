@@ -47,6 +47,16 @@ export interface CreateActivityBody {
   enroll_deadline?: string;
 }
 
+export interface ActivityDetail extends ActivityItem {
+  enrolled_count: number;   // 已缴费待参加（status=enrolled）
+  pending_count: number;    // 待收款（status=pending_payment）
+  checked_in_count: number; // 已签到
+  quota_used: number;       // 占位总数（含待收款，后端 ACTIVE_STATUSES 口径）
+  quota_left: number;
+  full: boolean;
+  created_at?: string;
+}
+
 export function apiListActivities(params?: {
   status?: string;
   keyword?: string;
@@ -74,7 +84,17 @@ export function apiListEnrollments(activityId: number): Promise<EnrollmentItem[]
   return request(`/api/admin/activities/${activityId}/enrollments`);
 }
 
-export function apiSignin(ticketCode: string): Promise<{ enrollment_id: number; checked_in_at: string }> {
+export interface SigninResult {
+  enrollment_id: number;
+  child_id: number;
+  // PRD §9.2.1 门店连扫：回执要能当场确认"签的是谁、哪场活动"
+  child_name: string | null;
+  activity_title: string;
+  ticket_code: string;
+  checked_in_at: string;
+}
+
+export function apiSignin(ticketCode: string): Promise<SigninResult> {
   return request("/api/admin/activity-signin", {
     method: "POST", body: JSON.stringify({ ticket_code: ticketCode }),
   });
@@ -93,9 +113,7 @@ export function apiReviewActivityRefund(
 }
 
 // T45（FEAT-082）：详情/编辑/封面上传
-export function apiGetActivityDetail(id: number): Promise<ActivityItem & {
-  enrolled_count: number; pending_count: number; checked_in_count: number;
-}> {
+export function apiGetActivityDetail(id: number): Promise<ActivityDetail> {
   return request(`/api/admin/activities/${id}`);
 }
 

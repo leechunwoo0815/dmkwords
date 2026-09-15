@@ -1,5 +1,7 @@
 /* pages/circle/share.wxss — 晒成就页（绘本风设计令牌） */
 .page {
+  min-height: 100vh;
+  box-sizing: border-box;
   background: var(--bg);
 }
 
@@ -34,7 +36,7 @@
 }
 .tab.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--surface);
   border-color: var(--fg);
 }
 
@@ -52,11 +54,6 @@
 .empty-icon {
   font-size: 90rpx;
   margin-bottom: 20rpx;
-}
-.empty-text {
-  color: var(--muted);
-  font-size: 26rpx;
-  line-height: 1.6;
 }
 
 .card-list {
@@ -150,7 +147,7 @@
   border-radius: 40rpx;
   border: 3rpx solid var(--fg);
   background: var(--accent);
-  color: #fff;
+  color: var(--surface);
   font-size: 28rpx;
   font-weight: 700;
 }

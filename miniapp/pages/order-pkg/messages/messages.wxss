@@ -7,16 +7,22 @@
 }
 
 /* ---------- 分类 chips ---------- */
+/* 2026-09-15：分类共 8 个（全部/资金/借阅/阅读/会员/活动/预约/报告），
+   一行横排必然溢出——即便收到最窄，最后 1~2 个 chip 也会被切到只剩半个字，
+   看着像布局坏了（用户视角）。改成 4×2 网格：8 个分类全部可见、无横滑歧义。 */
 .cat-tabs {
   display: flex;
-  gap: 14rpx;
-  overflow-x: auto;
-  padding: 4rpx 2rpx 20rpx;
-  white-space: nowrap;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  padding: 4rpx 0 20rpx;
 }
 .cat-tab {
-  flex-shrink: 0;
-  padding: 12rpx 32rpx;
+  /* 25% - 9rpx 会算成正好等于容器宽，浮点误差把第 4 个挤到下一行（3+3+2）；
+     -10rpx 留 4rpx 余量 → 稳定 4+4 */
+  flex: 0 0 calc(25% - 10rpx);
+  box-sizing: border-box;
+  text-align: center;
+  padding: 12rpx 0;
   border-radius: 999rpx;
   background: var(--surface);
   border: 3rpx solid var(--border);
@@ -27,7 +33,7 @@
 .cat-tab.active {
   background: var(--accent);
   border-color: var(--fg);
-  color: #fff;
+  color: var(--surface);
   box-shadow: var(--shadow-hard-sm);
 }
 
@@ -51,7 +57,7 @@
 }
 .unread-num {
   background: var(--accent);
-  color: #fff;
+  color: var(--surface);
   font-size: 22rpx;
   font-weight: 800;
   min-width: 40rpx;
@@ -91,10 +97,10 @@
   background: var(--accent-soft);
   color: var(--accent);
 }
-.cat-money { background: rgba(74, 222, 128, 0.16); color: var(--success); }
-.cat-borrow { background: rgba(96, 165, 250, 0.16); color: var(--sky); }
-.cat-member { background: rgba(167, 139, 250, 0.16); color: var(--lavender); }
-.cat-activity { background: rgba(244, 114, 182, 0.16); color: var(--sakura); }
+.cat-money { background: var(--success-soft); color: var(--success); }
+.cat-borrow { background: var(--sky-soft); color: var(--sky); }
+.cat-member { background: var(--lavender-soft); color: var(--lavender); }
+.cat-activity { background: var(--sakura-soft); color: var(--sakura); }
 .msg-title {
   flex: 1;
   min-width: 0;
@@ -135,5 +141,5 @@
   margin-top: 12rpx;
   font-size: 28rpx;
   font-weight: 700;
-  color: #f2935b;
+  color: var(--accent-light);
 }

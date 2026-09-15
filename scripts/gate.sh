@@ -71,6 +71,8 @@ run python scripts/check_miniapp_bindings.py
 run python scripts/check_docs_code_alignment.py
 # E-20260912-09：RBAC 三方一致对账（宪法 §五.2 承诺项——声明/后端引用/前端引用）
 run python scripts/check_rbac_consistency.py
+# E-20260913：小程序风格基准（令牌/内联样式/同义类/孤儿文件/JSON 值域；不能替代目视截图）
+run python scripts/check_miniapp_style.py
 
 step 6 "数据库迁移一致性"
 # 首个迁移文件创建后启用：

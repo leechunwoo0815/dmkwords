@@ -142,8 +142,8 @@
 }
 
 .today-card.checked {
-  border-color: rgba(53, 112, 60, 0.3);
-  background: rgba(53, 112, 60, 0.04);
+  border-color: var(--success-soft);
+  background: var(--success-soft);
 }
 
 .today-card .tc-icon {
@@ -158,11 +158,11 @@
 }
 
 .today-card.checked .tc-icon {
-  background: rgba(53, 112, 60, 0.1);
+  background: var(--success-soft);
 }
 
 .today-card.unchecked .tc-icon {
-  background: rgba(141, 102, 16, 0.1);
+  background: rgba(var(--warning-rgb), 0.1);
 }
 
 .today-card .tc-info {
@@ -499,8 +499,8 @@
 .streak-banner .streak-num {
   font-family: var(--font-display);
   font-weight: 800;
-  color: #FFFDF7;
-  text-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.45);
+  color: var(--surface);
+  text-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.45);
 }
 
 /* 日历卡：粗黑边 + 手绘圆角 */
@@ -513,10 +513,10 @@
 
 /* 统计小卡贴纸 */
 .streak-stats .ss-item {
-  border: 2rpx solid rgba(59, 47, 47, 0.6);
+  border: 2rpx solid rgba(var(--fg-rgb), 0.6);
   border-radius: 20rpx 24rpx 18rpx 26rpx;
   background: var(--surface);
-  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.35);
+  box-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.35);
 }
 
 /* ============================================
@@ -526,21 +526,21 @@
 .streak-banner .streak-num {
   font-size: 120rpx;
   line-height: 1;
-  color: #FFFDF7;
-  text-shadow: 4rpx 4rpx 0 rgba(59, 47, 47, 0.45);
+  color: var(--surface);
+  text-shadow: 4rpx 4rpx 0 rgba(var(--fg-rgb), 0.45);
 }
 
 .streak-banner .streak-label {
   font-size: 32rpx;
   font-weight: 700;
-  color: #FFFDF7;
+  color: var(--surface);
   opacity: 1;
   margin-top: 12rpx;
 }
 
 .streak-banner .streak-sub {
   font-size: 28rpx;
-  color: #FFFDF7;
+  color: var(--surface);
   opacity: 0.95;
   margin-top: 12rpx;
   font-weight: 600;
@@ -555,3 +555,10 @@
   opacity: 1;
   font-weight: 600;
 }
+
+
+/* ===== 2026-09-13 内联样式迁移（机械生成，勿手改） ===== */
+.x-cb307e { min-height: 100vh; padding: 24rpx; }
+.x-f0c0b3 { font-size: 32rpx; font-weight: 600; color: var(--fg); }
+.x-9a915c { font-weight: 800; color: var(--surface); font-size: 40rpx; }
+.x-43089c { margin-top: 24rpx; color: var(--muted); font-size: 24rpx; text-align: center; }

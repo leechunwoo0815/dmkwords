@@ -20,6 +20,8 @@ Page({
     borrowCount: 0,
     favCount: 0,
     resCount: 0,
+    passedBooks: [],
+    passedCount: 0,
     childId: null,
     childName: '',
     loading: true,
@@ -44,10 +46,12 @@ Page({
   async load() {
     this.setData({ loading: true })
     try {
-      const [borrows, favorites, reservations] = await Promise.all([
+      const [borrows, favorites, reservations, passedBooks] = await Promise.all([
         api.currentBorrows(this.data.childId).catch(() => []),
         api.listFavorites(this.data.childId).catch(() => []),
         api.listReservations(this.data.childId).catch(() => []),
+        // 已通过清单（2026-09-15）：独立接口按词账枚举，不受「当前是否在架」限制
+        api.passedBooks(this.data.childId).catch(() => []),
       ])
       // T43（U2）：在借+收藏书批量拉测验状态——passed 挂金色 🏆 角标
       let passedIds = []
@@ -79,6 +83,8 @@ Page({
           active: r.status === 'active',
         })),
         resCount: (reservations || []).length,
+        passedBooks: media.formatBooks(passedBooks || []),
+        passedCount: (passedBooks || []).length,
       })
     } finally {
       this.setData({ loading: false })

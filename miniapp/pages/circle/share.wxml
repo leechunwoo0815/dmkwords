@@ -1,4 +1,4 @@
-<view class="page" style="min-height:100vh;">
+<view class="page">
   <!-- 晒卡成功态：展示生成的成就卡片 -->
   <block wx:if="{{sharedPost}}">
     <view class="success-wrap">
@@ -26,13 +26,11 @@
         bindtap="onTab">已晒（{{shared.length}}）</view>
     </view>
 
-    <view wx:if="{{loading}}" class="loading-wrap">加载中…</view>
+    <loading-skeleton wx:if="{{loading}}" type="rows" rows="{{4}}" />
 
     <block wx:if="{{!loading && tab === 'available'}}">
-      <view wx:if="{{!available.length}}" class="empty-state">
-        <view class="empty-icon">🌱</view>
-        <view class="empty-text">还没有可晒的新成就——读完一本书、测个满分，回来第一个晒！</view>
-      </view>
+      <empty-state wx:if="{{!available.length}}" icon="🌱"
+        title="还没有可晒的新成就" desc="读完一本书、测个满分，回来第一个晒！" />
       <view class="card-list">
         <view wx:for="{{available}}" wx:key="index" class="ach-card"
           data-card="{{item}}" bindtap="onShareCard">

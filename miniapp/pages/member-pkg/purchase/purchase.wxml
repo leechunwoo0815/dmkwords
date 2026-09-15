@@ -1,0 +1,35 @@
+<view class="page-bg">
+  <view class="head-hint">会员方案与价格以到店公示为准；本页办理引导不涉及在线支付。</view>
+
+  <view class="plan-card">
+    <view class="plan-badge">观察期会员</view>
+    <view class="plan-price">价格以到店公示为准</view>
+    <view class="plan-feats">
+      <view class="plan-feat">🌱 面向新入会孩子的适应期方案</view>
+      <view class="plan-feat">📖 到店借阅 + 线上听读测验全功能</view>
+      <view class="plan-feat">⏱ 到期后可转正式会员（馆方核定）</view>
+    </view>
+  </view>
+
+  <view class="plan-card">
+    <view class="plan-badge plan-badge-gold">正式会员</view>
+    <view class="plan-price">价格以到店公示为准</view>
+    <view class="plan-feats">
+      <view class="plan-feat">📚 全馆藏书借阅额度与预约</view>
+      <view class="plan-feat">🏆 等级/积分/榜单/护照完整成长体系</view>
+      <view class="plan-feat">👨‍👩‍👧 馆内活动优先报名</view>
+    </view>
+  </view>
+
+  <view class="store-card">
+    <view class="store-title">到店 / 联系馆员办理</view>
+    <view class="store-line">① 携孩子到店，由馆员核定方案与价格</view>
+    <view class="store-line">② 到店支付或按馆方指引完成缴费</view>
+    <view class="store-line">③ 馆员确认收款后，会员状态在小程序内生效</view>
+    <view class="store-line store-soft">会员资格以到店核验为准，本页不展示与存储任何会员状态。</view>
+  </view>
+
+  <view class="pay-wrap">
+    <pay-button amount="{{0}}" buttonText="到店办理会员" bind:pay="onStoreGuide" />
+  </view>
+</view>

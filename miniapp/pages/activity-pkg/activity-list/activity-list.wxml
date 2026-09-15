@@ -1,21 +1,17 @@
-<view class="page-bg" style="min-height:100vh;">
-  <view class="top-bar">
-    <view class="tabs">
-      <view class="tab {{tab === 'upcoming' ? 'active' : ''}}" data-tab="upcoming" bindtap="onTab">可报名</view>
-      <view class="tab {{tab === 'mine' ? 'active' : ''}}" data-tab="mine" bindtap="onTab">我的报名</view>
-    </view>
+<view class="page-bg">
+  <view class="tabs">
+    <view class="tab {{tab === 'upcoming' ? 'active' : ''}}" data-tab="upcoming" bindtap="onTab">可报名</view>
+    <view class="tab {{tab === 'mine' ? 'active' : ''}}" data-tab="mine" bindtap="onTab">我的报名</view>
   </view>
 
-  <view wx:if="{{loading && !loadError}}" class="loading-wrap">加载中…</view>
+  <loading-skeleton wx:if="{{loading && !loadError}}" type="rows" rows="{{3}}" />
 
   <error-view wx:if="{{loadError}}" type="network" title="加载失败"
     desc="活动列表加载失败，请重试" bind:onRetry="onRetryLoad" />
 
   <block wx:if="{{!loading && !loadError && tab === 'upcoming'}}">
-    <view wx:if="{{!activities.length}}" class="empty-state">
-      <view class="empty-icon">🎪</view>
-      <view class="empty-text">近期没有活动，敬请期待</view>
-    </view>
+    <empty-state wx:if="{{!activities.length}}" icon="🎪" title="近期没有活动"
+      desc="有新活动会第一时间在这里发布" />
     <view class="activity-list">
       <view wx:for="{{activities}}" wx:key="id" class="activity-card" data-id="{{item.id}}" bindtap="goDetail">
         <view class="activity-banner banner-{{index % 3}}">
@@ -40,10 +36,8 @@
   </block>
 
   <block wx:if="{{!loading && !loadError && tab === 'mine'}}">
-    <view wx:if="{{!myEnrollments.length}}" class="empty-state">
-      <view class="empty-icon">🎟️</view>
-      <view class="empty-text">还没有报名，去「可报名」看看</view>
-    </view>
+    <empty-state wx:if="{{!myEnrollments.length}}" icon="🎟️" title="还没有报名"
+      desc="去「可报名」看看有什么好玩的" />
     <view class="activity-list">
       <view wx:for="{{myEnrollments}}" wx:key="id" class="activity-card">
         <view class="activity-body">

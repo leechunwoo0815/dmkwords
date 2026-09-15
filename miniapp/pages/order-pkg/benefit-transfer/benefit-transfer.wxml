@@ -1,4 +1,4 @@
-<view class="page" style="min-height:100vh;padding:24rpx;background:var(--bg);">
+<view class="page x-faa900">
   <view class="tip-card">
     <text class="tip-icon">💡</text>
     <text class="tip-text">把大孩的会员剩余时间转给二孩：年费不退、到期日直接继承；词数/等级/积分/打卡各是各的（排行榜不失真）。押金不转，各缴各的。</text>
@@ -11,7 +11,7 @@
         class="check-item {{sourceId === item.id ? 'active' : ''}}"
         data-id="{{item.id}}" bindtap="onPickSource">
         <view class="name">{{item.name}}</view>
-        <view class="meta">{{item.member_status}}</view>
+        <view class="meta">{{item.memberLabel}}</view>
         <view class="check-circle">{{sourceId === item.id ? '✓' : ''}}</view>
       </view>
     </view>
@@ -24,7 +24,7 @@
         class="check-item {{targetId === item.id ? 'active' : ''}}"
         data-id="{{item.id}}" bindtap="onPickTarget">
         <view class="name">{{item.name}}</view>
-        <view class="meta">{{item.member_status}}</view>
+        <view class="meta">{{item.memberLabel}}</view>
         <view class="check-circle">{{targetId === item.id ? '✓' : ''}}</view>
       </view>
     </view>
@@ -37,7 +37,7 @@
       <text class="check-text">{{item.name}}</text>
     </view>
     <view class="submit-wrap" wx:if="{{conditions.length}}">
-      <button class="submit-btn" bindtap="onSubmit" disabled="{{!allOk}}">
+      <button class="btn-primary" bindtap="onSubmit" disabled="{{!allOk}}">
         {{allOk ? '提交转让申请' : '条件不全，暂不能提交'}}
       </button>
     </view>

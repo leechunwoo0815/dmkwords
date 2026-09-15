@@ -131,7 +131,15 @@ def test_signin_and_refund_matrix(client: TestClient):
     # 签到
     s = client.post("/api/admin/activity-signin", json={"ticket_code": ticket}, headers=h)
     assert s.status_code == 200
-    assert s.json()["checked_in_at"]
+    body = s.json()
+    assert body["checked_in_at"]
+    # 门店连扫回执（PRD §9.2.1）：当场要说清"签的是谁、哪场活动"
+    assert body["child_name"] == "签到孩"
+    assert body["activity_title"] == "读书会"
+    assert body["ticket_code"] == ticket
+    # 重复扫 → 幂等提示（不重复写签到时间）
+    dup = client.post("/api/admin/activity-signin", json={"ticket_code": ticket}, headers=h)
+    assert dup.status_code == 409
     # 已签到 → 退款被拒
     r = client.post(
         f"/api/miniapp/enrollments/{eid}/refund-apply", json={"child_id": c1["id"]}, headers=m1

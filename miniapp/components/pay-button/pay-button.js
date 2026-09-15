@@ -1,3 +1,6 @@
+// iOS 合规：isIOS 统一走 utils/platform（唯一平台判定实现，2026-09-13 去重）
+const { isIOS } = require('../../utils/platform');
+
 Component({
   properties: {
     amount: { type: Number, value: 0 },
@@ -9,10 +12,7 @@ Component({
   },
   lifetimes: {
     attached() {
-      try {
-        var windowInfo = wx.getWindowInfo();
-        this.setData({ isIOS: windowInfo.platform === 'ios' });
-      } catch (e) {}
+      this.setData({ isIOS: isIOS() });
     }
   },
   methods: {

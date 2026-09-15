@@ -169,6 +169,18 @@ def withdrawal_list(child_id: int, auth: Any = Depends(get_current_parent)):
     return WithdrawalService(db).my_list(child)
 
 
+@router.get("/withdrawals/{request_id}/settlement")
+def withdrawal_settlement(request_id: int, child_id: int, auth: Any = Depends(get_current_parent)):
+    """本次退会「能退哪些费用」（2026-09-15 用户需求）。
+
+    家长端退会页只提退会申请；**审核通过后**由后端把自动排查出的可退费用明细
+    展示给家长（数据来自审核时真实生成的退款单，不是估算）。
+    """
+    parent, db = auth
+    child = child_of_parent(db, parent.id, child_id)
+    return WithdrawalService(db).my_settlement(child, request_id)
+
+
 class WithdrawalCancelRequest(BaseSchema):
     child_id: int
 

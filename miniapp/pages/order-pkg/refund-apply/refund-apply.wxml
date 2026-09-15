@@ -1,5 +1,5 @@
-<view class="page-bg" style="min-height:100vh;padding:24rpx;">
-  <view style="font-size:28rpx;font-weight:600;margin-bottom:16rpx;color:var(--fg);">
+<view class="page-bg x-cb307e">
+  <view class="x-bc7dc8">
     {{childName}} · 申请退款
   </view>
 
@@ -7,13 +7,12 @@
 
   <view class="selector-card" wx:if="{{!loading}}">
     <view class="card-h3">选择要退的订单（已支付）</view>
-    <view wx:if="{{!orders.length}}" class="empty-text" style="padding:20rpx 0;color:var(--muted);">
+    <view wx:if="{{!orders.length}}" class="empty-text x-4fdf3d">
       没有可退款的订单
     </view>
-    <view wx:for="{{orders}}" wx:key="id" class="info-row" data-order="{{item}}" bindtap="onPick"
-      style="padding:16rpx 0;border-bottom:1rpx solid var(--border);">
-      <view class="info-label">{{item.typeText}}</view>
-      <view class="info-value">￥{{item.amount}}</view>
+    <view wx:for="{{orders}}" wx:key="id" class="info-row x-3fde25" data-order="{{item}}" bindtap="onPick">
+      <view class="info-label kv-label">{{item.typeText}}</view>
+      <view class="info-value kv-value">￥{{item.amount}}</view>
       <view style="font-size:22rpx;color:{{item.status === 'paid' ? 'var(--success)' : 'var(--muted)'}};">
         {{item.statusText}}
       </view>
@@ -27,7 +26,7 @@
     <textarea class="reason-textarea" placeholder="如：孩子时间安排变化…" value="{{reason}}"
       bindinput="onReason" maxlength="200" />
     <view class="submit-wrap">
-      <button class="submit-btn {{preview.calc.mode === 'zero' ? 'submit-btn-disabled' : ''}}"
+      <button class="btn-primary {{preview.calc.mode === 'zero' ? 'btn-disabled' : ''}}"
         disabled="{{preview.calc.mode === 'zero'}}" bindtap="onSubmit">提交退款申请</button>
       <view wx:if="{{preview.calc.mode === 'zero'}}" class="zero-tip">当前订单无可退金额，无法提交退款申请</view>
     </view>
@@ -35,53 +34,22 @@
 
   <view class="tip-card" wx:if="{{refunds.length}}">
     <view class="card-h3">退款记录</view>
-    <view wx:for="{{refunds}}" wx:key="id" style="padding:14rpx 0;border-bottom:1rpx solid var(--border);">
-      <view style="display:flex;justify-content:space-between;align-items:center;">
+    <view class="x-718442" wx:for="{{refunds}}" wx:key="id">
+      <view class="x-510ea6">
         <text>￥{{item.amount}}</text>
         <text style="color:{{item.status === 'approved' ? 'var(--success)' : item.status === 'rejected' ? 'var(--error)' : item.status === 'cancelled' ? 'var(--muted)' : 'var(--warning)'}};">
           {{item.status === 'pending' ? '审核中' : item.status === 'approved' ? '已退款' : item.status === 'cancelled' ? '已撤销' : '已拒绝'}}
         </text>
       </view>
-      <view wx:if="{{item.review_remark}}" style="font-size:24rpx;color:var(--muted);margin-top:6rpx;">
+      <view class="x-be6535" wx:if="{{item.review_remark}}">
         审核意见：{{item.review_remark}}
       </view>
       <!-- W5 撤销入口：仅 pending 可撤（已审结/已失效不显示按钮） -->
-      <view wx:if="{{item.status === 'pending'}}" style="margin-top:12rpx;display:flex;justify-content:flex-end;">
+      <view class="x-ac2bd5" wx:if="{{item.status === 'pending'}}">
         <button class="cancel-refund-btn" size="mini" data-id="{{item.id}}" bindtap="onCancelRefund">撤销申请</button>
       </view>
     </view>
   </view>
 
-  <!-- R-313/E-20260912-11：家长端退会入口（此前 api 已有 applyWithdrawal/myWithdrawals 但全仓零调用
-       → 家长根本发不起退会，docs/04 WM10 第 2 步只能靠脚本） -->
-  <view class="tip-card">
-    <view class="card-h3">退会</view>
-    <view style="font-size:24rpx;color:var(--muted);margin-bottom:12rpx;">
-      退会后会员权益终止；审核期间借书/预约等功能冻结。押金按实际余额退还，已产生的赔偿优先扣除。
-    </view>
-    <view wx:if="{{!wdOpen}}" style="display:flex;justify-content:flex-end;">
-      <button class="cancel-refund-btn" size="mini" bindtap="onOpenWithdraw">申请退会</button>
-    </view>
-    <view wx:else>
-      <textarea class="reason-textarea" placeholder="退会原因（必填）" value="{{wdReason}}"
-        bindinput="onWdReason" maxlength="200" />
-      <view class="submit-wrap">
-        <button class="submit-btn" bindtap="onSubmitWithdraw">提交退会申请</button>
-      </view>
-    </view>
-    <view wx:if="{{withdrawals.length}}" style="margin-top:16rpx;">
-      <view wx:for="{{withdrawals}}" wx:key="id" style="padding:14rpx 0;border-bottom:1rpx solid var(--border);">
-        <view style="display:flex;justify-content:space-between;align-items:center;">
-          <text>退会申请</text>
-          <text style="color:{{item.status === 'completed' ? 'var(--success)' : (item.status === 'rejected' || item.status === 'cancelled') ? 'var(--muted)' : 'var(--warning)'}};">{{item.statusText}}</text>
-        </view>
-        <view wx:if="{{item.review_remark}}" style="font-size:24rpx;color:var(--muted);margin-top:6rpx;">
-          审核意见：{{item.review_remark}}
-        </view>
-        <view wx:if="{{item.status === 'applying'}}" style="margin-top:12rpx;display:flex;justify-content:flex-end;">
-          <button class="cancel-refund-btn" size="mini" data-id="{{item.id}}" bindtap="onCancelWithdrawal">撤销申请</button>
-        </view>
-      </view>
-    </view>
-  </view>
+
 </view>

@@ -47,4 +47,12 @@ Page({
       this.setData({ submitting: false })
     }
   },
+
+  goServiceAgreement() {
+    wx.navigateTo({ url: '/pages/agreement/service-agreement/service-agreement' })
+  },
+
+  goPrivacy() {
+    wx.navigateTo({ url: '/pages/agreement/privacy-policy/privacy-policy' })
+  },
 })

@@ -1,0 +1,60 @@
+<view class="page-bg wd-page">
+  <view class="wd-head">{{childName}} · 申请退会</view>
+
+  <view class="tip-card">
+    <text class="tip-icon">💡</text>
+    <text class="tip-text">退会后会员权益终止；审核期间借书、预约等功能冻结。押金按实际余额退还，已产生的赔偿优先扣除。审核通过后，系统会自动排查当前可退的费用并列在下方。</text>
+  </view>
+
+  <!-- 申请区：有进行中的申请就不给再提交（避免重复单） -->
+  <view class="card" wx:if="{{!hasActive && !loading}}">
+    <view class="card-h3">退会原因（必填）</view>
+    <textarea class="reason-textarea" placeholder="如：搬家、孩子时间安排变化…" value="{{reason}}"
+      bindinput="onReason" maxlength="200" />
+    <view class="submit-wrap">
+      <button class="btn-primary" bindtap="onSubmit">提交退会申请</button>
+    </view>
+  </view>
+
+  <!-- 我的退会申请 -->
+  <view class="card" wx:if="{{list.length}}">
+    <view class="card-h3">我的退会申请</view>
+    <view class="wd-item" wx:for="{{list}}" wx:key="id">
+      <view class="wd-item-head">
+        <text class="wd-status wd-{{item.status}}">{{item.status_text}}</text>
+        <text class="wd-time">{{item.created_at}}</text>
+      </view>
+      <view class="wd-reason">退会原因：{{item.reason}}</view>
+      <view class="wd-remark" wx:if="{{item.review_remark}}">审核意见：{{item.review_remark}}</view>
+
+      <!-- 审核通过后展示「能退哪些费用」（后端自动排查结果） -->
+      <view class="wd-settle" wx:if="{{item.settlement && item.settlement.settled}}">
+        <view class="wd-settle-title">本次可退费用</view>
+        <view class="wd-settle-row" wx:for="{{item.settlement.items}}" wx:for-item="fee" wx:key="order_no">
+          <view class="wd-fee-main">
+            <text class="wd-fee-rule">{{fee.rule}}</text>
+            <text class="wd-fee-no" wx:if="{{fee.order_no}}">{{fee.order_no}}</text>
+          </view>
+          <view class="wd-fee-right">
+            <text class="wd-fee-amount">￥{{fee.amount}}</text>
+            <text class="wd-fee-status">{{fee.status_text}}</text>
+          </view>
+        </view>
+        <view class="wd-settle-total">
+          <text>合计可退</text>
+          <text class="wd-total-amount">￥{{item.settlement.total}}</text>
+        </view>
+      </view>
+      <view class="wd-settle-hint" wx:elif="{{item.status === 'applying'}}">审核通过后这里会列出可退费用</view>
+
+      <view class="wd-actions" wx:if="{{item.can_cancel}}">
+        <button class="cancel-refund-btn" size="mini" data-id="{{item.id}}" bindtap="onCancel">撤销申请</button>
+      </view>
+    </view>
+  </view>
+
+  <empty-state wx:if="{{!loading && !list.length}}" icon="📋" title="还没有退会申请"
+    desc="提交后馆里会人工审核，审核期间借书与预约会冻结" />
+
+  <view wx:if="{{loading}}" class="loading-tip">加载中…</view>
+</view>

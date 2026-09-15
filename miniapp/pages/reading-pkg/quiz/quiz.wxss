@@ -33,17 +33,17 @@
 
 .option.selected .option-letter {
   background: var(--accent);
-  color: white;
+  color: var(--surface);
 }
 
 .option.correct .option-letter {
   background: var(--success);
-  color: white;
+  color: var(--surface);
 }
 
 .option.wrong .option-letter {
   background: var(--error);
-  color: white;
+  color: var(--surface);
 }
 
 /* check-icon */
@@ -118,7 +118,7 @@
   opacity: 0.5;
 }
 
-.submit-btn {
+.quiz-submit {
   flex: 1;
   padding: 28rpx;
   border-radius: var(--radius);
@@ -313,8 +313,8 @@
 }
 
 .feedback.selected {
-  background: rgba(44, 74, 110, 0.1);
-  color: var(--accent, #FF6B35);
+  background: var(--sky-soft);
+  color: var(--accent, var(--accent));
 }
 
 /* Footer */
@@ -333,7 +333,7 @@
   right: 0;
   bottom: 0;
   z-index: 50;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(var(--fg-rgb), 0.4);
   /* 显隐由 wx:if 控制（showConfirm），不能默认 display:none——否则节点出现也不可见 */
   display: flex;
   align-items: center;
@@ -348,7 +348,7 @@
   width: calc(100% - 96rpx);
   max-width: 680rpx;
   text-align: center;
-  box-shadow: 0 24rpx 80rpx rgba(0, 0, 0, 0.15);
+  box-shadow: 0 24rpx 80rpx rgba(var(--fg-rgb), 0.15);
 }
 
 .cd-emoji {
@@ -409,8 +409,8 @@
   padding: 6rpx 20rpx;
   font-size: 24rpx;
   font-weight: normal;
-  color: var(--primary, #2f6b8a);
-  background: rgba(47, 107, 138, 0.1);
+  color: var(--primary, var(--sky));
+  background: var(--sky-soft);
   border-radius: 24rpx;
 }
 
@@ -428,27 +428,27 @@
 }
 .options .option:active {
   transform: translate(3rpx, 3rpx);
-  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+  box-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.85);
 }
 
 /* 选中：太阳黄 + 按下 */
 .option.selected {
-  background: var(--sun-soft) !important;
-  border-color: var(--fg) !important;
-  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+  background: var(--sun-soft) ;
+  border-color: var(--fg) ;
+  box-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.85);
   transform: translate(3rpx, 3rpx);
 }
 /* 正确：嫩芽绿贴纸 */
 .option.correct {
-  background: var(--secondary-soft) !important;
-  border-color: var(--secondary-ink) !important;
-  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+  background: var(--secondary-soft) ;
+  border-color: var(--secondary-ink) ;
+  box-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.85);
 }
 /* 错误：番茄红贴纸 */
 .option.wrong {
-  background: var(--error-soft) !important;
-  border-color: var(--error) !important;
-  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85);
+  background: var(--error-soft) ;
+  border-color: var(--error) ;
+  box-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.85);
 }
 
 /* 选项字母：圆贴纸 */
@@ -466,7 +466,7 @@
   overflow: hidden;
 }
 .quiz-progress-fill {
-  background: linear-gradient(90deg, var(--accent), var(--accent-light)) !important;
+  background: linear-gradient(90deg, var(--accent), var(--accent-light)) ;
 }
 
 /* v5 增补：引导按钮 */
@@ -477,8 +477,12 @@
   border: 3rpx solid var(--fg);
   border-radius: 999rpx;
   box-shadow: var(--shadow-hard-sm);
-  color: #fff;
+  color: var(--surface);
   font-size: 28rpx;
   font-weight: 700;
   padding: 16rpx 64rpx;
 }
+
+
+/* ===== 2026-09-13 内联样式迁移（机械生成，勿手改） ===== */
+.x-dc4dd1 { background: var(--border); color: var(--fg); }

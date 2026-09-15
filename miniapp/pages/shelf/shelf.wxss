@@ -7,19 +7,23 @@
 }
 
 /* ---------- Tab 头 ---------- */
+/* 2026-09-15：加了第 4 个页签「已通过」后，内容宽 4×200+3×16=848rpx > 可用 686rpx
+   → 最后一个会被切掉（与 messages 分类条同族）。改等分自适应，4 个都完整可见。 */
 .tab-head {
   display: flex;
-  gap: 16rpx;
+  gap: 12rpx;
   margin-bottom: 24rpx;
 }
 .tab-item {
+  flex: 1;
+  justify-content: center;
   display: flex;
   align-items: center;
-  gap: 10rpx;
+  gap: 8rpx;
   background: var(--surface);
   border: 3rpx solid var(--border);
   border-radius: 999rpx;
-  padding: 14rpx 32rpx;
+  padding: 14rpx 8rpx;
   font-size: 28rpx;
   color: var(--muted);
   font-weight: 600;
@@ -27,7 +31,7 @@
 .tab-on {
   background: var(--accent);
   border-color: var(--fg);
-  color: #fff;
+  color: var(--surface);
   box-shadow: var(--shadow-hard-sm);
 }
 .tab-badge {
@@ -44,7 +48,7 @@
   padding: 0 6rpx;
   box-sizing: border-box;
 }
-.tab-on .tab-badge { background: #fff; color: var(--accent); }
+.tab-on .tab-badge { background: var(--surface); color: var(--accent); }
 
 /* ---------- 资产卡 ---------- */
 .asset-card {
@@ -73,13 +77,17 @@
   font-size: 52rpx;
 }
 .asset-info { flex: 1; min-width: 0; }
+/* 2026-09-15：原 nowrap 单行截断 → 「Harry Potter and the Sorce…」；
+   改两行截断，配合下面收窄的按钮列，书名可以完整显示 */
 .asset-title {
   font-size: 28rpx;
   font-weight: 700;
   color: var(--fg);
+  line-height: 1.32;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .asset-meta { font-size: 22rpx; color: var(--muted); margin-top: 4rpx; }
 .due-pill {
@@ -88,38 +96,41 @@
   font-size: 20rpx;
   padding: 4rpx 16rpx;
   border-radius: 999rpx;
-  background: rgba(96, 165, 250, 0.14);
+  background: var(--sky-soft);
   color: var(--sky);
   font-weight: 700;
 }
-.due-ok { background: rgba(74, 222, 128, 0.14); color: var(--success); }
-.due-over { background: rgba(239, 68, 68, 0.12); color: var(--error); }
+.due-ok { background: var(--success-soft); color: var(--success); }
+.due-over { background: var(--error-soft); color: var(--error); }
 .asset-tags { display: flex; gap: 8rpx; margin-top: 10rpx; }
 .tag { font-size: 18rpx; padding: 2rpx 14rpx; border-radius: 999rpx; font-weight: 700; }
-.tag-words { background: rgba(74, 222, 128, 0.14); color: var(--success); }
+.tag-words { background: var(--success-soft); color: var(--success); }
 .tag-ar { background: var(--accent-soft); color: var(--accent); }
 
 /* ---------- 操作按钮 ---------- */
+/* 2026-09-15：原先 10/24rpx 内边距 + 3rpx 边 + 700 字重，按钮列宽到 ~166rpx，
+   视觉重量压过书名（用户：按钮过大/过长）。收窄到 ~88rpx 宽，
+   省下的横向空间留给书名放两行。 */
 .asset-actions {
   display: flex;
   flex-direction: column;
-  gap: 12rpx;
+  gap: 10rpx;
   flex-shrink: 0;
 }
 .btn-mini {
   font-size: 22rpx;
-  font-weight: 700;
+  font-weight: 600;
   text-align: center;
-  padding: 10rpx 24rpx;
+  padding: 8rpx 18rpx;
   border-radius: 999rpx;
-  border: 3rpx solid var(--border);
+  border: 2rpx solid var(--border);
   background: var(--surface);
   color: var(--fg);
 }
 .btn-main {
   background: var(--accent);
   border-color: var(--fg);
-  color: #fff;
+  color: var(--surface);
   box-shadow: var(--shadow-hard-sm);
 }
 
@@ -130,7 +141,7 @@
   border: 3rpx solid var(--fg);
   border-radius: 999rpx;
   box-shadow: var(--shadow-hard-sm);
-  color: #fff;
+  color: var(--surface);
   font-size: 26rpx;
   font-weight: 700;
   padding: 14rpx 48rpx;
@@ -150,7 +161,7 @@
   line-height: 44rpx;
   text-align: center;
   font-size: 28rpx;
-  background: rgba(255, 215, 0, 0.92);
+  background: var(--gold);
   border-radius: 50%;
-  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2rpx 6rpx rgba(var(--fg-rgb), 0.25);
 }

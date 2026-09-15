@@ -1,5 +1,5 @@
 <view class="page">
-  <view wx:if="{{loading && !profile}}" class="loading-wrap">加载中…</view>
+  <loading-skeleton wx:if="{{loading && !profile}}" type="rows" rows="{{3}}" />
   <error-view wx:if="{{loadError}}" type="network" title="加载失败"
     desc="名片加载失败，请重试" bind:onRetry="onRetryLoad" />
 
@@ -33,7 +33,7 @@
 
     <!-- 勋章墙 -->
     <view class="section">
-      <view class="section-title">勋章墙</view>
+      <view class="section-title sec-head">勋章墙</view>
       <view wx:if="{{profile.badges.length}}" class="badge-wall">
         <view wx:for="{{profile.badges}}" wx:key="badge_id" class="badge">
           <image class="badge-icon" src="{{item.iconUrl}}" mode="aspectFit" />
@@ -45,7 +45,7 @@
 
     <!-- TA 晒过的成就 -->
     <view class="section">
-      <view class="section-title">TA 晒过的成就</view>
+      <view class="section-title sec-head">TA 晒过的成就</view>
       <view wx:if="{{posts.length}}" class="mini-feed">
         <view wx:for="{{posts}}" wx:key="id" class="mini-post">
           <view class="mini-text">

@@ -38,7 +38,7 @@
   </view>
 
   <view class="quiz-footer" wx:if="{{status !== 'locked' && status !== 'failed'}}">
-    <view wx:if="{{current > 0}}" class="next-btn" style="background:var(--border);color:var(--fg)" bindtap="onPrev">上一题</view>
+    <view wx:if="{{current > 0}}" class="next-btn x-dc4dd1" bindtap="onPrev">上一题</view>
     <view class="next-btn" bindtap="onNext">
       {{current === questions.length - 1 ? '提交测验' : '下一题'}}
     </view>

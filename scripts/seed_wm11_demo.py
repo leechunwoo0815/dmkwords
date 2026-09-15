@@ -146,7 +146,11 @@ def _ensure_demo_books(db: Session) -> None:
     让图书馆/详情/预约/借阅/测验链路都有像样的测试数据。按 ISBN 幂等。"""
     from backend.common.file_storage import _mp3_duration
     from backend.domain.catalog.models import Book, BookCopy, QuizQuestion
-    from scripts.seed_demo_library import make_questions
+    from scripts.seed_demo_library import (
+        gen_cover,
+        make_questions,
+        store_cover,
+    )
 
     for isbn, title, author, words, ar, grade, topic, audio_isbn in DEMO_BOOKS:
         # 查重含软删行（ISBN 唯一索引不含 is_deleted，软删行会挡 INSERT——C50 同族）：
@@ -156,7 +160,14 @@ def _ensure_demo_books(db: Session) -> None:
             if existing.is_deleted:
                 existing.is_deleted = 0
                 existing.status = Book.STATUS_ON
-                db.flush()
+            # 2026-09-15：存量行缺封面当场补。这 5 本由本函数建，而 seed 链里
+            # seed_demo_library 的「缺封面补齐」跑在**本函数之前** → 它们的封面
+            # 从来没人补，前端一直落 📕 emoji 兜底（图书馆首屏全是红小人书）。
+            if not existing.cover_path:
+                existing.cover_path = store_cover(
+                    existing, gen_cover(title, author, existing.id, topic)
+                )
+            db.flush()
             continue
         audio_rel = f"book_audio/{audio_isbn}/audio.mp3"
         try:
@@ -180,6 +191,8 @@ def _ensure_demo_books(db: Session) -> None:
         )
         db.add(book)
         db.flush()
+        # 建书即给封面（同 seed_demo_library 口径）——否则本批书永久无封面
+        book.cover_path = store_cover(book, gen_cover(title, author, book.id, topic))
         for seq in (1, 2):
             db.add(
                 BookCopy(
@@ -799,6 +812,57 @@ def _ensure_demo_t41_data(db: Session, child) -> None:
         _ensure_demo_deposit(db, dep_kid)
 
 
+def _ensure_demo_vocabulary(db: Session, child) -> None:
+    """生词本演示造数（2026-09-15，用户点名样板）。
+
+    原状：演示孩只有 'ham'（词典里没有该词条 → 闪卡空白）+ 'adventure' 两条、
+    查词次数全是 1，页面看不到统计。这里补一组**词典内已有的词**，来自不同来源书、
+    查词次数成梯度（5/4/3/2/1），让「我查过 5 次」这类积累感在演示里真实可见。
+
+    幂等：已存在的词只补词典缺失项，不动 lookup_count（否则每次 seed 都会洗掉真实使用）。
+    """
+    from backend.domain.reading.models import DictionaryWord, Vocabulary
+
+    wanted = [
+        ("animal", 1, 5),
+        ("bird", 2, 4),
+        ("beautiful", 3, 3),
+        ("brave", 4, 2),
+        ("bread", 5, 1),
+        ("birthday", 6, 1),
+    ]
+    # 'ham' 是历史遗留生词但词典无词条（查得到词却弹不出释义）——补上
+    if not db.query(DictionaryWord).filter(DictionaryWord.word == "ham").first():
+        db.add(
+            DictionaryWord(
+                word="ham",
+                phonetic="/hæm/",
+                definition="meat from a pig's leg",
+                translation="n. 火腿",
+            )
+        )
+        db.flush()
+    for word, book_id, count in wanted:
+        has_dict = (
+            db.query(DictionaryWord)
+            .filter(DictionaryWord.word == word, DictionaryWord.is_deleted == 0)
+            .first()
+        )
+        if not has_dict:
+            continue  # 词典没有就不造生词，避免出现「点了没释义」的空卡
+        row = (
+            db.query(Vocabulary)
+            .filter(Vocabulary.child_id == child.id, Vocabulary.word == word)
+            .first()
+        )
+        if row:
+            if row.is_deleted:
+                row.is_deleted = 0
+            continue
+        db.add(Vocabulary(child_id=child.id, word=word, book_id=book_id, lookup_count=count))
+    db.flush()
+
+
 def _ensure_activity_covers(db: Session) -> None:
     """R4（插修 15）：双演示活动补绘本风封面（gen_cover 同款；幂等——
     cover_path 非空跳过）。轮播 cover_path.isnot(None) 命中→首页有真数据。"""
@@ -806,12 +870,14 @@ def _ensure_activity_covers(db: Session) -> None:
 
     from backend.common.file_storage import _uploads_root
     from backend.domain.activity.models import Activity
-    from scripts.seed_demo_library import gen_cover
+    from scripts.seed_demo_library import gen_activity_banner
 
     acts = db.query(Activity).filter(Activity.is_deleted == 0, Activity.cover_path.is_(None)).all()
     os.makedirs(os.path.join(_uploads_root(), "cover", "activity"), exist_ok=True)
     for i, a in enumerate(acts):
-        data = gen_cover(a.title, "DmkWords 演示", i, "线下活动")
+        # 2026-09-15：改用**横版专用图**（900x320，无字）。原先拿竖版封面裁进 2.81:1 横条，
+        # 实测 devtools 的 aspectFill **不是居中裁切** → 热气球/云被切在横条顶缘（用户截图）。
+        data = gen_activity_banner(i)
         rel = f"cover/activity/{a.id}_{secrets.token_hex(6)}.jpg"
         with open(os.path.join(_uploads_root(), rel), "wb") as f:
             f.write(data)
@@ -1046,6 +1112,46 @@ def _seed_passed_book(db: Session, child, book, words_at: datetime) -> None:
     db.flush()
 
 
+def _ensure_ledger_attempts(db: Session) -> int:
+    """不变式自愈：**每条词账行都要有一条已通过的测验记录**。
+
+    为什么需要（2026-09-15，用户实测「测验通过但最佳成绩 0 分」）：
+    `get_quiz` 判 passed 看的是 `WordsLedger`（词数已入账＝通过），而 `best_percent`
+    看的是 `QuizAttempt` —— 只要有人只插词账不插 attempt，详情页就会渲染出
+    「PASSED + 最佳成绩 0 分 + 1 星」这种自相矛盾的画面。榜单演示段（`_ensure_demo_circle_rank`）
+    曾经就是这样的插入点。与其在各插入点各补一次，不如收尾统一对账自愈。
+    幂等：已有 attempt（含软删，避免复活语义打架）则跳过。
+    返回补造条数。
+    """
+    from backend.domain.growth.models import QuizAttempt, WordsLedger
+
+    created = 0
+    rows = db.query(WordsLedger).filter(WordsLedger.is_deleted == 0).all()
+    for w in rows:
+        exists = (
+            db.query(QuizAttempt)
+            .filter(QuizAttempt.child_id == w.child_id, QuizAttempt.book_id == w.book_id)
+            .first()
+        )
+        if exists:
+            continue
+        db.add(
+            QuizAttempt(
+                child_id=w.child_id,
+                book_id=w.book_id,
+                score=4,
+                total_questions=5,
+                passed=1,
+                snapshot="[]",
+                submitted_at=(w.created_at or datetime.now()) - timedelta(hours=2),
+            )
+        )
+        created += 1
+    if created:
+        db.flush()
+    return created
+
+
 def _resync_all_growth_states(db: Session) -> None:
     """收尾全量重算成长汇总（防漂移，WM4-10 验收盘点发现）。
 
@@ -1217,6 +1323,38 @@ def _ensure_wm4_10_acceptance_data(db: Session) -> None:
     elif act:
         print("c 活动报名三态跳过：演示活动已开始（重跑 seed 可重建）", flush=True)
 
+    # ②b 门店连扫验收补数（2026-09-15，PRD §9.2.1 / docs/04 S8"连扫 5 张"）
+    #     免费活动（无订单，enroll 即 enrolled）预置 5 个已报名孩子，店主验收时不必现场造数。
+    #     只补"没有报名"的，**不回滚已签到状态**——把 checked_in 改回 enrolled 会让门店
+    #     连扫看起来"永远能签"，掩盖真实行为，不做。
+    act_free = (
+        db.query(Activity)
+        .filter(Activity.title == "亲子共读体验课（演示）", Activity.is_deleted == 0)
+        .first()
+    )
+    if act_free and act_free.start_at > datetime.now():
+        for kid_name in ("演示孩", "押金孩", "观察期孩", "临期孩", "过期孩"):
+            kid = db.query(Child).filter(Child.name == kid_name, Child.is_deleted == 0).first()
+            if kid is None:
+                continue
+            exists = (
+                db.query(ActivityEnrollment)
+                .filter(
+                    ActivityEnrollment.activity_id == act_free.id,
+                    ActivityEnrollment.child_id == kid.id,
+                    ActivityEnrollment.is_deleted == 0,
+                )
+                .first()
+            )
+            if exists:
+                continue
+            try:
+                ActivityService(db).enroll(kid, act_free.id)
+            except Exception as exc:  # 免费活动理论上不拒；拒了就跳过并留痕，不阻断 seed
+                print(f"c 连扫验收补数跳过 {kid_name}: {exc}", flush=True)
+    elif act_free:
+        print("c 连扫验收补数跳过：免费活动已开始（重跑 seed 可重建）", flush=True)
+
     # ③ 过期孩在借（担保语义：过期仅在借书可听）
     expired_kid = _kid(wm3_parent.id, "过期孩", Child.MEMBER_EXPIRED)
     has_active_borrow = (
@@ -1379,7 +1517,7 @@ def _ensure_demo_circle_rank(db: Session) -> None:
     from datetime import timedelta as _td
 
     from backend.domain.catalog.models import Book
-    from backend.domain.growth.models import WordsLedger
+    from backend.domain.growth.models import QuizAttempt, WordsLedger
     from backend.domain.identity.models import Child
     from backend.domain.reading_circle.models import CircleRankSnapshot
     from backend.domain.reading_circle.snapshot_service import CircleSnapshotService
@@ -1426,6 +1564,32 @@ def _ensure_demo_circle_rank(db: Session) -> None:
         if not avail:
             continue
         book = avail[0] if size == "big" else avail[-1]
+        words_at = _dt.combine(day, _time(10, 0))
+        # 2026-09-15：词账行必须配一条**已通过**的测验记录，否则不变式被打破——
+        # get_quiz 的 status 判「passed」看的是 WordsLedger（词数已入账＝通过），
+        # 而 best_percent 看的是 QuizAttempt。只插词账不插 attempt → 详情页显示
+        # 「PASSED / 最佳成绩 0 分 / 1 星」自相矛盾（用户实测截图）。
+        if not (
+            db.query(QuizAttempt)
+            .filter(
+                QuizAttempt.child_id == child.id,
+                QuizAttempt.book_id == book.id,
+                QuizAttempt.is_deleted == 0,
+            )
+            .first()
+        ):
+            db.add(
+                QuizAttempt(
+                    child_id=child.id,
+                    book_id=book.id,
+                    score=4,
+                    total_questions=5,
+                    passed=1,
+                    snapshot="[]",
+                    submitted_at=words_at - _td(hours=2),
+                )
+            )
+            db.flush()
         db.execute(
             mysql_insert(WordsLedger)
             .values(
@@ -1433,7 +1597,7 @@ def _ensure_demo_circle_rank(db: Session) -> None:
                 book_id=book.id,
                 word_count=book.word_count,
                 source="quiz",
-                created_at=_dt.combine(day, _time(10, 0)),
+                created_at=words_at,
             )
             .prefix_with("IGNORE")
         )
@@ -1784,6 +1948,7 @@ def seed() -> None:
             _ensure_demo_growth(db, demo_child)
             _ensure_demo_quiz_journey(db, demo_child)
             _ensure_demo_fav_reservation(db, demo_child)
+            _ensure_demo_vocabulary(db, demo_child)
         _ensure_demo_activity(db)
         _ensure_demo_wm3_states(db)
         # 逾期借阅依赖演示孩（if 块内造）；押金孩依赖 WM3 家长（wm3_states 造）——
@@ -2057,6 +2222,10 @@ def seed() -> None:
             _upsert_notification(db, parent, **item)
         # 收尾：全量重算成长汇总（此后不再插词账——保证 state 与流水一致）
         _resync_all_growth_states(db)
+        # 收尾：词账 ↔ 测验记录对账自愈（防「已通过但 0 分」这类自相矛盾的详情页）
+        healed = _ensure_ledger_attempts(db)
+        if healed:
+            print(f"c 词账↔测验对账：补造 {healed} 条缺失的通过记录", flush=True)
         db.commit()
         print(
             "WM11 演示数据重建完成：通知 19 条（未读 10 / 已读 9；8 分类全覆盖；"

@@ -8,7 +8,7 @@
 .ring-avatar {
   display: block;
   border-radius: 50%;
-  background: #fffdf7;
+  background: var(--surface, #fffdf7);
 }
 
 .ring-frame {

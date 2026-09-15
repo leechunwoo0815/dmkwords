@@ -49,7 +49,7 @@
   box-shadow: var(--shadow-hard-sm);
   font-weight: 700;
   background: var(--accent);
-  color: #FFFDF7;
+  color: var(--surface);
 }
 .empty-state .empty-btn:active {
   transform: translate(2rpx, 2rpx);

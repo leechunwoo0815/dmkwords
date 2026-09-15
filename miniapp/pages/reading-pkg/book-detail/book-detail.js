@@ -32,6 +32,8 @@ Page({
     quizAttemptsLeft: 0,
     quizMaxAttempts: 3,
     quizStars: 0,
+    quizHasScore: false,
+    quizUnlocked: false,
     cheerText: '',
   },
 
@@ -122,10 +124,14 @@ Page({
       this.setData({
         quizStatus: q.status,
         quizBest: bestPercent,
+        // 2026-09-15：词账已入账而测验记录缺失时曾渲染「PASSED + 最佳成绩 0 分 + 1 星」
+        // 自相矛盾（用户实测）。无成绩就不编数字——星级与分数只在真有成绩时呈现。
+        quizHasScore: bestPercent > 0,
+        quizUnlocked: !!q.unlocked,
         quizAttemptsUsed: q.attempts_used || 0,
         quizAttemptsLeft: q.attempts_left || 0,
         quizMaxAttempts: q.max_attempts || 3,
-        quizStars: q.status === 'passed' ? this._starsOf(bestPercent) : 0,
+        quizStars: q.status === 'passed' && bestPercent > 0 ? this._starsOf(bestPercent) : 0,
         cheerText: q.status === 'passed' ? QUIZ_CHEERS[Math.floor(Math.random() * QUIZ_CHEERS.length)] : '',
       })
     } catch (e) { /* 静默：拉不到则徽章区隐藏（quizStatus 空） */ }
@@ -205,8 +211,15 @@ Page({
   },
 
   onQuiz() {
-    const { book, childId, childName, progress } = this.data
+    const { book, childId, childName, progress, quizStatus } = this.data
     if (!childId) { wx.showToast({ title: '请先选择孩子', icon: 'none' }); return }
+    // 2026-09-15（用户实测两种错法）：这个入口在已通过时叫「看成绩单」，
+    // 但它原来①只认**本地播放进度**，词账已入账/已通过却没有本地进度的书会被
+    // 「需先听完音频（95%）」拦住 ②有进度时跳的是**测验页**（显示"你已经通过啦"），
+    // 都不是成绩单。已通过就直接去成绩单页（同一本书，入口与结果一致）。
+    if (quizStatus === 'passed') {
+      this.onQuizCard(); return
+    }
     if (!progress || !progress.finished) {
       wx.showToast({ title: '需先听完音频（95%）才解锁测验', icon: 'none' }); return
     }

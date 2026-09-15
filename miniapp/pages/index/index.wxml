@@ -54,7 +54,7 @@
 
   <!-- 续听卡：在借第一本 + 真实进度 -->
   <view class="section" wx:if="{{currentChild && continueBook}}">
-    <view class="section-title">🎧 继续听</view>
+    <view class="section-title h-section">🎧 继续听</view>
     <view class="continue-card" bindtap="goContinue">
       <image class="continue-cover" src="{{continueBook.cover_url}}" mode="aspectFill" />
       <view class="continue-info">
@@ -88,7 +88,7 @@
   <!-- 今日推荐：真实书目横滑 -->
   <view class="section" wx:if="{{recommend.length}}">
     <view class="section-head">
-      <text class="section-title">📖 今日推荐</text>
+      <text class="section-title h-section">📖 今日推荐</text>
       <text class="section-more" bindtap="goMoreBooks">全部 ›</text>
     </view>
     <scroll-view class="rec-scroll" scroll-x enhanced show-scrollbar="{{false}}">
@@ -112,7 +112,7 @@
 
   <!-- 快捷入口 2x4 -->
   <view class="section" wx:if="{{currentChild}}">
-    <view class="section-title">🚀 快捷入口</view>
+    <view class="section-title h-section">🚀 快捷入口</view>
     <view class="entry-grid">
       <view class="entry" bindtap="goMoreBooks">
         <view class="entry-icon e-orange">📖</view><text class="entry-name">图书馆</text>

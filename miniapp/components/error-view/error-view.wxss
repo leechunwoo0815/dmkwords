@@ -53,23 +53,23 @@
    绘本风精修（v3 2026-08-30）— 覆盖块，勿删
    ============================================ */
 /* 按钮：胶囊贴纸 */
-.btn, button, .primary-btn, .secondary-btn, .submit-btn, .action-btn {
-  border: 3rpx solid var(--fg) !important;
-  border-radius: 999rpx !important;
-  box-shadow: var(--shadow-hard-sm) !important;
+.btn, .primary-btn, .secondary-btn, .action-btn {
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  box-shadow: var(--shadow-hard-sm);
   font-weight: 700;
 }
-.btn-primary, .primary, button[type="primary"], .primary-btn {
-  background: var(--accent) !important;
-  color: #FFFDF7 !important;
+.btn-primary, .primary, .primary-btn {
+  background: var(--accent);
+  color: var(--surface);
 }
 .btn-secondary, .secondary, .secondary-btn {
-  background: var(--surface) !important;
-  color: var(--fg) !important;
+  background: var(--surface);
+  color: var(--fg);
 }
-.btn:active, button:active, .primary-btn:active, .secondary-btn:active {
+.btn:active, .primary-btn:active, .secondary-btn:active {
   transform: translate(2rpx, 2rpx);
-  box-shadow: none !important;
+  box-shadow: none;
 }
 
 /* 标题圆体 */

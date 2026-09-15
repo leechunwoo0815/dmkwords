@@ -532,3 +532,163 @@ def test_observation_report_upload_and_view(client: TestClient):
         headers=h,
     )
     assert r2.status_code == 422
+
+
+def _pay_activity(client, h, child_id):
+    """建一场活动并为其下单收款（activity_fee 单必须带 activity_id）。"""
+    from datetime import datetime, timedelta
+
+    a = client.post(
+        "/api/admin/activities",
+        json={
+            "title": "退款扫描测试活动",
+            "start_at": (datetime.now() + timedelta(days=5)).isoformat(),
+            "max_quota": 10,
+            "fee": 50,
+        },
+        headers=h,
+    ).json()
+    o = client.post(
+        "/api/admin/orders",
+        json={"child_id": child_id, "order_type": "activity_fee", "activity_id": a["id"]},
+        headers=h,
+    ).json()
+    client.post(
+        f"/api/admin/orders/{o['id']}/confirm-payment", json={"pay_method": "scan"}, headers=h
+    )
+    return o
+
+
+def test_withdrawal_sweeps_all_refundable_orders(client: TestClient):
+    """2026-09-15（用户裁定边界）：退会＝自动触发**所有**规则内可退款项。
+
+    原先 _settle_items 只结算「会员费订单 + 押金」，活动费等其它已支付订单要家长
+    再单独走退款流程 —— 与「只要申请退会就该把能退的都退掉」的预期不符。
+    本测试锁死：活动费订单也进退会结算单（各自单独成单，便于逐单审核执行）。
+    """
+    h = _h(client)
+    p, [c], mini = _mk_parent_with_children(client, h, "13800001007", ["扫款孩"])
+    _pay(client, h, c["id"], "observation_fee")
+    act = _pay_activity(client, h, c["id"])
+    do = client.post(f"/api/admin/deposits/children/{c['id']}/orders", headers=h).json()
+    client.post(
+        f"/api/admin/orders/{do['order_id']}/confirm-payment",
+        json={"pay_method": "scan"},
+        headers=h,
+    )
+    r = client.post(
+        "/api/miniapp/withdrawals",
+        json={"child_id": c["id"], "reason": "搬家"},
+        headers=mini,
+    )
+    assert r.status_code == 200, r.text
+    ok = client.post(
+        f"/api/admin/withdrawals/{r.json()['id']}/review",
+        json={"approve": True, "remark": "同意"},
+        headers=h,
+    )
+    assert ok.status_code == 200, ok.text
+    pend = client.get("/api/admin/refund-requests?status=pending", headers=h).json()
+    mine = [x for x in pend if x["child_id"] == c["id"]]
+    types = sorted(x.get("order_type") for x in mine if x["kind"] == "order")
+    # 会员费 + 活动费都在；押金单独一项（不得因押金单同表而被退两遍）
+    assert "observation_fee" in types, f"退会结算漏了会员费：{types}"
+    assert "activity_fee" in types, f"退会结算漏了活动费：{types}"
+    assert types.count("deposit") == 0, f"押金单不应作为订单项（避免重复退）：{types}"
+    assert len([x for x in mine if x["kind"] == "deposit"]) == 1
+    act_req = next(x for x in mine if x.get("order_type") == "activity_fee")
+    assert act_req["order_id"] == act["id"]
+    assert float(act_req["amount"]) == 50.0
+
+
+def test_withdrawal_skips_order_with_existing_refund(client: TestClient):
+    """退会结算不得与独立退款流程叠加重复退：已有在办/已退退款单的订单要跳过。"""
+    h = _h(client)
+    p, [c], mini = _mk_parent_with_children(client, h, "13800001008", ["重复孩"])
+    _pay(client, h, c["id"], "observation_fee")
+    act = _pay_activity(client, h, c["id"])
+    # 先就活动费走一次独立退款申请（pending）
+    applied = client.post(
+        "/api/miniapp/refund-requests",
+        json={"child_id": c["id"], "order_id": act["id"], "reason": "先退活动费"},
+        headers=mini,
+    )
+    assert applied.status_code == 200, applied.text
+    r = client.post(
+        "/api/miniapp/withdrawals",
+        json={"child_id": c["id"], "reason": "再退会"},
+        headers=mini,
+    )
+    assert r.status_code == 200, r.text
+    ok = client.post(
+        f"/api/admin/withdrawals/{r.json()['id']}/review",
+        json={"approve": True, "remark": "同意"},
+        headers=h,
+    )
+    assert ok.status_code == 200, ok.text
+    pend = client.get("/api/admin/refund-requests?status=pending", headers=h).json()
+    dup = [
+        x
+        for x in pend
+        if x["child_id"] == c["id"] and x["kind"] == "order" and x.get("order_id") == act["id"]
+    ]
+    assert len(dup) == 1, f"活动费被结算重复计入：{dup}"
+
+
+def test_parent_can_view_withdrawal_settlement_after_approval(client: TestClient):
+    """2026-09-15 用户需求：退会页只提申请、不预先罗列费用；
+
+    **审核通过后**由后端把自动排查出的可退费用明细展示给家长。
+    本测试锁死这条口径：审核前 settled=False（前端据此提示"通过后列出"），
+    审核后返回真实结算单（来自审核时生成的退款单，不是估算）。
+    """
+    h = _h(client)
+    p, [c], mini = _mk_parent_with_children(client, h, "13800001009", ["结算可见孩"])
+    _pay(client, h, c["id"], "observation_fee")
+    _pay_activity(client, h, c["id"])
+    do = client.post(f"/api/admin/deposits/children/{c['id']}/orders", headers=h).json()
+    client.post(
+        f"/api/admin/orders/{do['order_id']}/confirm-payment",
+        json={"pay_method": "scan"},
+        headers=h,
+    )
+    applied = client.post(
+        "/api/miniapp/withdrawals", json={"child_id": c["id"], "reason": "结算测试"}, headers=mini
+    )
+    assert applied.status_code == 200, applied.text
+    wid = applied.json()["id"]
+    url = f"/api/miniapp/withdrawals/{wid}/settlement?child_id={c['id']}"
+
+    before = client.get(url, headers=mini).json()
+    assert before["settled"] is False, "审核前不应预先罗列费用"
+    assert before["items"] == []
+
+    ok = client.post(
+        f"/api/admin/withdrawals/{wid}/review",
+        json={"approve": True, "remark": "同意"},
+        headers=h,
+    )
+    assert ok.status_code == 200, ok.text
+
+    after = client.get(url, headers=mini).json()
+    assert after["settled"] is True
+    rules = " ".join(i["rule"] for i in after["items"])
+    assert "观察期" in rules or "会员" in rules, f"应含会员费结算项：{rules}"
+    assert "活动费" in rules, f"应含活动费结算项：{rules}"
+    assert any(i["kind"] == "deposit" for i in after["items"]), "应含押金结算项"
+    assert float(after["total"]) > 0
+    assert all(i["status_text"] for i in after["items"]), "每项都要有中文状态"
+
+
+def test_withdrawal_settlement_rejects_other_child(client: TestClient):
+    """越权防护：只能看自己孩子的退会结算。"""
+    h = _h(client)
+    p1, [c1], mini1 = _mk_parent_with_children(client, h, "13800001010", ["甲孩"])
+    p2, [c2], mini2 = _mk_parent_with_children(client, h, "13800001011", ["乙孩"])
+    _pay(client, h, c1["id"], "observation_fee")
+    applied = client.post(
+        "/api/miniapp/withdrawals", json={"child_id": c1["id"], "reason": "越权测试"}, headers=mini1
+    )
+    wid = applied.json()["id"]
+    r = client.get(f"/api/miniapp/withdrawals/{wid}/settlement?child_id={c2['id']}", headers=mini2)
+    assert r.status_code in (403, 404), r.text

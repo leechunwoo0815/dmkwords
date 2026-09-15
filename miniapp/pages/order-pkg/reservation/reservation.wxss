@@ -77,7 +77,7 @@
 }
 
 .section-count-muted {
-  background: rgba(111, 104, 90, 0.1);
+  background: var(--accent-soft);
   color: var(--muted);
 }
 
@@ -109,7 +109,7 @@
   font-size: 56rpx;
   border: 2rpx solid var(--border);
   overflow: hidden;
-  background: linear-gradient(135deg, #f0f2f5, #e4e8ec); /* intentional decorative */
+  background: linear-gradient(135deg, var(--bg), var(--border)); /* intentional decorative */
 }
 
 .reservation-cover image {
@@ -243,7 +243,7 @@
   gap: 8rpx;
   padding: 8rpx 20rpx;
   border-radius: 999rpx;
-  background: rgba(111, 104, 90, 0.1);
+  background: var(--accent-soft);
   color: var(--muted);
   font-size: 24rpx;
   font-weight: 600;
@@ -293,28 +293,28 @@
 }
 
 /* 按钮：胶囊贴纸 */
-.btn, button, .primary-btn, .secondary-btn, .submit-btn, .action-btn {
-  border: 3rpx solid var(--fg) !important;
-  border-radius: 999rpx !important;
-  box-shadow: var(--shadow-hard-sm) !important;
+.btn, button, .primary-btn, .secondary-btn, .action-btn {
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  box-shadow: var(--shadow-hard-sm);
   font-weight: 700;
 }
 .btn-primary, .primary, button[type="primary"], .primary-btn {
-  background: var(--accent) !important;
-  color: #FFFDF7 !important;
+  background: var(--accent);
+  color: var(--surface);
 }
 .btn-secondary, .secondary, .secondary-btn {
-  background: var(--surface) !important;
-  color: var(--fg) !important;
+  background: var(--surface);
+  color: var(--fg);
 }
 .btn:active, button:active, .primary-btn:active, .secondary-btn:active {
   transform: translate(2rpx, 2rpx);
-  box-shadow: none !important;
+  box-shadow: none;
 }
 
 /* 标签/徽章：圆角贴纸 */
 .tag, .badge, .pill, .tag-primary, .tag-secondary, .tag-success, .tag-warning {
-  border: 2rpx solid rgba(59, 47, 47, 0.6);
+  border: 2rpx solid rgba(var(--fg-rgb), 0.6);
   border-radius: 999rpx;
   font-weight: 700;
 }
@@ -324,20 +324,20 @@
 .tag-warning, .badge-warning { background: var(--warning-soft); color: var(--warning-dark); }
 
 /* 标题圆体 */
-.page-title, .section-title, .card-title, .header-title, .title, .name {
+.page-title, .card-title, .header-title, .title, .name {
   font-family: var(--font-display);
   font-weight: 700;
 }
 
-/* 列表项：卡片化 */
-.list-item, .item, .row, .cell, .info-row {
+.item, .row, .cell {
   background: var(--surface);
   border: 2rpx solid var(--fg);
   border-radius: 24rpx 28rpx 20rpx 30rpx;
-  box-shadow: 3rpx 3rpx 0 rgba(59, 47, 47, 0.55);
+  box-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.55);
 }
 
 /* 列表容器：加间距 */
 .list, .grid, .list-container {
   gap: 16rpx;
 }
+

@@ -1,6 +1,7 @@
 // pages/order-pkg/benefit-transfer/benefit-transfer.js — 权益转让（WM10）
 const api = require('../../../utils/api')
 const session = require('../../../utils/session')
+const { memberStatusText } = require('../../../utils/labels')
 
 Page({
   data: {
@@ -20,7 +21,10 @@ Page({
 
   async load() {
     // F-L13/T34：三连 setData 合并（竞态序号守卫未做，LOW 留痕——响应乱序窗口极小）
-    const children = session.getChildren()
+    // member_status 是后端枚举（formal/none/…），必须过一遍中文化再进 WXML
+    const children = session.getChildren().map(
+      c => ({ ...c, memberLabel: memberStatusText(c.member_status) })
+    )
     this.setData({ loading: true, children })
     try {
       const records = await api.myTransfers()

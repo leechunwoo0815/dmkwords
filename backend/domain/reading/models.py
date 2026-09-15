@@ -77,7 +77,7 @@ class DictionaryWord(BaseModel):
 
 
 class Vocabulary(BaseModel):
-    """生词本（查词自动收录；同词唯一；记来源书目）。"""
+    """生词本（查词自动收录；同词唯一；记来源书目；记累计被查次数）。"""
 
     __tablename__ = "vocabularies"
     __table_args__ = (Index("uq_vocab_child_word", "child_id", "word", unique=True),)
@@ -85,6 +85,11 @@ class Vocabulary(BaseModel):
     child_id = Column(Integer, nullable=False, index=True)
     word = Column(String(64), nullable=False, comment="单词")
     book_id = Column(Integer, nullable=True, comment="来源书目（查词时正在听的书）")
+    # 查词次数（2026-09-15）：生词本的成就感来自「我查过多少次」。
+    # 重复查同一个词自增（此前只有 created_at 一个时间点，前端无法呈现积累感）。
+    lookup_count = Column(
+        Integer, nullable=False, default=1, server_default="1", comment="累计被查次数"
+    )
     created_at = Column(DateTime, nullable=False, default=datetime.now)
 
 

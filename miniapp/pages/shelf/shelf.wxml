@@ -10,6 +10,10 @@
     <view class="tab-item {{tab === 'reservations' ? 'tab-on' : ''}}" data-tab="reservations" bindtap="onTab">
       <text>预约中</text><text class="tab-badge">{{resCount}}</text>
     </view>
+    <!-- 2026-09-15（用户需求）：让孩子一眼看到「哪些书我已经测过了」——最直接的成就感 -->
+    <view class="tab-item {{tab === 'passed' ? 'tab-on' : ''}}" data-tab="passed" bindtap="onTab">
+      <text>已通过</text><text class="tab-badge">{{passedCount}}</text>
+    </view>
   </view>
 
   <!-- 在借中 -->
@@ -87,6 +91,33 @@
     <empty-state wx:if="{{!loading && !reservations.length}}" icon="🔖" title="没有预约记录"
       desc="馆藏被借完的书可以先预约，72 小时内保留" >
       <view class="empty-btn" bindtap="goBooks">去图书馆看看</view>
+    </empty-state>
+  </block>
+
+  <!-- 已通过（成绩单式：让孩子看到自己的战果） -->
+  <block wx:if="{{tab === 'passed'}}">
+    <view wx:for="{{passedBooks}}" wx:key="book_id" class="asset-card">
+      <view class="asset-cover-wrap">
+        <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
+        <view wx:else class="asset-cover asset-cover-fb">📕</view>
+        <view class="trophy-badge">🏆</view>
+      </view>
+      <view class="asset-info">
+        <view class="asset-title">{{item.title}}</view>
+        <view class="asset-meta">{{item.author}}</view>
+        <view class="asset-tags">
+          <text class="tag tag-words">+{{item.word_count}} 词</text>
+          <text class="tag tag-ar" wx:if="{{item.best_percent}}">最佳 {{item.best_percent}} 分</text>
+          <text class="tag tag-ar" wx:else>成绩待同步</text>
+        </view>
+      </view>
+      <view class="asset-actions">
+        <view class="btn-mini btn-main" data-book="{{item}}" catchtap="goDetail">看详情</view>
+      </view>
+    </view>
+    <empty-state wx:if="{{!loading && !passedBooks.length}}" icon="🏆" title="还没有通过测验的书"
+      desc="听完一本音频就能挑战测验，通过后这里会收集你的战果" >
+      <view class="empty-btn" bindtap="goBooks">去图书馆选一本</view>
     </empty-state>
   </block>
 

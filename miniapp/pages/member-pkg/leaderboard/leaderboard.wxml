@@ -1,4 +1,4 @@
-<view class="page-bg" style="min-height:100vh;">
+<view class="page-bg x-8cf452">
   <view class="period-tabs" wx:if="{{board}}">
     <view wx:for="{{periods}}" wx:key="key"
       class="period-tab {{period === item.key ? 'active' : ''}}"
@@ -12,7 +12,7 @@
     <view class="rules-text" wx:else>仅展示当前有效会员；英文名/昵称展示，保护隐私</view>
   </view>
 
-  <view wx:if="{{loading}}" style="text-align:center;color:var(--muted);padding:40rpx;">加载中…</view>
+  <view class="x-931c22" wx:if="{{loading}}">加载中…</view>
 
   <view class="rank-list" wx:if="{{board && board.entries.length}}">
     <view wx:for="{{board.entries}}" wx:key="child_id"
@@ -24,15 +24,15 @@
       <view class="rank-info">
         <view class="rank-name">
           {{item.name}}
-          <text wx:if="{{item.is_me}}" style="color:var(--accent);font-size:22rpx;margin-left:8rpx;">（我）</text>
-          <text wx:if="{{item.is_history}}" style="color:var(--muted);font-size:22rpx;margin-left:8rpx;">历史学员</text>
+          <text class="x-2bc64d" wx:if="{{item.is_me}}">（我）</text>
+          <text class="x-30f1ac" wx:if="{{item.is_history}}">历史学员</text>
         </view>
         <view class="rank-words">{{item.words}} 词</view>
       </view>
     </view>
   </view>
 
-  <view wx:if="{{board && !board.entries.length && !loading}}" style="text-align:center;color:var(--muted);padding:80rpx 40rpx;">
+  <view class="x-2a2b2d" wx:if="{{board && !board.entries.length && !loading}}">
     本期还没有孩子上榜\n继续听书测验，第一名就是你！
   </view>
 </view>

@@ -1,0 +1,82 @@
+/* pages/member-pkg/purchase/purchase.wxss — 会员购买/续费占位页（本页特色：方案卡；全令牌） */
+.page-bg {
+  min-height: 100vh;
+  background: var(--bg);
+  box-sizing: border-box;
+  padding: 24rpx 32rpx calc(180rpx + env(safe-area-inset-bottom));
+}
+.head-hint {
+  font-size: 24rpx;
+  color: var(--muted);
+  margin-bottom: 20rpx;
+  line-height: 1.6;
+}
+.plan-card {
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-hard-sm);
+  padding: 32rpx;
+  margin-bottom: 24rpx;
+}
+.plan-badge {
+  display: inline-block;
+  padding: 6rpx 20rpx;
+  border-radius: 999rpx;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 24rpx;
+  font-weight: 700;
+  border: 2rpx solid rgba(var(--fg-rgb), 0.6);
+}
+.plan-badge-gold {
+  background: var(--gold-light);
+  color: var(--gold-dark);
+}
+.plan-price {
+  font-family: var(--font-display);
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--fg);
+  margin: 20rpx 0;
+}
+.plan-feat {
+  font-size: 26rpx;
+  color: var(--muted);
+  line-height: 2;
+}
+.store-card {
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-hard-sm);
+  padding: 32rpx;
+}
+.store-title {
+  font-family: var(--font-display);
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--fg);
+  margin-bottom: 16rpx;
+}
+.store-line {
+  font-size: 26rpx;
+  color: var(--muted);
+  line-height: 1.9;
+}
+.store-soft {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: var(--muted-light);
+}
+.pay-wrap {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  box-sizing: border-box;
+  padding: 24rpx 32rpx calc(env(safe-area-inset-bottom, 16rpx) + 24rpx);
+  background: var(--surface);
+  border-top: 3rpx solid var(--fg);
+  z-index: 99;
+}

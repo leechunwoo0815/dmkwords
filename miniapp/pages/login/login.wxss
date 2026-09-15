@@ -23,7 +23,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 16rpx 48rpx rgba(44, 74, 110, 0.25);
+  box-shadow: 0 16rpx 48rpx rgba(var(--fg-rgb), 0.25);
 }
 
 .logo-emoji {
@@ -87,7 +87,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(var(--fg-rgb), 0.5);
   z-index: 999;
   box-sizing: border-box;
 }
@@ -103,7 +103,7 @@
   padding: 48rpx 40rpx;
   padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
   z-index: 1000;
-  box-shadow: 0 -8rpx 32rpx rgba(0,0,0,0.1);
+  box-shadow: 0 -8rpx 32rpx rgba(var(--fg-rgb), 0.1);
   box-sizing: border-box;
 }
 
@@ -198,6 +198,9 @@
   padding: 0 24rpx;
   border: 2rpx solid var(--border);
   height: 88rpx;
+}
+.input-row.grow {
+  flex: 1;
 }
 
 .input-icon {
@@ -355,14 +358,14 @@
 
 /* 微信登录按钮：微信绿 + 粗黑边 + 硬阴影 */
 .wx-login-btn {
-  border: 3rpx solid var(--fg) !important;
-  border-radius: 999rpx !important;
-  box-shadow: var(--shadow-hard) !important;
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  box-shadow: var(--shadow-hard);
   font-weight: 800;
 }
 .wx-login-btn:active {
   transform: translate(3rpx, 3rpx);
-  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.85) !important;
+  box-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.85);
 }
 
 /* 隐私弹窗：贴纸卡 */
@@ -371,4 +374,17 @@
   border-radius: 32rpx 36rpx 28rpx 40rpx;
   box-shadow: var(--shadow-hard);
   background: var(--surface);
+}
+
+/* 合规入口（2026-09-13）：登录即同意协议（仅入口，不做勾选门禁——F3 同意流待拍板） */
+.agreement-row {
+  margin-top: 32rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.agreement-link {
+  color: var(--accent);
+  text-decoration: underline;
 }

@@ -11,6 +11,7 @@ from backend.common.base_schema import BaseSchema
 from backend.common.exceptions import ValidationError
 from backend.database import get_db
 from backend.domain.growth.board_service import LeaderboardService, PassportService
+from backend.domain.growth.passed_books_service import PassedBooksService
 from backend.domain.growth.report_service import ReportService
 from backend.domain.growth.service import GrowthService, QuizService
 from backend.domain.identity import guards
@@ -69,6 +70,15 @@ def points_ledger(child_id: int, auth: Any = Depends(get_current_parent)):
     child = child_of_parent(db, parent.id, child_id)
     guards.require_member_action(db, child, guards.POINTS_VIEW)
     return GrowthService(db).points_list(child_id)
+
+
+@router.get("/growth/passed-books")
+def passed_books(child_id: int, auth: Any = Depends(get_current_parent)):
+    """已通过测验的书（书架「已通过」页签：封面 + 词数 + 最佳成绩）。"""
+    parent, db = auth
+    child = child_of_parent(db, parent.id, child_id)
+    guards.require_member_action(db, child, guards.PASSPORT_VIEW)
+    return PassedBooksService(db).list_for(child_id)
 
 
 @router.get("/leaderboard")

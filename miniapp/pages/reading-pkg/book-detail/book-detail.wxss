@@ -196,7 +196,7 @@
 }
 
 .tag-words {
-  background: rgba(111, 104, 90, 0.1);
+  background: var(--accent-soft);
   color: var(--muted);
 }
 
@@ -220,9 +220,9 @@
   margin: 0 32rpx 20rpx;
   border-radius: 20rpx;
   padding: 32rpx 28rpx;
-  background: linear-gradient(135deg, #fcd34d, #ff8a5c);
-  color: #ffffff;
-  box-shadow: 0 6rpx 18rpx rgba(255, 138, 92, 0.35);
+  background: linear-gradient(135deg, var(--sun), var(--accent-light));
+  color: var(--surface);
+  box-shadow: 0 6rpx 18rpx rgba(var(--accent-light-rgb), 0.35);
 }
 
 /* 插修9/R8：英文印章主视觉——盖章的歪斜感是灵魂，别改垂直。
@@ -233,20 +233,20 @@
   font-size: 80rpx;
   font-weight: 900;
   letter-spacing: 8rpx;
-  color: #15803d;
-  background: rgba(255, 255, 255, 0.94);
-  border: 8rpx solid #16a34a;
+  color: var(--success);
+  background: rgba(var(--surface-rgb), 0.94);
+  border: 8rpx solid var(--success);
   border-radius: 20rpx;
   padding: 8rpx 36rpx;
   transform: rotate(-8deg);
-  box-shadow: 0 6rpx 14rpx rgba(21, 128, 61, 0.25);
+  box-shadow: 0 6rpx 14rpx var(--success-soft);
 }
 
 .qhc-title {
   margin-top: 16rpx;
   font-size: 32rpx;
   font-weight: 700;
-  color: #6b4a12;
+  color: var(--gold-dark);
 }
 
 .qhc-stars {
@@ -263,19 +263,19 @@
   margin-left: 12rpx;
   font-size: 30rpx;
   font-weight: 600;
-  color: #6b4a12;
+  color: var(--gold-dark);
 }
 
 .qhc-cheer {
   margin-top: 8rpx;
   font-size: 28rpx;
-  color: #6b4a12;
+  color: var(--gold-dark);
 }
 
 .qhc-tip {
   margin-top: 6rpx;
   font-size: 28rpx;
-  color: #6b4a12;
+  color: var(--gold-dark);
   opacity: 0.85;
 }
 
@@ -283,9 +283,9 @@
   margin: 0 32rpx 20rpx;
   border-radius: 20rpx;
   padding: 32rpx 28rpx;
-  background: #60a5fa;
-  color: #ffffff;
-  box-shadow: 0 6rpx 18rpx rgba(96, 165, 250, 0.35);
+  background: var(--sky);
+  color: var(--surface);
+  box-shadow: 0 6rpx 18rpx rgba(var(--fg-rgb), 0.35);
 }
 
 .qcc-title {
@@ -300,9 +300,9 @@
 
 .qcc-btn {
   margin-top: 16rpx;
-  background: #ffffff;
-  color: #2563eb;
-  border: 3rpx solid #fcd34d;
+  background: var(--surface);
+  color: var(--sky-ink);
+  border: 3rpx solid var(--sun);
   border-radius: 999rpx;
   font-size: 30rpx;
   font-weight: 700;
@@ -352,7 +352,7 @@
 }
 
 .inv-bar.out-of-stock {
-  background: rgba(111, 104, 90, 0.08);
+  background: var(--accent-soft);
   color: var(--muted);
 }
 
@@ -495,7 +495,7 @@
   border: 2rpx solid var(--border);
   border-radius: var(--radius);
   padding: 32rpx;
-  box-shadow: 0 4rpx 16rpx rgba(38, 36, 25, 0.04);
+  box-shadow: 0 4rpx 16rpx rgba(var(--fg-rgb), 0.04);
 }
 
 .section-card-header {
@@ -544,16 +544,7 @@
   gap: 20rpx;
 }
 
-.info-label {
-  font-size: 22rpx;
-  color: var(--muted);
-  margin-bottom: 4rpx;
-}
 
-.info-value {
-  font-size: 26rpx;
-  font-weight: 600;
-}
 
 /* Table of contents */
 .toc-item {
@@ -645,7 +636,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(var(--surface-rgb), 0.95);
   border-top: 2rpx solid var(--border);
   padding: 16rpx 32rpx;
   padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
@@ -688,18 +679,18 @@
 .action-fav {
   flex: 0.6;
   background: #fdecec;
-  color: #EF4444;
+  color: var(--error);
   border: 2rpx solid #f5c2c2;
 }
 
 .fav-active {
   background: #fdecec;
-  color: #EF4444;
+  color: var(--error);
   border-color: #f5c2c2;
 }
 
 .fav-text {
-  color: #EF4444;
+  color: var(--error);
 }
 
 /* ================================================================
@@ -823,10 +814,10 @@
   width: 160rpx;
   height: 216rpx;
   border-radius: 16rpx;
-  border: 3rpx solid var(--ink, #FF6B35);
+  border: 3rpx solid var(--ink, var(--accent));
   flex-shrink: 0;
   margin-right: 24rpx;
-  background: var(--paper, #fffdf7);
+  background: var(--paper, var(--surface));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -839,31 +830,31 @@
 
 /* 底部操作栏：粗黑顶边 + 按钮胶囊贴纸 */
 .action-bar {
-  border-top: 3rpx solid var(--fg) !important;
+  border-top: 3rpx solid var(--fg);
 }
 .action-bar .action-primary {
-  border: 3rpx solid var(--fg) !important;
-  border-radius: 999rpx !important;
-  box-shadow: var(--shadow-hard-sm) !important;
-  background: var(--accent) !important;
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  box-shadow: var(--shadow-hard-sm);
+  background: var(--accent);
   font-weight: 800;
 }
 .action-bar .action-primary:active {
   transform: translate(2rpx, 2rpx);
-  box-shadow: none !important;
+  box-shadow: none;
 }
 .action-bar .action-secondary {
-  border: 3rpx solid var(--fg) !important;
-  border-radius: 999rpx !important;
-  background: var(--surface) !important;
-  color: var(--fg) !important;
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  background: var(--surface);
+  color: var(--fg);
   font-weight: 700;
 }
 .action-bar .action-fav {
-  border: 3rpx solid var(--fg) !important;
-  border-radius: 999rpx !important;
-  background: var(--surface) !important;
-  color: var(--fg) !important;
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  background: var(--surface);
+  color: var(--fg);
 }
 
 /* ============================================
@@ -882,7 +873,7 @@
   color: var(--fg);
   font-size: 22rpx;
   font-weight: 700;
-  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.55);
+  box-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.55);
 }
 
 .action-bar {
@@ -900,7 +891,7 @@
   border: 3rpx solid var(--fg);
   border-radius: 999rpx;
   background: var(--accent);
-  color: #FFFDF7;
+  color: var(--surface);
   font-size: 32rpx;
   font-weight: 800;
   box-shadow: var(--shadow-hard-sm);
@@ -949,7 +940,7 @@
   border: 2rpx solid var(--fg);
   border-radius: 50%;
   background: var(--surface);
-  box-shadow: 2rpx 2rpx 0 rgba(59, 47, 47, 0.55);
+  box-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.55);
 }
 
 .action-icon.active .action-icon-emoji {
@@ -972,11 +963,11 @@
   font-size: 20rpx;
   padding: 4rpx 16rpx;
   border-radius: 999rpx;
-  background: rgba(96, 165, 250, 0.14);
+  background: var(--sky-soft);
   color: var(--sky);
   font-weight: 600;
 }
-.meta-chip2 { background: rgba(167, 139, 250, 0.16); color: var(--lavender); }
+.meta-chip2 { background: var(--lavender-soft); color: var(--lavender); }
 
 .state-card {
   display: flex;
@@ -988,8 +979,8 @@
   margin-top: 24rpx;
   box-shadow: var(--shadow-hard-sm);
 }
-.state-borrowing { background: rgba(74, 222, 128, 0.14); }
-.state-reserved { background: rgba(252, 211, 77, 0.22); }
+.state-borrowing { background: var(--secondary-soft); }
+.state-reserved { background: var(--sun-soft); }
 .state-emoji { font-size: 44rpx; }
 .state-texts { flex: 1; }
 .state-title { font-size: 28rpx; font-weight: 700; color: var(--fg); }

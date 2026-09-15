@@ -55,6 +55,10 @@ module.exports = {
   pointsList(childId) {
     return req.get('/api/miniapp/points', null, { params: { child_id: childId } })
   },
+  // 已通过测验的书（书架「已通过」页签）
+  passedBooks(childId) {
+    return req.get('/api/miniapp/growth/passed-books', null, { params: { child_id: childId } })
+  },
 
   // 榜单 / 护照 / 报告（WM8）
   leaderboard(period, childId) {
@@ -91,6 +95,12 @@ module.exports = {
   },
   applyWithdrawal(childId, reason) {
     return req.post('/api/miniapp/withdrawals', { child_id: childId, reason })
+  },
+  // 本次退会「能退哪些费用」（审核通过后由后端返回）
+  withdrawalSettlement(requestId, childId) {
+    return req.get(`/api/miniapp/withdrawals/${requestId}/settlement`, null, {
+      params: { child_id: childId },
+    })
   },
   myWithdrawals(childId) {
     return req.get('/api/miniapp/withdrawals', null, { params: { child_id: childId } })
