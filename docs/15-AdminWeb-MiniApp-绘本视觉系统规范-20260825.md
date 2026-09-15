@@ -543,6 +543,7 @@ admin-web 端未按本规范原定的 4 个迭代分阶段实施，而是一次�
 - `admin-web/src/styles/paint.css`：Button/Input/Tag/Card/Modal/Tabs/Table/Pagination/Menu/Upload/Dropdown/Form/Typography 全局覆盖
 - `admin-web/src/components/PaintEmpty.tsx`：8 角色空状态插画
 - `admin-web/src/components/PaintLoading.tsx`：7 角色加载态插画
+- `admin-web/src/components/PreviewImage.tsx`：**全后台唯一**的图片/凭证预览（缩略图 + 全屏干净预览；见 §十三）
 - `admin-web/index.html`：Nunito + ZCOOL KuaiLe 字体加载
 - `admin-web/src/pages/Layout.tsx`：Sidebar 加宽 240px、菜单图标按 route key 彩色化
 - 10 个页面标题字体替换为 `var(--font-display)`
@@ -634,7 +635,56 @@ admin-web 列表页统一使用绘本风分页底栏，替代 antd 原生 Pagina
 
 ---
 
+## 十三、媒体预览统一规范（2026-09-15，用户裁定）
+
+### 13.1 唯一基准
+
+**用户原话**：「图书详情编辑页那个封面预览非常好，非常清新干净，我要全后台所有有图片或者凭证
+预览的地方统一采用这个效果……我不希望看到收款凭证那种**带窗口的预览**，很不好用。」
+
+基准 = 图书详情「封面与音频」卡里的封面预览：
+
+| 维度 | 规约 |
+|---|---|
+| 缩略图 | 圆角 6、`1px solid var(--paint-border)`、纸色底（`var(--paint-paper-dim)`）、`object-fit: cover`、`cursor: zoom-in` |
+| 悬停遮罩 | 半透明黑 + 居中「预览」二字（`preview={{ mask: "预览" }}`，会顶掉 antd 默认的眼睛图标） |
+| 点开之后 | antd `Image` 内建 preview：**全屏蒙层**（`colorBgMask`）+ 底部工具条（缩放 / 左转 / 右转 / 水平翻转 / 垂直翻转 / 放大镜 / 复位），`Esc` 或右上角 × 关闭 |
+| 空态 | 虚线框 + `var(--paint-ink-light)` 小字（如「未上传」），尺寸与缩略图一致 |
+
+### 13.2 禁止事项
+
+- **禁止**用 `<Modal><img/></Modal>` 做预览（「带窗口的预览」）：图被压在 640px 弹窗里、
+  `maxHeight: 70vh`、**没有缩放**，看收款凭证/转账截图等于拿放大镜看缩略图；
+- **禁止**给同一交互写第 2 份实现：新页面要预览，先复用组件，不要「照着抄一遍」；
+- **禁止**裸 `<img>` 展示可作为内容核对的图（封面/凭证/卡片/报告）而不给预览入口。
+
+### 13.3 组件用法
+
+`admin-web/src/components/PreviewImage.tsx`（当前 7 处已接入：BookDetail 封面、MemberManage 收款凭证
+回看 + 凭证/评估报告选图本地预览、CircleManage 成就卡片、GrowthManage 周报/月报、ActivityManage 详情封面与编辑封面）
+
+```tsx
+// ① 缩略图 + 点开（固定画框；height 省略 = 按原图比例撑满 width，用于长图报告）
+<PreviewImage src={url} alt="封面" width={72} height={100} emptyText="未上传" />
+
+// ② 已有按钮/图标当入口（查看凭证、上传前本地预览）——命令式打开
+const viewer = useImageViewer();
+<Button onClick={() => viewer.open(url)}>查看凭证</Button>
+{viewer.node}
+// Blob URL 的回收挂在关闭回调上，避免 Modal 时代「onCancel 里 revoke」的写法丢失：
+viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
+```
+
+### 13.4 两个技术坑（详见错误库 §七十六）
+
+| 坑 | 结论 |
+|---|---|
+| 受控预览宿主写 `style={{ display: "none" }}` 会不会把预览一起隐藏？ | **不会**。rc-image 把 `style` 落到 `<img>`（遮罩另读 `style.display`），Preview 由 Portal 挂到 `body`，所以在 Fragment 的兄弟位，不受影响 |
+| `preview={{ mask: null }}` 是不是「用默认遮罩」？ | **不是**，是**不要遮罩**。antd 的合并是 `{mask: 默认, ...调用方}`，展开在后；要默认就别传这个键 |
+
+---
+
 *规范制定：外部专家*  
-*日期：2026-08-25（运营增强同步至 2026-08-28）*  
-*版本：V1.2*  
-*关联文档：theme-paint.ts, Layout.tsx, BookManage.tsx, BookDetail.tsx, Dashboard.tsx, miniapp/app.wxss*
+*日期：2026-08-25（运营增强同步至 2026-08-28；媒体预览统一同步至 2026-09-15）*  
+*版本：V1.3*  
+*关联文档：theme-paint.ts, Layout.tsx, BookManage.tsx, BookDetail.tsx, Dashboard.tsx, PreviewImage.tsx, miniapp/app.wxss*

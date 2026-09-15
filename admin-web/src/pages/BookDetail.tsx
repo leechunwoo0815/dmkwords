@@ -1,4 +1,5 @@
 import PaintEmpty from "../components/PaintEmpty";
+import PreviewImage from "../components/PreviewImage";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -6,7 +7,6 @@ import {
   Button,
   Card,
   Form,
-  Image,
   Input,
   InputNumber,
   Modal,
@@ -227,18 +227,13 @@ export default function BookDetail() {
           <div>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>封面</Typography.Text>
             <div style={{ margin: "4px 0 8px" }}>
-              {book.cover_path ? (
-                <Image
-                  src={apiMediaUrl(bookId, "cover", book.cover_path ?? undefined)}
-                  alt="封面"
-                  width={72}
-                  height={100}
-                  style={{ objectFit: "cover", borderRadius: 6, border: "1px solid var(--paint-border)" }}
-                  preview={{ mask: "预览" }}
-                />
-              ) : (
-                <div style={{ width: 72, height: 100, borderRadius: 6, border: "1px dashed var(--paint-border)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--paint-ink-light)", fontSize: 12 }}>未上传</div>
-              )}
+              <PreviewImage
+                src={book.cover_path ? apiMediaUrl(bookId, "cover", book.cover_path ?? undefined) : null}
+                alt="封面"
+                width={72}
+                height={100}
+                emptyText="未上传"
+              />
             </div>
             <Upload
               accept=".jpg,.jpeg,.png,.webp" maxCount={1} showUploadList={false}

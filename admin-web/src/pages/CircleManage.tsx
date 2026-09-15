@@ -17,6 +17,7 @@ import type { Dayjs } from "dayjs";
 
 import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
+import PreviewImage from "../components/PreviewImage";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { TODO_REFRESH_EVENT, useTodoCounts } from "../hooks/useTodoCounts";
 import {
@@ -86,8 +87,6 @@ export default function CircleManage() {
   // 删除 Modal（必填原因——审计留痕）
   const [deleteTarget, setDeleteTarget] = useState<CirclePostItem | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
-  // 卡片图点击放大（媒体消费点清单：管理端缩略图 + 点击放大，均需 getToken 拼 ?token=）
-  const [previewPost, setPreviewPost] = useState<CirclePostItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -186,18 +185,11 @@ export default function CircleManage() {
         dataIndex: "id",
         width: 110,
         render: (_: unknown, r: CirclePostItem) => (
-          <img
+          <PreviewImage
             src={circlePostImageUrl(r.id)}
             alt={r.card_type_label}
-            onClick={() => setPreviewPost(r)}
-            style={{
-              width: 72,
-              height: 96,
-              objectFit: "cover",
-              borderRadius: 6,
-              background: "#f5f2ea",
-              cursor: "zoom-in",
-            }}
+            width={72}
+            height={96}
           />
         ),
       },
@@ -440,26 +432,6 @@ export default function CircleManage() {
           value={deleteReason}
           onChange={(e) => setDeleteReason(e.target.value)}
         />
-      </Modal>
-      <Modal
-        title="成就卡片预览"
-        open={previewPost !== null}
-        onCancel={() => setPreviewPost(null)}
-        footer={null}
-        width={560}
-      >
-        {previewPost && (
-          <>
-            <div style={{ marginBottom: 8, color: "rgba(0,0,0,0.65)" }}>
-              {dualName(previewPost)} · {previewPost.card_type_label}
-            </div>
-            <img
-              src={circlePostImageUrl(previewPost.id)}
-              alt={previewPost.card_type_label}
-              style={{ width: "100%", borderRadius: 8, background: "#f5f2ea" }}
-            />
-          </>
-        )}
       </Modal>
     </Card>
   );

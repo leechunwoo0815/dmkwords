@@ -2,6 +2,7 @@ import dayjs from "dayjs";
 import { UploadOutlined } from "@ant-design/icons";
 import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
+import PreviewImage from "../components/PreviewImage";
 // 活动管理（WM9：发布/取消/报名/签到/退款审核）
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -312,13 +313,13 @@ export default function ActivityManage() {
         {detailView && (
           <>
             {detailView.cover_url ? (
-              <img
-                src={activityCoverUrl(detailView.id)} alt="活动封面"
-                style={{
-                  width: "100%", height: 200, objectFit: "cover",
-                  borderRadius: "var(--paint-radius)", border: "2px solid var(--paint-border)",
-                  marginBottom: 12,
-                }}
+              <PreviewImage
+                src={activityCoverUrl(detailView.id)}
+                alt="活动封面"
+                width="100%"
+                height={200}
+                radius={12}
+                style={{ marginBottom: 12, border: "2px solid var(--paint-border)" }}
               />
             ) : (
               <div style={{
@@ -380,7 +381,13 @@ export default function ActivityManage() {
           <div style={{ marginBottom: 12 }}>
             {/* T45：封面上传/预览（Q8 批复编辑白名单内） */}
             {editCover && (
-              <img src={editCover} alt="封面" style={{ width: 120, height: 68, objectFit: "cover", marginRight: 12, borderRadius: 4 }} />
+              <PreviewImage
+                src={editCover}
+                alt="封面"
+                width={120}
+                height={68}
+                style={{ marginRight: 12 }}
+              />
             )}
             <Upload accept="image/*" showUploadList={false} beforeUpload={onCoverUpload}>
               <Button icon={<UploadOutlined />}>上传封面</Button>

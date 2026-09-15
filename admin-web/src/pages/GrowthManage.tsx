@@ -1,9 +1,10 @@
 import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
+import PreviewImage from "../components/PreviewImage";
 // 成长与测验管理（WM7：词数流水/积分明细/测验重置/积分调整/等级重算）
 import { useCallback, useEffect, useState } from "react";
 import {
-  App as AntdApp, Button, Descriptions, Drawer, Form, Image, Input, InputNumber,
+  App as AntdApp, Button, Descriptions, Drawer, Form, Input, InputNumber,
   Modal, Space, Table, Tabs, Tag, Typography,
 } from "antd";
 
@@ -300,7 +301,7 @@ export default function GrowthManage() {
             <Typography.Paragraph type="secondary">
               {report.data.period_label} · 读 {report.data.books} 本 · {report.data.words} 词 · 打卡 {report.data.checkin_days} 天
             </Typography.Paragraph>
-            <Image src={report.url} width="100%" />
+            <PreviewImage src={report.url} width="100%" fit="contain" />
             <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
               家长端小程序「报告」入口也可查看与保存。
             </Typography.Paragraph>

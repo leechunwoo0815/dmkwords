@@ -27,6 +27,7 @@ import { useAuth } from "../auth";
 import AvatarPicker from "../components/AvatarPicker";
 import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
+import { useImageViewer } from "../components/PreviewImage";
 
 import {
   apiGetChildReading,
@@ -147,11 +148,9 @@ export default function MemberManage() {
   const [parentLoading, setParentLoading] = useState(false);
   const [editParent, setEditParent] = useState<ParentRow | null>(null);
   const [parentEditForm] = Form.useForm();
-  // WM3-B2 凭证：确认收款弹窗单图 + 查看凭证 Modal
+  // WM3-B2 凭证：确认收款弹窗单图；查看凭证 / 选图前本地预览统一走全屏干净预览
   const [voucherFile, setVoucherFile] = useState<UploadFile[]>([]);
-  const [viewVoucher, setViewVoucher] = useState<Order | null>(null);
-  // F5：本地预览（onPreview 自定义；antd 默认 window.open(file.name)=空白页）
-  const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const viewer = useImageViewer();
   const childPg = usePaintPagination(undefined, urlInitialPage);
   const orderPg = usePaintPagination(undefined, urlInitialPage);
   // 弹窗
@@ -629,7 +628,7 @@ export default function MemberManage() {
                       </>
                     )}
                     {r.status === "paid" && r.voucher_path && (
-                      <Button type="link" size="small" onClick={() => setViewVoucher(r)}>查看凭证</Button>
+                      <Button type="link" size="small" onClick={() => viewer.open(apiVoucherUrl(r.id))}>查看凭证</Button>
                     )}
                     {r.status === "paid" && user?.role === "superadmin" && (
                       <Button type="link" size="small" danger onClick={() => onRefundOrder(r)}>退款</Button>
@@ -922,10 +921,10 @@ export default function MemberManage() {
               beforeUpload={() => false}
               onChange={({ fileList: fl }) => setVoucherFile(fl.slice(0, 1))}
               onPreview={(file) => {
-                // F5：本地 blob 预览（不走后端；URL.createObjectURL 挂 unmount 回收）
+                // 本地 blob 预览（不走后端；不用 antd 默认 window.open 会开空白页）
                 if (file.originFileObj) {
                   const url = URL.createObjectURL(file.originFileObj);
-                  setLocalPreview(url);
+                  viewer.open(url, () => URL.revokeObjectURL(url));
                 }
               }}
               accept=".png,.jpg,.jpeg,.webp"
@@ -950,10 +949,10 @@ export default function MemberManage() {
           beforeUpload={() => false}
           onChange={({ fileList: fl }) => setObsFileList(fl.slice(0, 9))}
           onPreview={(file) => {
-            // F5 同族（E-03 反模式 3）：评估报告图同样禁 antd 默认 window.open
+            // 同上：评估报告图也走全屏干净预览，禁 antd 默认 window.open
             if (file.originFileObj) {
               const url = URL.createObjectURL(file.originFileObj);
-              setLocalPreview(url);
+              viewer.open(url, () => URL.revokeObjectURL(url));
             }
           }}
           accept=".png,.jpg,.jpeg"
@@ -1105,32 +1104,8 @@ export default function MemberManage() {
         </Form>
       </Modal>
 
-      {/* WM3-B2 查看收款凭证 */}
-      <Modal
-        title={`收款凭证 — ${viewVoucher ? viewVoucher.order_no : ""}`}
-        open={!!viewVoucher}
-        footer={null}
-        onCancel={() => setViewVoucher(null)}
-        width={640}
-      >
-        {viewVoucher?.voucher_path ? (
-          <img src={apiVoucherUrl(viewVoucher.id)} alt="收款凭证" style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }} />
-        ) : null}
-      </Modal>
-
-      {/* F5 本地预览（确认收款弹窗选图后点眼睛） */}
-      <Modal
-        title="凭证图预览（本地上传前）"
-        open={!!localPreview}
-        footer={null}
-        onCancel={() => {
-          if (localPreview) URL.revokeObjectURL(localPreview);
-          setLocalPreview(null);
-        }}
-        width={640}
-      >
-        {localPreview ? <img src={localPreview} alt="凭证预览" style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }} /> : null}
-      </Modal>
+      {/* 收款凭证 / 选图本地预览：统一走全屏干净预览（无窗口壳，可缩放旋转） */}
+      {viewer.node}
     </>
   );
 }
