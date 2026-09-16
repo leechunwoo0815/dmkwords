@@ -22,6 +22,7 @@ from backend.common.notifications import (
     SCENE_RESERVATION_EXPIRING,
     NotificationService,
 )
+from backend.common.sql_utils import escape_like
 from backend.domain.catalog.models import Book, BookCopy
 from backend.domain.circulation.models import BorrowRecord
 from backend.domain.identity.models import Child, Parent
@@ -576,8 +577,14 @@ class ReservationAdminService:
         if status:
             q = q.filter(Reservation.status == status)
         if keyword and keyword.strip():
-            kw = f"%{keyword.strip()}%"
-            q = q.filter(or_(Child.name.ilike(kw), Parent.name.ilike(kw), Parent.phone.ilike(kw)))
+            kw = f"%{escape_like(keyword.strip())}%"
+            q = q.filter(
+                or_(
+                    Child.name.ilike(kw, escape="\\"),
+                    Parent.name.ilike(kw, escape="\\"),
+                    Parent.phone.ilike(kw, escape="\\"),
+                )
+            )
         rows = q.order_by(Reservation.id.desc()).limit(200).all()
         book_ids = {r[0].book_id for r in rows}
         books = (

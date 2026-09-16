@@ -24,6 +24,7 @@ from backend.common.exceptions import (
     ValidationError,
 )
 from backend.common.security import create_admin_token, hash_password, verify_password
+from backend.common.sql_utils import escape_like
 from backend.domain.admin.models import AdminUser, AuditLog, SystemConfig
 from backend.domain.admin.repository import (
     AdminUserRepository,
@@ -398,7 +399,7 @@ class NotifyAdminService:
         if scene:
             q = q.filter(Notification.scene == scene)
         if parent_name:
-            q = q.filter(Parent.name.like(f"%{parent_name}%"))
+            q = q.filter(Parent.name.like(f"%{escape_like(parent_name)}%", escape="\\"))
         all_count = q.count()
         unread_count = q.filter(Notification.read_at.is_(None)).count()
         if unread:

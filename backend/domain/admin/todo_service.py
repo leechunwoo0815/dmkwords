@@ -25,6 +25,7 @@ from backend.common.admin_notifications import (
     TEXT_PENDING,
 )
 from backend.common.exceptions import NotFoundError, ValidationError
+from backend.common.sql_utils import escape_like
 from backend.domain.activity.models import ActivityEnrollment
 from backend.domain.admin.models import AdminUser
 from backend.domain.admin.service import role_has_permission
@@ -313,10 +314,10 @@ class AdminTodoService:
         if scene:
             q = q.filter(AdminNotification.scene == scene)
         if keyword:
-            like = f"%{keyword}%"
+            like = f"%{escape_like(keyword)}%"
             q = q.filter(
-                (AdminNotification.applicant_name.like(like))
-                | (AdminNotification.content.like(like))
+                (AdminNotification.applicant_name.like(like, escape="\\"))
+                | (AdminNotification.content.like(like, escape="\\"))
             )
         rows = q.order_by(AdminNotification.created_at.desc(), AdminNotification.id.desc()).all()
 

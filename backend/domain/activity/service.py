@@ -24,6 +24,7 @@ from backend.common.notifications import (
     SCENE_ACTIVITY_REMIND,
     NotificationService,
 )
+from backend.common.sql_utils import escape_like
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, Order, Parent
 
@@ -51,7 +52,7 @@ class ActivityService:
         if status:
             q = q.filter(Activity.status == status)
         if keyword:
-            q = q.filter(Activity.title.like(f"%{keyword}%"))
+            q = q.filter(Activity.title.like(f"%{escape_like(keyword)}%", escape="\\"))
         if activity_type:
             q = q.filter(Activity.activity_type == activity_type)
         rows = q.order_by(Activity.start_at.desc()).limit(200).all()

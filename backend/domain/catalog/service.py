@@ -9,6 +9,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from backend.common.exceptions import ConflictError, ValidationError
+from backend.common.sql_utils import escape_like
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.catalog.constants import ISBN_RE, clean_isbn
 from backend.domain.catalog.models import Book, BookCopy, QuizQuestion
@@ -67,13 +68,13 @@ class BookService:
         """C3：列表筛选的单一事实源——list_books 与 tab_counts 共用，防口径漂移。"""
         q = self.db.query(Book).filter(Book.is_deleted == 0)
         if keyword:
-            like = f"%{keyword}%"
+            like = f"%{escape_like(keyword)}%"
             q = q.filter(
                 or_(
-                    Book.title.like(like),
-                    Book.author.like(like),
-                    Book.isbn.like(like),
-                    Book.internal_code.like(like),
+                    Book.title.like(like, escape="\\"),
+                    Book.author.like(like, escape="\\"),
+                    Book.isbn.like(like, escape="\\"),
+                    Book.internal_code.like(like, escape="\\"),
                 )
             )
         if ar_pending:
@@ -182,8 +183,8 @@ class BookService:
 
         q = self.db.query(Book).filter(Book.is_deleted == 0, Book.status == Book.STATUS_ON)
         if keyword:
-            like = f"%{keyword}%"
-            q = q.filter(Book.title.like(like) | Book.author.like(like))
+            like = f"%{escape_like(keyword)}%"
+            q = q.filter(Book.title.like(like, escape="\\") | Book.author.like(like, escape="\\"))
         if grade:
             q = q.filter(Book.grade == grade)
         if topic:

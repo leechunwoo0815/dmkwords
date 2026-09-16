@@ -14,6 +14,7 @@ from backend.common.events import OrderPaidEvent, event_bus
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
 from backend.common.notification_models import Notification
 from backend.common.notifications import SCENE_MEMBER_EXPIRE_REMIND, NotificationService
+from backend.common.sql_utils import escape_like
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, Order, Parent, RefundRequest
 
@@ -509,8 +510,10 @@ class OrderService:
         if status:
             q = q.filter(Order.status == status)
         if keyword:
-            like = f"%{keyword}%"
-            q = q.filter(or_(Order.order_no.like(like), Order.remark.like(like)))
+            like = f"%{escape_like(keyword)}%"
+            q = q.filter(
+                or_(Order.order_no.like(like, escape="\\"), Order.remark.like(like, escape="\\"))
+            )
         # W7 受控后端排序：白名单映射写死，非法值 422 暴露前端 bug（禁静默回退）
         order_map = {
             "amount_asc": Order.amount.asc(),

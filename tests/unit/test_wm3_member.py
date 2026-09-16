@@ -183,6 +183,26 @@ def test_parent_search_keyword(client: TestClient):
     assert len(r3.json()) >= 2
 
 
+def test_search_wildcards_are_escaped(client: TestClient):
+    """搜索关键字里的 `%` / `_` 必须当**字面量**，不能当通配符（2026-09-16 接线 escape_like）。
+
+    不转义时：搜 `%` 会命中全部家长（通配全表）、搜 `_` 会变成"任意单字符"。
+    不是 SQL 注入（参数仍绑定），但搜索失真 + 可拿来探测数据。
+    """
+    h = _h(client)
+    _parent(client, h, "13800000021", "通配甲")
+    _parent(client, h, "13800000022", "通配乙")
+    # 前提：不带通配符时确实能搜到人（防"因为没数据所以搜不到"的假绿）
+    hit = client.get("/api/admin/members/parents", params={"keyword": "通配"}, headers=h).json()
+    assert len(hit) == 2, hit
+    # 通配符当字面量：没有任何家长姓名/手机号里含 % 或 _，故应 0 命中
+    for wildcard in ("%", "_", "通配%"):
+        rows = client.get(
+            "/api/admin/members/parents", params={"keyword": wildcard}, headers=h
+        ).json()
+        assert rows == [], f"keyword={wildcard!r} 被当成通配符了（命中 {len(rows)} 条）"
+
+
 def test_orders_counts(client: TestClient):
     """W3 订单 counts：一次返回各状态计数（语义化键名，WM13 预留）。"""
     h = _h(client)

@@ -1,7 +1,10 @@
 <view class="quiz-page">
   <view class="quiz-header">
     <view class="quiz-book-name">{{bookTitle}}</view>
-    <view class="quiz-progress-row" wx:if="{{questions.length}}">
+    <!-- 2026-09-16：进度/剩余机会只在「答题中」显示。原来只看 questions.length，
+         于是已通过/未解锁/机会用尽的页面也挂着「1 / 5 · 剩余机会 N 次」——
+         与下方反馈卡自相矛盾（用户报障「按钮自相矛盾」的同族）。 -->
+    <view class="quiz-progress-row" wx:if="{{questions.length && status !== 'locked' && status !== 'passed' && status !== 'failed'}}">
       <view class="quiz-progress-bar">
         <view class="quiz-progress-fill" style="width: {{(current + 1) * 100 / questions.length}}%"></view>
       </view>
@@ -37,7 +40,10 @@
     </view>
   </view>
 
-  <view class="quiz-footer" wx:if="{{status !== 'locked' && status !== 'failed'}}">
+  <!-- 2026-09-16：底栏只在「答题中」出现。原来这里只排除 locked/failed，
+       status=passed 时上方已显示「已通过 + 选下一本」，底栏却还挂着「提交测验」——
+       两个互相矛盾的动作同屏（用户报障「按钮自相矛盾」）。 -->
+  <view class="quiz-footer" wx:if="{{status !== 'locked' && status !== 'failed' && status !== 'passed'}}">
     <view wx:if="{{current > 0}}" class="next-btn x-dc4dd1" bindtap="onPrev">上一题</view>
     <view class="next-btn" bindtap="onNext">
       {{current === questions.length - 1 ? '提交测验' : '下一题'}}

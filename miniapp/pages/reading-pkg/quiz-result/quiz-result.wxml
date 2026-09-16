@@ -13,9 +13,16 @@
     <view class="result-sub" wx:if="{{result.from_server}}">本机无本次作答记录，显示服务端历史成绩</view>
     <view class="result-sub">{{result.book_title}} · 答对 {{result.score}} / {{result.total}} 题</view>
 
-    <view class="score-circle {{result.passed ? 'ring-pass' : 'ring-fail'}}">
-      <view class="score-value">{{percent}}</view>
-      <view class="score-unit">分</view>
+    <!-- 2026-09-16 接线修复：WXSS 早就写好三层环形（ring 渐变 + inner 挖洞 + 数值），
+         但 WXML 只渲染了数值层 → 环形退化成实心灰盘（用户报障「中性灰成绩徽章发闷」）。
+         `--pct` 也必须显式给，否则 var(--pct, 0%) 恒为 0% → 整环都是 --border。 -->
+    <view class="score-circle">
+      <view class="score-ring {{result.passed ? 'ring-pass' : 'ring-fail'}}"
+        style="--pct: {{percent}}%"></view>
+      <view class="score-inner">
+        <view class="score-value">{{percent}}</view>
+        <view class="score-unit">分</view>
+      </view>
     </view>
 
     <view class="stats-row" wx:if="{{result.passed}}">

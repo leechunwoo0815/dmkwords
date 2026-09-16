@@ -1,6 +1,6 @@
 """小程序风格基准机械门禁（2026-09-13，任务包-20260913 §五 落地）。
 
-十一条规则（R1–R7 = 最初七条；R8–R11 = 后续插修补入）：
+十二条规则（R1–R7 = 最初七条；R8–R11 = 后续插修补入；R12 = 2026-09-16 悬空类名）：
   R1 裸色值:    pages/components/custom-tab-bar 的 wxss 禁止色值字面量（app.wxss 定义令牌除外）
   R2 内联样式:  wxml 禁止 style= 写死颜色/尺寸（{{}} 动态绑定除外）；布局原语 WARN
   R3 同义类:    页面 wxss 禁止重复定义公共类（.empty-text/.section-title/...）
@@ -13,6 +13,10 @@
   R9 花括号结构: wxss 花括号配对失衡 = 0
   R10 组件变量兜底: 拿不到 page 变量的组件，var(--x) 必须带字面兜底
   R11 非法选择器: 选择器位置出现 var()（会让整个分包 WXSS 编译失败）
+  R12 悬空类名:  WXML 用到的类名必须在**本页作用域**（同目录 wxss + app.wxss + @import 链）有定义；
+                 别的页面定义了同名类不算（WXSS 按页隔离）。专治「设计做完、模板没接」——
+                 WXML 写 `speed-chip-active`、WXSS 定义 `.speed-chip.active` → 选中态永远不亮。
+                 已知存量走 R12_BASELINE（只许减不许增），新增直接 FAIL。
   ↑ R1–R7 为最初七条；R8–R11 为后续插修补入。**以 main() 实际打印的规则清单为准**
     （历史教训：docstring 只列七条、实现已十一条，文档与代码不同步）。
 
@@ -583,6 +587,116 @@ def m_group(line: str) -> str:
     return m.group(0) if m else "forbidden"
 
 
+# R12 基线（2026-09-16 首扫）：**已知悬空类名**，第二批待清；只许减不许增。
+# 新增（不在本表）直接 FAIL —— 这条规则专治「设计做完、模板没接」：
+#   WXML 写 speed-chip-active，WXSS 定义的是 .speed-chip.active → 选中态永远不亮（用户报障）。
+# 清理方式二选一：① 把 WXML 类名改成 WXSS 已有的（多数情况）；② 在页面 wxss 补上样式。
+R12_BASELINE: dict[str, tuple[str, ...]] = {
+    # 2026-09-16 首扫基线 35 处（第二批待清；清理时删行，别加行）
+    "components/pay-button/pay-button.wxml": ("pay-button-container",),
+    "pages/activity-pkg/activity-detail/activity-detail.wxml": ("qr-bright-hint",),
+    "pages/agreement/service-agreement/service-agreement.wxml": (
+        "agreement-title",
+        "section-content",
+    ),
+    "pages/index/index.wxml": ("badge-member", "hero-left"),
+    "pages/member-pkg/achievement/achievement.wxml": ("section-label",),
+    "pages/member-pkg/checkin/checkin.wxml": ("page-bg",),
+    "pages/member-pkg/observation-report/observation-report.wxml": (
+        "empty-icon",
+        "empty-state",
+        "page-bg",
+    ),
+    "pages/member-pkg/purchase/purchase.wxml": ("plan-feats",),
+    "pages/member-pkg/report/report.wxml": ("page-bg",),
+    "pages/order-pkg/benefit-transfer/benefit-transfer.wxml": (
+        "active",
+        "cancel",
+        "check-card",
+        "check-item-row",
+    ),
+    "pages/order-pkg/deposit/deposit.wxml": ("page-bg",),
+    "pages/order-pkg/messages/messages.wxml": ("empty-state", "is-unread"),
+    "pages/order-pkg/order-history/order-history.wxml": ("order-icon-text",),
+    "pages/reading-pkg/book-detail/book-detail.wxml": ("hero-cover-empty",),
+}
+
+
+def _class_tokens_from_attr(raw: str) -> set[str]:
+    """从 class="..." 抽出**静态可判**的类名（动态值先剔除，防误报）。
+
+    - 去掉 {{...}} 后的字面 token = 静态类名
+    - {{cond ? 'a' : 'b'}} 的分支字面量 = 条件类名；`=== 'x'` 里的比较值**不算**类名
+    - `badge-{{cond ? 'paid' : 'x'}}` 这种前缀拼接 = 真实类名 badge-paid；
+      **拼接过的那段不再单独出裸类名**（否则 paid/pending/refunded 全是假阳性）
+    """
+    out: set[str] = set()
+    # ① 前缀拼接：xxx-{{...}} → 分支拼上前缀才是真实类名
+    for pm in re.finditer(r"([A-Za-z][A-Za-z0-9_\-]*-)\{\{(.*?)\}\}", raw, re.S):
+        for b in re.finditer(r"'([A-Za-z][A-Za-z0-9_\-]*)'", pm.group(2)):
+            out.add(pm.group(1) + b.group(1))
+    # ② 拼接过的那段先挖掉，剩下的 {{...}} 才按条件类名解析
+    masked = re.sub(r"[A-Za-z][A-Za-z0-9_\-]*-(\{\{.*?\}\})", " ", raw, flags=re.S)
+    cleaned = re.sub(r"[=!]==?\s*['\"][^'\"]*['\"]", " ", masked)
+    cleaned = re.sub(r"[=!]==?\s*[^?:\s]+", " ", cleaned)
+    cleaned = re.sub(r"[<>]=?\s*[^?:\s]+", " ", cleaned)
+    for m in re.finditer(r"'([A-Za-z][A-Za-z0-9_\-]*)'|\"([A-Za-z][A-Za-z0-9_\-]*)\"", cleaned):
+        tok = m.group(1) or m.group(2)
+        if not tok.endswith("-"):
+            out.add(tok)
+    static = re.sub(r"\{\{.*?\}\}", " ", masked, flags=re.S)
+    for t in re.findall(r"[A-Za-z][A-Za-z0-9_\-]*", static):
+        if not t.endswith("-"):
+            out.add(t)
+    return out
+
+
+def _wxss_scope(css_paths, seen=None) -> str:
+    """把一批 wxss 连同 @import 链拼成一坨文本（类名定义都算在内）。"""
+    seen = seen if seen is not None else set()
+    text = ""
+    for p in css_paths:
+        p = Path(p)
+        if p in seen or not p.exists():
+            continue
+        seen.add(p)
+        raw = p.read_text(encoding="utf-8")
+        text += raw
+        for imp in re.findall(r"@import\s+[\"']([^\"']+)[\"']", raw):
+            text += _wxss_scope([(p.parent / imp).resolve()], seen)
+    return text
+
+
+def scan_undefined_classes(base: Path = MINIAPP):
+    """R12: WXML 里用到的类名必须在该页**作用域内**的 wxss 有定义。
+
+    作用域 = 同目录全部 wxss（含 @import 链）+ app.wxss（含 @import 链）。
+    WXSS 是**按页隔离**的，别的页面定义了同名类不算（`.page-bg` 就是这么漏的）。
+    只判静态可判类名（见 _class_tokens_from_attr），动态值一律不判，防误报。
+    """
+    new: list[tuple[str, int, str]] = []
+    baseline_hits: list[tuple[str, int, str]] = []
+    for wxml in sorted(base.rglob("*.wxml")):
+        if "__pycache__" in wxml.parts:
+            continue
+        rel = str(wxml.relative_to(base))
+        scope_css: list[Path] = [base / "app.wxss"]
+        if "components" in wxml.parts and (wxml.parent / f"{wxml.stem}.wxss").exists():
+            scope_css.append(wxml.parent / f"{wxml.stem}.wxss")
+        else:
+            scope_css += sorted(wxml.parent.glob("*.wxss"))
+        defined = set(re.findall(r"\.([A-Za-z][A-Za-z0-9_\-]*)", _wxss_scope(scope_css)))
+        text = wxml.read_text(encoding="utf-8")
+        allowed = set(R12_BASELINE.get(rel, ()))
+        for m in re.finditer(r'class\s*=\s*"([^"]*)"', text):
+            ln = text[: m.start()].count("\n") + 1
+            for tok in sorted(_class_tokens_from_attr(m.group(1))):
+                if tok in defined:
+                    continue
+                (baseline_hits if tok in allowed else new).append((rel, ln, tok))
+    return new, baseline_hits
+
+
 def self_test(tokens: set[str]) -> list[str]:
     """S1 注入自检：对内置违例样本运行检测器，必须全部命中。"""
     failures: list[str] = []
@@ -614,6 +728,10 @@ def self_test(tokens: set[str]) -> list[str]:
         (tmp / "pages/selvar.wxss").write_text(
             ".podium-card.var(--gold) { color: red; }\n", encoding="utf-8"
         )
+        # R12 注入样本：demo.wxss 只定义了 .a/.b，wxml 里故意用 .ghost（悬空）+ .a（正常）
+        (tmp / "pages/ghost.wxml").write_text(
+            "<view class=\"ghost {{ok ? 'a' : 'missing-cond'}}\">x</view>\n", encoding="utf-8"
+        )
 
         app_wxss = tmp / "app.wxss"
         toks = token_values(app_wxss.read_text(encoding="utf-8"))
@@ -644,6 +762,12 @@ def self_test(tokens: set[str]) -> list[str]:
         syn8 = scan_syntax(wfiles, base=tmp)
         br = scan_brace_structure(wfiles, base=tmp)
         sv = scan_selector_var(wfiles, base=tmp)
+        r12_new, _r12_base = scan_undefined_classes(base=tmp)
+        r12_hits = {t for _f, _l, t in r12_new}
+        if "ghost" not in r12_hits or "missing-cond" not in r12_hits:
+            failures.append(f"S1 悬空类名漏检: {r12_new}")
+        if "a" in r12_hits:
+            failures.append(f"S1 悬空类名误报（.a 在 demo.wxss 已定义）: {r12_new}")
         if not sv:
             failures.append("S1 非法选择器漏检")
         if not br:
@@ -688,6 +812,7 @@ def main() -> int:
     braces = scan_brace_structure(wxss)
     nofb = scan_component_fallback(wxss)
     selv = scan_selector_var(wxss)
+    undef_new, undef_base = scan_undefined_classes()
 
     n_token_equal = sum(1 for c in colors if c[3] == "token-equal")
     n_true_split = sum(1 for c in colors if c[3] == "true-split")
@@ -711,6 +836,11 @@ def main() -> int:
     print(f"R9 花括号结构: {len(braces)}")
     print(f"R10 组件变量兜底: {len(nofb)}")
     print(f"R11 非法选择器(选择器位置 var): {len(selv)}")
+    n_base = sum(len(v) for v in R12_BASELINE.values())
+    print(
+        f"R12 悬空类名(WXML 用到、本页 wxss 无定义): 新违规 {len(undef_new)} / "
+        f"基线待清 {n_base} 个类名（命中 {len(undef_base)} 处引用，只许减）"
+    )
     print(f"豁免白名单: {len(WHITELIST)} 条（初始 0 条，遇一例议一例）")
     for suffix, pattern, reason, date in WHITELIST:
         print(f"  - {suffix} /{pattern}/ {reason} ({date})")
@@ -742,11 +872,14 @@ def main() -> int:
     dump("R9 花括号结构", braces)
     dump("R10 组件缺字面兜底", nofb)
     dump("R11 非法选择器", selv)
+    dump("R12 悬空类名（新违规，必须修）", undef_new)
 
     for f, ln, d in braces:
         errors.append(f"R9 {f}:{ln} 结构非法 {d}")
     for f, ln, d in selv:
         errors.append(f"R11 {f}:{ln} 非法选择器（选择器位置出现 var）: {d}")
+    for f, ln, d in undef_new:
+        errors.append(f"R12 {f}:{ln} 悬空类名 .{d}（WXML 用到但本页 wxss 无定义）")
     for f, ln, d in nofb:
         errors.append(f"R10 {f}:{ln} 组件变量缺字面兜底 {d}")
     for f, ln, v, _k in colors:

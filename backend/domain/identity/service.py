@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
 from backend.common.notification_models import Notification
 from backend.common.notifications import SCENE_MEMBER_EXPIRE_REMIND, NotificationService
+from backend.common.sql_utils import escape_like
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, Order, Parent
 
@@ -141,8 +142,10 @@ class ParentService:
         """家长搜索（W1 建档选择器：姓名/手机号模糊匹配）。"""
         q = self.db.query(Parent).filter(Parent.is_deleted == 0)
         if keyword:
-            like = f"%{keyword}%"
-            q = q.filter(or_(Parent.name.like(like), Parent.phone.like(like)))
+            like = f"%{escape_like(keyword)}%"
+            q = q.filter(
+                or_(Parent.name.like(like, escape="\\"), Parent.phone.like(like, escape="\\"))
+            )
         return q.order_by(Parent.id.desc()).limit(limit).all()
 
     # ---- WM3-B1 家长编辑/删除（订单守卫）----
@@ -227,8 +230,10 @@ class ParentService:
         """家长管理 tab 分页（含 children_count / has_orders）。"""
         q = self.db.query(Parent).filter(Parent.is_deleted == 0)
         if keyword:
-            like = f"%{keyword}%"
-            q = q.filter(or_(Parent.name.like(like), Parent.phone.like(like)))
+            like = f"%{escape_like(keyword)}%"
+            q = q.filter(
+                or_(Parent.name.like(like, escape="\\"), Parent.phone.like(like, escape="\\"))
+            )
         total = q.count()
         q = q.order_by(Parent.id.desc())
         parents = q.offset((page - 1) * page_size).limit(page_size).all()
@@ -439,13 +444,13 @@ class ChildService:
     def list_children(self, page: int, page_size: int, keyword: str | None, status: str | None):
         q = self.db.query(Child).filter(Child.is_deleted == 0)
         if keyword:
-            like = f"%{keyword}%"
+            like = f"%{escape_like(keyword)}%"
             q = q.join(Parent, Child.parent_id == Parent.id).filter(
                 or_(
-                    Child.name.like(like),
-                    Child.english_name.like(like),
-                    Parent.phone.like(like),
-                    Parent.name.like(like),
+                    Child.name.like(like, escape="\\"),
+                    Child.english_name.like(like, escape="\\"),
+                    Parent.phone.like(like, escape="\\"),
+                    Parent.name.like(like, escape="\\"),
                 )
             )
         else:

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.common.config_service import ConfigService
 from backend.common.exceptions import NotFoundError, ValidationError
+from backend.common.sql_utils import escape_like
 from backend.domain.billing.models import Deposit, DepositLedger
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, Order
@@ -320,9 +321,9 @@ class DepositService:
         if status:
             q = q.filter(Deposit.status == status)
         if keyword:
-            like = f"%{keyword}%"
+            like = f"%{escape_like(keyword)}%"
             q = q.filter(
-                or_(Child.name.like(like), Child.english_name.like(like))
+                or_(Child.name.like(like, escape="\\"), Child.english_name.like(like, escape="\\"))
             )  # func.or_ 在 MySQL 生成非法 SQL（E-20260830 族）
         total = q.count()
         rows = q.order_by(Deposit.id.desc()).offset((page - 1) * page_size).limit(page_size).all()

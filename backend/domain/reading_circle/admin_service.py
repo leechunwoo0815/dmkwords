@@ -14,6 +14,7 @@ from sqlalchemy import and_, func, or_, update
 from sqlalchemy.orm import Session
 
 from backend.common.exceptions import NotFoundError, ValidationError
+from backend.common.sql_utils import escape_like
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, Parent
 from backend.domain.reading_circle.card_engine import CARD_TYPE_LABELS
@@ -52,12 +53,12 @@ class AdminCircleService(CircleService):
         if end:
             q = q.filter(CirclePost.created_at < end)
         if keyword:
-            like = f"%{keyword}%"
+            like = f"%{escape_like(keyword)}%"
             q = q.filter(
-                (Child.name.like(like))
-                | (ParentModel.name.like(like))
-                | (ParentModel.display_name.like(like))
-                | (Child.english_name.like(like))
+                (Child.name.like(like, escape="\\"))
+                | (ParentModel.name.like(like, escape="\\"))
+                | (ParentModel.display_name.like(like, escape="\\"))
+                | (Child.english_name.like(like, escape="\\"))
             )
         total = q.count()
         rows = (

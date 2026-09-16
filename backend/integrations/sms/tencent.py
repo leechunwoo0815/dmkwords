@@ -1,3 +1,6 @@
+# 未接线（2026-09-16 复核）：本网关实现完整（脱敏/重试/错误归一），但**无人 import**。
+# 现状：渠道选择器（common/gateways/sms/__init__.py）只导出 base/types，没有任何地方按厂商选，
+#       实际只走 Mock（MOCK_SMS=true）。启用见 docs/08 技术债台账 TD 行。
 import asyncio
 import logging
 import random

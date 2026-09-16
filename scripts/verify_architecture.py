@@ -173,6 +173,54 @@ def check_mutation_count_flush() -> list[str]:
     return alerts
 
 
+def check_like_escape(errors: list[str]) -> None:
+    """用户输入进 LIKE 必须转义（2026-09-16：``sql_utils.escape_like`` 写了却没人用）。
+
+    不转义的后果：搜索框里输 `%` 会匹配全部、输 `_` 会被当单字符通配——不是 SQL 注入
+    （参数仍绑定），但搜索失真、且能拿来探测数据。踩坑模式与 `question_validation`
+    同类：**「设计了统一入口但调用点各写各的」**，故进架构关机械拦截。
+
+    两种写法都要拦（首版只拦内联式，自证时被变量式绕过，已修正）：
+      A 内联：`X.like(f"%{keyword}%")`            → 本行须有 `escape=` 且须有 `escape_like(`
+      B 变量：`like = f"%{keyword}%"` + `X.like(like)` → 调用行须有 `escape=`，
+                                                        且赋值行须有 `escape_like(`
+    `escape=` 只声明"用反斜杠当转义符"，**前提是输入里的 % _ 已被 escape_like 转义**，
+    故两个条件都要。sql_utils 自身跳过（它就是要讲这件事）。
+    """
+    for py in BACKEND.rglob("*.py"):
+        if "__pycache__" in py.parts or py.name == "sql_utils.py":
+            continue
+        lines = py.read_text(encoding="utf-8").split("\n")
+        # 扫描一：收集"由 f-string 拼出来的 LIKE 模式变量"，记录该赋值有没有过 escape_like
+        pattern_vars: dict[str, tuple[int, bool]] = {}
+        for ln, line in enumerate(lines, 1):
+            m = re.match(r"\s*(\w+)\s*=\s*f\"%", line)
+            if m:
+                pattern_vars[m.group(1)] = (ln, "escape_like(" in line)
+        # 扫描二：逐行检查 .like/.ilike 调用
+        for ln, line in enumerate(lines, 1):
+            if not re.search(r"\.i?like\(", line):
+                continue
+            inline = "%" in line.split(".like")[-1] or "%" in line
+            uses_var = [
+                v for v in pattern_vars if re.search(rf"\.i?like\(\s*{re.escape(v)}\b", line)
+            ]
+            if not inline and not uses_var:
+                continue  # 既不是内联模式串、也没引用拼出来的变量（如领域方法 CircleService.like）
+            if "escape=" not in line:
+                errors.append(
+                    f"{py.relative_to(ROOT)}:{ln}: LIKE 调用缺 escape=（应用 escape_like + escape=）"
+                )
+            if inline and "escape_like(" not in line:
+                errors.append(f"{py.relative_to(ROOT)}:{ln}: 内联 LIKE 模式未经 escape_like 转义")
+            for var, (assign_ln, escaped) in ((v, pattern_vars[v]) for v in uses_var):
+                if not escaped:
+                    errors.append(
+                        f"{py.relative_to(ROOT)}:{assign_ln}: LIKE 模式变量 `{var}` 未经 "
+                        f"escape_like 转义（在 {ln} 行被使用）"
+                    )
+
+
 def main() -> int:
     errors: list[str] = []
     check_four_pieces(errors)
@@ -181,6 +229,7 @@ def main() -> int:
     check_file_length(errors)
     check_sqlite_ban(errors)
     check_import_whitelist(errors)
+    check_like_escape(errors)
 
     if errors:
         print(f"架构关 FAIL（{len(errors)} 处违规）：")
@@ -189,7 +238,7 @@ def main() -> int:
         return 1
     print(
         "架构关 PASS：四件套齐全 / Router 零违规（含 miniapp_router）/ 锁定读均链 populate_existing"
-        " / 行数达标 / 无 sqlite / import 白名单通过"
+        " / 行数达标 / 无 sqlite / import 白名单通过 / LIKE 全转义"
     )
     alerts = check_mutation_count_flush()
     if alerts:

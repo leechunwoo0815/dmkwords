@@ -1,6 +1,11 @@
 // frontend/utils/consent.js — 三段式监护人同意（前端流程唯一入口）
 // F-L7/T34：TODO——本模块引用的后端端点未实现（consent 三段式=PRD F3），
-//   废弃或实现待产品定（域F LOW 清偿登记）；未接入任何页面
+//   废弃或实现待产品定（域F LOW 清偿登记）；**未接入任何页面**（2026-09-16 复核仍为死代码）
+//
+// 未接线标注（2026-09-16）：本文件 + `pages/agreement/*` 静态页 = 同意链的现状；
+//   后端**没有** `/user/consent`、`/user/consent/texts` 端点，原 `backend/common/consent_texts.py`
+//   （第三份正文）已删除。将来实现 FEAT-006 时：**以 `pages/agreement/privacy-policy` 的正文为唯一文案源**，
+//   端点按 PRD F3 设计，别再造第三份正文。
 //
 // 用法：
 //   const consent = require('../../utils/consent')
@@ -21,7 +26,7 @@ const TYPE_TO_ERROR_CODE = {
   voice_recording: 'voice_consent_required',
 }
 
-// 兜底摘要（网络失败或文案过长时使用，与后端 consent_texts.py 同源）
+// 兜底摘要（网络失败或文案过长时使用；文案源见文件头——pages/agreement 静态页）
 const FALLBACK_SUMMARY = {
   privacy_policy: '请阅读并同意《隐私政策》后继续使用。完整文本见登录页"隐私政策"链接。',
   child_data:
