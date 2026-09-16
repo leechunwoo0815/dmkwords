@@ -1,5 +1,9 @@
 # backend/domain/growth/report_service.py — 周报/月报数据与图片生成（WM8，FEAT-053）
-"""图片为家长传播素材：Pillow 绘制存 uploads/reports/，家长端可保存转发。"""
+"""图片为家长传播素材：Pillow 绘制存 uploads/reports/，家长端可保存转发。
+
+绘制**必须走 `reading_circle.art` 引擎**（阅读圈卡片/头像/勋章同一套视觉语言）——
+禁止在本模块手搓矩形+系统字体（2026-09-15 用户报障「跟本项目的样式风格格格不入」的根因）。
+"""
 
 from __future__ import annotations
 
@@ -17,24 +21,8 @@ from backend.domain.identity.models import Child
 class ReportService:
     """周报/月报图片（FEAT-053：家长可保存转发）。Pillow 绘制，存 uploads/reports/。"""
 
-    FONT_CANDIDATES = [
-        "/System/Library/Fonts/Hiragino Sans GB.ttc",
-        "/System/Library/Fonts/STHeiti Light.ttc",
-        "/System/Library/Fonts/Supplemental/Songti.ttc",
-    ]
-
     def __init__(self, db: Session):
         self.db = db
-
-    def _font(self, size: int):
-        from PIL import ImageFont
-
-        for path in self.FONT_CANDIDATES:
-            try:
-                return ImageFont.truetype(path, size)
-            except OSError:
-                continue
-        return ImageFont.load_default()
 
     def period_range(self, kind: str) -> tuple[datetime, datetime, str]:
         """周报=上个自然周；月报=上个自然月。"""
@@ -128,76 +116,168 @@ class ReportService:
         import os
         import uuid
 
-        from PIL import Image, ImageDraw
-
         data = self.report_data(child, kind)
-        W, H = 750, 1100
-        BG, CARD, INK, MUTED, ACCENT = "#f6f2e9", "#fffefa", "#262419", "#6f685a", "#2c4a6e"
-        GOLD = "#c9a227"
-        img = Image.new("RGB", (W, H), BG)
-        d = ImageDraw.Draw(img)
-        f_title = self._font(52)
-        f_sub = self._font(30)
-        f_big = self._font(72)
-        f_lbl = self._font(26)
-
-        # 头部
-        d.rectangle([0, 0, W, 210], fill=ACCENT)
-        title = "DmkWords 阅读周报" if kind == "weekly" else "DmkWords 阅读月报"
-        d.text((48, 52), title, font=f_title, fill="#fffefa")
-        d.text(
-            (48, 130), f"{data['child_name']} · {data['period_label']}", font=f_sub, fill="#d9e2ee"
-        )
-
-        # 核心数字卡
-        d.rounded_rectangle(
-            [40, 250, W - 40, 470], radius=24, fill=CARD, outline="#e4dcc8", width=2
-        )
-        d.text((72, 285), "本期有效阅读词数", font=f_lbl, fill=MUTED)
-        d.text((72, 320), f"{data['words']:,}", font=f_big, fill=ACCENT)
-        d.text(
-            (72, 430),
-            f"累计 {data['total_words']:,} 词 · {data['level']} 级 · {data['points_total']} 积分",
-            font=f_sub,
-            fill=INK,
-        )
-
-        # 四格统计
-        stats = [
-            ("读完本书", f"{data['books']} 本"),
-            ("打卡天数", f"{data['checkin_days']} 天"),
-            ("测验次数", f"{data['quiz_count']} 次"),
-            (
-                "平均正确率",
-                f"{data['quiz_avg_percent']}%" if data["quiz_avg_percent"] is not None else "—",
-            ),
-        ]
-        x0, y0, bw, bh, gap = 40, 510, (W - 80 - 24) // 2, 150, 24
-        for i, (lbl, val) in enumerate(stats):
-            x = x0 + (i % 2) * (bw + gap)
-            y = y0 + (i // 2) * (bh + gap)
-            d.rounded_rectangle(
-                [x, y, x + bw, y + bh], radius=20, fill=CARD, outline="#e4dcc8", width=2
-            )
-            d.text((x + 24, y + 28), lbl, font=f_lbl, fill=MUTED)
-            d.text((x + 24, y + 66), val, font=self._font(44), fill=INK)
-
-        # 鼓励语
-        d.rounded_rectangle(
-            [40, 860, W - 40, 960], radius=20, fill="#f6edd3", outline=GOLD, width=2
-        )
-        msg = "每一分钟的聆听，都在悄悄变成孩子的翅膀。"
-        d.text((72, 900), msg, font=f_sub, fill="#736013")
-
-        # 底部品牌
-        d.text((48, H - 70), "DmkWords 少儿英语分级阅读 · 保存分享这份成长", font=f_lbl, fill=MUTED)
-
-        rel_dir = "reports"
-        out_dir = os.path.join(_uploads_root(), rel_dir)
-        os.makedirs(out_dir, exist_ok=True)
+        cv = paint_report(data, child, kind)
+        out_dir = os.path.join(_uploads_root(), "reports")
         filename = f"report_{kind}_{child.id}_{uuid.uuid4().hex[:8]}.png"
-        img.save(os.path.join(out_dir, filename), "PNG")
-        return f"{rel_dir}/{filename}"
+        cv.finish(os.path.join(out_dir, filename))
+        return f"reports/{filename}"
+
+
+# ---------------- 报告图绘制（WM8 / 2026-09-15 绘本风重做） ----------------
+# 用户原话：「生成的周报和月报，跟本项目的样式风格格格不入」。旧版是**手搓的通用报表**：
+# 深蓝横幅（#2c4a6e）+ 系统字体（Hiragino/STHeiti）+ 细线白卡——与本项目绘本令牌
+# （暖纸底 / 粗描边 / 圆体数字 / 云朵星闪 / 吉祥物）毫无关系，正是 art.py 开头警告的
+# 「各画各的必然割裂」。本版**全部改用 reading_circle.art 绘制引擎**（阅读圈卡片的同一套：
+# 超采样画布 + 马卡龙渐变 + 白描边贴纸字 + 圆角气泡 + 纸纹），与卡片/头像/勋章同源。
+#
+# 版式（750×1100，尺寸与旧版一致，家长端与管理端展示布局零改动）：
+#   标题胶囊 → 孩子·周期 → 主数字卡（大词数 + 吉祥物探头）→ 2×2 统计卡 → 鼓励语 → 日期条 → 馆标
+
+REPORT_W, REPORT_H = 750, 1100
+#: 周报=薰衣草紫（art 里 weekly_report 专用色），月报=薄荷绿（复用 books_count 色）
+REPORT_PALETTES = {"weekly": "weekly_report", "monthly": "books_count"}
+
+
+def _mascot_kind(child: Child) -> str:
+    """报告吉祥物 = 孩子自己的头像动物（`owl_sun` → `owl`），认不出则用小熊兜底。"""
+    from backend.domain.reading_circle import art
+
+    kind = str(child.avatar or "").split("_")[0]
+    return kind if kind in art.KIND_BASE else "bear"
+
+
+def paint_report(data: dict, child: Child, kind: str):
+    """按绘本视觉语言绘制周报/月报画布（返回超采样 Canvas，调用方落盘）。"""
+    from backend.domain.reading_circle import art
+    from backend.domain.reading_circle.art_mascot import mascot as art_mascot
+
+    pal = art.PALETTES[REPORT_PALETTES.get(kind, "weekly_report")]
+    cv = art.Canvas(REPORT_W, REPORT_H, pal)
+
+    # ---- 页面级装饰：只放卡片框外的安全边距，杜绝"被边框裁切" ----
+    art.glow(cv, 620, 92, 150, "#FFFFFF", 95)
+    art.glow(cv, 118, 84, 112, "#FFFFFF", 70)
+    # 云朵从标题横幅两侧探出来（横幅 100..650 压在云上，露出的部分即装饰）
+    art.cloud(cv, 70, 104, 140, "#FFFFFF", 200)
+    art.cloud(cv, 682, 100, 128, "#FFFFFF", 160)
+    art.sparkle(cv, 30, 176, 12, "#FFFFFF", 225)
+    art.sparkle(cv, 720, 184, 11, "#FFFFFF", 215)
+    art.star(cv, 24, 258, 11, "#FFFFFF", outline=pal["accent"], width=2.0, rotate=0.3)
+    art.star(cv, 726, 326, 10, "#FFFFFF", outline=pal["accent"], width=1.8, rotate=-0.2)
+    art.sparkle(cv, 22, 640, 11, "#FFFFFF", 205)
+    art.sparkle(cv, 728, 712, 10, "#FFFFFF", 200)
+    art.star(cv, 726, 906, 10, "#FFFFFF", outline=pal["accent"], width=1.7, rotate=0.24)
+
+    # ---- 标题横幅 + 孩子·周期 ----
+    # 横幅宽度按实测字宽（44px「DmkWords 阅读周报」= 454px）+ 左右各 48px 内边距定，
+    # 别再靠目测写死：首版 450 宽恰好比字窄 4px，白字直接糊在渐变背景上（已目视暴露）。
+    art.bubble(cv, (100, 54, 650, 146), radius=46, fill=pal["accent"], outline=None)
+    title = "DmkWords 阅读周报" if kind == "weekly" else "DmkWords 阅读月报"
+    art.sticker_text(cv, (375, 100), title, art.font_cn(44), "#FFFFFF")
+    art.sticker_text(
+        cv,
+        (375, 176),
+        f"{data['child_name']} · {data['period_label']}",
+        art.font_cn(29),
+        art.INK,
+        alpha=205,
+    )
+
+    # ---- 主数字卡（本期词数）+ 吉祥物探头 ----
+    art.soft_shadow(cv, (40, 216, 710, 544), radius=46, blur=12, alpha=58)
+    art.bubble(cv, (40, 216, 710, 544), radius=46, fill=art.PAPER, outline=pal["accent"], width=6)
+    art.glow(cv, 375, 372, 230, "#FFFFFF", 88)
+    art.sticker_text(cv, (375, 272), "本期有效阅读词数", art.font_cn(28), art.INK, alpha=165)
+    art.sticker_pair(
+        cv,
+        (375, 372),
+        f"{data['words']:,}",
+        art.font_round(118),
+        "词",
+        art.font_cn(52),
+        pal["deep"],
+        stroke="#FFFFFF",
+        stroke_w=9,
+        dy_unit=20,
+    )
+    art.sticker_text(
+        cv,
+        (375, 478),
+        f"累计 {data['total_words']:,} 词 · {data['level']} 级 · {data['points_total']} 积分",
+        art.font_cn(27),
+        art.INK,
+    )
+    kind_name = _mascot_kind(child)
+    base = art.KIND_BASE[kind_name]
+    art_mascot(
+        cv, 642, 306, 60, kind=kind_name, fur=base["fur"], ear=base["ear"], blush=base["blush"]
+    )
+
+    # ---- 2×2 统计卡（数字用圆体，量词用中文字体，作为整词居中） ----
+    stats: list[tuple[str, str, str]] = [
+        ("读完本书", f"{data['books']}", "本"),
+        ("打卡天数", f"{data['checkin_days']}", "天"),
+        ("测验次数", f"{data['quiz_count']}", "次"),
+        (
+            "平均正确率",
+            f"{data['quiz_avg_percent']}" if data["quiz_avg_percent"] is not None else "—",
+            "%" if data["quiz_avg_percent"] is not None else "",
+        ),
+    ]
+    for i, (lbl, val, unit) in enumerate(stats):
+        x0 = 40 if i % 2 == 0 else 388
+        y0 = 560 if i < 2 else 716
+        cx = x0 + 161
+        art.soft_shadow(cv, (x0, y0, x0 + 322, y0 + 140), radius=36, blur=9, alpha=46)
+        art.bubble(
+            cv,
+            (x0, y0, x0 + 322, y0 + 140),
+            radius=36,
+            fill=art.PAPER,
+            outline=pal["accent"],
+            width=5,
+        )
+        art.sticker_text(cv, (cx, y0 + 44), lbl, art.font_cn(26), art.INK, alpha=165)
+        if unit:
+            art.sticker_pair(
+                cv,
+                (cx, y0 + 100),
+                val,
+                art.font_round(46),
+                unit,
+                art.font_cn(30),
+                pal["deep"],
+                dy_unit=10,
+            )
+        else:
+            art.sticker_text(cv, (cx, y0 + 100), val, art.font_round(46), pal["deep"])
+
+    # ---- 鼓励语 + 日期条 + 馆标 ----
+    # 零阅读周期不摆冷冰冰的空卡：换一句"邀请开始"，家长转发出去也不难看
+    art.bubble(cv, (40, 876, 710, 952), radius=30, fill=art.PAPER, outline=pal["accent"], width=5)
+    art.sticker_text(
+        cv,
+        (375, 914),
+        (
+            "每一分钟的聆听，都在悄悄变成孩子的翅膀。"
+            if data["words"] or data["books"] or data["checkin_days"]
+            else "这个周期还没有阅读记录，今晚挑一本开始吧～"
+        ),
+        art.font_cn(28),
+        art.INK,
+    )
+    art.bubble(cv, (60, 976, 690, 1028), radius=26, fill=pal["accent"], outline=None)
+    art.sticker_text(
+        cv,
+        (375, 1002),
+        f"{datetime.now():%Y-%m-%d} · 保存分享这份成长",
+        art.font_cn(26),
+        "#FFFFFF",
+    )
+    art.sticker_text(cv, (375, 1062), "DmkWords 少儿英语分级阅读", art.font_cn(23), art.INK)
+    art.paper_grain(cv)
+    return cv
 
 
 def _uploads_root() -> str:

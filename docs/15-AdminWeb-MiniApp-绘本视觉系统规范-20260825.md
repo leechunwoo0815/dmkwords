@@ -684,7 +684,50 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 
 ---
 
+## 十四、后端出图统一规范（2026-09-15，用户报障后立规）
+
+**用户原话**：「生成的周报和月报，跟本项目的样式风格格格不入。」
+
+### 14.1 铁律：凡是要出图的东西，一律走 `reading_circle/art.py`
+
+后端**只有一套**绘图引擎：`backend/domain/reading_circle/art.py`（超采样画布 + 马卡龙渐变 +
+白描边贴纸字 + 圆角气泡 + 云朵/星闪/彩虹 + 纸纹颗粒 + 吉祥物）。当前三类消费方：
+
+| 资产 | 位置 | 色盘 |
+|---|---|---|
+| 阅读圈卡片（大图 + 缩略图） | `reading_circle/card_render.py` | 按卡型取 `art.PALETTES` |
+| 头像 24 枚 / 勋章 9 枚 / 名片海报 | `scripts/gen_wm15_*`、`profile_service` | 按类型取 `art.PALETTES` / `KIND_BASE` |
+| **周报 / 月报** | `growth/report_service.py::paint_report` | 周报=薰衣草紫 `weekly_report`；月报=薄荷绿 `books_count` |
+
+- **禁止**在业务模块里 `ImageDraw.rectangle/rounded_rectangle + ImageFont.truetype(系统字体)`
+  手搓图（2026-09-15 之前的报告图就是这么写的：深蓝横幅 + Hiragino，与绘本语言零交集）；
+- 引擎里缺原语 → **往 art.py 加原语**（云朵/星星/气泡/贴纸字都已就绪），不要另起一套；
+- 字体一律 `art.font_cn()`（中文，Hiragino Sans GB **W6**）+ `art.font_round()`（数字/字母，
+  .SF NS Rounded）——数字用圆体是卡哇伊的关键信号，别退回系统默认；
+- 出图后**必须自己看一遍**：`textlength` 先量字宽再定容器（别目测写死，见错误库 E-20260915-31）；
+- 尺寸变更要同步检查消费端（管理端 `PreviewImage`、小程序报告页）——报告图固定 750×1100。
+
+### 14.2 报告图版式（750×1100）
+
+标题横幅 → 孩子·周期 → 主数字卡（本期词数 + **孩子自己的头像动物**做吉祥物探头）→
+2×2 统计卡（读完/打卡/测验/正确率）→ 鼓励语 → 日期条 → 馆标。
+零阅读周期不摆空卡，鼓励语换成「这个周期还没有阅读记录，今晚挑一本开始吧～」。
+
+### 14.3 机械兜底与它的边界
+
+`tests/unit/test_wm8_features.py::test_report_image_drawn_on_picture_book_palette` 用**像素**
+锁死「报告图画在哪个色盘上」（左上角背景 = `art.PALETTES[...]["top"]`，容差 30 抵纸纹噪点），
+已自证喂旧版深蓝横幅会红。**它只锁色盘归属，锁不住排版退化——排版必须目视。**
+
+### 14.4 边界（如实标注，别把规矩说过头）
+
+`scripts/seed_demo_library.py` 里**演示书封面/活动封面**仍是自己一套画法（天空渐变 + 太阳 + 云），
+走的是**演示数据生成器**而非产品资产链路；它的产出是绘本感的插画封面、用户也未报障，
+故本轮**不动**。若将来要收敛，方向同样是"抽成 art.py 原语 + 生成器调用"。
+
+---
+
 *规范制定：外部专家*  
-*日期：2026-08-25（运营增强同步至 2026-08-28；媒体预览统一同步至 2026-09-15）*  
-*版本：V1.3*  
-*关联文档：theme-paint.ts, Layout.tsx, BookManage.tsx, BookDetail.tsx, Dashboard.tsx, PreviewImage.tsx, miniapp/app.wxss*
+*日期：2026-08-25（运营增强同步至 2026-08-28；媒体预览统一与后端出图规范同步至 2026-09-15）*  
+*版本：V1.4*  
+*关联文档：theme-paint.ts, Layout.tsx, BookManage.tsx, BookDetail.tsx, Dashboard.tsx, PreviewImage.tsx, reading_circle/art.py, growth/report_service.py, miniapp/app.wxss*

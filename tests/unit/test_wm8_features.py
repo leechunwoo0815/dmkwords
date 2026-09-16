@@ -200,6 +200,33 @@ def test_report_image_generation(client: TestClient):
     assert "image_url" in data
 
 
+def test_report_image_drawn_on_picture_book_palette(client: TestClient):
+    """报告图必须画在**绘本色盘**上（2026-09-15 用户报障「跟项目风格格格不入」防复发）。
+
+    旧版是自己手搓的通用报表（深蓝横幅 #2c4a6e + 系统字体 + 细线白卡），与
+    reading_circle.art 的绘本视觉语言毫无关系。本测试用**像素**锁死归属：
+    左上角背景 = 该报告色盘（art.PALETTES）的渐变色顶，换了画风即红。
+    """
+    from PIL import Image
+
+    from backend.config import get_settings
+    from backend.domain.reading_circle import art
+
+    h = _h(client)
+    c, _m = _mk_child(client, h, "13800000819", "画风孩")
+
+    for kind, pal_key in (("weekly", "weekly_report"), ("monthly", "books_count")):
+        r = client.post(f"/api/admin/children/{c['id']}/reports/{kind}/generate", headers=h)
+        assert r.status_code == 200, r.text
+        full = os.path.join(get_settings().UPLOADS_DIR, r.json()["path"])
+        img = Image.open(full).convert("RGB")
+        assert img.size == (750, 1100)
+        expected = art.hex2rgb(art.PALETTES[pal_key]["top"])
+        got = img.getpixel((4, 4))
+        # paper_grain 叠了 ±15 的纸纹噪点，故留 30 容差
+        assert all(abs(got[i] - expected[i]) <= 30 for i in range(3)), (kind, got, expected)
+
+
 def test_vocabulary_lookup_and_unique(client: TestClient):
     h = _h(client)
     c, m = _mk_child(client, h, "13800000810", "查词孩")
