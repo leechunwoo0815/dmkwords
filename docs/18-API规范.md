@@ -107,6 +107,12 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
   `backend/domain/growth/miniapp_router.py:75`，服务 `passed_books_service.py`）；
   `GET /api/miniapp/withdrawals/{request_id}/settlement`（退会审核通过后家长查看可退明细，
   `child_id` 必传；源 `backend/domain/identity/miniapp_router.py:172`）。
+- **2026-09-16 增补**：`GET /api/miniapp/children`（家长名下孩子列表，供小程序刷新本地缓存；
+  **与登录载荷同源** = `identity.auth.children_payload`，字段 id/name/english_name/member_status/
+  member_start/member_expire/avatar/level）。
+  存在理由：小程序把登录返回的孩子列表缓存在本地，而点赞墙/阅读圈/排行榜走服务端实时数据——
+  后台改了孩子头像后两处不一致（用户报障「点赞的头像跟我的页面的头像不匹配」）。
+  **纪律：这份载荷只有 `children_payload` 一个出口**，新增字段必须两处同时可见（防字段漂移）。
 
 ## 五、契约工作流（改接口三步链，缺一步 gate 红或前端断）
 

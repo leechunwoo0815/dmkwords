@@ -259,6 +259,11 @@ module.exports = {
   circleLike(postId, childId) {
     return req.post(`/api/miniapp/circle/posts/${postId}/like`, { child_id: childId })
   },
+  // 2026-09-16：家长名下孩子列表（**与登录载荷同源**）——供小程序刷新本地缓存。
+  // 修「点赞头像 vs 我的页头像不一致」：后台改了孩子头像，本地快照必须能同步。
+  myChildren() {
+    return req.get('/api/miniapp/children')
+  },
   // WM15-R3：孩子内置头像（白名单 id；空串=清空）
   updateChildAvatar(childId, avatar) {
     return req.put(`/api/miniapp/children/${childId}/avatar`, { avatar: avatar || '' })

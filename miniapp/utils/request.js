@@ -4,6 +4,11 @@ function request(method, path, data, options = {}) {
   const app = getApp()
   const { auth = true, showLoading = false, showError = true, params } = options
 
+  // 2026-09-16：getApp() 在 App.onLaunch/onShow 执行期间尚未就绪（微信经典坑），
+  // 此时 app 为 undefined，原代码会在下一行抛「Cannot read properties of undefined
+  // (reading 'globalData')」——错误信息完全指不到真因。这里显式拒绝，便于定位。
+  if (!app) return Promise.reject(new Error('应用未就绪（勿在 App.onLaunch/onShow 里发请求）'))
+
   // 处理 query params
   let url = `${app.globalData.baseURL}${path}`
   if (params && typeof params === 'object') {

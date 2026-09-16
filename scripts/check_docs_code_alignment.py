@@ -153,6 +153,9 @@ EXTERNAL_SYMBOLS = {
     "loading",
     "navigate",
     "redirectTo",
+    # 微信运行时 API（文档记录小程序坑时会提到，非本项目符号；E-20260916-36 首次遇到）
+    "getApp",
+    "getCurrentPages",
 }
 
 # 反引号里带这些形态的一律不校验（占位/通配/示例/正则）

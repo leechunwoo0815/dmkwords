@@ -38,6 +38,21 @@ class ChildAvatarRequest(BaseSchema):
     avatar: str = ""
 
 
+# ---------- 孩子列表刷新（2026-09-16：修「点赞头像 vs 我的页头像不一致」） ----------
+@router.get("/children")
+def my_children(auth: Any = Depends(get_current_parent)):
+    """家长名下孩子列表（**与登录载荷同源**：`identity.auth.children_payload`）。
+
+    为什么需要它：小程序把登录返回的孩子列表缓存在本地，而阅读圈点赞墙/排行榜走服务端
+    实时数据。**后台改了孩子头像（或会员到期）后本地快照永远不同步** → 用户看到
+    「点赞的头像跟我的页面的头像不匹配」。本端点供小程序刷新本地缓存（app 前台时拉一次）。
+    """
+    from backend.domain.identity.auth import children_payload
+
+    parent, db = auth
+    return {"children": children_payload(db, parent.id)}
+
+
 # ---------- 孩子头像（WM15-R3：系统内置头像库，家长自助选择） ----------
 @router.put("/children/{child_id}/avatar")
 def update_child_avatar(

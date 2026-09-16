@@ -23,7 +23,10 @@ Page({
     this.refresh()
   },
 
-  refresh() {
+  async refresh() {
+    // 2026-09-16：先向服务端同步孩子列表（后台改了头像/会员到期 → 本地缓存必须跟上）。
+    // 静默失败：拿不到就沿用旧缓存，绝不把页面打空；与 app.onShow 的并发去重见 session。
+    await session.refreshChildren()
     const parent = session.getParent()
     const children = session.getChildren().map((c) => ({
       ...c,
