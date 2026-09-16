@@ -10405,6 +10405,47 @@
         ]
       }
     },
+    "/api/miniapp/children": {
+      "get": {
+        "description": "家长名下孩子列表（**与登录载荷同源**：`identity.auth.children_payload`）。\n\n为什么需要它：小程序把登录返回的孩子列表缓存在本地，而阅读圈点赞墙/排行榜走服务端\n实时数据。**后台改了孩子头像（或会员到期）后本地快照永远不同步** → 用户看到\n「点赞的头像跟我的页面的头像不匹配」。本端点供小程序刷新本地缓存（app 前台时拉一次）。",
+        "operationId": "my_children_api_miniapp_children_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Children",
+        "tags": [
+          "identity-miniapp"
+        ]
+      }
+    },
     "/api/miniapp/children/{child_id}/avatar": {
       "put": {
         "description": "家长给孩子选内置头像（只允许该字段；空串=清空回默认）。白名单校验在 service。",

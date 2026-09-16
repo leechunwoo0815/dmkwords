@@ -2033,6 +2033,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/miniapp/children": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Children
+         * @description 家长名下孩子列表（**与登录载荷同源**：`identity.auth.children_payload`）。
+         *
+         *     为什么需要它：小程序把登录返回的孩子列表缓存在本地，而阅读圈点赞墙/排行榜走服务端
+         *     实时数据。**后台改了孩子头像（或会员到期）后本地快照永远不同步** → 用户看到
+         *     「点赞的头像跟我的页面的头像不匹配」。本端点供小程序刷新本地缓存（app 前台时拉一次）。
+         */
+        get: operations["my_children_api_miniapp_children_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/miniapp/children/{child_id}/avatar": {
         parameters: {
             query?: never;
@@ -2200,6 +2224,29 @@ export interface paths {
         put?: never;
         /** Withdrawal Apply */
         post: operations["withdrawal_apply_api_miniapp_withdrawals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/withdrawals/{request_id}/settlement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Withdrawal Settlement
+         * @description 本次退会「能退哪些费用」（2026-09-15 用户需求）。
+         *
+         *     家长端退会页只提退会申请；**审核通过后**由后端把自动排查出的可退费用明细
+         *     展示给家长（数据来自审核时真实生成的退款单，不是估算）。
+         */
+        get: operations["withdrawal_settlement_api_miniapp_withdrawals__request_id__settlement_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2538,6 +2585,26 @@ export interface paths {
         };
         /** Points Ledger */
         get: operations["points_ledger_api_miniapp_points_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/growth/passed-books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Passed Books
+         * @description 已通过测验的书（书架「已通过」页签：封面 + 词数 + 最佳成绩）。
+         */
+        get: operations["passed_books_api_miniapp_growth_passed_books_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2906,15 +2973,14 @@ export interface paths {
         put?: never;
         /**
          * Circle Like
-         * @description 点赞（一心一赞；like_count 原子更新；被赞通知同事务）。
+         * @description 点赞（fix33 R2：**社交主体=孩子**，child_id 必填；一孩一赞；被赞通知同事务）。
          *
-         *     WM15-R6：body.child_id 可选（点赞方当前孩子）——记录为展示名义快照，
-         *     通知文案随之为「Tommy 赞了你的成就」；缺省则降级家长显示名（老版本端兼容）。
+         *     缺 child_id → 422「请先选择孩子」（连带覆盖「整包 body 都不带」的老端）。
          */
         post: operations["circle_like_api_miniapp_circle_posts__post_id__like_post"];
         /**
          * Circle Unlike
-         * @description 取消点赞。
+         * @description 取消点赞（按孩子主体定位行；DELETE 走 query 而非 body——客户端不友好先例）。
          */
         delete: operations["circle_unlike_api_miniapp_circle_posts__post_id__like_delete"];
         options?: never;
@@ -3632,7 +3698,7 @@ export interface components {
         /** CircleLikeRequest */
         CircleLikeRequest: {
             /** Child Id */
-            child_id?: number | null;
+            child_id: number;
         };
         /** CircleShareRequest */
         CircleShareRequest: {
@@ -8617,6 +8683,37 @@ export interface operations {
             };
         };
     };
+    my_children_api_miniapp_children_get: {
+        parameters: {
+            query?: never;
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_child_avatar_api_miniapp_children__child_id__avatar_put: {
         parameters: {
             query?: never;
@@ -8728,6 +8825,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 category?: string | null;
+                /** @description 按场景过滤（fix34 R0：如 circle.liked） */
+                scene?: string | null;
             };
             header: {
                 authorization: string;
@@ -8978,6 +9077,41 @@ export interface operations {
                 "application/json": components["schemas"]["WithdrawalApplyRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdrawal_settlement_api_miniapp_withdrawals__request_id__settlement_get: {
+        parameters: {
+            query: {
+                child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path: {
+                request_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -9626,6 +9760,39 @@ export interface operations {
             };
         };
     };
+    passed_books_api_miniapp_growth_passed_books_get: {
+        parameters: {
+            query: {
+                child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     leaderboard_api_miniapp_leaderboard_get: {
         parameters: {
             query?: {
@@ -10149,6 +10316,8 @@ export interface operations {
             query?: {
                 page?: number;
                 page_size?: number;
+                /** @description 观看方当前选中的孩子（liked_by_me 口径） */
+                child_id?: number | null;
             };
             header: {
                 authorization: string;
@@ -10285,7 +10454,10 @@ export interface operations {
     };
     circle_unlike_api_miniapp_circle_posts__post_id__like_delete: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 点赞主体孩子（定位取消的赞） */
+                child_id?: number | null;
+            };
             header: {
                 authorization: string;
             };
