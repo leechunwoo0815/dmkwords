@@ -10,7 +10,7 @@
     desc="活动列表加载失败，请重试" bind:onRetry="onRetryLoad" />
 
   <block wx:if="{{!loading && !loadError && tab === 'upcoming'}}">
-    <empty-state wx:if="{{!activities.length}}" icon="🎪" title="近期没有活动"
+    <empty-state wx:if="{{!activities.length}}" icon-name="calendar" title="近期没有活动"
       desc="有新活动会第一时间在这里发布" />
     <view class="activity-list">
       <view wx:for="{{activities}}" wx:key="id" class="activity-card" data-id="{{item.id}}" bindtap="goDetail">
@@ -22,8 +22,8 @@
         <view class="activity-body">
           <view class="activity-title">{{item.title}}</view>
           <view class="activity-meta">
-            <view class="meta-item"><text class="meta-icon">🕒</text>{{item.start_at}}</view>
-            <view class="meta-item"><text class="meta-icon">📍</text>{{item.location}}</view>
+            <view class="meta-item"><image class="meta-icon" src="/icons/ui/clock.png" mode="aspectFit" />{{item.start_at}}</view>
+            <view class="meta-item"><image class="meta-icon" src="/icons/ui/pin.png" mode="aspectFit" />{{item.location}}</view>
           </view>
           <view class="activity-footer">
             <text wx:if="{{item.full}}" class="activity-status status-full">已满</text>
@@ -36,14 +36,14 @@
   </block>
 
   <block wx:if="{{!loading && !loadError && tab === 'mine'}}">
-    <empty-state wx:if="{{!myEnrollments.length}}" icon="🎟️" title="还没有报名"
+    <empty-state wx:if="{{!myEnrollments.length}}" icon-name="ticket" title="还没有报名"
       desc="去「可报名」看看有什么好玩的" />
     <view class="activity-list">
       <view wx:for="{{myEnrollments}}" wx:key="id" class="activity-card">
         <view class="activity-body">
           <view class="activity-title">{{item.activity_title}}</view>
           <view class="activity-meta">
-            <view class="meta-item"><text class="meta-icon">🕒</text>{{item.activity_start_at}}</view>
+            <view class="meta-item"><image class="meta-icon" src="/icons/ui/clock.png" mode="aspectFit" />{{item.activity_start_at}}</view>
           </view>
           <view class="activity-footer">
             <text class="activity-status">{{item.status === 'enrolled' ? '已报名' : item.status === 'checked_in' ? '已签到' : item.status === 'pending_payment' ? '待收款确认' : item.status === 'refund_pending' ? '退款待审' : item.status === 'refunded' ? '已退款' : '已取消'}}</text>

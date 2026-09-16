@@ -21,9 +21,9 @@
     <view wx:for="{{borrows}}" wx:key="record_id" class="asset-card">
       <view class="asset-cover-wrap">
         <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
-        <view wx:else class="asset-cover asset-cover-fb">📕</view>
+        <image wx:else class="asset-cover asset-cover-fb" src="/icons/ui/cover.png" mode="aspectFit" />
         <!-- T43（U2）：passed 金色 🏆 角标 -->
-        <view wx:if="{{item.passed}}" class="trophy-badge">🏆</view>
+        <image wx:if="{{item.passed}}" class="trophy-badge" src="/icons/ui/trophy.png" mode="aspectFit" />
       </view>
       <view class="asset-info">
         <view class="asset-title">{{item.title}}</view>
@@ -35,7 +35,7 @@
         <view class="btn-mini" data-book="{{item}}" catchtap="goDetail">详情</view>
       </view>
     </view>
-    <empty-state wx:if="{{!loading && !borrows.length}}" icon="📚" title="还没有在借的书"
+    <empty-state wx:if="{{!loading && !borrows.length}}" icon-name="book" title="还没有在借的书"
       desc="去图书馆选一本，让馆员帮你借回家" >
       <view class="empty-btn" bindtap="goBooks">去图书馆</view>
     </empty-state>
@@ -46,9 +46,9 @@
     <view wx:for="{{favorites}}" wx:key="id" class="asset-card">
       <view class="asset-cover-wrap">
         <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
-        <view wx:else class="asset-cover asset-cover-fb">📕</view>
+        <image wx:else class="asset-cover asset-cover-fb" src="/icons/ui/cover.png" mode="aspectFit" />
         <!-- T43（U2）：passed 金色 🏆 角标 -->
-        <view wx:if="{{item.passed}}" class="trophy-badge">🏆</view>
+        <image wx:if="{{item.passed}}" class="trophy-badge" src="/icons/ui/trophy.png" mode="aspectFit" />
       </view>
       <view class="asset-info">
         <view class="asset-title">{{item.title}}</view>
@@ -74,9 +74,9 @@
     <view wx:for="{{reservations}}" wx:key="id" class="asset-card">
       <view class="asset-cover-wrap">
         <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
-        <view wx:else class="asset-cover asset-cover-fb">📕</view>
+        <image wx:else class="asset-cover asset-cover-fb" src="/icons/ui/cover.png" mode="aspectFit" />
         <!-- T43（U2）：passed 金色 🏆 角标 -->
-        <view wx:if="{{item.passed}}" class="trophy-badge">🏆</view>
+        <image wx:if="{{item.passed}}" class="trophy-badge" src="/icons/ui/trophy.png" mode="aspectFit" />
       </view>
       <view class="asset-info">
         <view class="asset-title">{{item.title}}</view>
@@ -88,7 +88,7 @@
         <view class="btn-mini" data-book="{{item}}" catchtap="goDetail">详情</view>
       </view>
     </view>
-    <empty-state wx:if="{{!loading && !reservations.length}}" icon="🔖" title="没有预约记录"
+    <empty-state wx:if="{{!loading && !reservations.length}}" icon-name="bookmark" title="没有预约记录"
       desc="馆藏被借完的书可以先预约，72 小时内保留" >
       <view class="empty-btn" bindtap="goBooks">去图书馆看看</view>
     </empty-state>
@@ -99,8 +99,8 @@
     <view wx:for="{{passedBooks}}" wx:key="book_id" class="asset-card">
       <view class="asset-cover-wrap">
         <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
-        <view wx:else class="asset-cover asset-cover-fb">📕</view>
-        <view class="trophy-badge">🏆</view>
+        <image wx:else class="asset-cover asset-cover-fb" src="/icons/ui/cover.png" mode="aspectFit" />
+        <image class="trophy-badge" src="/icons/ui/trophy.png" mode="aspectFit" />
       </view>
       <view class="asset-info">
         <view class="asset-title">{{item.title}}</view>
@@ -115,7 +115,7 @@
         <view class="btn-mini btn-main" data-book="{{item}}" catchtap="goDetail">看详情</view>
       </view>
     </view>
-    <empty-state wx:if="{{!loading && !passedBooks.length}}" icon="🏆" title="还没有通过测验的书"
+    <empty-state wx:if="{{!loading && !passedBooks.length}}" icon-name="trophy" title="还没有通过测验的书"
       desc="听完一本音频就能挑战测验，通过后这里会收集你的战果" >
       <view class="empty-btn" bindtap="goBooks">去图书馆选一本</view>
     </empty-state>

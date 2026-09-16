@@ -486,3 +486,6 @@
 
 /* ===== 2026-09-13 内联样式迁移（机械生成，勿手改） ===== */
 .x-dc4dd1 { background: var(--border); color: var(--fg); }
+
+.feedback-icon { width: 96rpx; height: 96rpx; margin-bottom: 16rpx; }
+.cd-emoji { width: 72rpx; height: 72rpx; margin: 0 auto 12rpx; }

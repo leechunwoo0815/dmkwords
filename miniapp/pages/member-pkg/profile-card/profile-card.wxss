@@ -518,3 +518,5 @@
 .x-255591 { background: var(--surface); border-radius: 16rpx; padding: 20rpx 24rpx; margin-bottom: 12rpx; display: flex; justify-content: space-between; }
 .x-0c7277 { color: var(--accent); font-weight: 600; }
 
+.ach-icon { width: 44rpx; height: 44rpx; }
+.ach-entry-icon { width: 44rpx; height: 44rpx; }

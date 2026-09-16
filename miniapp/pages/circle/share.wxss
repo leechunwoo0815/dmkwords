@@ -151,3 +151,6 @@
   font-size: 28rpx;
   font-weight: 700;
 }
+
+.success-icon { width: 40rpx; height: 40rpx; vertical-align: -6rpx; }
+.child-emoji { width: 40rpx; height: 40rpx; }

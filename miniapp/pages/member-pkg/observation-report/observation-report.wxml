@@ -1,6 +1,6 @@
 <view class="page-bg x-cb307e">
   <view class="report-header">
-    <view class="rh-icon">📋</view>
+    <image class="rh-icon" src="/icons/ui/clipboard.png" mode="aspectFit" />
     <view>
       <view class="rh-title">{{childName}} 的观察期评估</view>
       <view class="rh-period">由馆内老师评估上传 · 每一阶段的成长记录</view>
@@ -9,10 +9,8 @@
 
   <view class="x-36e383" wx:if="{{loading}}">加载中…</view>
 
-  <view wx:if="{{!loading && !reports.length}}" class="empty-state">
-    <view class="empty-icon">📭</view>
-    <view class="x-87ddc0">还没有评估报告，老师上传后这里会展示</view>
-  </view>
+  <empty-state wx:if="{{!loading && !reports.length}}"
+    icon-name="clipboard" title="还没有评估报告" desc="老师上传后这里会展示" />
 
   <view wx:for="{{reports}}" wx:key="id" class="stat-card x-560223">
     <view class="x-545127">

@@ -137,3 +137,10 @@
 /* ===== 2026-09-13 内联样式迁移（机械生成，勿手改） ===== */
 .x-cb307e { min-height: 100vh; padding: 24rpx; }
 .x-c92966 { margin-top: 24rpx; }
+
+.page-bg {
+  min-height: 100vh;
+  background: var(--bg);
+  box-sizing: border-box;
+  padding: 20rpx 24rpx calc(60rpx + env(safe-area-inset-bottom));
+}

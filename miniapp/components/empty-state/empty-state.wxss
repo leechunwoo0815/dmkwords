@@ -61,3 +61,5 @@
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8rpx); }
 }
+
+.empty-state .empty-icon-img { width: 84rpx; height: 84rpx; }

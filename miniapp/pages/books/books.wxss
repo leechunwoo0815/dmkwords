@@ -169,3 +169,7 @@
 .tag-words { background: var(--secondary-soft); color: var(--success); }
 .tag-ar { background: var(--accent-soft); color: var(--accent); }
 
+.search-icon { width: 32rpx; height: 32rpx; }
+.pill-icon { width: 26rpx; height: 26rpx; margin-right: 6rpx; vertical-align: -3rpx; }
+.cover-ph { width: 96rpx; height: 96rpx; }
+.audio-badge { width: 30rpx; height: 30rpx; }

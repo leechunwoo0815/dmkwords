@@ -28,11 +28,8 @@
   <error-view wx:if="{{loadError}}" type="network" title="加载失败"
     desc="生词本加载失败，请重试" bind:onRetry="onRetryLoad" />
 
-  <view wx:if="{{!loading && !loadError && !words.length}}" class="empty-state">
-    <view class="emoji">📖</view>
-    <view class="text">还没有生词</view>
-    <view class="text-sub">播放页下半屏查词会自动收录</view>
-  </view>
+  <empty-state wx:if="{{!loading && !loadError && !words.length}}"
+    icon-name="book" title="还没有生词" desc="播放页下半屏查词会自动收录" />
 
   <view class="word-list" wx:if="{{words.length}}">
     <view class="word-item" wx:for="{{words}}" wx:key="id" data-index="{{index}}"

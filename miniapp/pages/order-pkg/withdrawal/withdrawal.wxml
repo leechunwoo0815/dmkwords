@@ -2,7 +2,7 @@
   <view class="wd-head">{{childName}} · 申请退会</view>
 
   <view class="tip-card">
-    <text class="tip-icon">💡</text>
+    <image class="tip-icon" src="/icons/ui/tip.png" mode="aspectFit" />
     <text class="tip-text">退会后会员权益终止；审核期间借书、预约等功能冻结。押金按实际余额退还，已产生的赔偿优先扣除。审核通过后，系统会自动排查当前可退的费用并列在下方。</text>
   </view>
 
@@ -53,7 +53,7 @@
     </view>
   </view>
 
-  <empty-state wx:if="{{!loading && !list.length}}" icon="📋" title="还没有退会申请"
+  <empty-state wx:if="{{!loading && !list.length}}" icon-name="clipboard" title="还没有退会申请"
     desc="提交后馆里会人工审核，审核期间借书与预约会冻结" />
 
   <view wx:if="{{loading}}" class="loading-tip">加载中…</view>

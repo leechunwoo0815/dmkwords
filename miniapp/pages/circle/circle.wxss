@@ -462,3 +462,9 @@
   background: linear-gradient(135deg, var(--gold-light), var(--sun));
   border: 2rpx solid rgba(var(--warning-rgb), 0.5);
 }
+
+.share-entry-icon { width: 40rpx; height: 40rpx; }
+.banner-emoji { width: 40rpx; height: 40rpx; }
+.like-icon { width: 34rpx; height: 34rpx; }
+
+.badge-spark { width: 22rpx; height: 22rpx; margin-left: 4rpx; vertical-align: -3rpx; }

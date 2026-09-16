@@ -13,17 +13,17 @@
   </view>
 
   <view wx:if="{{status === 'locked'}}" class="feedback">
-    <text class="feedback-icon">🔒</text>
+    <image class="feedback-icon" src="/icons/ui/lock.png" mode="aspectFit" />
     <text class="feedback-text">先去把这本书听完（95%），测验就会解锁啦</text>
     <view class="feedback-btn" bindtap="goBack">去听书</view>
   </view>
   <view wx:elif="{{status === 'passed'}}" class="feedback">
-    <text class="feedback-icon">🎉</text>
+    <image class="feedback-icon" src="/icons/ui/party.png" mode="aspectFit" />
     <text class="feedback-text">这本书你已经通过测验啦，词数已入账\n去挑战下一本书吧！</text>
     <view class="feedback-btn" bindtap="goBack">选下一本</view>
   </view>
   <view wx:elif="{{status === 'failed'}}" class="feedback">
-    <text class="feedback-icon">😅</text>
+    <image class="feedback-icon" src="/icons/ui/warning.png" mode="aspectFit" />
     <text class="feedback-text">这本书的测验机会已用完，可以请馆员帮忙重置</text>
   </view>
 
@@ -52,7 +52,7 @@
 
   <view wx:if="{{showConfirm}}" class="confirm-overlay">
     <view class="confirm-dialog">
-      <view class="cd-emoji">📝</view>
+      <image class="cd-emoji" src="/icons/ui/clipboard.png" mode="aspectFit" />
       <view class="cd-title">确认提交？</view>
       <view class="cd-sub">提交后占用 1 次机会（还剩 {{attemptsLeft}} 次）；中途退出不占次</view>
       <view class="cd-actions">

@@ -18,12 +18,12 @@
   </view>
 
   <view wx:if="{{loading && list.length === 0}}" class="loading">加载中…</view>
-  <view wx:elif="{{error && list.length === 0}}" class="empty-state" bindtap="onPullDownRefresh">加载失败，点此重试</view>
-  <empty-state wx:elif="{{list.length === 0}}" icon="🔔" title="暂无消息" desc="有新消息时会第一时间通知你" />
+  <view wx:elif="{{error && list.length === 0}}" class="list-error" bindtap="onPullDownRefresh">加载失败，点此重试</view>
+  <empty-state wx:elif="{{list.length === 0}}" icon-name="bell" title="暂无消息" desc="有新消息时会第一时间通知你" />
 
   <view class="msg-list" wx:else>
     <view wx:for="{{list}}" wx:key="id"
-      class="msg-card {{item.read ? 'is-read' : 'is-unread'}}"
+      class="msg-card {{item.read ? 'is-read' : ''}}"
       data-id="{{item.id}}" bindtap="toggleExpand">
       <view class="msg-head">
         <view wx:if="{{!item.read}}" class="unread-dot"></view>

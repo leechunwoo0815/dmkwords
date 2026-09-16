@@ -592,33 +592,9 @@ def m_group(line: str) -> str:
 #   WXML 写 speed-chip-active，WXSS 定义的是 .speed-chip.active → 选中态永远不亮（用户报障）。
 # 清理方式二选一：① 把 WXML 类名改成 WXSS 已有的（多数情况）；② 在页面 wxss 补上样式。
 R12_BASELINE: dict[str, tuple[str, ...]] = {
-    # 2026-09-16 首扫基线 35 处（第二批待清；清理时删行，别加行）
-    "components/pay-button/pay-button.wxml": ("pay-button-container",),
-    "pages/activity-pkg/activity-detail/activity-detail.wxml": ("qr-bright-hint",),
-    "pages/agreement/service-agreement/service-agreement.wxml": (
-        "agreement-title",
-        "section-content",
-    ),
-    "pages/index/index.wxml": ("badge-member", "hero-left"),
-    "pages/member-pkg/achievement/achievement.wxml": ("section-label",),
-    "pages/member-pkg/checkin/checkin.wxml": ("page-bg",),
-    "pages/member-pkg/observation-report/observation-report.wxml": (
-        "empty-icon",
-        "empty-state",
-        "page-bg",
-    ),
-    "pages/member-pkg/purchase/purchase.wxml": ("plan-feats",),
-    "pages/member-pkg/report/report.wxml": ("page-bg",),
-    "pages/order-pkg/benefit-transfer/benefit-transfer.wxml": (
-        "active",
-        "cancel",
-        "check-card",
-        "check-item-row",
-    ),
-    "pages/order-pkg/deposit/deposit.wxml": ("page-bg",),
-    "pages/order-pkg/messages/messages.wxml": ("empty-state", "is-unread"),
-    "pages/order-pkg/order-history/order-history.wxml": ("order-icon-text",),
-    "pages/reading-pkg/book-detail/book-detail.wxml": ("hero-cover-empty",),
+    # 2026-09-16 二批清空：首扫 22 个类名 / 35 处引用全部处理完毕
+    # （改错类名 4 处、补设计缺失 10 处、换共享组件 1 处、去冗余类 2 处），基线归零。
+    # 规则照旧：新增（不在本表）直接 FAIL —— 本表应保持为空，别再往里加。
 }
 
 
@@ -697,6 +673,58 @@ def scan_undefined_classes(base: Path = MINIAPP):
     return new, baseline_hits
 
 
+# R13 图标槽位（2026-09-16）：两件事必须机器看得住
+#   a) 图标槽位（class 含 icon/emoji）里**不许出现 emoji**——三端渲染不一致、颜色与令牌无关；
+#   b) 引用的图标资产必须真的存在（`/icons/ui/x.png` / `icon-name="x"`）。
+r"""图标槽位里的 emoji（class 含 icon|emoji 的元素文本里出现 emoji）= 违规。"""
+RE_ICON_SLOT_EMOJI = re.compile(
+    r'class="[^"]*\b(?:[a-z-]*icon[a-z-]*|[a-z-]*emoji[a-z-]*)\b[^"]*"[^>]*>\s*'
+    r"(?P<txt>[^<]{0,40})"
+)
+# 排版字形白名单：✓ ✕ ★ ☆ ▶ 等在 2600~27BF 区间，但属**设计系统文字符号**
+# （`已打卡 ✓`、环形勾叉、星级），不是平台 emoji——不能一并禁掉（R13a 误报源，已实证）。
+TYPO_GLYPHS = "\u2713\u2714\u2715\u2716\u2717\u2718\u2605\u2606\u25b6\u25c0\u25b2\u25bc\u25cf\u25cb\u25a0\u25a1\u25c6\u25c7\u203b"
+RE_EMOJI = re.compile("[\U0001f300-\U0001faff\u2600-\u27bf\u2b00-\u2bff]")
+
+
+def scan_icon_emoji(base: Path = MINIAPP):
+    """R13a: 图标槽位出现 emoji（含三元表达式里的 emoji 图标）。"""
+    out: list[tuple[str, int, str]] = []
+    for wxml in sorted(base.rglob("*.wxml")):
+        if "__pycache__" in wxml.parts:
+            continue
+        for i, line in enumerate(wxml.read_text(encoding="utf-8").split("\n"), 1):
+            m = RE_ICON_SLOT_EMOJI.search(line)
+            if not m:
+                continue
+            hit = next((c for c in RE_EMOJI.findall(m.group("txt")) if c not in TYPO_GLYPHS), None)
+            if hit:
+                out.append((str(wxml.relative_to(base)), i, hit))
+    return out
+
+
+def scan_icon_assets(base: Path = MINIAPP):
+    """R13b: 图标引用必须落到真实资产（/icons/ui/*.png 与 icon-name）。"""
+    have = {p.stem for p in (base / "icons" / "ui").glob("*.png")}
+    out: list[tuple[str, int, str]] = []
+    for wxml in sorted(base.rglob("*.wxml")):
+        if "__pycache__" in wxml.parts:
+            continue
+        rel = str(wxml.relative_to(base))
+        for i, line in enumerate(wxml.read_text(encoding="utf-8").split("\n"), 1):
+            for name in re.findall(r'icon-name="([a-z0-9-]+)"', line):
+                if name not in have:
+                    out.append((rel, i, name))
+            for name in re.findall(r"/icons/ui/([a-z0-9-]+)\.png", line):
+                if name not in have:
+                    out.append((rel, i, name))
+            for expr in re.findall(r"/icons/ui/\{\{([^}]*)\}\}\.png", line):
+                for name in re.findall(r"'([a-z0-9-]+)'", expr):
+                    if name not in have:
+                        out.append((rel, i, name))
+    return out
+
+
 def self_test(tokens: set[str]) -> list[str]:
     """S1 注入自检：对内置违例样本运行检测器，必须全部命中。"""
     failures: list[str] = []
@@ -729,6 +757,15 @@ def self_test(tokens: set[str]) -> list[str]:
             ".podium-card.var(--gold) { color: red; }\n", encoding="utf-8"
         )
         # R12 注入样本：demo.wxss 只定义了 .a/.b，wxml 里故意用 .ghost（悬空）+ .a（正常）
+        # 自证夹具里放一个真实存在的图标资产：同时验证"存在的别误报 / 不存在的必须报"
+        (tmp / "icons" / "ui").mkdir(parents=True, exist_ok=True)
+        (tmp / "icons" / "ui" / "calendar.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+        (tmp / "pages/emoji.wxml").write_text(
+            '<text class="fi-icon">📅</text>\n'
+            '<image class="fi-icon" src="/icons/ui/calendar.png" mode="aspectFit" />\n'
+            '<empty-state icon-name="nosuchicon" title="x" />\n',
+            encoding="utf-8",
+        )
         (tmp / "pages/ghost.wxml").write_text(
             "<view class=\"ghost {{ok ? 'a' : 'missing-cond'}}\">x</view>\n", encoding="utf-8"
         )
@@ -768,6 +805,14 @@ def self_test(tokens: set[str]) -> list[str]:
             failures.append(f"S1 悬空类名漏检: {r12_new}")
         if "a" in r12_hits:
             failures.append(f"S1 悬空类名误报（.a 在 demo.wxss 已定义）: {r12_new}")
+        r13e = scan_icon_emoji(base=tmp)
+        r13a = scan_icon_assets(base=tmp)
+        if not r13e:
+            failures.append("S1 图标槽位 emoji 漏检")
+        if not any(n == "nosuchicon" for _f, _l, n in r13a):
+            failures.append(f"S1 图标资产缺失漏检: {r13a}")
+        if any(n == "calendar" for _f, _l, n in r13a):
+            failures.append("S1 图标资产误报（calendar 存在）")
         if not sv:
             failures.append("S1 非法选择器漏检")
         if not br:
@@ -813,6 +858,8 @@ def main() -> int:
     nofb = scan_component_fallback(wxss)
     selv = scan_selector_var(wxss)
     undef_new, undef_base = scan_undefined_classes()
+    icon_emoji = scan_icon_emoji()
+    icon_asset = scan_icon_assets()
 
     n_token_equal = sum(1 for c in colors if c[3] == "token-equal")
     n_true_split = sum(1 for c in colors if c[3] == "true-split")
@@ -836,6 +883,7 @@ def main() -> int:
     print(f"R9 花括号结构: {len(braces)}")
     print(f"R10 组件变量兜底: {len(nofb)}")
     print(f"R11 非法选择器(选择器位置 var): {len(selv)}")
+    print(f"R13 图标槽位 emoji: {len(icon_emoji)} / 图标资产缺失: {len(icon_asset)}")
     n_base = sum(len(v) for v in R12_BASELINE.values())
     print(
         f"R12 悬空类名(WXML 用到、本页 wxss 无定义): 新违规 {len(undef_new)} / "
@@ -873,6 +921,8 @@ def main() -> int:
     dump("R10 组件缺字面兜底", nofb)
     dump("R11 非法选择器", selv)
     dump("R12 悬空类名（新违规，必须修）", undef_new)
+    dump("R13a 图标槽位 emoji（必须换 /icons/ui 资产）", icon_emoji)
+    dump("R13b 图标资产缺失", icon_asset)
 
     for f, ln, d in braces:
         errors.append(f"R9 {f}:{ln} 结构非法 {d}")
@@ -880,6 +930,10 @@ def main() -> int:
         errors.append(f"R11 {f}:{ln} 非法选择器（选择器位置出现 var）: {d}")
     for f, ln, d in undef_new:
         errors.append(f"R12 {f}:{ln} 悬空类名 .{d}（WXML 用到但本页 wxss 无定义）")
+    for f, ln, ch in icon_emoji:
+        errors.append(f"R13a {f}:{ln} 图标槽位里是 emoji {ch!r}（改用 /icons/ui/*.png）")
+    for f, ln, name in icon_asset:
+        errors.append(f"R13b {f}:{ln} 图标资产不存在: {name}")
     for f, ln, d in nofb:
         errors.append(f"R10 {f}:{ln} 组件变量缺字面兜底 {d}")
     for f, ln, v, _k in colors:

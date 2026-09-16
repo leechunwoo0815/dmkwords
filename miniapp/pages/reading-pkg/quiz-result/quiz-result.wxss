@@ -617,3 +617,5 @@
   border: 3rpx solid var(--fg);
   box-shadow: var(--shadow-hard-sm);
 }
+
+.level-up-emoji { width: 96rpx; height: 96rpx; margin: 0 auto 8rpx; }

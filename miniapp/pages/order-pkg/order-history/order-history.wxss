@@ -290,3 +290,5 @@
 
 /* ===== 2026-09-13 内联样式迁移（机械生成，勿手改） ===== */
 .x-245e15 { padding: 80rpx 0; text-align: center; color: var(--muted); font-size: 26rpx; }
+
+.order-icon-text { font-family: var(--font-display); font-size: 32rpx; font-weight: 700; color: var(--fg); }

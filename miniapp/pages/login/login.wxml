@@ -1,19 +1,19 @@
 <view class="login-container">
   <view class="logo-area">
-    <view class="logo-icon"><text class="logo-emoji">📚</text></view>
+    <view class="logo-icon"><image class="logo-emoji" src="/icons/ui/book.png" mode="aspectFit" /></view>
     <view class="app-name">DmkWords</view>
     <view class="app-slogan">分级阅读 · 听见成长</view>
   </view>
 
   <view class="login-form">
     <view class="input-row">
-      <text class="input-icon">📱</text>
+      <image class="input-icon" src="/icons/ui/phone.png" mode="aspectFit" />
       <input class="input-field" type="number" maxlength="11" placeholder="家长手机号（到店建档）"
         value="{{phone}}" bindinput="onPhoneInput" />
     </view>
     <view class="sms-row">
       <view class="input-row grow">
-        <text class="input-icon">🔑</text>
+        <image class="input-icon" src="/icons/ui/key.png" mode="aspectFit" />
         <input class="input-field" type="number" maxlength="4" placeholder="验证码（开发期 1234）"
           value="{{code}}" bindinput="onCodeInput" />
       </view>

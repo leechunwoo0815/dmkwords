@@ -3,7 +3,7 @@
 
   <view wx:if="{{loading}}" class="loading-state">加载中…</view>
 
-  <empty-state wx:if="{{!loading && !items.length}}" icon="🔖" title="还没有预约"
+  <empty-state wx:if="{{!loading && !items.length}}" icon-name="bookmark" title="还没有预约"
     desc="在图书馆里选一本书，点「预约此书」，副本会为你保留 72 小时" />
 
   <view class="reservation-list">

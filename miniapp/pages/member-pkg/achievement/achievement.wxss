@@ -550,3 +550,11 @@
 .x-03f368 { margin: 32rpx 0 16rpx; font-size: 28rpx; font-weight: 600; color: var(--fg); }
 .x-f31427 { color: var(--success); font-weight: 600; }
 .x-a0f80c { color: var(--muted); font-size: 26rpx; text-align: center; padding: 20rpx; }
+
+.section-label {
+  font-family: var(--font-display);
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 16rpx 32rpx 8rpx;
+}

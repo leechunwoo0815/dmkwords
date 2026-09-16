@@ -812,3 +812,7 @@
 .link-row:last-child { border-bottom: none; }
 .link-text { font-size: 28rpx; color: var(--fg); }
 .link-arrow { font-size: 32rpx; color: var(--muted-light); }
+
+.profile-edit { width: 30rpx; height: 30rpx; }
+
+.lk-icon { width: 32rpx; height: 32rpx; }

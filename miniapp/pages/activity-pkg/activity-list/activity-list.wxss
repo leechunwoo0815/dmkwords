@@ -146,3 +146,5 @@
    正好压在第一个活动卡上把卡片上半部分盖住。改为贴内容区顶部吸附（用户说的"往上挪"）。
    对照：order-history 自绘了 sticky 导航栏，它的 top:96rpx 是对的口径，勿动。 */
 .tabs { background: var(--surface); position: sticky; top: 0; z-index: 9; }
+
+.meta-icon { width: 28rpx; height: 28rpx; margin-right: 6rpx; }

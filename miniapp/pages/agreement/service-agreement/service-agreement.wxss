@@ -19,3 +19,6 @@
   font-size: 24rpx;
   line-height: 1.6;
 }
+
+.agreement-title { font-size: 32rpx; font-weight: 700; color: var(--fg); margin-top: 48rpx; margin-bottom: 16rpx; }
+.agreement-title:first-child { margin-top: 0; }

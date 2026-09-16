@@ -2,7 +2,7 @@
   <!-- 头部：封面 + 信息 -->
   <view class="book-hero">
     <image wx:if="{{book.cover_url}}" class="hero-cover" src="{{book.cover_url}}" mode="aspectFill" />
-    <view wx:else class="hero-cover hero-cover-empty">📕</view>
+    <image wx:else class="hero-cover hero-cover-empty" src="/icons/ui/cover.png" mode="aspectFit" />
     <view class="hero-info">
       <view class="hero-title">{{book.title}}</view>
       <view class="hero-author">{{book.author || '佚名'}}</view>
@@ -20,7 +20,7 @@
 
   <!-- 真实借阅状态卡 -->
   <view class="state-card state-borrowing" wx:if="{{borrowState === 'borrowing'}}" bindtap="goShelf">
-    <text class="state-emoji">📚</text>
+    <image class="state-emoji" src="/icons/ui/book.png" mode="aspectFit" />
     <view class="state-texts">
       <view class="state-title">{{borrowStateText}}{{childName}}的书架上</view>
       <view class="state-sub">{{dueText}} · 去书架续听</view>
@@ -28,7 +28,7 @@
     <text class="state-arrow">›</text>
   </view>
   <view class="state-card state-reserved" wx:elif="{{borrowState === 'reserved'}}">
-    <text class="state-emoji">🔖</text>
+    <image class="state-emoji" src="/icons/ui/bookmark.png" mode="aspectFit" />
     <view class="state-texts">
       <view class="state-title">{{borrowStateText}}</view>
       <view class="state-sub">{{dueText}}</view>
@@ -57,7 +57,8 @@
       <view class="qhc-stamp">PASSED</view>
       <view class="qhc-title">测验通过！</view>
       <view class="qhc-stars">
-        <text wx:for="{{[1, 2, 3, 4, 5]}}" wx:key="*this" class="qhc-star">{{item <= quizStars ? '⭐' : '☆'}}</text>
+        <image wx:for="{{[1, 2, 3, 4, 5]}}" wx:key="*this" class="qhc-star"
+          src="/icons/ui/{{item <= quizStars ? 'star' : 'star-off'}}.png" mode="aspectFit" />
         <!-- 2026-09-15：词账已入账但测验记录缺失时，曾渲染成「PASSED + 最佳成绩 0 分 + 1 星」
              自相矛盾（用户实测）。无成绩就不编数字，直说待同步。 -->
         <text class="qhc-best" wx:if="{{quizHasScore}}">最佳成绩 {{quizBest}} 分</text>
@@ -93,15 +94,15 @@
     <button class="action-primary" bindtap="onPlay">▶ {{progress && progress.finished ? '再听一遍' : (progress && progress.coverage_seconds > 0 ? '继续听' : '开始听')}}</button>
     <view class="action-row">
       <button class="action-icon {{inFav ? 'active' : ''}}" bindtap="onFav">
-        <text class="action-icon-emoji">{{inFav ? '⭐' : '🤍'}}</text>
+        <image class="action-icon-emoji" src="/icons/ui/{{inFav ? 'heart' : 'heart-off'}}.png" mode="aspectFit" />
         <text class="action-icon-label">{{inFav ? '已收藏' : '收藏'}}</text>
       </button>
       <button class="action-icon {{borrowState === 'reserved' ? 'active' : ''}}" bindtap="onReserve" disabled="{{reserving}}">
-        <text class="action-icon-emoji">📅</text>
+        <image class="action-icon-emoji" src="/icons/ui/calendar.png" mode="aspectFit" />
         <text class="action-icon-label">{{borrowState === 'borrowing' ? '在借中' : borrowState === 'reserved' ? '已预约' : (reserving ? '预约中' : '预约借书')}}</text>
       </button>
       <button class="action-icon" bindtap="onQuiz">
-        <text class="action-icon-emoji">📝</text>
+        <image class="action-icon-emoji" src="/icons/ui/clipboard.png" mode="aspectFit" />
         <!-- 2026-09-15：已通过的书即便没有本地进度记录也已解锁，不能显示「测验未解锁」 -->
         <text class="action-icon-label">{{quizStatus === 'passed' ? '看成绩单' : (quizUnlocked ? '去测验' : '测验未解锁')}}</text>
       </button>

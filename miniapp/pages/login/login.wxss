@@ -388,3 +388,6 @@
   color: var(--accent);
   text-decoration: underline;
 }
+
+.logo-emoji { width: 72rpx; height: 72rpx; }
+.input-icon { width: 34rpx; height: 34rpx; }

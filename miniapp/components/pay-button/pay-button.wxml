@@ -1,4 +1,4 @@
-<view class="pay-button-container">
+<view>
   <block wx:if="{{!isIOS}}">
     <button class="pay-btn {{disabled ? 'disabled' : ''}}" bindtap="onTap" disabled="{{disabled}}">
       <text>{{buttonText}}</text>

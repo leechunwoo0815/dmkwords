@@ -1,6 +1,6 @@
 <view class="result-page" wx:if="{{result}}">
   <view class="level-up-banner" wx:if="{{result.level_up}}">
-    <view class="level-up-emoji">🎉</view>
+    <image class="level-up-emoji" src="/icons/ui/party.png" mode="aspectFit" />
     <view class="level-up-title">升级啦！</view>
     <view class="level-up-desc">升到 {{result.new_level}} 级，继续加油！</view>
   </view>

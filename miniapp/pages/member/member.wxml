@@ -9,7 +9,7 @@
       <view class="profile-info">
         <view class="profile-name" bindtap="onEditDisplayName">
           {{parent.display_name || parent.name || '家长'}}
-          <text class="profile-edit">✏️</text>
+          <image class="profile-edit" src="/icons/ui/edit.png" mode="aspectFit" />
         </view>
         <view class="profile-phone">{{parent.phone || '已登录'}}</view>
       </view>
@@ -66,31 +66,31 @@
     <view class="section-title sec-title">成长中心</view>
     <view class="func-grid">
       <view class="func-item" bindtap="goCheckin">
-        <text class="fi-icon">📅</text>
+        <image class="fi-icon" src="/icons/ui/calendar.png" mode="aspectFit" />
         <text class="fi-label">打卡日历</text>
       </view>
       <view class="func-item" bindtap="goAchievement">
-        <text class="fi-icon">🏆</text>
+        <image class="fi-icon" src="/icons/ui/trophy.png" mode="aspectFit" />
         <text class="fi-label">等级勋章</text>
       </view>
       <view class="func-item" bindtap="goPassport">
-        <text class="fi-icon">🪪</text>
+        <image class="fi-icon" src="/icons/ui/card.png" mode="aspectFit" />
         <text class="fi-label">阅读护照</text>
       </view>
       <view class="func-item" bindtap="goReport">
-        <text class="fi-icon">📊</text>
+        <image class="fi-icon" src="/icons/ui/report.png" mode="aspectFit" />
         <text class="fi-label">周报月报</text>
       </view>
       <view class="func-item" bindtap="goLeaderboard">
-        <text class="fi-icon">🏅</text>
+        <image class="fi-icon" src="/icons/ui/chart.png" mode="aspectFit" />
         <text class="fi-label">排行榜</text>
       </view>
       <view class="func-item" bindtap="goObservation">
-        <text class="fi-icon">📋</text>
+        <image class="fi-icon" src="/icons/ui/clipboard.png" mode="aspectFit" />
         <text class="fi-label">评估报告</text>
       </view>
       <view class="func-item" bindtap="goVocabulary">
-        <text class="fi-icon">📖</text>
+        <image class="fi-icon" src="/icons/ui/book.png" mode="aspectFit" />
         <text class="fi-label">生词本</text>
       </view>
     </view>
@@ -100,35 +100,35 @@
     <view class="section-title sec-title">借阅服务</view>
     <view class="func-grid">
       <view class="func-item" bindtap="goReservation">
-        <text class="fi-icon">🔖</text>
+        <image class="fi-icon" src="/icons/ui/bookmark.png" mode="aspectFit" />
         <text class="fi-label">我的预约</text>
       </view>
       <view class="func-item" bindtap="goDeposit">
-        <text class="fi-icon">💳</text>
+        <image class="fi-icon" src="/icons/ui/wallet.png" mode="aspectFit" />
         <text class="fi-label">押金</text>
       </view>
       <view class="func-item" bindtap="goOrders">
-        <text class="fi-icon">📋</text>
+        <image class="fi-icon" src="/icons/ui/receipt.png" mode="aspectFit" />
         <text class="fi-label">我的订单</text>
       </view>
       <view class="func-item" bindtap="goRefund">
-        <text class="fi-icon">💰</text>
+        <image class="fi-icon" src="/icons/ui/refund.png" mode="aspectFit" />
         <text class="fi-label">退款申请</text>
       </view>
       <view class="func-item" bindtap="goPurchase">
-        <text class="fi-icon">💎</text>
+        <image class="fi-icon" src="/icons/ui/crown.png" mode="aspectFit" />
         <text class="fi-label">会员购买/续费</text>
       </view>
       <view class="func-item" bindtap="goWithdraw">
-        <text class="fi-icon">🚪</text>
+        <image class="fi-icon" src="/icons/ui/door.png" mode="aspectFit" />
         <text class="fi-label">退会申请</text>
       </view>
       <view class="func-item" bindtap="goTransfer">
-        <text class="fi-icon">🔁</text>
+        <image class="fi-icon" src="/icons/ui/transfer.png" mode="aspectFit" />
         <text class="fi-label">权益转让</text>
       </view>
       <view class="func-item" bindtap="goMessages">
-        <text class="fi-icon">🔔</text>
+        <image class="fi-icon" src="/icons/ui/bell.png" mode="aspectFit" />
         <text class="fi-label">消息中心</text>
       </view>
     </view>
@@ -136,7 +136,7 @@
 
   <view class="bottom-links">
     <view class="link-item logout" bindtap="onLogout">
-      <view class="lk-left"><text class="lk-icon">🚪</text><text class="lk-text">退出登录</text></view>
+      <view class="lk-left"><image class="lk-icon" src="/icons/ui/door.png" mode="aspectFit" /><text class="lk-text">退出登录</text></view>
       <text class="lk-arrow">›</text>
     </view>
   </view>

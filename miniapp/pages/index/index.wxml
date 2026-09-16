@@ -42,13 +42,13 @@
   <!-- 提醒条：未读消息 / 在借 / 预约（有才显示） -->
   <view class="notice-row" wx:if="{{currentChild && (unreadCount > 0 || borrowCount > 0 || reservationCount > 0)}}">
     <view class="notice-item" wx:if="{{unreadCount > 0}}" bindtap="goMessage">
-      <text class="notice-emoji">🔔</text><text>{{unreadCount}} 条新消息</text>
+      <image class="notice-emoji" src="/icons/ui/bell.png" mode="aspectFit" /><text>{{unreadCount}} 条新消息</text>
     </view>
     <view class="notice-item" wx:if="{{borrowCount > 0}}" bindtap="goShelf">
-      <text class="notice-emoji">📚</text><text>在借 {{borrowCount}} 本</text>
+      <image class="notice-emoji" src="/icons/ui/book.png" mode="aspectFit" /><text>在借 {{borrowCount}} 本</text>
     </view>
     <view class="notice-item" wx:if="{{reservationCount > 0}}" bindtap="goReservation">
-      <text class="notice-emoji">🔖</text><text>预约中 {{reservationCount}}</text>
+      <image class="notice-emoji" src="/icons/ui/bookmark.png" mode="aspectFit" /><text>预约中 {{reservationCount}}</text>
     </view>
   </view>
 
@@ -112,31 +112,31 @@
 
   <!-- 快捷入口 2x4 -->
   <view class="section" wx:if="{{currentChild}}">
-    <view class="section-title h-section">🚀 快捷入口</view>
+    <view class="section-title h-section">快捷入口</view>
     <view class="entry-grid">
       <view class="entry" bindtap="goMoreBooks">
-        <view class="entry-icon e-orange">📖</view><text class="entry-name">图书馆</text>
+        <view class="entry-icon e-orange"><image class="entry-icon-img" src="/icons/ui/book.png" mode="aspectFit" /></view><text class="entry-name">图书馆</text>
       </view>
       <view class="entry" bindtap="goCheckin">
-        <view class="entry-icon e-green">📅</view><text class="entry-name">打卡日历</text>
+        <view class="entry-icon e-green"><image class="entry-icon-img" src="/icons/ui/calendar.png" mode="aspectFit" /></view><text class="entry-name">打卡日历</text>
       </view>
       <view class="entry" bindtap="goShelf">
-        <view class="entry-icon e-blue">📚</view><text class="entry-name">我的书架</text>
+        <view class="entry-icon e-blue"><image class="entry-icon-img" src="/icons/ui/book.png" mode="aspectFit" /></view><text class="entry-name">我的书架</text>
       </view>
       <view class="entry" bindtap="goReservation">
-        <view class="entry-icon e-gold">🔖</view><text class="entry-name">我的预约</text>
+        <view class="entry-icon e-gold"><image class="entry-icon-img" src="/icons/ui/bookmark.png" mode="aspectFit" /></view><text class="entry-name">我的预约</text>
       </view>
       <view class="entry" bindtap="goAchievement">
-        <view class="entry-icon e-gold">🏆</view><text class="entry-name">等级勋章</text>
+        <view class="entry-icon e-gold"><image class="entry-icon-img" src="/icons/ui/trophy.png" mode="aspectFit" /></view><text class="entry-name">等级勋章</text>
       </view>
       <view class="entry" bindtap="goLeaderboard">
-        <view class="entry-icon e-pink">🏅</view><text class="entry-name">排行榜</text>
+        <view class="entry-icon e-pink"><image class="entry-icon-img" src="/icons/ui/chart.png" mode="aspectFit" /></view><text class="entry-name">排行榜</text>
       </view>
       <view class="entry" bindtap="goPassport">
-        <view class="entry-icon e-purple">🛂</view><text class="entry-name">阅读护照</text>
+        <view class="entry-icon e-purple"><image class="entry-icon-img" src="/icons/ui/card.png" mode="aspectFit" /></view><text class="entry-name">阅读护照</text>
       </view>
       <view class="entry" bindtap="goActivities">
-        <view class="entry-icon e-cyan">🎪</view><text class="entry-name">线下活动</text>
+        <view class="entry-icon e-cyan"><image class="entry-icon-img" src="/icons/ui/ticket.png" mode="aspectFit" /></view><text class="entry-name">线下活动</text>
       </view>
     </view>
   </view>

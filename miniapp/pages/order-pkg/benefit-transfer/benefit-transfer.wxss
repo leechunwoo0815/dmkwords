@@ -551,3 +551,8 @@
   /* 2026-09-15：固定底栏改回文档流后，末元素不再被盖，但仍贴页面底 → 补留白 */
   padding-bottom: calc(60rpx + env(safe-area-inset-bottom)); background: var(--bg); }
 
+.check-item.active { background: var(--accent-soft); border-radius: var(--radius-sm); }
+.record-arrow.cancel { color: var(--error); font-weight: 600; }
+
+.tip-icon { width: 36rpx; height: 36rpx; flex-shrink: 0; }
+.arrow-icon { width: 60rpx; height: 60rpx; }

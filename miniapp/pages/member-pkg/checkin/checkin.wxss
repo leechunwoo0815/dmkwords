@@ -562,3 +562,11 @@
 .x-f0c0b3 { font-size: 32rpx; font-weight: 600; color: var(--fg); }
 .x-9a915c { font-weight: 800; color: var(--surface); font-size: 40rpx; }
 .x-43089c { margin-top: 24rpx; color: var(--muted); font-size: 24rpx; text-align: center; }
+
+.page-bg {
+  min-height: 100vh;
+  background: var(--bg);
+  box-sizing: border-box;
+  /* 底部留白 ≥ 固定 .bottom-nav（约 170rpx）+ 安全区：末行不被底栏压住 */
+  padding: 20rpx 24rpx calc(200rpx + env(safe-area-inset-bottom));
+}

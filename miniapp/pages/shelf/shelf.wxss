@@ -165,3 +165,6 @@
   border-radius: 50%;
   box-shadow: 0 2rpx 6rpx rgba(var(--fg-rgb), 0.25);
 }
+
+.asset-cover-fb { width: 40rpx; height: 40rpx; }
+.trophy-badge { width: 34rpx; height: 34rpx; }

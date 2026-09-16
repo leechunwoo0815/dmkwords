@@ -199,3 +199,9 @@
 .x-0c118e { color: var(--warning); }
 .x-5a091f { color: var(--accent); }
 
+.page-bg {
+  min-height: 100vh;
+  background: var(--bg);
+  box-sizing: border-box;
+  padding: 20rpx 24rpx calc(60rpx + env(safe-area-inset-bottom));
+}

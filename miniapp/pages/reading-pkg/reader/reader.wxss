@@ -1155,3 +1155,6 @@
 .x-aa01b4 { opacity: 0.3; }
 .x-e83e61 { color: var(--muted); font-size: 24rpx; }
 .x-f15519 { color: var(--error); }
+
+.no-audio-icon { width: 56rpx; height: 56rpx; }
+.popup-emoji { width: 120rpx; height: 120rpx; margin: 0 auto 12rpx; }

@@ -224,3 +224,5 @@
   color: var(--muted);
   font-size: 26rpx;
 }
+
+.tip-icon { width: 36rpx; height: 36rpx; flex-shrink: 0; }

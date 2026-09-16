@@ -395,3 +395,12 @@
 .x-6e6b5a { width: 200rpx; height: 200rpx; border-radius: 12rpx; background: var(--border); }
 .x-87d128 { position: fixed; inset: 0; background: rgba(var(--fg-rgb), 0.9); display: flex; align-items: center; justify-content: center; z-index: 99; }
 .x-9dfda0 { width: 100%; height: 100%; }
+
+.page-bg {
+  min-height: 100vh;
+  background: var(--bg);
+  box-sizing: border-box;
+  padding: 20rpx 24rpx calc(60rpx + env(safe-area-inset-bottom));
+}
+
+.rh-icon { width: 48rpx; height: 48rpx; }

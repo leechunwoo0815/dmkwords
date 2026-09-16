@@ -267,3 +267,5 @@
 .action-bar .btn-outline {
   width: 100%;
 }
+
+.qr-bright-hint { margin-top: 8rpx; color: var(--success); font-weight: 600; }

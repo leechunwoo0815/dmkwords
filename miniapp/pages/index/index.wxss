@@ -295,3 +295,11 @@
 
 /* ===== 2026-09-14 回归修复（对照 HEAD 逐条核回被批处理误删的声明）===== */
 .h-section { font-size: 34rpx; margin-bottom: 20rpx; }
+
+.hero-left { flex: 1; min-width: 0; }
+.badge-member { background: var(--accent-soft); border-color: var(--fg); color: var(--accent-darker); }
+
+.notice-emoji { width: 34rpx; height: 34rpx; flex-shrink: 0; }
+
+/* 快捷入口圆贴纸里的自家图标（2026-09-16 替换 emoji） */
+.entry-icon-img { width: 56rpx; height: 56rpx; }

@@ -719,6 +719,53 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 锁死「报告图画在哪个色盘上」（左上角背景 = `art.PALETTES[...]["top"]`，容差 30 抵纸纹噪点），
 已自证喂旧版深蓝横幅会红。**它只锁色盘归属，锁不住排版退化——排版必须目视。**
 
+## 十五、小程序 UI 图标体系（2026-09-16 立规）
+
+### 15.1 为什么禁用 emoji 当图标
+
+用户长期提的"视觉割裂"里，emoji 是最典型的一类：**同一个 emoji 在 iOS / Android /
+微信开发者工具是三种画风**（形状、配色、粗细都不同），颜色与绘本令牌无关，也无法与卡片
+描边/圆角对齐；系统升级还会换脸。故：**图标槽位一律用自家 PNG 资产，不用 emoji**。
+
+### 15.2 资产与生成
+
+- 生成器：`scripts/gen_ui_icons.py`（`python -m scripts.gen_ui_icons [--sheet]`）
+- 资产：`miniapp/icons/ui/*.png`（96×96 透明，37 枚；与 tabbar 图标同规格）
+- 画法：`backend/domain/reading_circle/art.py` 引擎——粗墨线描边（INK `#5B4636`）+
+  马卡龙实色 + 白高光 + 轻纸纹，**与头像/勋章/成就卡同一套语言**（别再新起一种画法）
+- 命名：概念名（`calendar` / `trophy` / `bookmark` / `headphone` / `search` / `cover` / `lock` /
+  `party` / `warning` / `tip` / `globe` / `sparkle` / `edit` / `refund` / `crown` / `door` /
+  `transfer` / `clock` / `pin` / `heart(-off)` / `star(-off)` / `wallet` / `receipt` / `card` /
+  `chart` / `report` / `clipboard` / `ticket` / `child` / `phone` / `key` / `empty` …）
+
+### 15.3 用法
+
+```xml
+<!-- 直接引用 -->
+<image class="fi-icon" src="/icons/ui/calendar.png" mode="aspectFit" />
+<!-- 条件切换（同一槽位多态） -->
+<image class="like-icon" src="/icons/ui/{{liked ? 'heart' : 'heart-off'}}.png" mode="aspectFit" />
+<!-- 共享空态组件：传概念名，不传 emoji -->
+<empty-state icon-name="bell" title="暂无消息" desc="有新消息时会第一时间通知你" />
+```
+
+尺寸写在页面的槽位类里（`width/height`，rpx），**不要**改资产的像素尺寸去适配单页。
+
+### 15.4 例外：文字字形不是 emoji
+
+`✓ ✕ ★ ☆ ▶ ◀ ▲ ▼ ● ○ ■ □ ◆ ◇ ※` 这些**排版字形**属设计系统（`已打卡 ✓`、成绩环的 ✓/✕、
+星级），不在禁用范围——门禁 R13a 有 `TYPO_GLYPHS` 白名单把它们排除。
+
+### 15.5 机械门禁 R13（`scripts/check_miniapp_style.py`）
+
+| 规则 | 判定 |
+|---|---|
+| R13a | 图标槽位（class 含 `icon` / `emoji`）里出现 emoji → FAIL |
+| R13b | `/icons/ui/*.png` 与 `icon-name="x"` 引用的资产不存在 → FAIL |
+
+三重自证：注入 emoji 必命中、注入不存在的图标名必命中、**存在的图标名不得误报**（首版把
+`check-result-icon` 的 ✓、`fc-close-icon` 的 ✕ 误报成违规，已加白名单并留自证）。
+
 ### 14.4 边界（如实标注，别把规矩说过头）
 
 `scripts/seed_demo_library.py` 里**演示书封面/活动封面**仍是自己一套画法（天空渐变 + 太阳 + 云），

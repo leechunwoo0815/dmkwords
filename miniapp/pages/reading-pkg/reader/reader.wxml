@@ -30,7 +30,7 @@
     </view>
 
     <view wx:if="{{anomalyMsg}}" class="no-audio">
-      <text class="no-audio-icon">⚠️</text>
+      <image class="no-audio-icon" src="/icons/ui/warning.png" mode="aspectFit" />
       <text class="no-audio-text">{{anomalyMsg}}</text>
     </view>
   </view>
@@ -58,7 +58,7 @@
 
   <view wx:if="{{showCompletion && completion}}" class="completion-overlay" catchtap="onCloseCompletion">
     <view class="completion-card" catchtap="onCloseCompletion">
-      <view class="popup-emoji">🎉</view>
+      <image class="popup-emoji" src="/icons/ui/party.png" mode="aspectFit" />
       <view class="popup-title">这本书听完啦！</view>
       <view class="popup-sub">有效覆盖 ≥95%，阅读时长 {{completion.minutes}} 分钟已记录</view>
       <view class="popup-stats">

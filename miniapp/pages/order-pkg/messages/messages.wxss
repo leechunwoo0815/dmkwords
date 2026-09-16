@@ -143,3 +143,5 @@
   font-weight: 700;
   color: var(--accent-light);
 }
+
+.list-error { text-align: center; padding: 80rpx 32rpx; color: var(--accent); font-size: 28rpx; }

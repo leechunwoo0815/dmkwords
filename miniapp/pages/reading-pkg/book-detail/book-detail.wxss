@@ -256,7 +256,9 @@
 }
 
 .qhc-star {
-  font-size: 40rpx;
+  width: 36rpx;
+  height: 36rpx;
+  margin-right: 4rpx;
 }
 
 .qhc-best {
@@ -989,3 +991,9 @@
 
 .muted-line { color: var(--muted); font-size: 26rpx; line-height: 1.6; }
 .desc-text { color: var(--fg); font-size: 26rpx; line-height: 1.7; }
+
+.hero-cover-empty { justify-content: center; font-size: 72rpx; }
+
+.hero-cover-empty { padding: 40rpx; }
+.state-emoji { width: 72rpx; height: 72rpx; }
+.action-icon-emoji { width: 36rpx; height: 36rpx; }
