@@ -283,6 +283,9 @@ async def upload_order_voucher(
     """收款凭证上传（WM3-B2 两步式第一步；仅待人工确认订单可传；统一转 JPG）。
 
     存储/落库/失败清理全链在 OrderService.upload_voucher（Router 零异常处理纪律）。"""
+    from backend.common.file_storage import ensure_upload_within_limit, read_image_policy
+
+    ensure_upload_within_limit(file, read_image_policy(db, "doc"))
     data = await file.read()
     order = OrderService(db).upload_voucher(admin, order_id, data, file.filename or "")
     return VoucherUploadResponse(
@@ -439,4 +442,9 @@ async def upload_observation_report(
     db: Session = Depends(get_db),
 ):
     """观察期评估报告上传（≤9 张图；家长端可见）。"""
+    from backend.common.file_storage import ensure_upload_within_limit, read_image_policy
+
+    policy = read_image_policy(db, "doc")
+    for f in files:  # 解码前逐张拦超限（服务层还会按同一口径压缩）
+        ensure_upload_within_limit(f, policy)
     return ObservationReportService(db).upload_for_admin(admin, child_id, files, remark or None)

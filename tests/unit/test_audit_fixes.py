@@ -141,10 +141,10 @@ def test_report_image_endpoint(client: TestClient):
     gen = client.post(f"/api/admin/children/{c['id']}/reports/weekly/generate", headers=h)
     assert gen.status_code == 200
     path = gen.json()["path"]
-    # 图片接口（query token）能取回 PNG
+    # 图片接口（query token）能取回图片（2026-09-17 起报告图落盘 JPEG）
     r = client.get(f"/api/miniapp/reports/weekly/image?child_id={c['id']}&token={token}")
     assert r.status_code == 200, r.text
-    assert r.content[:8] == b"\x89PNG\r\n\x1a\n"
+    assert r.content[:3] == b"\xff\xd8\xff"  # JPEG SOI
     assert path  # 管理端与小程序共用同一文件
 
 
@@ -205,11 +205,13 @@ def test_observation_image_endpoint(client: TestClient):
     c = client.post(
         f"/api/admin/members/parents/{p['id']}/children", json={"name": "图孩"}, headers=h
     ).json()
-    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+    # 2026-09-17：观察报告改走统一图片管线（EXIF 摆正 + 限幅 + JPEG），假字节会被拒 → 用真实图
+    from tests.unit.test_wm3_voucher import _png_bytes
+
     up = client.post(
         f"/api/admin/children/{c['id']}/observation-reports",
         data={"remark": "审查"},
-        files=[("files", ("r1.png", io.BytesIO(png), "image/png"))],
+        files=[("files", ("r1.png", io.BytesIO(_png_bytes()), "image/png"))],
         headers=h,
     )
     assert up.status_code == 200
@@ -219,7 +221,7 @@ def test_observation_image_endpoint(client: TestClient):
     sub = rel.replace("observation/", "", 1)
     ok = client.get(f"/api/miniapp/observation-images/{sub}?token={token}")
     assert ok.status_code == 200, ok.text
-    assert ok.content[:8] == b"\x89PNG\r\n\x1a\n"
+    assert ok.content[:3] == b"\xff\xd8\xff"  # 落盘统一 JPEG（2026-09-17 体积纪律）
     # 越权路径（跳出 observation/ 目录）被拒
     evil = client.get(f"/api/miniapp/observation-images/..%2F..%2Fetc%2Fpasswd?token={token}")
     assert evil.status_code in (404, 400)

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
+from backend.common.file_utils import image_media_type
 from backend.database import get_db
 from backend.domain.reading_circle.admin_service import AdminCircleService
 from backend.domain.reading_circle.card_engine import CARD_TYPE_LABELS, post_card_image
@@ -138,4 +139,4 @@ def circle_post_image(
         from backend.common.exceptions import NotFoundError
 
         raise NotFoundError("卡片图文件不存在")
-    return FileResponse(full, media_type="image/png")
+    return FileResponse(full, media_type=image_media_type(rel))

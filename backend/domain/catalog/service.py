@@ -441,13 +441,17 @@ class BookService:
         return copy
 
     def upload_cover(self, admin, book_id: int, data: bytes, ext: str) -> Book:
-        """封面上传：统一转 JPG 存储（Pillow），路径 cover/{isbn前4}/{code}_{token}.jpg。
+        """封面上传：统一走图片管线（EXIF 摆正 + 长边限幅 + JPEG），路径 cover/{isbn前4}/{code}_{token}.jpg。
         R2：旧文件只在 commit 成功后删除（对齐 delete_book），防 DB 指向已删文件。"""
         book = self.book_repo.get_by_id_or_raise(book_id)
-        from backend.common.file_storage import remove_book_media, save_cover_jpg
+        from backend.common.file_storage import (
+            read_image_policy,
+            remove_book_media,
+            save_cover_jpg,
+        )
 
         old = book.cover_path
-        book.cover_path = save_cover_jpg(book, data, ext)
+        book.cover_path = save_cover_jpg(book, data, ext, read_image_policy(self.db, "cover"))
         self.book_repo.update(book)
         self._audit(admin, "book.cover", str(book.id), {"path": book.cover_path})
         self.db.commit()

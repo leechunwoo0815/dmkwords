@@ -49,6 +49,20 @@ def media_version(cover_path: str | None) -> str:
     return os.path.splitext(os.path.basename(cover_path))[0].rsplit("_", 1)[-1]
 
 
+#: 媒体响应 MIME 映射（2026-09-17：生成图由 PNG 改 JPEG，端点原先硬编码 image/png → 必须按路径判定）
+_IMAGE_MEDIA_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+}
+
+
+def image_media_type(path: str) -> str:
+    """按文件扩展名给媒体响应的 Content-Type（未知扩展名兜底 image/jpeg）。"""
+    return _IMAGE_MEDIA_TYPES.get(os.path.splitext(path or "")[1].lower(), "image/jpeg")
+
+
 def book_cover_url(book_id: int, cover_path: str | None) -> str | None:
     """书籍封面 URL（带 v 版本参数）。
 

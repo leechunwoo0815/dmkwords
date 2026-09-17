@@ -309,6 +309,10 @@ async def upload_cover(
     admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
+    from backend.common.file_storage import ensure_upload_within_limit, read_image_policy
+
+    policy = read_image_policy(db, "cover")
+    ensure_upload_within_limit(file, policy)  # 解码前拦超限（不把巨图读进内存）
     data = await file.read()
     ext = os.path.splitext(file.filename or "")[1]
     book = BookService(db).upload_cover(admin, book_id, data, ext)

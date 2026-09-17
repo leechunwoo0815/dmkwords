@@ -772,9 +772,55 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 走的是**演示数据生成器**而非产品资产链路；它的产出是绘本感的插画封面、用户也未报障，
 故本轮**不动**。若将来要收敛，方向同样是"抽成 art.py 原语 + 生成器调用"。
 
+## 十六、图片体积规范（2026-09-17 立规，用户裁定）
+
+> 用户原话：「未来服务器磁盘空间可能没那么大…**只要是上传或者是自动生成的图片，就必须控制大小**，
+> 不管运营人员上传多大的图片，后端都应该能自动压缩，自动生成的图片也要控制一下大小，
+> 保证小程序端显示清晰即可」。
+
+### 16.1 一条铁律：图片落盘只有两个出口
+
+| 出口 | 用于 | 位置 |
+|---|---|---|
+| `file_storage.normalize_image()` | **所有上传图**（EXIF 摆正 → 长边限幅 → JPEG → 体积兜底降质） | `backend/common/file_storage.py` |
+| `art.Canvas.finish(path, quality=)` | **所有生成图**（卡片/报告/海报；需要 alpha 的资产传 `quality=None` 出 PNG） | `backend/domain/reading_circle/art.py` |
+
+**禁止**在业务代码里自己 `img.save(...)` / `cv.img.resize(...).save(...)`——历史上"同一业务两套画法"
+已经犯过三次（报告图、活动封面、海报），体积口径再分叉就是第四次。
+
+### 16.2 目标值（实测口径，数值全在 SystemConfig）
+
+| 类型 | 显示需求 | 目标 | 实测 |
+|---|---|---|---|
+| 阅读圈大图 750×1180 | 信息流点开全屏 + 长按存相册 | JPEG q85 | **769KB → 67KB** |
+| 阅读圈缩略图 618×618 | 信息流卡片满宽 | JPEG q85 | **317KB → 28KB** |
+| 周报/月报 750×1100 | 全屏长图 + 存相册 | JPEG q85 | **781KB → 92KB** |
+| 图书封面 | 列表 340rpx / 详情 220rpx | 长边 ≤1080 JPEG | 600×900 → 32KB |
+| 活动封面（横版） | banner | 长边 ≤1200 JPEG | 900×320 → 18KB |
+| 收款凭证 / 观察报告 | **要放大看清小字** | 长边 ≤1600 JPEG | 1080 宽 → 55KB |
+
+配置键：`image_upload_max_mb` / `image_upload_max_output_kb` / `image_jpeg_quality` /
+`image_generated_jpeg_quality` / `image_cover_max_edge` / `image_activity_cover_max_edge` / `image_doc_max_edge`。
+
+### 16.3 三条工程约束（踩过才知道）
+
+1. **为什么必须 JPEG**：本项目的插画一律带 `paper_grain` 纸纹噪点，**PNG 对噪点几乎压不动**
+   （卡片 761KB 基本都是噪点）。海报早在 fix34-R2 就改过 JPEG，卡片与报告是漏网的同类。
+2. **改图必须换文件名**：小程序 `<image>` 按 **URL** 缓存，原地覆盖会让端上永远吃旧图。
+   生成图文件名带随机 tag / 规格版本号（缩略图 `thumb_v4_*`），重出品即换名 ⇒ 缓存必刷；
+   上传图原地重编码不需要换名（内容没变，只是变小了）。
+3. **报告图按内容摘要幂等**：报告图端点**每次请求都会出图**，旧实现用 随机 uuid 命名 命名 ⇒
+   家长每看一次就多一个文件（磁盘无上限增长）。现按 `sha256(report_data)[:10]` 命名并清理同
+   (孩子,类型) 的历史文件：同内容零新增、内容变则换名。
+
+### 16.4 EXIF 方向（顺带修的历史缺陷）
+
+`Image.open(...).convert("RGB")` **不会应用 EXIF Orientation**：运营用手机竖拍上传凭证/报告，
+存下来是躺着的（全项目此前无 `exif_transpose`）。统一管线已加，并有测试锁死。
+
 ---
 
 *规范制定：外部专家*  
-*日期：2026-08-25（运营增强同步至 2026-08-28；媒体预览统一与后端出图规范同步至 2026-09-15）*  
-*版本：V1.4*  
+*日期：2026-08-25（运营增强同步至 2026-08-28；媒体预览统一与后端出图规范同步至 2026-09-15；图片体积规范同步至 2026-09-17）*  
+*版本：V1.5*  
 *关联文档：theme-paint.ts, Layout.tsx, BookManage.tsx, BookDetail.tsx, Dashboard.tsx, PreviewImage.tsx, reading_circle/art.py, growth/report_service.py, miniapp/app.wxss*

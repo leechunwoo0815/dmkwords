@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import os
-import uuid
 
 from sqlalchemy.orm import Session
 
@@ -29,21 +28,15 @@ class ObservationReportService:
             raise ValidationError("请至少上传一张图片")
         if len(files) > 9:
             raise ValidationError("最多上传 9 张图片")
-        from backend.config import get_settings
+        from backend.common.file_storage import read_image_policy, save_observation_image
 
-        root = os.path.abspath(get_settings().UPLOADS_DIR)
-        rel_dir = os.path.join("observation", f"child_{child.id}")
-        out_dir = os.path.join(root, rel_dir)
-        os.makedirs(out_dir, exist_ok=True)
+        policy = read_image_policy(self.db, "doc")
         paths = []
         for f in files:
             ext = os.path.splitext(f.filename or "")[1].lower()
             if ext not in (".png", ".jpg", ".jpeg"):
                 raise ValidationError(f"仅支持 PNG/JPG 图片（{f.filename}）")
-            name = f"{uuid.uuid4().hex}{ext}"
-            with open(os.path.join(out_dir, name), "wb") as out:
-                out.write(f.file.read())
-            paths.append(os.path.join(rel_dir, name))
+            paths.append(save_observation_image(child.id, f.file.read(), ext, policy))
         report = ObservationReport(
             child_id=child.id,
             images=json.dumps(paths, ensure_ascii=False),

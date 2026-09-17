@@ -101,7 +101,7 @@ class AdminActivityService(ActivityService):
         """T45：活动封面上传（R-316 同款通道；失败删文件防孤儿）。"""
         import os as _os
 
-        from backend.common.file_storage import save_activity_cover_jpg
+        from backend.common.file_storage import read_image_policy, save_activity_cover_jpg
 
         a = (
             self.db.query(Activity)
@@ -113,7 +113,7 @@ class AdminActivityService(ActivityService):
         ext = _os.path.splitext(filename or "")[1]
         if not ext:
             raise ValidationError("封面文件缺少扩展名")
-        rel = save_activity_cover_jpg(a.id, data, ext)
+        rel = save_activity_cover_jpg(a.id, data, ext, read_image_policy(self.db, "activity_cover"))
         try:
             a.cover_path = rel
             publish_audit(

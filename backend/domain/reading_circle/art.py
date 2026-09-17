@@ -163,10 +163,20 @@ class Canvas:
     def box(self, x0: float, y0: float, x1: float, y1: float) -> tuple:
         return (x0 * SS, y0 * SS, x1 * SS, y1 * SS)
 
-    def finish(self, path: str) -> str:
+    def finish(self, path: str, *, quality: int | None = None) -> str:
+        """降采样落盘。`quality=None` 出 PNG（需要 alpha 的资产：头像/勋章/图标）；
+        给定质量出 **JPEG**（不透明大图：卡片/报告/海报）。
+
+        [Why] 2026-09-17：插画带 `paper_grain` 噪点，PNG 对噪点几乎压不动——卡片 750×1180
+        实测 769KB，同图 JPEG q85 仅 67KB（8.8%）。海报早在 fix34-R2 就改过 JPEG，卡片与
+        报告是漏网的同类；现统一由本方法收口，禁止调用方自己 `img.save`（避免长出第三套画法）。
+        """
         out = self.img.resize((self.w, self.h), Image.LANCZOS)
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        out.save(path, "PNG")
+        if quality is None:
+            out.save(path, "PNG")
+        else:
+            out.convert("RGB").save(path, "JPEG", quality=quality, optimize=True, progressive=True)
         return path
 
 

@@ -17,6 +17,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.common.exceptions import NotFoundError
+from backend.common.file_storage import generated_jpeg_quality
 from backend.domain.growth.models import CheckinStreakRecord, MilestoneAward, WordsLedger
 from backend.domain.identity.models import Child
 from backend.domain.reading_circle import art
@@ -234,15 +235,13 @@ class CircleProfileService:
 
         out_dir = os.path.join(self._uploads_root(), "posters")
         os.makedirs(out_dir, exist_ok=True)
-        from PIL import Image
 
-        img = cv.img.resize((POSTER_W, POSTER_H), Image.LANCZOS).convert("RGB")
         # 按孩子**覆盖**（派生数据无需留历史；避免每次请求堆积 ~700KB 新文件）
         # fix34 R2：PNG → JPEG q85。海报 750×1150 的 723KB 体积主因是**纸纹噪点**
         # （PNG 压不动噪点），JPEG 对噪点友好 → 降到约 1/4，真机加载明显更快。
-        # 旧 .png 顺手删掉，不留孤儿。
+        # 2026-09-17：改走 `cv.finish(quality=)` 统一出口（卡片/报告同一口径，不再各写一份 save）。
         filename = f"poster_{child.id}.jpg"
-        img.save(os.path.join(out_dir, filename), "JPEG", quality=85, optimize=True)
+        cv.finish(os.path.join(out_dir, filename), quality=generated_jpeg_quality(self.db))
         legacy = os.path.join(out_dir, f"poster_{child.id}.png")
         if os.path.isfile(legacy):
             try:

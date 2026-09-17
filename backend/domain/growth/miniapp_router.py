@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
 from backend.common.exceptions import ValidationError
+from backend.common.file_utils import image_media_type
 from backend.database import get_db
 from backend.domain.growth.board_service import LeaderboardService, PassportService
 from backend.domain.growth.passed_books_service import PassedBooksService
@@ -129,4 +130,4 @@ def report_image(kind: str, child_id: int, token: str = "", db: Session = Depend
         from backend.common.exceptions import NotFoundError
 
         raise NotFoundError("报告图片不存在")
-    return FileResponse(full, media_type="image/png", filename=os.path.basename(rel))
+    return FileResponse(full, media_type=image_media_type(rel), filename=os.path.basename(rel))

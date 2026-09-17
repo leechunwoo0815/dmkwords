@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
 from backend.common.exceptions import NotFoundError
-from backend.common.file_utils import book_cover_url
+from backend.common.file_utils import book_cover_url, image_media_type
 from backend.database import get_db
 from backend.domain.catalog.models import Book
 from backend.domain.identity import guards
@@ -244,7 +244,8 @@ def observation_image(path: str, token: str = "", db: Session = Depends(get_db))
     stored_path = f"observation/{path}"
     if not ObservationReportService(db).image_owned_by(parent.id, stored_path, path):
         raise NotFoundError("图片不存在")
-    return FileResponse(full, media_type="image/jpeg")
+    # 2026-09-17：新上传一律 JPEG，但**存量**观察报告是原图直存的（可能 .png）→ 按扩展名派生
+    return FileResponse(full, media_type=image_media_type(path))
 
 
 @router.get("/covers/{book_id}")

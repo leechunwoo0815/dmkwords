@@ -506,14 +506,16 @@ def test_observation_report_upload_and_view(client: TestClient):
     h = _h(client)
     p, [c], mini = _mk_parent_with_children(client, h, "13800001008", ["观察孩"])
     _pay(client, h, c["id"], "observation_fee")
-    # 上传 2 张图
-    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+    # 上传 2 张图（2026-09-17：走统一管线，必须是**真实图片**；假字节会被 422）
+    from tests.unit.test_wm3_voucher import _png_bytes
+
+    img = _png_bytes()
     r = client.post(
         f"/api/admin/children/{c['id']}/observation-reports",
         data={"remark": "第一阶段评估：听力优秀"},
         files=[
-            ("files", ("r1.png", io.BytesIO(png), "image/png")),
-            ("files", ("r2.png", io.BytesIO(png), "image/png")),
+            ("files", ("r1.png", io.BytesIO(img), "image/png")),
+            ("files", ("r2.png", io.BytesIO(img), "image/png")),
         ],
         headers=h,
     )

@@ -187,13 +187,16 @@ def test_report_image_generation(client: TestClient):
     assert body["path"].startswith("reports/")
     assert body["url"].startswith("/api/admin/uploads/reports/")
     assert body["data"]["words"] == 1800
-    # 文件真实存在且是 PNG
+    # 文件真实存在且是 JPEG（2026-09-17：报告图 PNG → JPEG，单张 781KB → 92KB）
     from backend.config import get_settings
 
     full = os.path.join(get_settings().UPLOADS_DIR, body["path"])
     assert os.path.isfile(full)
     with open(full, "rb") as f:
-        assert f.read(8) == b"\x89PNG\r\n\x1a\n"
+        assert f.read(3) == b"\xff\xd8\xff"  # JPEG SOI
+    assert os.path.getsize(full) <= 250 * 1024, (
+        f"周报图 {os.path.getsize(full) / 1024:.0f}KB 超 250KB"
+    )
     # 小程序数据接口
     data = client.get(f"/api/miniapp/reports/weekly?child_id={c['id']}", headers=m).json()
     assert data["words"] == 1800

@@ -18,7 +18,8 @@
     reports/      周报月报图（ReportService 按需生成）
 
 永不清理（保护名单 + "不在白名单内一律不动"）：
-    miniapp-audit-*/  *-samples/   文档（docs/04 与交接卡）引用的视觉证据，INDEX.md 是证据本体
+    miniapp-audit-*/  *-samples/   视觉证据目录（保留在名单里以防将来再生成；**2026-09-17 用户裁定
+                                  已整体删除 31MB**，见 LEDGER 同日行——重出用 gen_* 脚本，不再回仓）
     posters/     按 child_id 定名、就地覆盖，体积极小
     voucher/     收款凭证（**人工上传，不可再生**）
     observation/ 评估报告图（**人工上传，不可再生**）

@@ -295,7 +295,7 @@ class OrderService:
         校验仅待人工确认可传（422）→ 统一转 JPG 存储 → 落库 → 失败删文件防孤儿（R-316 口径）。"""
         import os as _os
 
-        from backend.common.file_storage import _uploads_root, save_voucher_jpg
+        from backend.common.file_storage import _uploads_root, read_image_policy, save_voucher_jpg
 
         order = self.db.query(Order).filter(Order.id == order_id, Order.is_deleted == 0).first()
         if not order:
@@ -305,7 +305,7 @@ class OrderService:
         ext = _os.path.splitext(filename or "")[1]
         if not ext:
             raise ValidationError("凭证文件缺少扩展名")
-        rel = save_voucher_jpg(order.order_no, data, ext)
+        rel = save_voucher_jpg(order.order_no, data, ext, read_image_policy(self.db, "doc"))
         try:
             order.voucher_path = rel
             publish_audit(

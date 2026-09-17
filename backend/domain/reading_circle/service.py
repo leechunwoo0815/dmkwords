@@ -118,7 +118,11 @@ class CircleService:
             raise ValidationError(f"今日已晒 {today_count} 帖，每日限晒 {limit} 帖，明天再来吧")
 
         # ④ 渲染卡片图 + 落帖（card_data 快照冻结）
-        rendered = card_engine.render_card(card_data)  # WM15-R2：双规格（含字大图 + 无字缩略图）
+        from backend.common.file_storage import generated_jpeg_quality
+
+        rendered = card_engine.render_card(  # WM15-R2：双规格（含字大图 + 无字缩略图）
+            card_data, jpeg_quality=generated_jpeg_quality(self.db)
+        )
         post = CirclePost(
             parent_id=parent.id,
             child_id=child.id,

@@ -112,6 +112,9 @@ async def upload_activity_cover(
     file: UploadFile = File(...),
 ):
     """T45：封面上传（R-316 同款通道统一转 JPG；Router 零异常处理纪律）。"""
+    from backend.common.file_storage import ensure_upload_within_limit, read_image_policy
+
+    ensure_upload_within_limit(file, read_image_policy(db, "activity_cover"))
     data = await file.read()
     a = AdminActivityService(db).upload_cover(admin, activity_id, data, file.filename or "")
     return {"id": a.id, "cover_path": a.cover_path}

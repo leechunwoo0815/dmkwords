@@ -40,7 +40,12 @@ CARD_W, CARD_H = 750, 1180
 # （幂等：已是当前规格即跳过），重渲后删旧文件，不留无主残留。
 #   v2（fix33）= 与完整版同管线、仅跳文字层（两套版式，用户仍觉"割裂"）
 #   v3（fix34）= **从完整版画布直接裁切插画区**（像素同源，点开=放大同一画面）
-THUMB_SPEC_VERSION = "v3"
+#   v4（2026-09-17）= 落盘格式 PNG → **JPEG**（体积：大图 769KB→67KB、缩略图 317KB→28KB；
+#       带 paper_grain 噪点的插画用 PNG 压不动）。版本号进文件名 ⇒ URL 必变 ⇒ 客户端缓存必刷。
+THUMB_SPEC_VERSION = "v4"
+
+#: 生成图 JPEG 质量兜底值（真实值走 SystemConfig `image_generated_jpeg_quality`）
+DEFAULT_JPEG_QUALITY = 85
 
 # 插画区（方形 618×618，位于卡面上部）：完整版里它**零文字**，
 # 缩略图 = 这块的裁切 → 缩略图与大图必然一致（fix34 R1-C 的几何前提）。
@@ -161,12 +166,23 @@ def _circle_dir() -> str:
     return out_dir
 
 
-def render_thumb(card_data: dict) -> str:
+def save_jpeg(img, path: str, quality: int) -> str:
+    """生成图统一落盘（JPEG，optimize + progressive）——**唯一出口**，禁止各处自己 save。
+
+    2026-09-17 用户裁定「自动生成的图片也要控体积」：带 paper_grain 噪点的插画 PNG
+    压不动（卡片 769KB），JPEG q85 实测 67KB（8.8%）。
+    """
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    img.convert("RGB").save(path, "JPEG", quality=quality, optimize=True, progressive=True)
+    return path
+
+
+def render_thumb(card_data: dict, *, jpeg_quality: int = DEFAULT_JPEG_QUALITY) -> str:
     """只输出缩略图（存量回填用，不落大图）：内容 = 完整版插画区的裁切。"""
     card_type = card_data.get("card_type", "x")
-    name = f"thumb_{THUMB_SPEC_VERSION}_{card_type}_{uuid.uuid4().hex[:8]}.png"
+    name = f"thumb_{THUMB_SPEC_VERSION}_{card_type}_{uuid.uuid4().hex[:8]}.jpg"
     _, thumb = card_images(card_data)
-    thumb.save(os.path.join(_circle_dir(), name), "PNG")
+    save_jpeg(thumb, os.path.join(_circle_dir(), name), jpeg_quality)
     return f"circle/{name}"
 
 
@@ -177,8 +193,10 @@ def ensure_circle_thumbs(db: Session) -> dict:
     重渲成功后删旧缩略图文件（避免无主残留），**大图 image_path 一律不动**。
     单帖失败跳过不阻塞整批（返回 skipped 计数供调用方显式报告）。
     """
+    from backend.common.file_storage import generated_jpeg_quality
     from backend.domain.reading_circle.models import CirclePost as Post
 
+    quality = generated_jpeg_quality(db, DEFAULT_JPEG_QUALITY)
     marker = f"thumb_{THUMB_SPEC_VERSION}_"
     rows = db.query(Post).filter(Post.is_deleted == 0).all()
     root = _uploads_root()
@@ -189,7 +207,7 @@ def ensure_circle_thumbs(db: Session) -> dict:
             continue
         old_rel = post.thumb_path or ""
         try:
-            post.thumb_path = render_thumb(json.loads(post.card_data or "{}"))
+            post.thumb_path = render_thumb(json.loads(post.card_data or "{}"), jpeg_quality=quality)
         except Exception:  # 单帖失败不影响整批
             skipped += 1
             continue
@@ -205,22 +223,25 @@ def ensure_circle_thumbs(db: Session) -> dict:
     return {"rendered": rendered, "skipped": skipped}
 
 
-def render_card(card_data: dict) -> dict:
+def render_card(card_data: dict, *, jpeg_quality: int = DEFAULT_JPEG_QUALITY) -> dict:
     """渲染**双规格**卡片图 → {"image_path": 完整版, "thumb_path": 缩略图}。
 
     fix34 R1-C：两规格**同源**——缩略图 = 完整版画布 ART_BOX（插画区）的裁切，
     点开大图所见即缩略图的放大版 + 下方文字条，观感是"放大"而不是"换了一张图"。
     两文件同为 uploads/circle/ 运行时产物，生命周期绑定同一帖
     （删帖由 CircleImageCleanupService 两列一起清）。
+
+    2026-09-17：落盘改 JPEG（大图 769KB→67KB、缩略图 317KB→28KB）；文件名带随机 tag
+    ⇒ URL 必变 ⇒ 客户端不吃旧缓存。
     """
     out_dir = _circle_dir()
     card_type = card_data.get("card_type", "x")
     tag = uuid.uuid4().hex[:8]
     full, thumb = card_images(card_data)
-    image_name = f"card_{card_type}_{tag}.png"
-    thumb_name = f"thumb_{THUMB_SPEC_VERSION}_{card_type}_{tag}.png"
-    full.save(os.path.join(out_dir, image_name), "PNG")
-    thumb.save(os.path.join(out_dir, thumb_name), "PNG")
+    image_name = f"card_{card_type}_{tag}.jpg"
+    thumb_name = f"thumb_{THUMB_SPEC_VERSION}_{card_type}_{tag}.jpg"
+    save_jpeg(full, os.path.join(out_dir, image_name), jpeg_quality)
+    save_jpeg(thumb, os.path.join(out_dir, thumb_name), jpeg_quality)
     return {"image_path": f"circle/{image_name}", "thumb_path": f"circle/{thumb_name}"}
 
 

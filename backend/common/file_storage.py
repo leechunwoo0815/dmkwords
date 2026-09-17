@@ -1,21 +1,165 @@
 # backend/common/file_storage.py — 文件存储（本地磁盘 ADR-004 + 统一路径 R-316）
-"""封面统一转 JPG；音频仅 MP3 并解析时长。存储根目录由 settings.UPLOADS_DIR。"""
+"""封面统一转 JPG；音频仅 MP3 并解析时长。存储根目录由 settings.UPLOADS_DIR。
+
+**图片体积纪律（2026-09-17 用户裁定）**：服务器磁盘有限，运营上传多大都必须在服务端
+**自动压缩**，目标是"小程序端看得清即够"。所有上传图一律走 `normalize_image()`
+（EXIF 摆正 → 长边限幅 → JPEG → 体积兜底降质），数值全部来自 SystemConfig 不写魔数。
+"""
 
 from __future__ import annotations
 
 import os
 import secrets
 import struct
+from dataclasses import dataclass
+from io import BytesIO
 
 from backend.config import get_settings
 
 ALLOWED_COVER_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+
+#: 上传图解码前的像素上限（防解压炸弹：header 即知其尺寸，超限直接拒，不进解码）
+MAX_DECODE_PIXELS = 50_000_000
 
 
 def _uploads_root() -> str:
     root = get_settings().UPLOADS_DIR
     os.makedirs(root, exist_ok=True)
     return root
+
+
+# ---------------- 图片体积策略（数值全配置化：宪法 §〇 铁律 6） ----------------
+
+
+@dataclass(frozen=True)
+class ImagePolicy:
+    """一类上传图的体积口径。"""
+
+    #: 长边上限（px）——超过才缩放，不放大
+    max_edge: int
+    #: JPEG 质量（1-95）
+    quality: int
+    #: 单文件输入上限（字节）：超过直接 422，不读进内存
+    max_input_bytes: int
+    #: 输出上限（字节）：达标前逐档降质/缩边
+    max_output_bytes: int
+
+
+#: 场景 → (长边配置键, 输出上限配置键)；质量统一取 image_jpeg_quality
+_POLICY_KEYS = {
+    "cover": ("image_cover_max_edge", 1080),
+    "activity_cover": ("image_activity_cover_max_edge", 1200),
+    "doc": ("image_doc_max_edge", 1600),  # 收款凭证 / 观察报告：文档类，要看清小字
+}
+
+
+def read_image_policy(db, scope: str) -> ImagePolicy:
+    """按场景读图片体积口径（ConfigService 带 60s 缓存）。"""
+    from backend.common.config_service import ConfigService
+
+    if scope not in _POLICY_KEYS:
+        raise ValueError(f"未知图片场景: {scope}")
+    edge_key, edge_default = _POLICY_KEYS[scope]
+    cfg = ConfigService(db)
+    return ImagePolicy(
+        max_edge=cfg.get_int(edge_key, edge_default),
+        quality=cfg.get_int("image_jpeg_quality", 85),
+        max_input_bytes=cfg.get_int("image_upload_max_mb", 8) * 1024 * 1024,
+        max_output_bytes=cfg.get_int("image_upload_max_output_kb", 600) * 1024,
+    )
+
+
+def generated_jpeg_quality(db=None, default: int = 85) -> int:
+    """生成图（阅读圈卡片 / 周报月报）的 JPEG 质量。无 db 上下文（seed/脚本）时用默认值。"""
+    if db is None:
+        return default
+    from backend.common.config_service import ConfigService
+
+    return ConfigService(db).get_int("image_generated_jpeg_quality", default)
+
+
+def ensure_upload_within_limit(file, policy: ImagePolicy) -> None:
+    """解码前拦超大上传：Starlette 已填 `file.size`，不必先读进内存。
+
+    体积硬上限是**防呆**（运营误传上百 MB 的原图/PDF），不是防攻击——上传端点本身要权限。
+    """
+    size = getattr(file, "size", None)
+    if size is not None and size > policy.max_input_bytes:
+        from backend.common.exceptions import ValidationError
+
+        raise ValidationError(
+            f"图片体积超限（{size / 1024 / 1024:.1f}MB > "
+            f"{policy.max_input_bytes / 1024 / 1024:.0f}MB），请先压缩再传"
+        )
+
+
+def normalize_image(
+    data: bytes,
+    *,
+    max_edge: int,
+    quality: int,
+    max_input_bytes: int | None = None,
+    max_output_bytes: int | None = None,
+) -> bytes:
+    """上传图统一规范化 → JPEG 字节（唯一入口，禁各处自己 `img.save`）。
+
+    1. **EXIF 摆正**：手机竖拍照片带 Orientation 标记，不校正会被存成躺着的（历史缺陷）；
+    2. **长边限幅**：`max_edge` 内不缩放（不放大、不损清晰度），超出才 LANCZOS 缩；
+    3. **JPEG 输出**：`optimize` + `progressive`（体积优先，小程序端友好）；
+    4. **体积兜底**：给了 `max_output_bytes` 就逐档降质（-5/-10/-15），仍超再缩边 ×0.8，最多 3 轮。
+
+    解码前先按 **header 尺寸**拒绝超大图（像素上限），避免巨图解码打爆内存。
+    """
+    from PIL import Image, ImageOps
+
+    from backend.common.exceptions import ValidationError
+
+    if max_input_bytes is not None and len(data) > max_input_bytes:
+        raise ValidationError(
+            f"图片体积超限（{len(data) / 1024 / 1024:.1f}MB > {max_input_bytes / 1024 / 1024:.0f}MB）"
+        )
+    try:
+        img = Image.open(BytesIO(data))
+        img.load()
+    except Exception as e:  # noqa: BLE001 — Pillow 异常类型多，统一转业务异常
+        raise ValidationError("图片文件无法解析") from e
+    if img.width * img.height > MAX_DECODE_PIXELS:
+        raise ValidationError(f"图片像素过大（{img.width}x{img.height}），请先自行压缩")
+    try:
+        img = ImageOps.exif_transpose(img) or img
+        img = img.convert("RGB")
+    except Exception as e:  # noqa: BLE001
+        raise ValidationError("图片文件无法解析") from e
+
+    def _fit(source, edge: int):
+        if max(source.size) <= edge:
+            return source
+        scale = edge / max(source.size)
+        return source.resize(
+            (max(1, int(source.width * scale)), max(1, int(source.height * scale))),
+            Image.LANCZOS,
+        )
+
+    def _encode(source, q: int) -> bytes:
+        buf = BytesIO()
+        source.save(buf, "JPEG", quality=q, optimize=True, progressive=True)
+        return buf.getvalue()
+
+    out = _encode(_fit(img, max_edge), quality)
+    if max_output_bytes is None or len(out) <= max_output_bytes:
+        return out
+    for step in (5, 10, 15):
+        q = max(40, quality - step)
+        out = _encode(_fit(img, max_edge), q)
+        if len(out) <= max_output_bytes:
+            return out
+    edge = max_edge
+    for _ in range(3):  # 极噪图（截图/扫描件）降质仍超标 → 继续缩边
+        edge = int(edge * 0.8)
+        out = _encode(_fit(img, edge), max(40, quality - 15))
+        if len(out) <= max_output_bytes:
+            return out
+    return out
 
 
 def remove_book_media(cover_path: str | None, audio_path: str | None) -> None:
@@ -34,86 +178,98 @@ def remove_book_media(cover_path: str | None, audio_path: str | None) -> None:
                 pass
 
 
-def save_cover_jpg(book, data: bytes, ext: str) -> str:
-    """封面存储：统一转 JPG（Pillow）；路径 cover/{isbn前4位}/{code}.jpg；无 ISBN 走 local/。"""
+def _check_ext(ext: str, what: str) -> None:
     ext = ext.lower()
     if ext and ext not in ALLOWED_COVER_EXTS:
         from backend.common.exceptions import ValidationError
 
-        raise ValidationError(f"封面格式仅支持 JPG/JPEG/PNG/WebP: {ext}")
-    from io import BytesIO
+        raise ValidationError(f"{what}格式仅支持 JPG/JPEG/PNG/WebP: {ext}")
 
-    from PIL import Image
 
-    try:
-        img = Image.open(BytesIO(data))
-        img = img.convert("RGB")
-    except Exception as e:  # noqa: BLE001 — Pillow 异常类型多，统一转业务异常
-        from backend.common.exceptions import ValidationError
-
-        raise ValidationError("封面文件无法解析为图片") from e
-
-    if book.isbn:
-        rel = os.path.join("cover", book.isbn[:4], f"{book.isbn}_{secrets.token_hex(6)}.jpg")
-    else:
-        rel = os.path.join("cover", "local", f"{book.book_code}_{secrets.token_hex(6)}.jpg")
+def save_cover_jpg(book, data: bytes, ext: str, policy: ImagePolicy) -> str:
+    """封面存储：规范化 JPEG（长边 ≤ policy.max_edge）；路径 cover/{isbn前4位}/{code}_{token}.jpg。"""
+    _check_ext(ext, "封面")
+    rel = (
+        os.path.join("cover", book.isbn[:4], f"{book.isbn}_{secrets.token_hex(6)}.jpg")
+        if book.isbn
+        else os.path.join("cover", "local", f"{book.book_code}_{secrets.token_hex(6)}.jpg")
+    )
     abs_path = os.path.join(_uploads_root(), rel)
     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-    img.save(abs_path, "JPEG", quality=88)
+    with open(abs_path, "wb") as f:
+        f.write(
+            normalize_image(
+                data,
+                max_edge=policy.max_edge,
+                quality=policy.quality,
+                max_input_bytes=policy.max_input_bytes,
+                max_output_bytes=policy.max_output_bytes,
+            )
+        )
     return rel.replace(os.sep, "/")
 
 
-def save_activity_cover_jpg(activity_id: int, data: bytes, ext: str) -> str:
-    """T45（FEAT-082）：活动封面存储——统一转 JPG（Pillow）；路径 cover/activity/{id}_{hex}.jpg
-    （R-316 同款通道，参照书目封面先例）。"""
-    ext = ext.lower()
-    if ext and ext not in ALLOWED_COVER_EXTS:
-        from backend.common.exceptions import ValidationError
-
-        raise ValidationError(f"封面格式仅支持 JPG/JPEG/PNG/WebP: {ext}")
-    from io import BytesIO
-
-    from PIL import Image
-
-    try:
-        img = Image.open(BytesIO(data))
-        img = img.convert("RGB")
-    except Exception as e:  # noqa: BLE001 — Pillow 异常类型多，统一转业务异常
-        from backend.common.exceptions import ValidationError
-
-        raise ValidationError("封面文件无法解析为图片") from e
-
+def save_activity_cover_jpg(activity_id: int, data: bytes, ext: str, policy: ImagePolicy) -> str:
+    """T45（FEAT-082）：活动封面存储——规范化 JPEG；路径 cover/activity/{id}_{hex}.jpg。"""
+    _check_ext(ext, "封面")
     rel = os.path.join("cover", "activity", f"{activity_id}_{secrets.token_hex(6)}.jpg")
     abs_path = os.path.join(_uploads_root(), rel)
     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-    img.save(abs_path, "JPEG", quality=85)
+    with open(abs_path, "wb") as f:
+        f.write(
+            normalize_image(
+                data,
+                max_edge=policy.max_edge,
+                quality=policy.quality,
+                max_input_bytes=policy.max_input_bytes,
+                max_output_bytes=policy.max_output_bytes,
+            )
+        )
     return rel.replace(os.sep, "/")
 
 
-def save_voucher_jpg(order_no: str, data: bytes, ext: str) -> str:
-    """收款凭证存储（WM3-B2）：统一转 JPG（Pillow 对齐封面口径）；
+def save_voucher_jpg(order_no: str, data: bytes, ext: str, policy: ImagePolicy) -> str:
+    """收款凭证存储（WM3-B2）：规范化 JPEG（凭证要放大看小字 → 独立 doc 口径）；
     路径 voucher/{order_no}_{token}.jpg（订单号便于归档追溯）。"""
-    ext = ext.lower()
-    if ext and ext not in ALLOWED_COVER_EXTS:
-        from backend.common.exceptions import ValidationError
-
-        raise ValidationError(f"凭证格式仅支持 JPG/JPEG/PNG/WebP: {ext}")
-    from io import BytesIO
-
-    from PIL import Image
-
-    try:
-        img = Image.open(BytesIO(data))
-        img = img.convert("RGB")
-    except Exception as e:  # noqa: BLE001 — Pillow 异常类型多，统一转业务异常
-        from backend.common.exceptions import ValidationError
-
-        raise ValidationError("凭证文件无法解析为图片") from e
+    _check_ext(ext, "凭证")
     rel = os.path.join("voucher", f"{order_no}_{secrets.token_hex(6)}.jpg")
     abs_path = os.path.join(_uploads_root(), rel)
     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-    img.save(abs_path, "JPEG", quality=88)
+    with open(abs_path, "wb") as f:
+        f.write(
+            normalize_image(
+                data,
+                max_edge=policy.max_edge,
+                quality=policy.quality,
+                max_input_bytes=policy.max_input_bytes,
+                max_output_bytes=policy.max_output_bytes,
+            )
+        )
     return rel.replace(os.sep, "/")
+
+
+def save_observation_image(child_id: int, data: bytes, ext: str, policy: ImagePolicy) -> str:
+    """观察期评估报告图（WM10/FEAT-066）：**2026-09-17 起走统一管线**。
+
+    此前是 `open(...,"wb")` 原始字节直存 → 运营传 9 张手机原图可落几十 MB。
+    现与凭证同口径（doc 类：家长端要看清报告小字），路径 observation/child_{id}/{uuid}.jpg。
+    """
+    _check_ext(ext, "图片")
+    rel_dir = os.path.join("observation", f"child_{child_id}")
+    out_dir = os.path.join(_uploads_root(), rel_dir)
+    os.makedirs(out_dir, exist_ok=True)
+    name = f"{secrets.token_hex(16)}.jpg"
+    with open(os.path.join(out_dir, name), "wb") as f:
+        f.write(
+            normalize_image(
+                data,
+                max_edge=policy.max_edge,
+                quality=policy.quality,
+                max_input_bytes=policy.max_input_bytes,
+                max_output_bytes=policy.max_output_bytes,
+            )
+        )
+    return os.path.join(rel_dir, name).replace(os.sep, "/")
 
 
 def _mp3_duration(data: bytes) -> int:

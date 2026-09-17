@@ -112,15 +112,37 @@ class ReportService:
         }
 
     def generate_image(self, child: Child, kind: str) -> str:
-        """生成报告图片，返回相对路径（uploads/ 下）。"""
+        """生成报告图片，返回相对路径（uploads/ 下）。**幂等**：同内容只落一份文件。
+
+        2026-09-17 两处修（用户点名"自动生成的图片也要控体积 / 服务器磁盘有限"）：
+        ① 落盘 PNG → **JPEG**（实测单张 781KB → 92KB；报告图带 paper_grain 噪点，PNG 压不动）；
+        ② 文件名改为 **内容摘要**。此前是 `uuid4()`：家长**每看一次报告就多一个文件**（报告图
+           端点每次请求都会调本方法），磁盘无上限增长。现在内容不变 → 命中同一文件名、连重绘
+           都省了；内容变了（新周期/新数据）→ 摘要变 → 名字变 → 端上不吃旧图。落盘后清掉同
+           (孩子, 类型) 的历史文件（派生数据无需留历史，同 passport 海报口径）。
+        """
+        import glob
+        import hashlib
+        import json
         import os
-        import uuid
+
+        from backend.common.file_storage import generated_jpeg_quality
 
         data = self.report_data(child, kind)
-        cv = paint_report(data, child, kind)
+        digest = hashlib.sha256(
+            json.dumps(data, sort_keys=True, ensure_ascii=False, default=str).encode()
+        ).hexdigest()[:10]
         out_dir = os.path.join(_uploads_root(), "reports")
-        filename = f"report_{kind}_{child.id}_{uuid.uuid4().hex[:8]}.png"
-        cv.finish(os.path.join(out_dir, filename))
+        filename = f"report_{kind}_{child.id}_{digest}.jpg"
+        full = os.path.join(out_dir, filename)
+        if not os.path.isfile(full):  # 同内容已有图 → 直接复用（省 CPU 也不堆文件）
+            paint_report(data, child, kind).finish(full, quality=generated_jpeg_quality(self.db))
+        for stale in glob.glob(os.path.join(out_dir, f"report_{kind}_{child.id}_*")):
+            if os.path.abspath(stale) != os.path.abspath(full):
+                try:
+                    os.remove(stale)  # 旧摘要 / 存量 .png / uuid 命名的历史文件
+                except OSError:
+                    pass  # 删不掉只留孤儿，清理任务兜底
         return f"reports/{filename}"
 
 

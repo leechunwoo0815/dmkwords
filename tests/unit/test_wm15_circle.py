@@ -91,7 +91,8 @@ def test_share_creates_both_specs_and_thumb_endpoint(client: TestClient):
     for ep in ("image", "thumb"):
         r = client.get(f"/api/miniapp/circle/posts/{post_id}/{ep}", params={"token": token})
         assert r.status_code == 200, ep
-        assert r.headers["content-type"] == "image/png"
+        # 2026-09-17：卡片落盘 PNG → JPEG（带纸纹噪点的插画 PNG 压不动：769KB → 67KB）
+        assert r.headers["content-type"] == "image/jpeg"
 
 
 def test_thumb_falls_back_to_full_for_legacy_post(client: TestClient):
