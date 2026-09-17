@@ -42,7 +42,7 @@ scripts/            gate.sh 门禁 / verify_architecture 架构关 / dev.sh
 | [docs/01-顶层规划.md](docs/01-顶层规划.md) | 阶段目标与里程碑 |
 | [docs/02-架构蓝图.md](docs/02-架构蓝图.md) | 系统架构与 ADR |
 | [docs/03-Feature全量清单.md](docs/03-Feature全量清单.md) | 87 项 Feature 索引（状态按代码实测重算） |
-| [docs/04-模块交付顺序与手动验收手册.md](docs/04-模块交付顺序与手动验收手册.md) | WM1-WM12 交付顺序与手动测试步骤 |
+| [docs/04-模块交付顺序与手动验收手册.md](docs/04-模块交付顺序与手动验收手册.md) | WM1–WM15 交付顺序与手动测试步骤 |
 | [docs/07-按图施工手册.md](docs/07-按图施工手册.md) | 后续开发施工标准 + 第十二章 UX 增强基线 |
 | [docs/LEDGER.md](docs/LEDGER.md) | 任务台账（唯一进度事实源） |
 | [PRD/业务需求文档-定稿V1.1.md](PRD/业务需求文档-定稿V1.1.md) | 业务需求唯一事实源 |

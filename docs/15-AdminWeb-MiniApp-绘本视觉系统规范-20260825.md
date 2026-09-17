@@ -228,7 +228,8 @@
   资产 `miniapp/icons/frames/*`（由 `scripts/gen_fix34_frames.py` 生成），
   规格常量在 `miniapp/utils/frames.js`（含 `FRAME_SCALE` 缩放基准）。
 - **统一叠层组件** `miniapp/components/avatar-ring`：入参 `src` / `level` / `size` / `gm`；
-  **五端消费点**（信息流、名片页、点赞墙、榜单、我的页）一律复用它，禁止各自拼图。
+  **六端消费点**（信息流、名片页、点赞墙、榜单、我的页、**阅读护照**）一律复用它，
+  禁止各自拼图。（阅读护照 2026-09-17 接入，此前是手搓圆圈 + 写死 emoji。）
 - **馆方专属资产** `miniapp/icons/special/gm_{avatar,frame}.png`：馆长金光头像 + 鎏金冠冕外框，
   **不进 `AVATAR_IDS` 白名单**（孩子不可冒用馆方身份）。
   画法约束：金冠/光晕只用**同心环**叠加，禁止在透明画布上做整片光晕填充
@@ -561,7 +562,7 @@ admin-web 端未按本规范原定的 4 个迭代分阶段实施，而是一次�
 ### miniapp 小程序端绘本风（2026-08-30 已落地）
 
 - **已实施**：`miniapp/app.wxss` 落地整套绘本令牌（改值不改名，43 个页面 wxss 零改动继承）；`miniapp/components/avatar-ring/` 等级头像框叠层组件；`miniapp/icons/frames/` 四档头像框资产。
-- **机械门禁**：`scripts/check_miniapp_style.py`（R1-R11 规则 + S1-S3 三重自证），已进 `scripts/gate.sh` 第 5 步「契约与反假绿」。
+- **机械门禁**：`scripts/check_miniapp_style.py`（R1-R13 规则 + S1-S3 三重自证），已进 `scripts/gate.sh` 第 5 步「契约与反假绿」。
 
 ---
 
@@ -753,8 +754,10 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 
 ### 15.4 例外：文字字形不是 emoji
 
-`✓ ✕ ★ ☆ ▶ ◀ ▲ ▼ ● ○ ■ □ ◆ ◇ ※` 这些**排版字形**属设计系统（`已打卡 ✓`、成绩环的 ✓/✕、
-星级），不在禁用范围——门禁 R13a 有 `TYPO_GLYPHS` 白名单把它们排除。
+`✓ ✕ ★ ☆ ▶ ◀ ▲ ▼ ● ○ ■ □ ◆ ◇ ※` 这些**排版字形**属设计系统（`已打卡 ✓`、成绩环的 ✓/✕），
+不在禁用范围——门禁 R13a 有 `TYPO_GLYPHS` 白名单把它们排除。
+（★/☆ 在白名单里但**当前无页面在用**：星级已是 `icons/ui/star.png`/`star-off.png` 资产，
+2026-09-17 起为亮黄 `#FFD84D`。）
 
 ### 15.5 机械门禁 R13（`scripts/check_miniapp_style.py`）
 
