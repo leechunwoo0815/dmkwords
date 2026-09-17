@@ -11,7 +11,7 @@ import os
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from sqlalchemy import func, update
+from sqlalchemy import delete, func, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.orm import Session
 
@@ -309,55 +309,95 @@ def _ensure_demo_growth(db: Session, child) -> None:
     if not books:
         return
 
-    # 1) 积分流水（无唯一索引，先查后插）。19 号 T-B：创建时直挂 related_id——
-    # 原先插后补（UPDATE WHERE related_id IS NULL）在 SessionLocal autoflush=False
-    # 下单次运行必扑空（教训 41 同族第三犯，用户目视 +0 积分实锤），
-    # 直挂即真链路入账口径（E-20260904-01）。
-    # 锚点与 journey 同款 title 定位（Brown Bear）——books[0] 在脏库（测试残留
-    # 书占前位）下会与 journey 演示三书错位，get_quiz points_added 挂空。
-    points_anchor = (
-        db.query(Book).filter(Book.is_deleted == 0, Book.title.like("Brown Bear%")).first()
-        or books[0]
-    )
-    if not db.query(PointLedger).filter(PointLedger.child_id == child.id).first():
-        db.add(
-            PointLedger(
-                child_id=child.id,
-                points=5,
-                reason_type="quiz_first_pass",
-                related_id=points_anchor.id,
-                detail="演示：首次通过测验",
-            )
-        )
-        db.add(
-            PointLedger(
-                child_id=child.id,
-                points=3,
-                reason_type="quiz_full_marks",
-                related_id=points_anchor.id,
-                detail="演示：测验满分",
-            )
-        )
-        db.add(
-            PointLedger(
-                child_id=child.id,
-                points=2,
-                reason_type="words_convert",
-                related_id=points_anchor.id,
-                detail="演示：词数兑换",
-            )
-        )
-    # 存量自愈（19 号 T-B 择 a 保留）：补挂历史版本留下的 related_id=NULL 行——
-    # 行已在库（跨事务），execute 能命中；全体有值后本段天然空转 0 行，保留无害
+    # 1) 积分流水：按 `GrowthService.on_quiz_passed` 的规则重建。
+    #    2026-09-17 用户实测「成绩单的积分都是横线」：旧版这里是手拍 5/3/2 共 10 分、
+    #    全部挂 Brown Bear 一本书，其余已通过的书（Harry Potter / Green Eggs /
+    #    Matilda / Diary…）一笔积分都没有——而成绩单按 related_id=book_id 求和，
+    #    求和为 0 就显示「—」（页面 2026-09-15 起刻意不显示「+0」）。
+    #    规则源 = ConfigService 的 words_per_point / quiz_pass_bonus /
+    #    quiz_full_marks_bonus（脚本里不写死数字，配置改了这里跟着改）：
+    #      ① 词数折算：每 words_per_point 词 1 分，零头池跨书滚动（按词账时间顺序）
+    #      ② 测验奖励：满分 quiz_full_marks_bonus / 首过 quiz_pass_bonus，互斥取高、每书一次
+    #    幂等：先清本函数历史版本手插的演示积分行（签名 = detail 前缀「演示：」）再重建。
+    #    重建后「补挂 related_id=NULL」的存量自愈段失去意义，一并去掉。
+    from backend.common.config_service import ConfigService
+    from backend.domain.growth.models import QuizAttempt
+
+    per_point = int(ConfigService(db).get_value("words_per_point") or 0)
+    pass_bonus = int(ConfigService(db).get_value("quiz_pass_bonus") or 0)
+    full_bonus = int(ConfigService(db).get_value("quiz_full_marks_bonus") or 0)
     db.execute(
-        update(PointLedger)
-        .where(
-            PointLedger.child_id == child.id,
-            PointLedger.related_id.is_(None),
-            PointLedger.reason_type.in_(["quiz_first_pass", "quiz_full_marks", "words_convert"]),
-            PointLedger.detail.like("演示：%"),
+        delete(PointLedger).where(
+            PointLedger.child_id == child.id, PointLedger.detail.like("演示：%")
         )
-        .values(related_id=points_anchor.id)
+    )
+    attempts = {
+        a.book_id: a for a in db.query(QuizAttempt).filter(QuizAttempt.child_id == child.id).all()
+    }
+    remainder = 0
+    n_points = 0
+    word_rows = (
+        db.query(WordsLedger)
+        .filter(WordsLedger.child_id == child.id, WordsLedger.is_deleted == 0)
+        .order_by(WordsLedger.created_at, WordsLedger.id)
+        .all()
+    )
+    for w in word_rows:
+        book = db.query(Book).filter(Book.id == w.book_id).first()
+        if book is None:
+            continue
+        at = w.created_at or datetime.now()
+        if per_point > 0:
+            pool = remainder + w.word_count
+            earn = pool // per_point
+            remainder = pool % per_point
+            if earn > 0:
+                db.add(
+                    PointLedger(
+                        child_id=child.id,
+                        points=earn,
+                        reason_type="words_convert",
+                        related_id=book.id,
+                        detail=f"演示：《{book.title}》词数折算",
+                        created_at=at,
+                    )
+                )
+                n_points += 1
+        attempt = attempts.get(w.book_id)
+        if not (attempt and attempt.passed):
+            continue
+        if attempt.total_questions and attempt.score >= attempt.total_questions and full_bonus > 0:
+            db.add(
+                PointLedger(
+                    child_id=child.id,
+                    points=full_bonus,
+                    reason_type="quiz_full_marks",
+                    related_id=book.id,
+                    detail=f"演示：《{book.title}》测验满分",
+                    created_at=at,
+                )
+            )
+            n_points += 1
+        elif pass_bonus > 0:
+            db.add(
+                PointLedger(
+                    child_id=child.id,
+                    points=pass_bonus,
+                    reason_type="quiz_first_pass",
+                    related_id=book.id,
+                    detail=f"演示：《{book.title}》测验首次通过",
+                    created_at=at,
+                )
+            )
+            n_points += 1
+    # 零头池与规则一致（规则每次折算后写 state.words_remainder）
+    growth_state = db.query(ChildGrowthState).filter(ChildGrowthState.child_id == child.id).first()
+    if growth_state:
+        growth_state.words_remainder = remainder
+    db.flush()
+    print(
+        f"c 积分流水按规则重建：{n_points} 笔（词数折算 + 测验奖励），零头池 {remainder} 词",
+        flush=True,
     )
 
     # 2) 打卡近 3 天（先查后插）
@@ -439,9 +479,18 @@ def _ensure_demo_quiz_journey(db: Session, child) -> None:
     只插单表造业务终态（假 passed 无 QuizAttempt/无进度曾致金卡 0 分、首进无卡、
     弹窗被拦，用户实测三项全撞）。三表一致（ReadingProgress/QuizAttempt/
     WordsLedger）且时间戳错开禁同秒（同秒批量即假数据特征）；按 title 稳定定位
-    防 id 漂移；只动演示孩的演示三书，其余数据（如 book 6 用户真实通过全链）
+    防 id 漂移；只动演示孩的演示书目，其余数据（如 book 6 用户真实通过全链）
     严禁触碰。幂等：progress 按 (child,book) upsert 对齐目标态，attempt 先查后插，
-    words 唯一索引 IGNORE。"""
+    words 唯一索引 IGNORE。
+
+    2026-09-17 扩两本（用户「没达到的就是没达到」）：10 万词里程碑原先由
+    `_ensure_demo_circle` **手插** MilestoneAward 造出来，而演示孩只有 78,220 词
+    → 等级与勋章页「10万词」显示已解锁、同页却写「有效词数 78220」自相矛盾
+    （docs/项目交接 问题清单第 7 条早记过）。现改为让演示孩**真的**读过 10 万词：
+    加 Matilda(12,100) + Diary of a Wimpy Kid(12,000) → 102,320 词，
+    勋章由真实判定链补发（见 _ensure_demo_circle），页面口径才自洽。
+    顺带修掉既有数据合理性问题：3 本书 78,220 词（单靠 Harry Potter 78,000 拉动）
+    此前被记为「显得荒谬」，5 本 102,320 词才像真读出来的。"""
     from backend.domain.catalog.models import Book
     from backend.domain.growth.models import QuizAttempt, WordsLedger
     from backend.domain.reading.models import ReadingProgress
@@ -451,6 +500,8 @@ def _ensure_demo_quiz_journey(db: Session, child) -> None:
         ("Brown Bear", True, 5, 5, 1),  # 金卡：best_score=100 → 五星
         ("Chicka Chicka", True, 3, 5, 0),  # 蓝卡：测过未过，attempts_left=2
         ("Corduroy", False, 0, 0, 0),  # 灰态：读到 60%
+        ("Matilda", True, 5, 5, 1),  # 真实词数 12,100：抬过 10 万里程碑节点
+        ("Diary of a Wimpy", True, 5, 5, 1),  # 真实词数 12,000：同上
     )
     # 19 号 T-C：同表循环同秒也是假数据特征（book1/2 submitted_at 曾同秒）——
     # 逐书递增 3 小时，跨表+同表全错开
@@ -1797,7 +1848,7 @@ def _backfill_demo_hall_rank(db: Session) -> int:
 def _ensure_demo_circle(db: Session) -> None:
     """WM14-A 阅读圈演示帖：3 帖覆盖三类卡 + 金色态/置顶样例（验收步骤 13/18 用）。
 
-    - 演示孩 milestone 卡（admin_liked=1 馆长赞金色态样例）
+    - 演示孩 milestone 卡（admin_liked=1 馆长赞金色态样例；勋章走真实判定链补发，见下）
     - 观察期孩 perfect_quiz 满分卡
     - 押金孩 streak 连击卡（is_pinned=1 置顶样例）
     幂等：成就/帖子均先查后插；不预造点赞（用户验收自己点）。
@@ -1867,21 +1918,29 @@ def _ensure_demo_circle(db: Session) -> None:
 
     created = 0
 
-    # ① 演示孩里程碑卡（造 MilestoneAward 节点 10 万词）——admin_liked=1 金色态样例
+    # ① 演示孩里程碑卡——勋章必须**真的**达到（用户 2026-09-17「没达到的就是没达到」）。
+    #    旧版在这里手插 MilestoneAward(node_words=100000)，而演示孩实际只有 78,220 词
+    #    → 等级与勋章页「10万词」格已解锁、同页 hero 却写「有效词数 78220」，自相矛盾
+    #    （docs/项目交接 问题清单第 7 条早记过）。现在改为：先把成长态对齐词账流水，
+    #    再走**真实判定链**补发（同管理端「里程碑核对补发」按钮那条路），
+    #    演示孩词数（经 _ensure_demo_quiz_journey 扩书后 102,320）真的过线才有勋章。
+    from backend.domain.growth.service import GrowthService
+
+    _sync_growth_state(db, demo_child)
+    admin = db.query(AdminUser).filter(AdminUser.username == "admin").first()
+    if admin:
+        GrowthService(db).check_milestones_now(admin, demo_child.id)
+    else:
+        print("c 阅读圈演示帖：admin 未就位，跳过里程碑补发（演示帖可能缺里程碑卡）", flush=True)
     ms = (
         db.query(MilestoneAward)
         .filter(MilestoneAward.child_id == demo_child.id, MilestoneAward.node_words == 100000)
         .first()
     )
     if not ms:
-        ms = MilestoneAward(
-            child_id=demo_child.id,
-            node_words=100000,
-            awarded_at=datetime.now() - timedelta(days=2),
-        )
-        db.add(ms)
-        db.flush()
-    created += _ensure_post(demo_child, demo_parent.id, "milestone", ms.id, admin_liked=1)
+        print("c 阅读圈演示帖：演示孩未达 10 万词（词账口径），跳过里程碑卡", flush=True)
+    else:
+        created += _ensure_post(demo_child, demo_parent.id, "milestone", ms.id, admin_liked=1)
 
     # ② 观察期孩满分卡（造 5/5 满分测验——真实满分卡口径）
     perfect = (
@@ -1926,8 +1985,262 @@ def _ensure_demo_circle(db: Session) -> None:
         db.flush()
     created += _ensure_post(dep_kid, wm3_parent.id, "streak", streak.id, is_pinned=1)
 
+    # ④ 2026-09-17 用户「阅读圈补到 10 帖、走真实链路」——客户端演示需要"馆里有人在读"的观感。
+    #    每帖的 ref 都从**真实数据**反查（周榜快照 / 词账 / 测验记录 / 完读账目），
+    #    assemble_card_data 自带归属与门槛校验（周报必须已结束的完整周且当周有词账、
+    #    突破卡门槛 circle_breakthrough_min_words、上榜卡要有周榜快照且 rank≤TOP10…），
+    #    造不出来就跳过并打印原因——**绝不硬塞假卡**（与 E-20260904-01 同源纪律）。
+    #    覆盖面：演示孩 4 / 观察期孩 3 / 押金孩 2 / 退会孩 1（含下方已有的 3 帖共 10）。
+    parent_of = {
+        c.id: db.query(Parent).filter(Parent.id == c.parent_id).first()
+        for c in (demo_child, obs_kid, dep_kid)
+    }
+    withdrawn_kid = _kid_by_name(wm3_parent.id, "退会孩")
+    extra_created, skipped = _ensure_extra_circle_posts(
+        db,
+        demo_child,
+        obs_kid,
+        dep_kid,
+        withdrawn_kid,
+        demo_parent,
+        wm3_parent,
+        parent_of,
+        _ensure_post,
+    )
+    created += extra_created
+
+    # ⑤ 真实点赞：CircleLike 行 + like_count 对齐（点赞墙读的就是这张表；
+    #    like_count = 真实赞数 + 馆长赞——与真链路 admin_like() 同口径）。
+    n_likes = _ensure_circle_likes(db)
+
     db.commit()
-    print(f"c 阅读圈演示帖完成（新建 {created} 帖：里程碑[馆长赞]/满分/连击[置顶]）", flush=True)
+    print(
+        f"c 阅读圈演示帖完成（新建 {created} 帖 / 共 "
+        f"{db.query(CirclePost).filter(CirclePost.is_deleted == 0).count()} 帖；"
+        f"真实点赞补齐 {n_likes} 行；跳过 {skipped} 帖）",
+        flush=True,
+    )
+
+
+def _ensure_extra_circle_posts(
+    db: Session,
+    demo_child,
+    obs_kid,
+    dep_kid,
+    withdrawn_kid,
+    demo_parent,
+    wm3_parent,
+    parent_of,
+    ensure_post,
+) -> tuple[int, int]:
+    """补足演示帖到 10 帖（真实链路版）。返回 (新建数, 跳过数)。
+
+    设计原则：**先找得到真实支撑才发帖**。ref 一律反查：
+      - perfect_quiz  → 该孩子真实满分（score==total_questions 且 passed）的 QuizAttempt.id
+      - breakthrough  → 该孩子单日词数新高的那一天（YMD）——门槛由配置决定
+      - rank_top      → 该孩子在 CircleRankSnapshot 里 rank≤10 的那一周（YMD）
+      - weekly_report → 该孩子有词账/打卡的某个**已结束完整周**的周一（YMD）
+      - finish_book   → 该孩子词账里真实存在的 book_id
+    """
+    from backend.domain.catalog.models import Book
+    from backend.domain.growth.models import QuizAttempt, WordsLedger
+    from backend.domain.reading_circle import card_engine
+    from backend.domain.reading_circle.models import CirclePost, CircleRankSnapshot
+    from backend.domain.reading_circle.snapshot_service import CircleSnapshotService
+
+    def _author(child):
+        """帖子的署名家长（与 _ensure_post 的 parent_id 一致）。"""
+        if child is demo_child:
+            return demo_parent.id
+        if child in (obs_kid, dep_kid, withdrawn_kid):
+            return wm3_parent.id
+        return parent_of.get(child.id).id if parent_of.get(child.id) else None
+
+    def _emit(child, card_type, ref_id, **kw) -> tuple[int, int]:
+        if child is None or ref_id is None:
+            return 0, 1
+        try:
+            card_engine.assemble_card_data(db, child, card_type, ref_id)  # 归属+门槛预检
+        except Exception as exc:  # 校验不过就跳过（不硬塞）
+            print(f"c   跳过 {card_type} (child={child.id}, ref={ref_id})：{exc}", flush=True)
+            return 0, 1
+        return ensure_post(child, _author(child), card_type, ref_id, **kw), 0
+
+    created = skipped = 0
+
+    # 演示孩：满分卡（Matilda 满分）/ 单日突破卡 / 周榜上榜卡
+    best = (
+        db.query(QuizAttempt)
+        .filter(
+            QuizAttempt.child_id == demo_child.id,
+            QuizAttempt.passed == 1,
+            QuizAttempt.score == QuizAttempt.total_questions,
+        )
+        .order_by(QuizAttempt.submitted_at)
+        .first()
+    )
+    c, s = _emit(demo_child, CirclePost.CARD_PERFECT_QUIZ, best.id if best else None)
+    created, skipped = created + c, skipped + s
+
+    rows = (
+        db.query(WordsLedger)
+        .filter(WordsLedger.child_id == demo_child.id, WordsLedger.is_deleted == 0)
+        .all()
+    )
+    per_day: dict[str, int] = {}
+    for r in rows:
+        if r.created_at:
+            key = r.created_at.strftime("%Y%m%d")
+            per_day[key] = per_day.get(key, 0) + r.word_count
+    peak_day = max(per_day, key=per_day.get) if per_day else None
+    c, s = _emit(demo_child, CirclePost.CARD_BREAKTHROUGH, int(peak_day) if peak_day else None)
+    created, skipped = created + c, skipped + s
+
+    def _top_week(child, max_rank: int = 10):
+        snap = (
+            db.query(CircleRankSnapshot)
+            .filter(
+                CircleRankSnapshot.child_id == child.id,
+                CircleRankSnapshot.is_deleted == 0,
+                CircleRankSnapshot.rank <= max_rank,
+            )
+            .order_by(CircleRankSnapshot.week_start.desc())
+            .first()
+        )
+        return int(snap.week_start.strftime("%Y%m%d")) if snap else None
+
+    c, s = _emit(demo_child, CirclePost.CARD_RANK_TOP, _top_week(demo_child))
+    created, skipped = created + c, skipped + s
+
+    # 观察期孩：周报卡（有词账的那个完整周）+ 上榜卡
+    obs_days = sorted(
+        {
+            int(r.created_at.strftime("%Y%m%d"))
+            for r in db.query(WordsLedger)
+            .filter(WordsLedger.child_id == obs_kid.id, WordsLedger.is_deleted == 0)
+            .all()
+            if r.created_at
+        }
+    )
+    report_week = None
+    for ymd in reversed(obs_days):
+        day = datetime.strptime(str(ymd), "%Y%m%d").date()
+        monday = day - timedelta(days=day.weekday())
+        if monday <= CircleSnapshotService.last_complete_week()[0]:
+            report_week = int(monday.strftime("%Y%m%d"))
+            break
+    c, s = _emit(obs_kid, CirclePost.CARD_WEEKLY_REPORT, report_week)
+    created, skipped = created + c, skipped + s
+    c, s = _emit(obs_kid, CirclePost.CARD_RANK_TOP, _top_week(obs_kid))
+    created, skipped = created + c, skipped + s
+
+    # 押金孩：上榜卡
+    c, s = _emit(dep_kid, CirclePost.CARD_RANK_TOP, _top_week(dep_kid))
+    created, skipped = created + c, skipped + s
+
+    # 退会孩：完读卡（历史小读者语义——退会后帖子仍在，正是产品要展示的"成就永不回收"）
+    first_book = (
+        db.query(WordsLedger)
+        .filter(WordsLedger.child_id == withdrawn_kid.id, WordsLedger.is_deleted == 0)
+        .first()
+        if withdrawn_kid
+        else None
+    )
+    if first_book:
+        title = db.query(Book).filter(Book.id == first_book.book_id).first()
+        c, s = _emit(withdrawn_kid, CirclePost.CARD_FINISH_BOOK, first_book.book_id)
+        created, skipped = created + c, skipped + s
+        if c:
+            print(
+                f"c   退会孩完读卡：《{title.title if title else first_book.book_id}》", flush=True
+            )
+    return created, skipped
+
+
+def _ensure_circle_likes(db: Session) -> int:
+    """给演示帖补**真实点赞行**（circle_likes）+ 对齐 like_count。
+
+    - 点赞人池 = **全部在册会员孩子**（正式/观察期）。点赞不需要阅读数据（真人在 APP 里
+      也是刷到就能赞），所以不设"有词账"门槛——2026-09-17 首版限成"有词账的会员"，
+      结果池子只剩 3 人、每帖都只有 2 个赞，梯度做不出来（观感反而更假）。
+      排除作者自己（点赞墙上出现自己的头像会穿帮）；未入会 / 待评估 / 已退会不参与
+      （这几种状态进不去阅读圈，是各自的异常态演示载体）。
+    - like_count = 真实赞数 + 馆长赞（真链路 admin_like() 就是这么 +1 的，
+      见 _ensure_demo_circle_visuals 的同口径注释）
+    - 幂等：先清库里"作者自赞"的历史行（早期 seed 造的），再按目标数补；已够则不动
+    """
+    from backend.domain.identity.models import Child
+    from backend.domain.reading_circle.models import CircleLike, CirclePost
+
+    # 各卡型的点赞目标数（梯度：越"高光"的卡赞越多，看着像真有人在看）
+    TARGET = {
+        CirclePost.CARD_MILESTONE: 7,
+        CirclePost.CARD_PERFECT_QUIZ: 5,
+        CirclePost.CARD_RANK_TOP: 4,
+        CirclePost.CARD_BREAKTHROUGH: 3,
+        CirclePost.CARD_WEEKLY_REPORT: 3,
+        CirclePost.CARD_STREAK: 2,
+        CirclePost.CARD_FINISH_BOOK: 2,
+    }
+    readers = (
+        db.query(Child)
+        .filter(
+            Child.is_deleted == 0,
+            Child.member_status.in_([Child.MEMBER_FORMAL, Child.MEMBER_OBSERVATION]),
+        )
+        .order_by(Child.id)
+        .all()
+    )
+    added = removed = 0
+    for post in db.query(CirclePost).filter(CirclePost.is_deleted == 0).all():
+        # 清作者自赞（早期 seed 留下的；一孩对一帖一赞的唯一索引不含 is_deleted → 软删）
+        self_likes = (
+            db.query(CircleLike)
+            .filter(
+                CircleLike.post_id == post.id,
+                CircleLike.child_id == post.child_id,
+                CircleLike.is_deleted == 0,
+            )
+            .all()
+        )
+        for row in self_likes:
+            row.is_deleted = 1
+            removed += 1
+        db.flush()
+        have = (
+            db.query(CircleLike)
+            .filter(CircleLike.post_id == post.id, CircleLike.is_deleted == 0)
+            .all()
+        )
+        have_ids = {r.child_id for r in have}
+        want = TARGET.get(post.card_type, 2)
+        pool = [c for c in readers if c.id != post.child_id]
+        for candidate in pool:
+            if len(have_ids) >= want:
+                break
+            if candidate.id in have_ids:
+                continue
+            db.add(
+                CircleLike(
+                    post_id=post.id,
+                    parent_id=candidate.parent_id,
+                    child_id=candidate.id,
+                    liker_child_id=candidate.id,
+                    created_at=datetime.now() - timedelta(hours=6 + len(have_ids)),
+                )
+            )
+            have_ids.add(candidate.id)
+            added += 1
+        db.flush()
+        real = (
+            db.query(CircleLike)
+            .filter(CircleLike.post_id == post.id, CircleLike.is_deleted == 0)
+            .count()
+        )
+        post.like_count = real + (1 if post.admin_liked else 0)
+    if removed:
+        print(f"c   清理作者自赞 {removed} 行（点赞墙上不该出现作者自己）", flush=True)
+    return added
 
 
 def seed() -> None:
