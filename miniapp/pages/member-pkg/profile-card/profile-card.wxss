@@ -54,6 +54,12 @@
   background: linear-gradient(160deg, var(--accent) 0%, var(--accent-dark) 45%, var(--accent-darker) 100%);
   border-radius: 40rpx;
   padding: 56rpx 48rpx 48rpx;
+  /* 2026-09-17：此前无外边距，护照卡左右顶到屏幕边（用户实测「两边没留白」）。
+     24rpx 与本页其余区块（.x-1595cd/.my-achievements-entry）同档。
+     同时把左右内边距 48→32rpx：卡片窄了 48rpx 后「演示孩 的阅读护照」被挤成两行，
+     内边距让回同样的宽度，标题恢复单行（横向净占位与加边距前一致）。 */
+  padding: 56rpx 32rpx 48rpx;
+  margin: 24rpx;
   color: var(--surface);
   position: relative;
   overflow: hidden;
@@ -87,25 +93,17 @@
 .card-header {
   display: flex;
   align-items: center;
-  gap: 32rpx;
+  /* 2026-09-17：32→24rpx，为加边距后变窄的卡片让宽度（防标题折行） */
+  gap: 24rpx;
   margin-bottom: 40rpx;
   position: relative;
   z-index: 1;
 }
 
-.card-avatar {
-  width: 136rpx;
-  height: 136rpx;
-  border-radius: 50%;
-  background: rgba(var(--surface-rgb), 0.15);
-  border: 6rpx solid rgba(var(--surface-rgb), 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 64rpx;
-  flex-shrink: 0;
-}
-
+/* 2026-09-17：头像改走共享件 avatar-ring（等级头像框资产 FRAME_SCALE=440/256 溢出
+   在四周、**不参与布局**）。尺寸 84rpx 是按本卡的横向余量反推的：框溢出量
+   = size×(FRAME_SCALE-1)/2 ≈ 30rpx，必须 ≤ 卡片左内边距 32rpx，否则框被卡片的
+   overflow:hidden 切掉。改尺寸前先算这条。 */
 .card-identity {
   flex: 1;
 }
@@ -520,3 +518,9 @@
 
 .ach-icon { width: 44rpx; height: 44rpx; }
 .ach-entry-icon { width: 44rpx; height: 44rpx; }
+
+/* 2026-09-17：最近读完——书名字长时右侧「+N 词」被挤折行（"词"独占第二行）
+   且与书名零间距。覆盖机械生成的 .x-255591/.x-0c7277：徽章不收缩不折行，
+   与书名留固定间距（gap 不参与收缩，书名自己折行）。 */
+.x-255591 { gap: 16rpx; }
+.x-0c7277 { flex: 0 0 auto; white-space: nowrap; }

@@ -251,13 +251,24 @@
 
 .qhc-stars {
   margin-top: 10rpx;
-  display: flex;
+  /* inline-flex：卡片是块级容器，块级 flex 会撑满整行，药丸要贴着内容
+     （同 .qhc-stamp 的 inline-block 口径） */
+  display: inline-flex;
   align-items: center;
+  /* 2026-09-17：金星压在金橙渐变底上怎么调都发闷（用户复验「星星还是不明显，
+     因为背景也是黄的」）。装白垫层隔离——与同卡 PASSED 印章同一手法
+     （见下方 §插修9/R8 注释），不动「金卡」本身的配色语义（docs/03 FEAT-081）。
+     垫层 85% 白 + 星色亮黄 #FFD84D：底色够白才撑得住亮黄星（实测亮度差 34、
+     蓝通道差 149，形状靠墨线、底色靠色相）。 */
+  background: rgba(var(--surface-rgb), 0.85);
+  border-radius: 999rpx;
+  padding: 6rpx 18rpx;
 }
 
 .qhc-star {
-  width: 36rpx;
-  height: 36rpx;
+  /* 2026-09-17：36rpx 比原来的 ⭐(font-size: 40rpx) 小一圈，用户复验「以前是大点的星星」→ 44rpx */
+  width: 44rpx;
+  height: 44rpx;
   margin-right: 4rpx;
 }
 

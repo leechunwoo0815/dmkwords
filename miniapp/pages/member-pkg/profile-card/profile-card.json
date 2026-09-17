@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "阅读护照"
+  "navigationBarTitleText": "阅读护照",
+  "usingComponents": {
+    "avatar-ring": "/components/avatar-ring/avatar-ring"
+  }
 }

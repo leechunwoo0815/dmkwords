@@ -1,7 +1,7 @@
 <view class="page" wx:if="{{passport}}">
   <view class="profile-card">
     <view class="card-header">
-      <view class="card-avatar">{{passport.read_only ? '📚' : '🧒'}}</view>
+      <avatar-ring size="{{84}}" src="{{avatarUrl}}" level="{{passport.level}}" />
       <view class="card-identity">
         <view class="card-en-name">{{passport.english_name || passport.child_name}}</view>
         <view class="card-cn-name">{{passport.child_name}} 的阅读护照</view>

@@ -241,13 +241,23 @@ def icon_warning(cv: Canvas) -> None:
 
 
 def icon_star(cv: Canvas) -> None:
-    """星级（实心）。"""
-    star(cv, 48, 48, 32, C["sun"], outline=INK, width=5.0)
+    """星级（点亮）：亮黄实心 + 墨线勾边。
+
+    2026-09-17 三轮定档：
+    ① 原 sun(#FFC94D) 落在 PASSED 金卡（sun→accent-light 渐变）上时，星心 (246,202,100)
+       与卡底 (243,198,103) 只差 3 个色阶 → 填充隐形只剩墨线，用户报「星星变空心」；
+    ② 压深到 #F59E0B → 用户「太暗了」；
+    ③ 提到 #FBBF24 → 用户「没有变亮」（amber 到 amber 幅度不够感知）。
+    定档亮黄 #FFD84D + 半径 36→40（44rpx 框里星星从占 75% 提到 83%，视觉更大）。
+    星星垫在 85% 白药丸上（book-detail.wxss .qhc-stars），
+    与药丸底的亮度差 34、蓝通道差 149——形状靠墨线、底色靠色相，两头都立得住。"""
+    star(cv, 48, 48, 40, "#FFD84D", outline=INK, width=4.5)
 
 
 def icon_star_off(cv: Canvas) -> None:
-    """星级（未点亮）。"""
-    star(cv, 48, 48, 32, C["dim"], outline=INK, width=5.0)
+    """星级（未点亮）：米白实心（比金卡底色更亮，读作"空星"）+ 墨线勾边。
+    半径/描边与 icon_star 保持一致，否则同一行里亮星暗星大小不一。"""
+    star(cv, 48, 48, 40, C["dim"], outline=INK, width=4.5)
 
 
 def icon_globe(cv: Canvas) -> None:

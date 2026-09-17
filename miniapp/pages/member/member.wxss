@@ -578,7 +578,9 @@
 }
 
 .section-card.no-padding {
-  padding: 24rpx 0;
+  /* 2026-09-17：底部 24→36rpx。本卡上方留白 = 卡内 24 + .sec-title margin-top 32
+     = 56rpx，底部只有 24rpx，内容贴底（用户报「下面没有留白」）。仅此卡用 no-padding。 */
+  padding: 24rpx 0 36rpx;
 }
 
 .section-card.no-padding .sec-title {
@@ -598,7 +600,11 @@
 .child-switcher-scroll {
   display: flex;
   gap: 16rpx;
-  padding: 0 24rpx;
+  /* 2026-09-17：底部必须留出 chip 硬阴影的高度。`overflow-x: auto` 会把
+     `overflow-y` 强制算成 auto，容器内容盒＝chip 高度 → chip 的 4rpx 硬阴影
+     （.active 还叠加 translate(2rpx,2rpx)）在底边被整条裁掉，用户报
+     「下面的边缘线被微微遮挡」。同族写法 .related-scroll 也是靠 padding-bottom 兜的。 */
+  padding: 0 24rpx 12rpx;
   overflow-x: auto;
   scrollbar-width: none;
 }
