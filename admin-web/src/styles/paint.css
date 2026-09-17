@@ -582,3 +582,55 @@ h1, h2, h3, h4, h5, h6,
   box-shadow: inset 3px 0 0 #faad14;
   transition: background 1.2s ease;
 }
+
+/* ===== 全屏预览大图尺寸（2026-09-17 修，用户报障「封面预览又小又糊」）=====
+   根因：antd 默认 `.ant-image-preview-img { max-height: 70% }` 是**百分比高度**。
+   百分比要相对父级已解析高度才有意义，而预览的 wrapper（绝对定位 + flex 居中）
+   在 Safari 下高度按内容计算 → 这条链退化，实测预览只剩视口的 ~27%（784 高窗口里
+   仅 212px），封面上的书名小到看不清，用户感知为「模糊」；Chromium 下是 549px。
+   修法：改用**视口单位**（vh/vw）断掉对父级高度链的依赖，两个浏览器同一口径；
+   顺带把上限从 70% 提到 82vh，预览更接近"看得清"的预期。
+
+   ⚠️ 修法②（同批，更关键）：组件侧给预览 img 补上**原图真实 width/height 属性**，
+   消除"挂载时图未解码 → intrinsic size 为 0 → Safari 按错尺寸栅格化并卡住"的竞态
+   （现象：每次刷新换一本书预览又小又糊，无规律）。补了属性后 box 由属性定尺寸，
+   而 max-height 会把它压矮 —— antd 默认 `object-fit` 是 fill，**会把图压变形**，
+   故必须同时 contain：box 可以比图矮，图在 box 内等比居中、不拉伸。 */
+.ant-image-preview-img {
+  max-height: 82vh !important;
+  max-width: min(92vw, 1200px) !important;
+  object-fit: contain !important;
+}
+
+/* 预览滚轮只该缩放，不该滚页面（2026-09-17 用户报障）。
+   根因：`.ant-image-preview-wrap` 带着 rc-dialog 的 `overflow-y: auto`，一旦预览内容比视口高
+   它就成了可滚动祖先 → Safari 的滚轮默认行为落在它身上（浏览器出现滚动条、图被滚到看不见），
+   而 rc-image 的滚轮缩放处理器在 React 里是**被动监听**，preventDefault 无效、拦不住。
+   直接把这条滚动通道关掉：缩放/拖拽由 rc-image 的 transform 负责，不需要容器滚动。 */
+.ant-image-preview-wrap {
+  overflow: hidden !important;
+}
+
+/* 预览入场动画：从**缩略图那一侧的小尺寸**飞到居中（用户 2026-09-17 反馈「以前有动画，
+   很丝滑，像从小图放大到大图」，但也报过 antd 自带动画会"先闪一下最终态再跳回起点"）。
+   这里自己做，好处是动画从元素**第一帧**就是起始态，没有 rc-motion 那约 60ms 的预滚帧。
+   起飞点/起始缩放由 PreviewImage 在点击瞬间写进根元素变量（--pv-dx/--pv-dy/--pv-scale）。
+   注意 fill-mode 不设 forwards：动画结束后立刻交还给 rc-image 的内联 transform（缩放/拖拽）。 */
+@keyframes pv-fly-in {
+  from {
+    transform: translate(var(--pv-dx, 0px), var(--pv-dy, 0px)) scale(var(--pv-scale, 0.3));
+    opacity: 0.35;
+  }
+  to {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+}
+.ant-image-preview-img {
+  animation: pv-fly-in 0.34s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ant-image-preview-img {
+    animation: none;
+  }
+}
