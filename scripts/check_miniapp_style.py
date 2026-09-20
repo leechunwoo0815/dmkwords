@@ -1,6 +1,6 @@
 """小程序风格基准机械门禁（2026-09-13，任务包-20260913 §五 落地）。
 
-十三条规则（R1–R7 = 最初七条；R8–R11 = 后续插修补入；R12/R13 = 2026-09-16 两批补入）：
+十四条规则（R1–R7 = 最初七条；R8–R11 = 后续插修补入；R12/R13 = 2026-09-16，R14 = 2026-09-20）：
   R1 裸色值:    pages/components/custom-tab-bar 的 wxss 禁止色值字面量（app.wxss 定义令牌除外）
   R2 内联样式:  wxml 禁止 style= 写死颜色/尺寸（{{}} 动态绑定除外）；布局原语 WARN
   R3 同义类:    页面 wxss 禁止重复定义公共类（.empty-text/.section-title/...）
@@ -21,7 +21,11 @@
                  颜色与令牌无关）；R13b = 引用的图标资产必须真实存在（`/icons/ui/*.png` 与
                  `icon-name`）。排版字形（✓ ✕ ★ ☆ ▶ 等 TYPO_GLYPHS）是设计系统文字符号，
                  在白名单内、不算 emoji（R13a 误报源，已实证）。
-  ↑ R1–R7 为最初七条；R8–R11 为后续插修补入；R12/R13 为 2026-09-16 两批补入。
+  R14 WXML 结构: wxml **注释必须以 `-->` 收尾**、标签必须正确闭合（跨行标签也算）。
+                 专治「注释写成 `*/`（JS 习惯）→ 注释吞掉半页模板 → 标签配对错位」：
+                 2026-09-20 实测该错误让小程序整页编译失败，且**报错行指向的是别处**
+                 （`.wxml:79: expect end-tag view, near block`），模拟器停在旧帧极难定位。
+  ↑ R1–R7 为最初七条；R8–R11 为后续插修补入；R12/R13 为 2026-09-16 两批补入；R14 为 2026-09-20 补入。
     **以 main() 实际打印的规则清单为准**（历史教训：docstring 只列七条、实现已十一条，
     2026-09-20 又发现漏列 R13——文档与代码不同步是这类检查器的惯犯，改规则必改本清单）。
 
@@ -730,6 +734,88 @@ def scan_icon_assets(base: Path = MINIAPP):
     return out
 
 
+def scan_wxml_structure(base: Path = MINIAPP) -> list[tuple[str, int, str]]:
+    """R14：wxml 注释必须 `-->` 收尾 + 标签正确闭合（含跨行标签、引号内不识别 `>`）。
+
+    为什么需要：wxml 里写 JS 风格注释 `/* … */` 不会报"注释错"，而是**吞到下一个 -->
+    才结束**，于是后面所有标签的配对整体错位，编译器报的行号指向的却是别的地方
+    （实测：`activity-detail.wxml:79: expect end-tag view, near block`，
+    真凶是第 18 行的 `*/`）。这类错误只在 IDE 里编译才暴露，机械门禁此前完全空白。
+    """
+    out: list[tuple[str, int, str]] = []
+    for wxml in sorted(base.rglob("*.wxml")):
+        if "__pycache__" in wxml.parts:
+            continue
+        rel = str(wxml.relative_to(base))
+        src = wxml.read_text(encoding="utf-8")
+        n, i, stack = len(src), 0, []
+
+        while i < n:
+            if src.startswith("<!--", i):
+                end = src.find("-->", i + 4)
+                if end == -1:
+                    out.append(
+                        (
+                            rel,
+                            src.count("\n", 0, i) + 1,
+                            "注释没有用 `-->` 收尾（WXML 注释不是 /* */）",
+                        )
+                    )
+                    break
+                # 注释体内出现 */ 是典型误写（外层仍是 --> 收尾时也要报）
+                body = src[i + 4 : end]
+                if "*/" in body:
+                    k = body.index("*/")
+                    out.append(
+                        (rel, src.count("\n", 0, i + 4 + k) + 1, "注释体内出现 `*/`（应写 `-->`）")
+                    )
+                i = end + 3
+                continue
+            if src[i] == "<":
+                m = re.match(r"<\s*(/?)([A-Za-z][-\w]*)", src[i:])
+                if not m:
+                    i += 1
+                    continue
+                closing, tag = m.group(1), m.group(2)
+                j, quote = i + m.end(), None
+                while j < n:
+                    c = src[j]
+                    if quote:
+                        if c == quote:
+                            quote = None
+                    elif c in "\"'":
+                        quote = c
+                    elif c == ">":
+                        break
+                    j += 1
+                raw = src[i : j + 1]
+                if closing:
+                    if not stack:
+                        out.append(
+                            (rel, src.count("\n", 0, i) + 1, f"</{tag}> 多余（没有对应的开标签）")
+                        )
+                    elif stack[-1][0] != tag:
+                        top, tline = stack[-1]
+                        out.append(
+                            (
+                                rel,
+                                src.count("\n", 0, i) + 1,
+                                f"</{tag}> 与第 {tline} 行 <{top}> 不匹配",
+                            )
+                        )
+                        stack.pop()
+                    else:
+                        stack.pop()
+                elif not raw.rstrip().endswith("/>") and tag not in ("image", "input", "icon"):
+                    stack.append((tag, src.count("\n", 0, i) + 1))
+                i = j + 1
+                continue
+            i += 1
+        for tag, tline in stack:
+            out.append((rel, tline, f"<{tag}> 未闭合"))
+    return out
+
+
 def self_test(tokens: set[str]) -> list[str]:
     """S1 注入自检：对内置违例样本运行检测器，必须全部命中。"""
     failures: list[str] = []
@@ -750,7 +836,14 @@ def self_test(tokens: set[str]) -> list[str]:
             encoding="utf-8",
         )
         (tmp / "pages/demo.wxml").write_text(
-            '<view style="color: #123456; display: flex;">x</view>\n', encoding="utf-8"
+            '<view style="color: #123456; display: flex;">x</view>\n'
+            "<!-- 好注释：以 --> 收尾 -->\n"
+            '<view class="ok"><text>y</text></view>\n',
+            encoding="utf-8",
+        )
+        (tmp / "pages/broken.wxml").write_text(
+            "<!-- 坏注释用 */ 收尾 */\n<view><text>x</text></view>\n",
+            encoding="utf-8",
         )
         cfg = {"pages": ["pages/demo"], "subPackages": []}
         (tmp / "app.json").write_text(json.dumps(cfg), encoding="utf-8")
@@ -819,6 +912,11 @@ def self_test(tokens: set[str]) -> list[str]:
         if any(n == "calendar" for _f, _l, n in r13a):
             failures.append("S1 图标资产误报（calendar 存在）")
         if not sv:
+            if not any("R14" not in d and "注释" in d for _f, _l, d in scan_wxml_structure(tmp)):
+                failures.append("S1 WXML 注释违规漏检")
+            r14_good = [d for f, _l, d in scan_wxml_structure(tmp) if f.endswith("demo.wxml")]
+            if r14_good:
+                failures.append(f"S1 WXML 结构误报（好样本）: {r14_good}")
             failures.append("S1 非法选择器漏检")
         if not br:
             failures.append("S1 花括号结构失衡漏检")
@@ -836,6 +934,7 @@ def main() -> int:
     app_wxss = MINIAPP / "app.wxss"
 
     errors: list[str] = []
+    wxml_struct = scan_wxml_structure()
 
     # S2 空结果自检
     if not pages:
@@ -889,6 +988,7 @@ def main() -> int:
     print(f"R10 组件变量兜底: {len(nofb)}")
     print(f"R11 非法选择器(选择器位置 var): {len(selv)}")
     print(f"R13 图标槽位 emoji: {len(icon_emoji)} / 图标资产缺失: {len(icon_asset)}")
+    print(f"R14 WXML 结构: 违规 {len(wxml_struct)}")
     n_base = sum(len(v) for v in R12_BASELINE.values())
     print(
         f"R12 悬空类名(WXML 用到、本页 wxss 无定义): 新违规 {len(undef_new)} / "
@@ -928,6 +1028,7 @@ def main() -> int:
     dump("R12 悬空类名（新违规，必须修）", undef_new)
     dump("R13a 图标槽位 emoji（必须换 /icons/ui 资产）", icon_emoji)
     dump("R13b 图标资产缺失", icon_asset)
+    dump("R14 WXML 结构（注释/标签必须闭合）", wxml_struct)
 
     for f, ln, d in braces:
         errors.append(f"R9 {f}:{ln} 结构非法 {d}")
@@ -939,6 +1040,8 @@ def main() -> int:
         errors.append(f"R13a {f}:{ln} 图标槽位里是 emoji {ch!r}（改用 /icons/ui/*.png）")
     for f, ln, name in icon_asset:
         errors.append(f"R13b {f}:{ln} 图标资产不存在: {name}")
+    for f, ln, d in wxml_struct:
+        errors.append(f"R14 {f}:{ln} WXML 结构: {d}")
     for f, ln, d in nofb:
         errors.append(f"R10 {f}:{ln} 组件变量缺字面兜底 {d}")
     for f, ln, v, _k in colors:

@@ -73,7 +73,8 @@ run python scripts/check_miniapp_bindings.py
 run python scripts/check_docs_code_alignment.py
 # E-20260912-09：RBAC 三方一致对账（宪法 §五.2 承诺项——声明/后端引用/前端引用）
 run python scripts/check_rbac_consistency.py
-# E-20260913：小程序风格基准（**R1–R13** 规则 + S1–S3 自证；含 R12 悬空类名 / R13 图标槽位 emoji 与资产存在性。
+# E-20260913：小程序风格基准（**R1–R14** 规则 + S1–S3 自证；含 R12 悬空类名 / R13 图标槽位 emoji/资产 /
+# R14 WXML 注释与标签结构——2026-09-20 补：注释写成 */ 会吞掉半页模板且报错行指向别处，IDE 才看得见。
 # 2026-09-20 修正：旧注释写"R1–R7"是陈旧的，规则实际已到 R13（见 docs/08 TD-11/TD-12）。不能替代目视截图）
 run python scripts/check_miniapp_style.py
 # fix44 R4（Q8 机化）：媒体纪律三条——M1 落盘单出口（只有 file_storage / Canvas.finish / save_jpeg

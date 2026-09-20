@@ -1,0 +1,74 @@
+<!-- 我的入场券（签到码出示页）——2026-09-20 客户口径变更：
+     二维码从「活动详情页」迁到本页，只在家长**主动点「出示签到码」**时进入。
+     详情页只保留报名状态，不再出现任何码。 -->
+<loading-skeleton wx:if="{{loading}}" type="rows" rows="{{3}}" />
+<error-view wx:if="{{loadError}}" type="network" title="{{errorTitle}}"
+  desc="{{errorDesc}}" bind:onRetry="onBackToList" />
+
+<!-- 签到成功：全屏遮罩 + 大勾 + 文案，1.4s 后自动回活动详情（家长此时正把手机递给馆员，
+     toast 太轻，必须有"看得见"的反馈） -->
+<view class="checkin-mask" wx:if="{{checkinSuccess}}">
+  <view class="checkin-card">
+    <image class="checkin-icon" src="/icons/ui/trophy.png" mode="aspectFit" />
+    <view class="checkin-title">签到成功</view>
+    <view class="checkin-sub">{{checkedInTime ? '签到时间 ' + checkedInTime : ''}}{{checkedInTime ? ' · ' : ''}}欢迎参加</view>
+    <view class="checkin-tip">正在返回活动详情…</view>
+  </view>
+</view>
+
+<view class="page-bg" wx:if="{{!loading && !loadError && enrollment}}">
+  <view class="section">
+    <view class="section-title sec-head">{{activityTitle}}</view>
+    <view class="section-body">
+      <view class="ticket-meta">
+        <view class="meta-item">
+          <image class="meta-icon" src="/icons/ui/clock.png" mode="aspectFit" />
+          <text>{{startAt}}</text>
+        </view>
+        <view class="meta-item">
+          <image class="meta-icon" src="/icons/ui/child.png" mode="aspectFit" />
+          <text>{{childName}}</text>
+        </view>
+      </view>
+
+      <!-- 声明：入场券仅 enrolled / checked_in 可进入本页（待收款态不发放） -->
+      <view class="qr-section">
+        <!-- PRD §9.2.1：二维码（主）+ Code128 条形码（备）。
+             展示用 <image>（canvasToTempFilePath 产物），不是 canvas 本身——
+             `canvas type="2d"` 是原生层，首帧坐标若早于布局稳定会停在旧位置且不自愈
+             （实测画到 hero/按钮上 = 用户报的"遮挡"真因）。导出失败时露出券码文本兜底。 -->
+        <view class="qr-canvas-wrap">
+          <image wx:if="{{qrImage}}" class="qr-canvas" src="{{qrImage}}" mode="scaleToFill" />
+          <text wx:else class="qr-fallback">{{enrollment.ticket_code}}</text>
+        </view>
+        <view class="bc-canvas-wrap" wx:if="{{bcImage}}">
+          <image class="bc-canvas" src="{{bcImage}}" mode="scaleToFill" />
+        </view>
+        <view class="qr-hint qr-code-line" bindtap="copyTicket">入场券码：{{enrollment.ticket_code}}</view>
+        <view class="qr-hint qr-checked" wx:if="{{checkedIn}}">
+          <image class="hint-icon" src="/icons/ui/calendar.png" mode="aspectFit" />
+          <text>已于 {{checkedInTime}} 签到，欢迎参加</text>
+        </view>
+        <view class="qr-hint" wx:else>活动当天出示此码，馆员扫码签到</view>
+        <view class="qr-hint qr-copy-hint" bindtap="copyTicket">条码扫不出时，点此复制券码</view>
+        <view class="qr-hint qr-bright-hint" wx:if="{{brightnessBoosted}}">已把屏幕调到最亮，离开本页自动恢复</view>
+      </view>
+
+      <!-- 出图用画布：移出可视区（不影响布局、不遮挡、不入镜），只用来生成上面两张图。
+           尺寸**必须与对应 <image> 的显示尺寸同比例**，否则图片被拉伸（条形码会糊）。 -->
+      <canvas type="2d" id="ticket-qr" class="draw-canvas draw-canvas-qr"></canvas>
+      <canvas type="2d" id="ticket-bc" class="draw-canvas draw-canvas-bc"></canvas>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-body">
+      <view class="tip-card">
+        <view class="tip-title">到店怎么用</view>
+        <view class="tip-line">1. 到馆后打开本页，把二维码对准扫码枪（条形码是备用）</view>
+        <view class="tip-line">2. 提示音响起即签到成功，页面会自动更新为「已签到」</view>
+        <view class="tip-line">3. 扫码不成功时，点券码复制给馆员手工录入</view>
+      </view>
+    </view>
+  </view>
+</view>

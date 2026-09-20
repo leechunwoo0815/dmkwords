@@ -46,8 +46,15 @@
             <view class="meta-item"><image class="meta-icon" src="/icons/ui/clock.png" mode="aspectFit" />{{item.activity_start_at}}</view>
           </view>
           <view class="activity-footer">
-            <text class="activity-status">{{item.status === 'enrolled' ? '已报名' : item.status === 'checked_in' ? '已签到' : item.status === 'pending_payment' ? '待收款确认' : item.status === 'refund_pending' ? '退款待审' : item.status === 'refunded' ? '已退款' : '已取消'}}</text>
-            <text class="meta-item" wx:if="{{item.ticket_code}}">券码 {{item.ticket_code}}</text>
+            <text class="activity-status">{{item.statusText}}</text>
+            <!-- 2026-09-20 客户口径：列表不再默认露出券码（露出即等于"码就在眼前"），
+                 要出示走「出示签到码」按钮 → 独立入场券页 -->
+            <text class="meta-item" wx:if="{{item.checkedInAtText}}">{{item.checkedInAtText}}</text>
+          </view>
+          <view class="mine-actions">
+            <button wx:if="{{item.canShowTicket}}" class="mine-btn mine-btn-primary"
+              data-id="{{item.id}}" bindtap="goTicket">出示签到码</button>
+            <button class="mine-btn" data-id="{{item.activity_id}}" bindtap="goMineDetail">查看活动</button>
           </view>
         </view>
       </view>

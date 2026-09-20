@@ -1,7 +1,6 @@
 // pages/activity-pkg/activity-detail/activity-detail.js — 活动详情与报名（WM9）
 const api = require('../../../utils/api')
 const media = require('../../../utils/media')
-const ticketCode = require('../../../utils/ticket-code')
 
 const STATUS_TEXT = {
   enrolled: '已报名', checked_in: '已签到', pending_payment: '待收款确认',
@@ -15,12 +14,10 @@ Page({
     loading: true,
     loadError: false,
     enrolling: false,
-    // 入场券码图片（canvasToTempFilePath 产物）；空 = 出图失败，露出券码文本兜底
-    qrImage: '',
-    bcImage: '',
-    // 已签到时间（HH:MM）与"已调亮屏幕"提示
-    checkedInTime: '',
-    brightnessBoosted: false,
+    // 报名状态条（2026-09-20：详情页不再出现二维码，只给状态 + 去「我的入场券」的入口）
+    stripTitle: '',
+    stripSub: '',
+    canShowTicket: false,
   },
 
   onLoad(options) {
@@ -38,12 +35,7 @@ Page({
     this._loadedOnce = true
   },
 
-  // 离开页面必须把亮度还回去——改系统亮度是全局副作用，不还原就是骚扰用户
-  onHide() { this._restoreBrightness() },
-  onUnload() {
-    this._clearDrawTimers()
-    this._restoreBrightness()
-  },
+  // 2026-09-20：亮度管理随入场券一起迁到「我的入场券」页（本页不再出示码，也就没有调亮的理由）
 
   async load() {
     this.setData({ loading: true, loadError: false })
@@ -59,16 +51,7 @@ Page({
       a.cover_url = a.cover_url ? media.fullUrl(a.cover_url, true) : ''
       // 时间去掉秒级精度（2026-09-16 01:38:32 → 2026-09-16 01:38）
       if (a.start_at) a.start_at = String(a.start_at).replace('T', ' ').slice(0, 16)
-      const mine = a.my_enrollment
-      this.setData({
-        activity: a,
-        checkedInTime: mine && mine.checked_in_at
-          ? String(mine.checked_in_at).replace('T', ' ').slice(11, 16) : '',
-      }, () => {
-        this._scheduleTicketDraw(a)
-        // 有券才调亮：没券的页面调亮只会让人莫名其妙
-        if (mine) this._boostBrightness()
-      })
+      this.setData({ activity: a, ...this._stripOf(a.my_enrollment) })
     } catch (e) {
       // F-M11 族：加载失败必须有错误态+重试，不许整页空白
       this.setData({ loadError: true })
@@ -78,104 +61,29 @@ Page({
 
   onRetryLoad() { this.load() },
 
-  // 入场券出图调度：画布是"隐藏的渲染后端"，出图是异步的，故画完再导出成图片。
-  // 首次若在布局未稳时查询节点，尺寸可能拿不到 → 补一次；出图本身与布局无关，不存在错位。
-  _scheduleTicketDraw(a) {
-    if (!a || !a.my_enrollment || !a.my_enrollment.ticket_code) return
-    this._clearDrawTimers()
-    this._drawTimers = [0, 300].map((ms) => setTimeout(() => this._renderTicket(a), ms))
-  },
-
-  _clearDrawTimers() {
-    if (this._drawTimers) {
-      this._drawTimers.forEach(clearTimeout)
-      this._drawTimers = []
+  // 报名状态条：详情页只讲"了解与报名"，出示签到码在独立页（客户 2026-09-20 口径）
+  _stripOf(mine) {
+    if (!mine) return { stripTitle: '', stripSub: '', canShowTicket: false }
+    // 文案只说"什么时候做什么"，不指路到用户看不到的入口（用户 2026-09-20 反馈：
+    // 原先写"签到码在「我的入场券」里"——那是页面名，前端没有这个入口，而按钮就在右边，
+    // 属于"脱裤子放屁还找不到裤子"）
+    const MAP = {
+      enrolled: ['已报名', '活动当天点右侧「出示签到码」给馆员扫'],
+      pending_payment: ['待收款确认', '名额已保留；馆员确认收款后即可出示签到码'],
+      checked_in: ['已签到', '欢迎参加，祝阅读愉快'],
+      refund_pending: ['退款审核中', '审核通过后名额释放'],
     }
+    const hit = MAP[mine.status] || ['报名状态未同步', '请下拉刷新或联系馆员']
+    // 只有"已报名未签到"才需要出示码；已签到/待收款/退款中都不给入口
+    return { stripTitle: hit[0], stripSub: hit[1], canShowTicket: mine.status === 'enrolled' }
   },
 
-  // 展示入场券时把屏幕亮度拉满（扫码枪成功率）+ 保持常亮（出示码时别息屏）。
-  // 原亮度先存下来，onHide/onUnload 还原；拿不到原值就不设（宁可不调亮，也不能还原成黑屏）。
-  // ⚠️ 开发者工具里 setScreenBrightness 是空实现/会失败，真机才有效果。
-  _boostBrightness() {
-    if (this._brightnessSaved !== undefined) return
-    wx.setKeepScreenOn({ keepScreenOn: true, fail: () => {} })
-    wx.getScreenBrightness({
-      success: (res) => {
-        const v = typeof res.value === 'number' ? res.value : -1
-        this._brightnessSaved = v > 0 && v <= 1 ? v : null
-        wx.setScreenBrightness({
-          value: 1,
-          success: () => { if (v > 0 && !this.data.brightnessBoosted) this.setData({ brightnessBoosted: true }) },
-          fail: () => {},
-        })
-      },
-      fail: () => { this._brightnessSaved = null },
+  goTicket() {
+    const mine = this.data.activity && this.data.activity.my_enrollment
+    if (!mine) return
+    wx.navigateTo({
+      url: `/pages/activity-pkg/ticket/ticket?enrollment_id=${mine.id}&child_id=${this._childId}`,
     })
-  },
-
-  _restoreBrightness() {
-    wx.setKeepScreenOn({ keepScreenOn: false, fail: () => {} })
-    const saved = this._brightnessSaved
-    this._brightnessSaved = undefined
-    if (typeof saved === 'number' && saved > 0) {
-      wx.setScreenBrightness({ value: saved, fail: () => {} })
-    }
-  },
-
-  // 入场券码出图（PRD §9.2.1）：二维码（主）+ Code128 条形码（备），纯本地计算。
-  // 画布只是"渲染后端"（移出可视区），**展示一律用 canvasToTempFilePath 出来的 <image>**：
-  // `canvas type="2d"` 是原生层，首帧坐标早于布局稳定时会停在旧位置且不自愈
-  // （实测二维码画到 hero 上、条形码画到按钮附近 = 用户报的"遮挡"），当图片显示就没有这个问题。
-  _renderTicket(a) {
-    const mine = a && a.my_enrollment
-    if (!mine || !mine.ticket_code) return
-    const code = mine.ticket_code
-    const query = wx.createSelectorQuery().in(this)
-    query.select('#ticket-qr').fields({ node: true, size: true })
-    query.select('#ticket-bc').fields({ node: true, size: true })
-    query.exec((res) => {
-      const qr = res && res[0]
-      const bc = res && res[1]
-      const dpr = this._pixelRatio()
-      // 二维码画布做成正方形：取宽高里较小的那个，保证画圆不裁边
-      const qrSize = qr && qr.width ? Math.min(qr.width, qr.height) : 0
-      if (qr && qr.node && qrSize) {
-        const ctx = qr.node.getContext('2d')
-        qr.node.width = qrSize * dpr // 设 width 会重置变换矩阵，故每次都要重设
-        qr.node.height = qrSize * dpr
-        ctx.scale(dpr, dpr)
-        if (ticketCode.drawQr(ctx, code, qrSize, {})) {
-          this._exportCanvas(qr.node, qrSize, qrSize, dpr, 'qrImage')
-        }
-      }
-      if (bc && bc.node && bc.width) {
-        const ctx = bc.node.getContext('2d')
-        bc.node.width = bc.width * dpr
-        bc.node.height = bc.height * dpr
-        ctx.scale(dpr, dpr)
-        if (ticketCode.drawBarcode(ctx, code, bc.width, bc.height, {})) {
-          this._exportCanvas(bc.node, bc.width, bc.height, dpr, 'bcImage')
-        }
-      }
-    })
-  },
-
-  // 画布 → 临时图片文件 → setData（导出失败就不显示，页面仍有券码文本兜底）
-  _exportCanvas(node, w, h, dpr, key) {
-    wx.canvasToTempFilePath({
-      canvas: node,
-      x: 0, y: 0, width: w, height: h,
-      destWidth: Math.round(w * dpr), destHeight: Math.round(h * dpr),
-      success: (res) => { this.setData({ [key]: res.tempFilePath }) },
-      fail: () => {},
-    })
-  },
-
-  _pixelRatio() {
-    try {
-      if (wx.getWindowInfo) return wx.getWindowInfo().pixelRatio || 2
-      return wx.getSystemInfoSync().pixelRatio || 2
-    } catch (e) { return 2 }
   },
 
   async onEnroll() {
@@ -198,7 +106,7 @@ Page({
       } else {
         wx.showModal({
           title: '报名成功',
-          content: `入场券码 ${r.enrollment.ticket_code}，活动当天出示给馆员扫码签到。`,
+          content: '报名成功！活动当天在活动页「我的报名」里点「出示签到码」，出示给馆员扫码即可。',
           showCancel: false,
         })
       }
@@ -239,9 +147,4 @@ Page({
     } catch (e) { /* toast 已弹（已签到/临期/已开始等） */ }
   },
 
-  copyTicket() {
-    const mine = this.data.activity && this.data.activity.my_enrollment
-    if (!mine) return
-    wx.setClipboardData({ data: mine.ticket_code })
-  },
 })

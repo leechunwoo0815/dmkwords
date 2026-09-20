@@ -148,3 +148,30 @@
 .tabs { background: var(--surface); position: sticky; top: 0; z-index: 9; }
 
 .meta-icon { width: 28rpx; height: 28rpx; margin-right: 6rpx; }
+
+/* ---------- 「我的报名」项内动作（2026-09-20 客户口径：出示签到码 / 查看活动） ---------- */
+.mine-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+.mine-btn {
+  flex: 1;
+  margin: 0;
+  padding: 0 20rpx;
+  height: 68rpx;
+  line-height: 68rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--fg);
+  background: var(--surface);
+  border: 3rpx solid var(--border);
+  border-radius: 999rpx;
+}
+.mine-btn::after { border: none; }
+.mine-btn-primary {
+  color: var(--surface);
+  background: var(--accent);
+  border-color: var(--fg);
+  box-shadow: var(--shadow-hard-sm);
+}

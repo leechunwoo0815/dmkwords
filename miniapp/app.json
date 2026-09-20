@@ -54,7 +54,8 @@
       "name": "activity",
       "pages": [
         "activity-list/activity-list",
-        "activity-detail/activity-detail"
+        "activity-detail/activity-detail",
+        "ticket/ticket"
       ]
     }
   ],

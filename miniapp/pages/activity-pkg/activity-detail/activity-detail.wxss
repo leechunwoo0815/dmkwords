@@ -175,81 +175,53 @@
   flex: 1;
 }
 
-/* ---------- 我的报名 / 入场券 ---------- */
-.qr-section {
+/* ---------- 报名状态条（2026-09-20：出码能力已迁往 pages/activity-pkg/ticket）---------- */
+.enroll-strip {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 8rpx;
-}
-/* 二维码画布：440rpx ≈ 220px，25 模块版本下每模块 6px，扫码枪读取余量充足 */
-.qr-canvas-wrap {
-  width: 440rpx;
-  height: 440rpx;
-  margin-bottom: 16rpx;
+  gap: 20rpx;
+  padding: 24rpx 28rpx;
   background: var(--surface);
-  border: 4rpx solid var(--border);
-  border-radius: var(--radius);
+  border: 3rpx solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.strip-text {
+  flex: 1;
+  min-width: 0;
+}
+.strip-title {
   display: flex;
   align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-.qr-canvas {
-  width: 420rpx;
-  height: 420rpx;
-}
-/* 出图画布：移出可视区。它只是"渲染后端"，展示一律走 <image>（见 wxml 注释）。
-   尺寸与对应 <image> 同比例 —— 不同比例会被拉伸（条形码变糊）。 */
-.draw-canvas {
-  position: fixed;
-  left: -9999rpx;
-  top: 0;
-}
-.draw-canvas-qr {
-  width: 420rpx;
-  height: 420rpx;
-}
-.draw-canvas-bc {
-  width: 620rpx;
-  height: 120rpx;
-}
-.qr-fallback {
+  gap: 10rpx;
   font-size: 30rpx;
-  color: var(--fg);
-  letter-spacing: 2rpx;
-  padding: 0 24rpx;
-  text-align: center;
-}
-/* 条形码画布：券码 16 字符 → 231 模块，按屏宽 1 CSS px/模块（高 DPR 下 =2~3 设备像素） */
-.bc-canvas-wrap {
-  width: 640rpx;
-  height: 140rpx;
-  margin-bottom: 8rpx;
-  background: var(--surface);
-  border-radius: var(--radius);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-.bc-canvas {
-  width: 620rpx;
-  height: 120rpx;
-}
-.qr-code-line {
-  font-family: var(--font-mono, monospace);
-  letter-spacing: 2rpx;
+  font-weight: 700;
   color: var(--fg);
 }
-.qr-copy-hint {
-  text-decoration: underline;
+.strip-icon {
+  width: 32rpx;
+  height: 32rpx;
 }
-.qr-hint {
-  font-size: 22rpx;
+.strip-sub {
+  margin-top: 8rpx;
+  font-size: 24rpx;
   color: var(--muted);
   line-height: 1.5;
 }
+.strip-btn {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 28rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--surface);
+  background: var(--accent);
+  border: 3rpx solid var(--fg);
+  border-radius: 999rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+.strip-btn::after { border: none; }
 
 /* ---------- 固定底栏（z ≤99 档；自带安全区） ---------- */
 .action-bar {
@@ -268,4 +240,3 @@
   width: 100%;
 }
 
-.qr-bright-hint { margin-top: 8rpx; color: var(--success); font-weight: 600; }

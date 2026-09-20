@@ -42,9 +42,18 @@ Page({
         cover_url: a.cover_url ? media.fullUrl(a.cover_url, true) : '',
         start_at: fmt(a.start_at),
       }))
+      // 2026-09-20：列表不再默认露出券码；状态文案与「出示签到码」入口在这里算好（wxml 只渲染）
+      const STATUS_TEXT = {
+        enrolled: '已报名', checked_in: '已签到', pending_payment: '待收款确认',
+        refund_pending: '退款待审', refunded: '已退款', cancelled: '已取消',
+      }
       const myEnrollments = (mine || []).map((m) => ({
         ...m,
         activity_start_at: fmt(m.activity_start_at),
+        statusText: STATUS_TEXT[m.status] || '状态未同步',
+        canShowTicket: m.status === 'enrolled',
+        checkedInAtText: m.status === 'checked_in' && m.checked_in_at
+          ? `已于 ${String(m.checked_in_at).replace('T', ' ').slice(11, 16)} 签到` : '',
       }))
       this.setData({ activities, myEnrollments })
     } catch (e) {
@@ -55,6 +64,20 @@ Page({
   },
 
   onRetryLoad() { this.load() },
+
+  // 出示签到码 → 独立「我的入场券」页（客户 2026-09-20：码不出现在详情页/列表里）
+  goTicket(e) {
+    const id = e.currentTarget.dataset.id
+    wx.navigateTo({
+      url: `/pages/activity-pkg/ticket/ticket?enrollment_id=${id}&child_id=${this._childId}`,
+    })
+  },
+
+  // 「我的报名」里进活动详情：报名态下详情页只显示状态条，不再出码（双入口都留着，
+  // 家长想改主意取消报名时不必切回「可报名」各自找一遍）
+  goMineDetail(e) {
+    this.goDetail(e)
+  },
 
   goDetail(e) {
     const id = e.currentTarget.dataset.id

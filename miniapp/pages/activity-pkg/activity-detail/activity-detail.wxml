@@ -13,36 +13,21 @@
     </view>
   </view>
 
-  <!-- 2026-09-15 用户需求：入场券码放最上面（到店点开详情就能直接出示扫码），
-       活动信息挪到下面。展示期间屏幕自动调到最亮（见 js 的亮度管理）。 -->
+  <!-- 2026-09-20 客户口径变更：入场券**不再出现在详情页**（09-15 的"置顶出示"口径作废）。
+       详情页只讲"了解与报名"；出示签到码是"到店那一刻"的动作 → 走独立「我的入场券」页
+       （「我的报名」列表项上的按钮进入）。 -->
   <view class="section" wx:if="{{activity.my_enrollment}}">
-    <view class="section-title sec-head">我的入场券</view>
     <view class="section-body">
-      <view class="qr-section">
-        <!-- PRD §9.2.1：二维码（主）+ Code128 条形码（备）。
-             展示用的是 <image>（canvasToTempFilePath 的产物），不是 canvas 本身——
-             `canvas type="2d"` 是原生层，首帧坐标若早于布局稳定会**停在旧位置且不自愈**
-             （实测画到 hero 封面/按钮上，用户报的"遮挡"真因），改成图片后彻底躲开这一类问题。
-             导出失败时露出券码文本兜底。 -->
-        <view class="qr-canvas-wrap">
-          <image wx:if="{{qrImage}}" class="qr-canvas" src="{{qrImage}}" mode="scaleToFill" />
-          <text wx:else class="qr-fallback">{{activity.my_enrollment.ticket_code}}</text>
+      <view class="enroll-strip">
+        <view class="strip-text">
+          <view class="strip-title">
+            <image class="strip-icon" src="/icons/ui/ticket.png" mode="aspectFit" />
+            <text>{{stripTitle}}</text>
+          </view>
+          <view class="strip-sub">{{stripSub}}</view>
         </view>
-        <view class="bc-canvas-wrap" wx:if="{{bcImage}}">
-          <image class="bc-canvas" src="{{bcImage}}" mode="scaleToFill" />
-        </view>
-        <view class="qr-hint qr-code-line" bindtap="copyTicket">入场券码：{{activity.my_enrollment.ticket_code}}</view>
-        <view class="qr-hint" wx:if="{{activity.my_enrollment.status === 'checked_in'}}">
-          已于 {{checkedInTime}} 签到，欢迎参加
-        </view>
-        <view class="qr-hint" wx:else>活动当天出示此码，馆员扫码签到</view>
-        <view class="qr-hint qr-copy-hint" bindtap="copyTicket">条码扫不出时，点此复制券码</view>
-        <view class="qr-hint qr-bright-hint" wx:if="{{brightnessBoosted}}">已把屏幕调到最亮，离开本页自动恢复</view>
+        <button class="strip-btn" wx:if="{{canShowTicket}}" bindtap="goTicket">出示签到码</button>
       </view>
-      <!-- 出图用画布：移出可视区（不影响布局、不遮挡、不入镜），只用来生成上面两个图片。
-           尺寸**必须与对应 <image> 的显示尺寸同比例**，否则图片会被拉伸（条形码会糊）。 -->
-      <canvas type="2d" id="ticket-qr" class="draw-canvas draw-canvas-qr"></canvas>
-      <canvas type="2d" id="ticket-bc" class="draw-canvas draw-canvas-bc"></canvas>
     </view>
   </view>
 

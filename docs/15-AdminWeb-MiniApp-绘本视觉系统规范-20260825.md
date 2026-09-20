@@ -562,7 +562,7 @@ admin-web 端未按本规范原定的 4 个迭代分阶段实施，而是一次�
 ### miniapp 小程序端绘本风（2026-08-30 已落地）
 
 - **已实施**：`miniapp/app.wxss` 落地整套绘本令牌（改值不改名，43 个页面 wxss 零改动继承）；`miniapp/components/avatar-ring/` 等级头像框叠层组件；`miniapp/icons/frames/` 四档头像框资产。
-- **机械门禁**：`scripts/check_miniapp_style.py`（R1-R13 规则 + S1-S3 三重自证），已进 `scripts/gate.sh` 第 5 步「契约与反假绿」。
+- **机械门禁**：`scripts/check_miniapp_style.py`（R1-**R14** 规则 + S1-S3 三重自证），已进 `scripts/gate.sh` 第 5 步「契约与反假绿」。
 
 ---
 

@@ -1,0 +1,192 @@
+/* pages/activity-pkg/ticket/ticket.wxss — 我的入场券（签到码出示页，2026-09-20 新增）
+   样式自 activity-detail 的「我的入场券」区块迁移而来（同一套二维码/条形码尺寸口径，
+   尺寸**必须与 wxml 里的 <image> 及出图画布同比例**，否则条形码会被拉伸发虚）。
+   颜色全部走 app.wxss 令牌（门禁 R1 禁裸色值）。 */
+.page-bg {
+  min-height: 100vh;
+  background: var(--bg);
+  box-sizing: border-box;
+  padding-bottom: calc(80rpx + env(safe-area-inset-bottom));
+}
+.sec-head {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--fg);
+}
+.section-body {
+  padding: 0 32rpx;
+}
+
+/* ---------- 活动信息小行 ---------- */
+.ticket-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx 32rpx;
+  margin-bottom: 24rpx;
+}
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  font-size: 26rpx;
+  color: var(--muted);
+}
+.meta-icon {
+  width: 28rpx;
+  height: 28rpx;
+}
+
+/* ---------- 入场券主体 ---------- */
+.qr-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+/* 二维码画布：440rpx ≈ 220px，25 模块版本下每模块 6px，扫码枪读取余量充足 */
+.qr-canvas-wrap {
+  width: 440rpx;
+  height: 440rpx;
+  margin-bottom: 16rpx;
+  background: var(--surface);
+  border: 4rpx solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.qr-canvas {
+  width: 420rpx;
+  height: 420rpx;
+}
+/* 出图画布：移出可视区，只作"渲染后端"（展示一律走 <image>，见 wxml 注释） */
+.draw-canvas {
+  position: fixed;
+  left: -9999rpx;
+  top: 0;
+}
+.draw-canvas-qr {
+  width: 420rpx;
+  height: 420rpx;
+}
+.draw-canvas-bc {
+  width: 620rpx;
+  height: 120rpx;
+}
+.qr-fallback {
+  font-size: 30rpx;
+  color: var(--fg);
+  letter-spacing: 2rpx;
+  padding: 0 24rpx;
+  text-align: center;
+}
+/* 条形码：券码 16 字符 → 231 模块，按屏宽 1 CSS px/模块 */
+.bc-canvas-wrap {
+  width: 640rpx;
+  height: 140rpx;
+  margin-bottom: 8rpx;
+  background: var(--surface);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.bc-canvas {
+  width: 620rpx;
+  height: 120rpx;
+}
+.qr-code-line {
+  font-family: var(--font-mono);
+  letter-spacing: 2rpx;
+  color: var(--fg);
+}
+.qr-copy-hint {
+  text-decoration: underline;
+}
+.qr-hint {
+  font-size: 22rpx;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.qr-bright-hint {
+  margin-top: 8rpx;
+  color: var(--success);
+  font-weight: 600;
+}
+.qr-checked {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  color: var(--success);
+  font-weight: 600;
+  font-size: 24rpx;
+}
+.hint-icon {
+  width: 26rpx;
+  height: 26rpx;
+}
+
+/* ---------- 使用说明卡 ---------- */
+.tip-card {
+  margin-top: 24rpx;
+  padding: 28rpx 32rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.tip-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--fg);
+  margin-bottom: 12rpx;
+}
+.tip-line {
+  font-size: 24rpx;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+/* ---------- 签到成功遮罩（2026-09-20 用户反馈：签到后页面必须"有反应"） ---------- */
+.checkin-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.checkin-card {
+  width: 560rpx;
+  padding: 56rpx 40rpx 44rpx;
+  background: var(--surface);
+  border: 4rpx solid var(--fg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-hard);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16rpx;
+}
+.checkin-icon {
+  width: 160rpx;
+  height: 160rpx;
+}
+.checkin-title {
+  font-size: 44rpx;
+  font-weight: 800;
+  color: var(--success);
+}
+.checkin-sub {
+  font-size: 28rpx;
+  color: var(--fg);
+}
+.checkin-tip {
+  font-size: 24rpx;
+  color: var(--muted);
+}
