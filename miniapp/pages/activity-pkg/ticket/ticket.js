@@ -46,7 +46,7 @@ Page({
   onShow() {
     // 馆员扫完码后家长应看到「已签到」——回到本页（含从后台切回）重新拉一次状态；
     // 首次 onShow（onLoad 后那次）不重复请求
-    if (this._loadedOnce && this._enrollmentId) this.load()
+    if (this._loadedOnce && this._enrollmentId) this.load({ silent: true })
     this._loadedOnce = true
     this._startWatch()
   },
@@ -124,8 +124,10 @@ Page({
     }
   },
 
-  async load() {
-    this.setData({ loading: true, loadError: false })
+  // silent=true：回页/轮询刷新不显示骨架屏（骨架屏与正文互斥 wx:if，置 loading 会整页重挂）
+  async load({ silent = false } = {}) {
+    if (!silent) this.setData({ loading: true })
+    this.setData({ loadError: false })
     try {
       const list = await api.myEnrollments(this._childId)
       const mine = (list || []).find((m) => Number(m.id) === this._enrollmentId)

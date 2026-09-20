@@ -32,15 +32,23 @@ Page({
 
   onShow() {
     // 体验必修①：报名/退款/支付确认后回到本页必须看到最新名额与报名态；
-    // 首次 onShow（onLoad 后立即触发的那次）不重复拉取
-    if (this._loadedOnce && this._activityId) this.load()
+    // 首次 onShow（onLoad 后立即触发的那次）不重复拉取。
+    // **静默刷新**（2026-09-20 用户报「看图预览返回跳回页面顶部」）：不置 loading，
+    // 避免整页卸载重挂丢滚动位置。
+    if (this._loadedOnce && this._activityId) this.load({ silent: true })
     this._loadedOnce = true
   },
 
   // 2026-09-20：亮度管理随入场券一起迁到「我的入场券」页（本页不再出示码，也就没有调亮的理由）
 
-  async load() {
-    this.setData({ loading: true, loadError: false })
+  // silent=true：**不显示骨架屏**，直接在原页面上换数据。
+  // 为什么必须这样（用户 2026-09-20 实测报障）：看图预览返回会触发 onShow → 重载；
+  // 若此时把 loading 置 true，`<loading-skeleton>` 与正文是互斥的 wx:if，
+  // 整页会被卸载再重挂 → **滚动位置被清空，页面跳回活动最上面**。
+  // 规则：骨架屏只在"首次进入 / 出错重试"出现，回页刷新一律静默。
+  async load({ silent = false } = {}) {
+    if (!silent) this.setData({ loading: true })
+    this.setData({ loadError: false })
     try {
       const a = await api.activityDetail(this._activityId, this._childId)
       // S4 双保险：终态记录（refunded/cancelled）不占报名入口位——后端 map 已仅回
@@ -149,7 +157,7 @@ Page({
           showCancel: false,
         })
       }
-      this.load()
+      this.load({ silent: true })
     } catch (e) { /* toast 已弹（已满/仅会员/重复报名等） */ }
     finally { this.setData({ enrolling: false }) }
   },
@@ -163,7 +171,7 @@ Page({
     try {
       await api.cancelEnrollment(mine.id, this._childId)
       wx.showToast({ title: '已取消', icon: 'success' })
-      this.load()
+      this.load({ silent: true })
     } catch (e) { /* toast 已弹 */ }
   },
 
@@ -182,7 +190,7 @@ Page({
     try {
       await api.refundApplyEnrollment(mine.id, this._childId)
       wx.showToast({ title: '已提交，等待审核', icon: 'none' })
-      this.load()
+      this.load({ silent: true })
     } catch (e) { /* toast 已弹（已签到/临期/已开始等） */ }
   },
 

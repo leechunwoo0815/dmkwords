@@ -25,13 +25,15 @@ Page({
     const child = session.getCurrentChild()
     this._childId = child ? child.id : null
     this.setData({ childName: child ? child.name : '' })
-    if (this._childId) this.load()
+    if (this._childId) this.load({ silent: true })
   },
 
   onTab(e) { this.setData({ tab: e.currentTarget.dataset.tab }) },
 
-  async load() {
-    this.setData({ loading: true, loadError: false })
+  // silent=true：回页刷新不显示骨架屏——整页卸载重挂会丢滚动位置（同详情页 2026-09-20 报障）
+  async load({ silent = false } = {}) {
+    if (!silent) this.setData({ loading: true })
+    this.setData({ loadError: false })
     try {
       const [acts, mine, past] = await Promise.all([
         api.listActivities(this._childId),
