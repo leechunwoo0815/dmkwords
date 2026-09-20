@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "gen:api": "openapi-typescript http://localhost:8002/openapi.json -o src/api/schema.d.ts"
+    "gen:api": "node scripts/gen-api.mjs",
+    "gen:api:check": "node scripts/gen-api.mjs --check"
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.1",

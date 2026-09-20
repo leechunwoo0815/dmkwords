@@ -6,10 +6,12 @@ on:
   pull_request:
     branches: [main]
 
-# DmkWords 门禁（D3 重写）：MySQL-only + uv + bash scripts/gate.sh（含 tsc step 8）
+# DmkWords 门禁（D3 重写）：MySQL-only + uv + bash scripts/gate.sh（9 步；tsc=step 7 /
+# 契约快照+前端类型=step 8。2026-09-20 修正：旧注释写"含 tsc step 8"与 gate.sh 不符）
 # 事实依据：项目为 pyproject.toml + uv（无 requirements.txt）；测试用 TRUNCATE/
 # MySQL 语义，sqlite 无法启动；旧 job（verify_api_contract/check_model_consistency/
 # verify_action_wiring/gen_config_doc.py）为 librio 遗留工具，仓库中不存在。
+# fix44 R2：CI 装了 admin-web 依赖 → gate[8] 的 `pnpm gen:api --check`（前端类型漂移）在 CI 同样生效。
 
 jobs:
   gate:

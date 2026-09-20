@@ -117,13 +117,25 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
 ## 五、契约工作流（改接口三步链，缺一步 gate 红或前端断）
 
 1. **改后端**（schema/端点/响应模型）；
-2. `cd admin-web && pnpm gen:api`（重生成 schema.d.ts，前端类型同步）+
-   `python scripts/export_openapi.py`（更新契约快照，**单独 commit**，
-   message 带 `contract-change:` 前缀 + 变更端点列表）；
+2. `python scripts/export_openapi.py`（更新契约快照，**单独 commit**，message 带
+   `contract-change:` 前缀 + 变更端点列表）→ `cd admin-web && pnpm gen:api`
+   （由**快照**重生成 `src/api/schema.d.ts`，前端类型同步）；
 3. 前端适配调用点 + tsc 绿。
 
-漏第 2 步 → gate [8] diff 红（T27）；漏第 3 步 → tsc 红。破坏性变更（删字段/改类型/
-删端点）在两步 commit 里显形，审查一眼可见。
+漏第 2 步 → gate [8] 红：**两步都在门禁里，各自有独立检查项**
+（`export_openapi.py --check` 管后端快照；`pnpm gen:api --check` 管前端类型产物）；
+漏第 3 步 → tsc 红。破坏性变更（删字段/改类型/删端点）在两步 commit 里显形，审查一眼可见。
+
+> ⚠️ **口径更正（2026-09-20，fix44 R2）**：本条原先写"漏 `pnpm gen:api` → gate[8] diff 红（T27）"，
+> **当时是错的**——T27 只比 `docs/api/openapi.json`，**全文不涉及 `schema.d.ts`**，前端类型漂移
+> 门禁根本发现不了（实测 `schema.d.ts` 曾漂移 4 天）。现已补上第 [8] 步的第二条检查：
+> `pnpm gen:api --check` 由快照生成临时文件与提交版**逐字节**比对，不一致即红。
+>
+> **契约源已统一为快照**（不再直连 `http://localhost:8002`）：直连要求先起后端，
+> 检查进不了 CI；且本地会静默读到"当时起着的那个服务"的契约。
+> 链路：**代码 →（gate[8]）→ `docs/api/openapi.json` →（gate[8]）→ `src/api/schema.d.ts`**。
+> 生成顺序因此不能颠倒：先 `export_openapi.py` 再 `pnpm gen:api`，否则前端类型会照着旧快照生成。
+>
 
 ---
 
