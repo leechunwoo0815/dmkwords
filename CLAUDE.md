@@ -1,8 +1,8 @@
 # DmkWords 少儿英语分级阅读系统 — 项目宪法（CLAUDE.md）
 
 > **本文件 = 新项目最高法律，每次 AI 会话开工第一件必读。**
-> 版本：v1.5（2026-09-15：门禁清单按实际 9 步重写 + 知识库索引死链修正 + 技术栈文件名更正）
-> 版本沿革：v1.4（门禁后现场恢复入 DoD）← v1.3（2026-08-28，新增功能闭环必更文档纪律）
+> 版本：v1.5.1（2026-09-20：DoD 3b「验收通过必打 tag」条款——专家 Q14 裁定授权增补；门禁第 5/8 步口径更新）
+> 版本沿革：v1.5（2026-09-15：门禁清单按实际 9 步重写 + 知识库索引死链修正 + 技术栈文件名更正）← v1.4（门禁后现场恢复入 DoD）← v1.3（2026-08-28，新增功能闭环必更文档纪律）
 > 来源：业务需求文档定稿 V1.1 + 需求决策链 V1.0.1（R-300 系规则，**该文件未入库**）+ 旧项目血泪教训（错误记忆库 8 条红线 + 模式手册）+ 旧宪法 v0.3。
 > 边界声明：本宪法只写"**什么不能做**"与"**必须怎么做**"；业务数值以业务需求文档 V1.1 为准，宪法不锁死数值，但**锁死"数值必须配置化"**。
 
@@ -128,6 +128,10 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 1. 门禁命令**全量复制不缩范围**（第八节），贴原始输出，退出码 0；
 2. **门禁后现场恢复（gate PASS ≠ 现场可用）**：门禁/pytest 与 dev 后端**共库**，TRUNCATE 清空业务表——必须按 `docs/19-门禁后现场恢复手册.md` 执行：`bash scripts/dev.sh restart`（**restart 而非 start，禁止单跑某支 seed**——演示数据双支构成）→ 三项核验（数据 35 本/进程新启/health ok）→ 简报固定句式声明。历史翻车 4 次（E-20260903-04 三犯/E-20260905-01/插修 19 T-B），细节全在 docs/19；
 3. **用户本地验收前禁止 commit/push**：代码改完、本地验证通过后，先交用户测试；用户明确说"OK"/"可以提交了"，再执行 `git add → commit → push`；
+   - 3b. **验收通过必打 tag（2026-09-20 增补，专家 Q14 裁定）**：用户确认验收通过后，**在交付 commit 上打注释 tag**
+     `acceptance-<模块>`（同一模块的第二批验收追加 `-2`，例：`acceptance-scan-checkin` / `acceptance-scan-checkin-2`），
+     tag message 写清"验收批次 + 覆盖范围 + 用户原话依据"。**tag 与 push 必须同批**（tag 没 push 等于没打）。
+     立规原因：09-12 之后**零新 tag**（验收在 LEDGER 有记录、在 git 里查不到），补打时只能靠人回忆批次——纪要不落 git 就不是证据。
 4. **功能闭环必更文档**：任意功能/修复开发+测试+推送成功后，**立即全量更新其涉及的所有 md 文档**（LEDGER / 交接卡 / 验收报告 / 视觉规范 / 手动验收手册 / 错误记忆库等），保证文档与代码同步，杜绝滞后错乱；
 5. 证据落盘 `gate-runs/` → 台账流转 → 提交；
 6. 新坑写入错误记忆库（根因+防复发动作）；
@@ -182,10 +186,10 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 | 2 | 单测 + 覆盖率 | `pytest tests/ -q --cov=backend --cov-fail-under=25`（**passed 数以 `gate-runs/` 最新一次输出为准**：2026-09-17 gate-115422 = **477 passed / 84%**；阈值 25% 是"防覆盖率塌方"下限，不是目标值） |
 | 3 | BDD | `behave features/ --no-capture -q`（当前 8 features / 30 scenarios / 103 steps） |
 | 4 | 架构关 | `python -m scripts.verify_architecture`（Router 违规 0 / 单文件 ≤800 行 / 域四件套 / import 白名单 / 锁定读 `populate_existing` / 无 sqlite） |
-| 5 | 契约与反假绿 | `check_fake_assertions` + `check_miniapp_bindings` + `check_docs_code_alignment` + `check_rbac_consistency` + **`check_miniapp_style`**（R1–R13 + S1–S3 自证） |
+| 5 | 契约与反假绿 | `check_fake_assertions`（假绿断言 + **时间炸弹**：测试禁写死的近期未来绝对时间） + `check_miniapp_bindings` + `check_docs_code_alignment` + `check_rbac_consistency` + **`check_miniapp_style`**（R1–R13 + S1–S3 自证）+ **`check_media_discipline`**（M1 落盘单出口 / M2 破缓存单出口 / M3 清理脚本默认 dry-run + S1 注入自证） |
 | 6 | 数据库迁移一致性 | `alembic check`（"No new upgrade operations detected"） |
 | 7 | 前端类型检查 | `pnpm exec tsc --noEmit`（admin-web） |
-| 8 | 契约快照（T27） | `python scripts/export_openapi.py --check`（端点变更必须"改代码 + 重导快照"两步显形） |
+| 8 | 契约快照（T27） | `python scripts/export_openapi.py --check` + `cd admin-web && pnpm gen:api --check`（端点变更必须"改代码 + 重导快照"两步显形；**前端类型 `schema.d.ts` 自 2026-09-20 起同在此步守**——此前是职责空白，曾漂移 4 天没人发现） |
 | 9 | 交付完整性 | 引用目录（外部专家意见/docs/error_list）不得有 untracked |
 
 > 已归档/停用（**别再当门禁命令跑**）：`verify_api_contract`、`check_model_consistency` —— 两份脚本已移入 `docs/legacy-attic/`，gate 第 5 步只做 skip 判断。

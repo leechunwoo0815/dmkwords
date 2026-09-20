@@ -759,6 +759,31 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 （★/☆ 在白名单里但**当前无页面在用**：星级已是 `icons/ui/star.png`/`star-off.png` 资产，
 2026-09-17 起为亮黄 `#FFD84D`。）
 
+### 15.5 emoji 豁免口径：**文案语气**可以用，**图标位**不可以（2026-09-20，fix44 R10 / 专家 Q12 裁定）
+
+用户裁定"不加检查器"（机械判定会把语气 emoji 也一起禁掉，误伤面大于收益），改为**写清边界**：
+
+| 位置 | 口径 | 例 |
+|---|---|---|
+| **通知/文案正文的语气 emoji** | ✅ **允许**（豁免） | 「馆长亲赞 ✨」「太棒了 ✨」「今天是我的生日 🎂」「馆内最高荣誉 · 已点缀在你的帖子上 ✨」 |
+| **图标槽位**（`class` 含 `icon`/`emoji` 的元素里当图标用） | ❌ 禁止（R13a 拦） | 曾把 `calendar`/`trophy` 写成 emoji —— 已换 `/icons/ui/*.png` |
+| **排版字形** | ✅ 允许（见 §15.4） | `已打卡 ✓`、成绩环 ✓/✕ |
+
+> **为什么语气 emoji 可以留**：它们参与的是**文案情绪**，不是布局与视觉系统；三端画风差异
+> 在"一句话里的点缀"上不构成割裂。而一旦成为图标（独立占位、需要与描边/圆角/令牌对齐），
+> 三端画风差异就会直接暴露——那才是 §15.1 要治的病。
+
+**已知灰区（如实登记，本轮不动；红线 30：不进则明说）**：下列地方 emoji **实质在当图标用**，
+但形态上逃过 R13a（emoji 在 JS 数据里、或 class 不含 icon）：
+
+- `components/error-view/error-view.js` 的 `icons = { error:'😔', network:'📡', empty:'📭', permission:'🔒' }`；
+- `pages/index/index.wxml` 的章节标题前缀（`🎧 继续听` / `📖 今日推荐` / `🏠 还没有孩子档案`）；
+- `pages/member/member.wxml:44` 头像兜底 `'👶'`（孩子无头像时）。
+
+> 这三处**不在本轮 fix44 范围**（改动面涉及多页布局与资产补齐），登记为**已知缺口**：
+> 后续若要收口，做法同 §15.2（用 `gen_ui_icons.py` 出资产 + 换 `icon-name`），
+> **不要**零散手写 emoji 继续扩散。
+
 ### 15.5 机械门禁 R13（`scripts/check_miniapp_style.py`）
 
 | 规则 | 判定 |
@@ -821,9 +846,56 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 `Image.open(...).convert("RGB")` **不会应用 EXIF Orientation**：运营用手机竖拍上传凭证/报告，
 存下来是躺着的（全项目此前无 `exif_transpose`）。统一管线已加，并有测试锁死。
 
+### 16.5 机械门禁：媒体纪律三条（2026-09-20，fix44 R4）
+
+§16.1 的"铁律"与 §16.3 第 2 条原来**只写在文档里**（靠人记得 → 历史上已犯三次）。
+现由 `scripts/check_media_discipline.py` 机化，接在 `gate.sh` 第 [5] 步（改规则必同步其 docstring 清单）：
+
+| 规则 | 内容 | 拦截形状 |
+|---|---|---|
+| **M1 落盘单出口** | `backend/` 内写媒体文件只许三个出口：`file_storage.py`（上传/回压）、`art.py`（`Canvas.finish`）、`card_render.py`（`save_jpeg`） | 其它后端文件出现 `open(...,"wb")` 或 `img.save(<路径>)`（含 `img.save("x.png")` 字面量路径） |
+| **M2 破缓存单出口** | `?v=` 只许出现在 `backend/common/file_utils.py`（`media_version` 三函数） | `backend/` `admin-web/src/` `miniapp/` 别处手写 `?v=`（写死→永远吃旧图；每次新值→缓存永不命中） |
+| **M3 清理脚本默认 dry-run** | `scripts/` 下 clean/purge/optimize/regen/trash 类脚本必须有**正向** apply 开关（`--apply`/`--trash`/`--no-dry-run`/`--force`），破坏性调用必须在守卫内 | ① 缺正向开关；② 破坏性调用（`os.remove`/`unlink`/`open wb`/…）在守卫外；③ 把安全阀做成 opt-in 的 `--dry-run`（`action="store_true"` 且非 `default=True`） |
+
+**范围说明**（红线 30：门禁只管一部分就必须说清）：M1 只管 `backend/`——`scripts/` 下的一次性生成/运维
+脚本不跑在生产请求路径上，不在 M1 范围；其中会删东西的另受 M3 管。判定"删自己的临时产物"（`out = ROOT / "tmp-icon-opt.png"` → `out.unlink()`）不计 M3b 违例。
+
+**本轮实修**：`scripts/regen_covers.py` 原先是 opt-in `--dry-run`（**默认就写盘 + 删旧封面 + commit**），
+与全项目清理脚本纪律相反 → 改为默认 dry-run + `--apply`。检查器实树注入自证：M1/M2/M3 三类违例全命中，
+还原后全绿（`python scripts/check_media_discipline.py --self-test` 可单跑 S1 注入自检）。
+
+### 16.6 清理/回压脚本的三个"靠运气守住"的陷阱（2026-09-20，fix44 R3）
+
+| # | 陷阱 | 真因 | 修法（含回归测试） |
+|---|---|---|---|
+| ① | `cleanup_uploads` 的**证据目录保护名存实亡** | `PROTECTED_PREFIXES` 里写 `"-samples/"`，判定用 `rel.startswith(p)`——真实目录名是 `wm15-samples/…` → **永远匹配不到**；当时没出事只因它同时也不在可再生白名单里 | 新增 `PROTECTED_SUFFIX_DIRS`，按**路径首段后缀**匹配（`wm15-samples/` ✓ `fix34-samples/` ✓） |
+| ② | `cover/activity/` 与书封**同前缀不同口径**，回压会串 | 回压脚本靠 DB 引用集区分"哪些文件算数"，口径却按前缀一刀切 | `_UPLOAD_SCOPES` 增 `"cover/activity/"` + 新增 `scope_of()` **最长前缀**匹配（与字典顺序解耦） |
+| ③ | 活动封面被按书封口径回压 | 前缀只有 `"cover/"` → `activity_cover`(1200) 当成 `cover`(1080) | 同上；回归测试另断言两个口径的默认长边**必须不同**（哪天被改成同值就该有人回头看） |
+
+> 回归锁：`tests/unit/test_fix44_media_scope.py`（3 例）。这三条属"守住了但靠运气"——
+> 靠运气的东西迟早会输，故一律改成显式规则 + 测试锁死。
+
+### 16.7 报告图实测数据（2026-09-20，fix44 R5；此前三项全无数据）
+
+对 `uploads/reports/report_weekly_1_*.jpg`（演示孩周报，内容摘要 `ea03a0e2bc`）实测：
+
+| 项 | 实测值 | 口径说明 |
+|---|---|---|
+| 产出规格 | **750×1100 px / 101 KB** | JPEG q85（`image_generated_jpeg_quality`） |
+| 生成耗时（冷） | **634 ms**（直调 `generate_image`）/ **765 ms**（HTTP 家长入口） | 含绘制超采样画布 + LANCZOS 降采样 + JPEG 编码 + 老摘要文件清理 |
+| 生成耗时（命中复用） | **7.4 ms** / **16 ms** | 内容摘要不变 → 连重绘都省（2026-09-17 改的内容寻址） |
+| 小字笔画（页脚馆标 23px） | 行带高 9 px，笔画段中位 **2 px**，最细 1 px（1px 段占 23%） | 墨色阈值 L<110 自动定位行带；**深色系文字**才测（白字压彩底不适用该阈值） |
+| 小字笔画（统计卡标签 26px） | 笔画段中位 **2 px**，最细 1 px（1px 段占 14%） | 同上 |
+| 屏显 | 750 px 图 = 手机 375 pt 宽的 **2x retina**；页脚 23 px ≈ 屏显 11.5 pt | **主用途（存相册/微信分享）：清晰** |
+| 打印（300 dpi，A5） | 6.35×9.31 cm；页脚 23 px = **1.95 mm ≈ 6 pt**；最细笔画 1 px = **0.085 mm** | 低于胶印 0.1 mm 安全线 → 属"看得见但读着累" |
+| 放大打印可行吗 | LANCZOS 2x/3x 后平均梯度 6.9 / 4.7（细节由插值补，**不加信息**） | 真要打印须**重绘 2x（1500×2200）出新规格档**，不能靠放大 |
+
+**结论**：报告图定位为**屏幕分享物**（当前设计目标），屏幕清晰度达标；
+**打印不在当前范围**——若甲方将来要打印，需新增 2x 出图档位（新规格 + 新文件名，见 §16.3 第 2 条破缓存）。
+
 ---
 
 *规范制定：外部专家*  
-*日期：2026-08-25（运营增强同步至 2026-08-28；媒体预览统一与后端出图规范同步至 2026-09-15；图片体积规范同步至 2026-09-17）*  
+*日期：2026-08-25（运营增强同步至 2026-08-28；媒体预览统一与后端出图规范同步至 2026-09-15；图片体积规范同步至 2026-09-17；媒体纪律机械门禁同步至 2026-09-20）*
 *版本：V1.5*  
 *关联文档：theme-paint.ts, Layout.tsx, BookManage.tsx, BookDetail.tsx, Dashboard.tsx, PreviewImage.tsx, reading_circle/art.py, growth/report_service.py, miniapp/app.wxss*

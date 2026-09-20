@@ -266,6 +266,26 @@ NOT NULL 列显式写入（F47），避免依赖 DB 默认值在迁移后漂移�
 
 **测试背书**：`tests/unit/test_wm10_transfer_refund.py`（含越权守卫、非本孩拒绝、双退拦截）。
 
+**可退费用白名单（2026-09-20 从代码注释提升为文档口径，fix44 R6/N4）**
+
+`_settle_items` 扫单**只认这 4 类**（源码 `backend/domain/identity/wm10_withdrawal_service.py`
+的 `refundable_types`；本表与代码常量必须同步改）：
+
+| 类型 | 常量 | 退法 |
+|---|---|---|
+| 首次活动费 | `Order.TYPE_FIRST_ACTIVITY` | 按规则 |
+| 观察期费 | `Order.TYPE_OBSERVATION` | 按规则 |
+| 会员年费 | `Order.TYPE_FORMAL` | 按**剩余天数比例** |
+| 活动费 | `Order.TYPE_ACTIVITY` | 未签到未开始全额（见 P9c） |
+
+**明确排除**（白名单的对称面，别靠"没想到"）：
+
+- `deposit` 押金 —— **双表示**：同时是订单与 `Deposit` 实体，扫进来会退两遍；
+- `custom` 自定义单（纯资金流水，如赔偿金）—— 不属于"可退费用"范畴。
+
+> 纪律：这份名单是**资金口径**，增删必须同时改 ①代码常量 ②本表 ③`docs/03` FEAT-028 行——
+> 三处不一致就是客诉与对账差异的来源。
+
 ### P9c 活动签到与退款资格（新项目独有）
 
 - 券状态机：`pending_payment → enrolled → checked_in`；退款另走 `refund_pending → refunded`；
