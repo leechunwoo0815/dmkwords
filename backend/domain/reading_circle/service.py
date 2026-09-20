@@ -326,6 +326,7 @@ class CircleService:
 
         一孩一赞：同一孩子重复点赞幂等；兄弟各赞各的（唯一索引 (post_id, child_id)）。
         软删行复活（同 FavoriteService B5 先例——唯一索引不含 is_deleted）。
+        fix44 R1：**不自赞**——同家长名下任意孩子都不许赞自家帖（与下方通知排除同口径）。
         """
         post = (
             self.db.query(CirclePost)
@@ -334,6 +335,10 @@ class CircleService:
         )
         if not post:
             raise NotFoundError("帖子不存在")
+        # N1：产品语义「不自赞」。前端已把自家帖的点赞钮置灰，此处兜底防绕过
+        # （发通知时也排除自家帖，两处同口径：parent_id 相等即自家，跨孩一并拦）
+        if post.parent_id == parent.id:
+            raise ValidationError("不能给自己的帖子点赞")
         existing = (
             self.db.query(CircleLike)
             .filter(CircleLike.post_id == post_id, CircleLike.child_id == child.id)
@@ -362,6 +367,8 @@ class CircleService:
         )
         self.db.flush()
         # 被赞通知（同事务；自家帖不打扰——同一家长名下多孩互赞也不提醒）
+        # fix44 R1 起本条判断对**家长端**恒真（上面的自赞守卫已拦）；保留为纵深防御：
+        # 守卫口径若放宽（如未来引入馆内互赞场景），通知排除仍必须独立成立。
         if post.parent_id != parent.id:
             # 去重键含 post：同一孩子赞了你**两帖**应各通知一次
             # （send() 的去重键 = parent+scene+ref_type+ref_id+dedup_key，而 ref_id 是点赞孩子

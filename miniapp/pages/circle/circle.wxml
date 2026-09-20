@@ -100,7 +100,8 @@
 
       <!-- 点赞 + 谁赞过（头像墙） -->
       <view class="post-foot">
-        <view class="like-btn {{item.liked_by_me ? 'liked' : ''}} {{item.pop ? 'pop' : ''}}"
+        <!-- fix44 R1：自家帖不给赞（未赞状态置灰；已被自赞的历史帖仍可点，用于取消） -->
+        <view class="like-btn {{item.is_mine && !item.liked_by_me ? 'like-off' : ''}} {{item.liked_by_me ? 'liked' : ''}} {{item.pop ? 'pop' : ''}}"
           data-id="{{item.id}}" bindtap="onToggleLike">
           <image class="like-icon" src="/icons/ui/{{item.liked_by_me ? 'heart' : 'heart-off'}}.png" mode="aspectFit" />
           <text class="like-count">{{item.like_count}}</text>

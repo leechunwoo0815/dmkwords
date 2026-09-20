@@ -262,6 +262,12 @@ Page({
     const id = e.currentTarget.dataset.id
     const post = this.data.posts.find((p) => p.id === id)
     if (!post) return
+    // fix44 R1：产品语义「不自赞」——自家帖（含同家长其他孩子）点赞钮置灰；
+    // 已被自赞的历史帖放行到取消分支（清理存量）。后端 like() 同口径 422 兜底防绕过。
+    if (post.is_mine && !post.liked_by_me) {
+      wx.showToast({ title: '不能给自己的帖子点赞', icon: 'none' })
+      return
+    }
     const child = session.getCurrentChild()
     try {
       const res = post.liked_by_me

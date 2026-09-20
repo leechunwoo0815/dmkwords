@@ -204,6 +204,10 @@
   background: var(--surface);
 }
 .like-btn.liked { border-color: var(--error); background: var(--error-soft); }
+/* fix44 R1：自家帖点赞钮置灰（产品语义「不自赞」）——只在未赞态置灰，
+   已赞态（历史自赞行）保持可点，给用户留取消的出口 */
+.like-btn.like-off { opacity: 0.45; border-style: dashed; }
+.like-btn.like-off .like-count { color: var(--muted); }
 .like-icon { font-size: 30rpx; }
 .like-count { font-size: 26rpx; font-weight: 700; color: var(--fg); }
 
