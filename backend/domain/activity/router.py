@@ -157,6 +157,32 @@ async def upload_activity_detail_image(
     )
 
 
+@router.get("/activities/{activity_id}/detail-image")
+def activity_detail_image_admin(
+    activity_id: int,
+    request: Request,
+    name: str = "",
+    token: str = "",
+    db: Session = Depends(get_db),
+):
+    """图文配图查看（**管理端编辑器预览**用；query token 双通道——照 cover-media 先例）。
+
+    为什么必须单开一个：小程序那个端点走家长 token，管理端只有管理员 token；
+    编辑器的 <img> 又不能带 Authorization 头，只能拼 query token（与封面同款链路）。
+    路径校验复用 `detail_blocks.resolve_image_file`，两侧同一套规则。
+    """
+    from fastapi.responses import FileResponse
+
+    from backend.common.file_utils import IMAGE_MEDIA_TYPES
+    from backend.domain.activity import detail_blocks
+    from backend.domain.catalog.media_auth import authorize_media
+
+    authorize_media(request, token, db)
+    full = detail_blocks.resolve_image_file(activity_id, name)
+    ext = os.path.splitext(full)[1].lower()
+    return FileResponse(full, media_type=IMAGE_MEDIA_TYPES.get(ext, "image/jpeg"))
+
+
 @router.get("/activities/{activity_id}/cover-media")
 def activity_cover_media(
     activity_id: int,

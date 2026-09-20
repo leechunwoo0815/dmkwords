@@ -47,40 +47,24 @@ def activity_detail_image(
     authorization: str | None = Header(None, alias="Authorization"),
     db: Session = Depends(get_db),
 ):
-    """活动图文配图（2026-09-20）：**只接受 basename**，服务端自行拼 `activity_detail/` 前缀。
+    """活动图文配图（2026-09-20）：家长端取图。
 
-    为什么不接受完整相对路径：路径参数化是路径穿越最常见的入口；这里让客户端只能给文件名，
-    目录由服务端写死，配合"文件名前缀 = 活动 id"的归属校验，越权与穿越同时封死。
+    校验全部交给 `detail_blocks.resolve_image_file`（与**管理端预览端点同一套**）：
+    只接受 basename + 文件名前缀必须等于活动 id + 目录服务端写死 → 路径穿越与越权同时封死。
     """
     import os
 
     from fastapi.responses import FileResponse
 
-    from backend.common.exceptions import NotFoundError
     from backend.common.file_utils import IMAGE_MEDIA_TYPES
-    from backend.config import get_settings
+    from backend.domain.activity import detail_blocks
     from backend.domain.identity.auth import _parent_from_token
 
     effective_token = token or (authorization or "").replace("Bearer ", "").strip()
     _parent_from_token(effective_token, db)
-    # 只接受 basename（与 URL 侧同名）；名字必须形如「活动id_十六进制.jpg」——
-    # 服务端不做任何用户可控的路径拼接，目录写死 + 文件名字符白名单 = 穿越与越权同时封死
-    base = name or ""
-    stem, ext = os.path.splitext(base)
-    ok = (
-        base == os.path.basename(base)
-        and base.startswith(f"{activity_id}_")
-        and ext.lower() in (".jpg", ".jpeg", ".png")
-        and len(stem) <= 64
-        and all(c.isalnum() or c == "_" for c in stem)
-    )
-    if not ok:
-        raise NotFoundError("配图不存在")
-    root = os.path.abspath(get_settings().UPLOADS_DIR)
-    full = os.path.abspath(os.path.join(root, "activity_detail", base))
-    if not full.startswith(root + os.sep) or not os.path.isfile(full):
-        raise NotFoundError("配图文件不存在")
-    return FileResponse(full, media_type=IMAGE_MEDIA_TYPES.get(ext.lower(), "image/jpeg"))
+    full = detail_blocks.resolve_image_file(activity_id, name)
+    ext = os.path.splitext(full)[1].lower()
+    return FileResponse(full, media_type=IMAGE_MEDIA_TYPES.get(ext, "image/jpeg"))
 
 
 @router.get("/activities/carousel")

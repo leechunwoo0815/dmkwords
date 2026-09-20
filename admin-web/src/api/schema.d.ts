@@ -130,6 +130,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/activities/{activity_id}/detail-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Activity Detail Image Admin
+         * @description 图文配图查看（**管理端编辑器预览**用；query token 双通道——照 cover-media 先例）。
+         *
+         *     为什么必须单开一个：小程序那个端点走家长 token，管理端只有管理员 token；
+         *     编辑器的 <img> 又不能带 Authorization 头，只能拼 query token（与封面同款链路）。
+         *     路径校验复用 `detail_blocks.resolve_image_file`，两侧同一套规则。
+         */
+        get: operations["activity_detail_image_admin_api_admin_activities__activity_id__detail_image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/activities/{activity_id}/detail-images": {
         parameters: {
             query?: never;
@@ -2014,10 +2038,10 @@ export interface paths {
         };
         /**
          * Activity Detail Image
-         * @description 活动图文配图（2026-09-20）：**只接受 basename**，服务端自行拼 `activity_detail/` 前缀。
+         * @description 活动图文配图（2026-09-20）：家长端取图。
          *
-         *     为什么不接受完整相对路径：路径参数化是路径穿越最常见的入口；这里让客户端只能给文件名，
-         *     目录由服务端写死，配合"文件名前缀 = 活动 id"的归属校验，越权与穿越同时封死。
+         *     校验全部交给 `detail_blocks.resolve_image_file`（与**管理端预览端点同一套**）：
+         *     只接受 basename + 文件名前缀必须等于活动 id + 目录服务端写死 → 路径穿越与越权同时封死。
          */
         get: operations["activity_detail_image_api_miniapp_activities__activity_id__detail_image_get"];
         put?: never;
@@ -5019,6 +5043,40 @@ export interface operations {
                 "application/json": components["schemas"]["ActivityDetailBlocksRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activity_detail_image_admin_api_admin_activities__activity_id__detail_image_get: {
+        parameters: {
+            query?: {
+                name?: string;
+                token?: string;
+            };
+            header?: never;
+            path: {
+                activity_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

@@ -175,10 +175,11 @@ export function apiUploadDetailImage(id: number, file: File): Promise<{ path: st
   return request(`/api/admin/activities/${id}/detail-images`, { method: "POST", body: fd });
 }
 
-/** 管理端预览配图（<img> 不带 Authorization → query token，与封面同款双通道）。 */
+/** 管理端预览配图（<img> 不带 Authorization → query token；走**管理端**端点，
+ *  因为 miniapp 那个要家长 token——管理端只有管理员 token）。 */
 export function activityDetailImageUrl(id: number, name: string): string {
   const token = getToken();
-  const base = `/api/miniapp/activities/${id}/detail-image?name=${encodeURIComponent(name)}`;
+  const base = `/api/admin/activities/${id}/detail-image?name=${encodeURIComponent(name)}`;
   return token ? `${base}&token=${encodeURIComponent(token)}` : base;
 }
 

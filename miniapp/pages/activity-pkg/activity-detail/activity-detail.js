@@ -97,7 +97,13 @@ Page({
       if (!b || !b.type) return
       if (b.type === 'paragraph' && b.text) out.push({ type: 'paragraph', text: b.text })
       else if (b.type === 'image' && b.image_url) {
-        out.push({ type: 'image', image_url: b.image_url, caption: b.caption || '' })
+        // ⚠️ 必须走 media.fullUrl：后端给的是**相对路径**，小程序 <image> 需要绝对 URL + token
+        // （封面同一处理；漏这一步就是"图全都不显示"——图文上线首日实测踩到）
+        out.push({
+          type: 'image',
+          image_url: media.fullUrl(b.image_url, true),
+          caption: b.caption || '',
+        })
       }
     })
     this._previewUrls = out.filter((b) => b.type === 'image').map((b) => b.image_url)

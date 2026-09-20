@@ -4162,6 +4162,67 @@
         ]
       }
     },
+    "/api/admin/activities/{activity_id}/detail-image": {
+      "get": {
+        "description": "图文配图查看（**管理端编辑器预览**用；query token 双通道——照 cover-media 先例）。\n\n为什么必须单开一个：小程序那个端点走家长 token，管理端只有管理员 token；\n编辑器的 <img> 又不能带 Authorization 头，只能拼 query token（与封面同款链路）。\n路径校验复用 `detail_blocks.resolve_image_file`，两侧同一套规则。",
+        "operationId": "activity_detail_image_admin_api_admin_activities__activity_id__detail_image_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "activity_id",
+            "required": true,
+            "schema": {
+              "title": "Activity Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "name",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activity Detail Image Admin",
+        "tags": [
+          "activity-admin"
+        ]
+      }
+    },
     "/api/admin/activities/{activity_id}/detail-images": {
       "post": {
         "description": "图文配图上传（活动配图口径：长边 ≤ image_activity_cover_max_edge，转 JPEG）。",
@@ -10103,7 +10164,7 @@
     },
     "/api/miniapp/activities/{activity_id}/detail-image": {
       "get": {
-        "description": "活动图文配图（2026-09-20）：**只接受 basename**，服务端自行拼 `activity_detail/` 前缀。\n\n为什么不接受完整相对路径：路径参数化是路径穿越最常见的入口；这里让客户端只能给文件名，\n目录由服务端写死，配合\"文件名前缀 = 活动 id\"的归属校验，越权与穿越同时封死。",
+        "description": "活动图文配图（2026-09-20）：家长端取图。\n\n校验全部交给 `detail_blocks.resolve_image_file`（与**管理端预览端点同一套**）：\n只接受 basename + 文件名前缀必须等于活动 id + 目录服务端写死 → 路径穿越与越权同时封死。",
         "operationId": "activity_detail_image_api_miniapp_activities__activity_id__detail_image_get",
         "parameters": [
           {

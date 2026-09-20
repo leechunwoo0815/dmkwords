@@ -7,8 +7,10 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
+from backend.common.exceptions import NotFoundError
 from backend.common.file_utils import activity_detail_image_url
 
 #: 块类型与落盘目录（与 `schemas` / `file_storage` 同源；改这里必须同步那两处）
@@ -53,3 +55,33 @@ def image_paths(activity: Any) -> set[str]:
         for b in raw_blocks(activity)
         if b.get("type") == BLOCK_IMAGE and b.get("path")
     }
+
+
+def resolve_image_file(activity_id: int, name: str) -> str:
+    """把 URL 里的 `name` 解析成磁盘绝对路径（**管理端与小程序共用同一套校验**）。
+
+    安全口径（任一条不满足即 404，绝不落到文件系统）：
+      ① 只接受 basename（`name` 必须等于它自己的 basename，封死 `../` 与子目录）；
+      ② 文件名必须形如「活动id_十六进制.ext」——前缀 = 归属校验（越权引用别家活动的图直接拒），
+        且不带任何用户可控的目录拼接（目录由服务端写死为 activity_detail/）；
+      ③ 扩展名白名单 + 字符白名单（字母数字下划线）；
+      ④ 解析后的绝对路径必须仍在 uploads 根内。
+    """
+    from backend.config import get_settings
+
+    base = name or ""
+    stem, ext = os.path.splitext(base)
+    ok = (
+        base == os.path.basename(base)
+        and base.startswith(f"{activity_id}_")
+        and ext.lower() in (".jpg", ".jpeg", ".png")
+        and 0 < len(stem) <= 64
+        and all(c.isalnum() or c == "_" for c in stem)
+    )
+    if not ok:
+        raise NotFoundError("配图不存在")
+    root = os.path.abspath(get_settings().UPLOADS_DIR)
+    full = os.path.abspath(os.path.join(root, DETAIL_IMAGE_DIR, base))
+    if not full.startswith(root + os.sep) or not os.path.isfile(full):
+        raise NotFoundError("配图文件不存在")
+    return full

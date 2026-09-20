@@ -253,3 +253,33 @@ def test_cleanup_registers_detail_images(client: TestClient):
     referenced, _missing = collect_referenced(os.path.abspath("uploads"))
     assert rel in referenced, "图文配图必须进引用集"
     assert is_protected(rel), "图文配图必须在保护名单里"
+
+
+def test_admin_detail_image_preview_endpoint(client: TestClient):
+    """管理端编辑器预览端点（管理员 token 通道）：可取图；与小程序端点同套拒绝规则。
+
+    为什么单测这条：管理端 <img> 打不开 Authorization 头，只能拼 query token；而它拿的是
+    **管理员** token，走不了小程序那个要家长 token 的端点——漏了就是"编辑器里配图全是裂图"。
+    """
+    h = _h(client)
+    act = _mk_activity(client, h, "管理端预览活动")
+    rel = _upload_image(client, h, act["id"])
+    name = os.path.basename(rel)
+    tok = h["Authorization"].split()[1]
+
+    ok = client.get(
+        f"/api/admin/activities/{act['id']}/detail-image",
+        params={"name": name, "token": tok},
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.headers["content-type"] == "image/jpeg"
+
+    # 同套拒绝：穿越 / 别家文件名 / 非常规名字
+    other = _mk_activity(client, h, "别人的预览活动")
+    theirs = os.path.basename(_upload_image(client, h, other["id"]))
+    for bad in ("../../etc/passwd", theirs, "a.jpg", f"sub/{name}"):
+        r = client.get(
+            f"/api/admin/activities/{act['id']}/detail-image",
+            params={"name": bad, "token": tok},
+        )
+        assert r.status_code == 404, f"{bad} 应 404，实 {r.status_code}"
