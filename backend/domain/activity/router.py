@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from backend.common.base_schema import BaseSchema
 from backend.database import get_db
 from backend.domain.activity.admin_service import AdminActivityService
+from backend.domain.activity.schemas import ActivityDetailBlocksRequest
 from backend.domain.activity.service import ActivityService
 from backend.middleware.admin_rbac import require_perm, require_super_admin
 
@@ -118,6 +119,42 @@ async def upload_activity_cover(
     data = await file.read()
     a = AdminActivityService(db).upload_cover(admin, activity_id, data, file.filename or "")
     return {"id": a.id, "cover_path": a.cover_path}
+
+
+@router.put("/activities/{activity_id}/detail-blocks")
+def update_activity_detail_blocks(
+    activity_id: int,
+    body: ActivityDetailBlocksRequest,
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """图文详情编辑（FEAT-057 增补，2026-09-20 客户需求）。
+
+    与 `PUT /activities/{id}` 分开成独立端点，因为守卫不同：图文是**纯展示字段**，
+    活动开始后/结束后仍可编辑（活动前写招募图文、活动后补往期回顾）；而时间/名额/费用
+    继续受"仅 PUBLISHED 且未开始"约束（**不在这里放宽**）。
+    """
+    svc = AdminActivityService(db)
+    a = svc.update_detail_blocks(admin, activity_id, body.blocks)
+    # 返回**原始块**（编辑器可写形态）：图片是相对路径，URL 由前端按 token 拼
+    return {"id": a.id, "blocks": svc.raw_detail_blocks(a)}
+
+
+@router.post("/activities/{activity_id}/detail-images")
+async def upload_activity_detail_image(
+    activity_id: int,
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+    file: UploadFile = File(...),
+):
+    """图文配图上传（活动配图口径：长边 ≤ image_activity_cover_max_edge，转 JPEG）。"""
+    from backend.common.file_storage import ensure_upload_within_limit, read_image_policy
+
+    ensure_upload_within_limit(file, read_image_policy(db, "activity_detail"))
+    data = await file.read()
+    return AdminActivityService(db).upload_detail_image(
+        admin, activity_id, data, file.filename or ""
+    )
 
 
 @router.get("/activities/{activity_id}/cover-media")

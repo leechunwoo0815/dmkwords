@@ -50,7 +50,8 @@ def media_version(cover_path: str | None) -> str:
 
 
 #: 媒体响应 MIME 映射（2026-09-17：生成图由 PNG 改 JPEG，端点原先硬编码 image/png → 必须按路径判定）
-_IMAGE_MEDIA_TYPES = {
+#: 2026-09-20：由私有 `_IMAGE_MEDIA_TYPES` 改名公开，活动图文端点需要复用同一份映射
+IMAGE_MEDIA_TYPES = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".png": "image/png",
@@ -60,7 +61,7 @@ _IMAGE_MEDIA_TYPES = {
 
 def image_media_type(path: str) -> str:
     """按文件扩展名给媒体响应的 Content-Type（未知扩展名兜底 image/jpeg）。"""
-    return _IMAGE_MEDIA_TYPES.get(os.path.splitext(path or "")[1].lower(), "image/jpeg")
+    return IMAGE_MEDIA_TYPES.get(os.path.splitext(path or "")[1].lower(), "image/jpeg")
 
 
 def book_cover_url(book_id: int, cover_path: str | None) -> str | None:
@@ -81,3 +82,15 @@ def activity_cover_url(activity_id: int, cover_path: str | None) -> str | None:
     if not cover_path:
         return None
     return f"/api/miniapp/activities/{activity_id}/cover?v={media_version(cover_path)}"
+
+
+def activity_detail_image_url(activity_id: int, path: str | None) -> str | None:
+    """活动图文详情配图 URL（带 v 版本参数，同 book_cover_url / activity_cover_url 的理由）。
+
+    图片经 `/activities/{id}/detail-image?name=` 端点出（端点只接受 basename，
+    路径穿越在端点侧再校验一次），版本 token 取文件名随机段 → 换图必换 URL。
+    """
+    if not path:
+        return None
+    name = os.path.basename(path)
+    return f"/api/miniapp/activities/{activity_id}/detail-image?name={name}&v={media_version(path)}"

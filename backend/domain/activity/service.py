@@ -25,6 +25,7 @@ from backend.common.notifications import (
     NotificationService,
 )
 from backend.common.sql_utils import escape_like
+from backend.domain.activity import detail_blocks
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, Order, Parent
 
@@ -33,6 +34,11 @@ from .models import Activity, ActivityEnrollment
 
 def _ticket_code(activity_id: int, child_id: int) -> str:
     return f"TK{activity_id:05d}{child_id:05d}{uuid.uuid4().hex[:4].upper()}"
+
+
+#: 「已结束」判定小时数（2026-09-20 C 批抽成常量）：活动开始超过该时长即视为往期。
+#: 与 `activity_auto_finish` 的 cutoff **同源**——两处各写一份，迟早出现"状态说结束了、往期列表说没有"。
+PAST_AFTER_HOURS = 24
 
 
 class ActivityService:
@@ -140,6 +146,10 @@ class ActivityService:
             "description": a.description,
             # T45：封面 URL（管理端 cover-media token 双通道；miniapp 公开端点）
             "cover_url": activity_cover_url(a.id, a.cover_path),
+            # 图文详情块（2026-09-20 客户需求）：图片块出带 token 的 URL，段落块原样
+            "detail_blocks": detail_blocks.blocks_view(a),
+            # 往期标记（2026-09-20 C 批）：前端据此切"回顾形态"（不展示报名入口）
+            "is_past": a.start_at < datetime.now() - timedelta(hours=PAST_AFTER_HOURS),
         }
         if with_quota:
             used = self._quota_used(a.id)
@@ -668,7 +678,7 @@ class ActivityService:
 
     def activity_auto_finish(self) -> int:
         """已开始超过 1 天且无进行中报名 → finished（活动状态机收口）。"""
-        cutoff = datetime.now() - timedelta(days=1)
+        cutoff = datetime.now() - timedelta(hours=PAST_AFTER_HOURS)
         acts = (
             self.db.query(Activity)
             .filter(

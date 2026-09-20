@@ -18,6 +18,8 @@ Page({
     stripTitle: '',
     stripSub: '',
     canShowTicket: false,
+    // 图文详情块（2026-09-20 客户需求「像公众号一样」）：paragraph / image 两种
+    detailBlocks: [],
   },
 
   onLoad(options) {
@@ -51,7 +53,11 @@ Page({
       a.cover_url = a.cover_url ? media.fullUrl(a.cover_url, true) : ''
       // 时间去掉秒级精度（2026-09-16 01:38:32 → 2026-09-16 01:38）
       if (a.start_at) a.start_at = String(a.start_at).replace('T', ' ').slice(0, 16)
-      this.setData({ activity: a, ...this._stripOf(a.my_enrollment) })
+      this.setData({
+        activity: a,
+        ...this._stripOf(a.my_enrollment, a.is_past),
+        detailBlocks: this._blocksOf(a),
+      })
     } catch (e) {
       // F-M11 族：加载失败必须有错误态+重试，不许整页空白
       this.setData({ loadError: true })
@@ -62,7 +68,7 @@ Page({
   onRetryLoad() { this.load() },
 
   // 报名状态条：详情页只讲"了解与报名"，出示签到码在独立页（客户 2026-09-20 口径）
-  _stripOf(mine) {
+  _stripOf(mine, isPast) {
     if (!mine) return { stripTitle: '', stripSub: '', canShowTicket: false }
     // 文案只说"什么时候做什么"，不指路到用户看不到的入口（用户 2026-09-20 反馈：
     // 原先写"签到码在「我的入场券」里"——那是页面名，前端没有这个入口，而按钮就在右边，
@@ -75,7 +81,34 @@ Page({
     }
     const hit = MAP[mine.status] || ['报名状态未同步', '请下拉刷新或联系馆员']
     // 只有"已报名未签到"才需要出示码；已签到/待收款/退款中都不给入口
-    return { stripTitle: hit[0], stripSub: hit[1], canShowTicket: mine.status === 'enrolled' }
+    // 往期活动不给出示入口（活动已过，场馆不再扫码）
+    return {
+      stripTitle: hit[0],
+      stripSub: hit[1],
+      canShowTicket: !isPast && mine.status === 'enrolled',
+    }
+  },
+
+  // 图文块（后端已把图片块转成带 token 的 URL；这里只做防御性过滤 + 收集预览图列表）
+  _blocksOf(a) {
+    const raw = (a && a.detail_blocks) || []
+    const out = []
+    raw.forEach((b) => {
+      if (!b || !b.type) return
+      if (b.type === 'paragraph' && b.text) out.push({ type: 'paragraph', text: b.text })
+      else if (b.type === 'image' && b.image_url) {
+        out.push({ type: 'image', image_url: b.image_url, caption: b.caption || '' })
+      }
+    })
+    this._previewUrls = out.filter((b) => b.type === 'image').map((b) => b.image_url)
+    return out
+  },
+
+  // 点图全屏预览（可左右滑动看完整组图——家长最常做的动作）
+  onPreviewImage(e) {
+    const url = e.currentTarget.dataset.src
+    if (!url) return
+    wx.previewImage({ current: url, urls: this._previewUrls || [url] })
   },
 
   goTicket() {

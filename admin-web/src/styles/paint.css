@@ -634,3 +634,35 @@ h1, h2, h3, h4, h5, h6,
     animation: none;
   }
 }
+
+/* ---------- 活动图文详情编辑器（2026-09-20 客户需求） ---------- */
+.detail-block-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.detail-block-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--paint-paper);
+  border: 2px solid var(--paint-border);
+  border-radius: var(--paint-radius);
+}
+.detail-block-body {
+  flex: 1;
+  min-width: 0;
+}
+.detail-empty {
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--paint-ink-light);
+  background: var(--paint-paper);
+  border: 2px dashed var(--paint-border);
+  border-radius: var(--paint-radius);
+  text-align: center;
+}

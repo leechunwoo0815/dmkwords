@@ -137,6 +137,10 @@ module.exports = {
   enrollActivity(activityId, childId) {
     return req.post(`/api/miniapp/activities/${activityId}/enroll`, { child_id: childId })
   },
+  // 往期活动回顾（2026-09-20 C 批）：只读，不需要 child_id
+  activitiesPast(limit = 30) {
+    return req.get('/api/miniapp/activities/past', null, { params: { limit } })
+  },
   myEnrollments(childId) {
     return req.get('/api/miniapp/enrollments', null, { params: { child_id: childId } })
   },

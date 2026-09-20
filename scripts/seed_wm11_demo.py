@@ -894,6 +894,298 @@ def _ensure_demo_activity(db: Session) -> None:
     db.flush()
 
 
+# ---------- 活动图文详情 + 往期活动回顾（2026-09-20 B/C 批演示素材）----------
+#
+# 配图一律**用项目自己的绘本引擎现画**，不引外部图片：① 版权干净；② 天然不含任何孩子形象
+# （客户合规口径：往期照片只放不含可辨识孩子的图）；③ 与全站视觉同源，不会"配图与产品割裂"。
+
+
+def _draw_activity_scene(kind: str) -> bytes:
+    """画一张活动配图（1200×800，PNG 字节）——供 seed 写入 activity_detail/。"""
+
+    from backend.domain.reading_circle import art
+
+    pal_key = {
+        "reading_room": "weekly_report",
+        "open_book": "books_count",
+        "book_stack": "finish_book",
+        "balloons": "perfect_quiz",
+        "snack": "milestone",
+        "craft": "streak",
+        "moon": "rank_top",
+    }[kind]
+    cv = art.Canvas(1200, 800, art.PALETTES[pal_key])
+    ink = "#5B4636"
+
+    def rect(x0, y0, x1, y1, fill, r=18, w=7):
+        cv.d.rounded_rectangle(
+            cv.box(x0, y0, x1, y1), radius=r * art.SS, fill=fill, outline=ink, width=int(w * art.SS)
+        )
+
+    def ellipse(x0, y0, x1, y1, fill, w=7):
+        cv.d.ellipse(cv.box(x0, y0, x1, y1), fill=fill, outline=ink, width=int(w * art.SS))
+
+    if kind == "reading_room":
+        art.glow(cv, 980, 150, 200, "#FFF6D8", 120)
+        art.cloud(cv, 200, 130, 150, "#FFFFFF", 200)
+        rect(90, 300, 700, 700, "#FFE9C9", r=26)
+        for i, col in enumerate(["#FF9A66", "#6C9BF0", "#4FB98A", "#F2789F"]):
+            rect(140 + i * 140, 360, 240 + i * 140, 660, col, r=14, w=6)
+            rect(160 + i * 140, 400, 220 + i * 140, 470, "#FFFFFF", r=10, w=5)
+        ellipse(760, 560, 1120, 720, "#FFD9E8")
+    elif kind == "open_book":
+        ellipse(120, 520, 1080, 720, "#CDEFE0")
+        rect(300, 250, 900, 560, "#FFFDF7", r=20, w=8)
+        cv.d.line([cv.p(600, 260), cv.p(600, 550)], fill=ink, width=int(7 * art.SS))
+        for i in range(4):
+            for x0, x1 in ((350, 560), (640, 850)):
+                cv.d.line(
+                    [cv.p(x0, 320 + i * 50), cv.p(x1, 320 + i * 50)],
+                    fill="#D4C5B5",
+                    width=int(6 * art.SS),
+                )
+        art.star(cv, 940, 160, 20, "#FCD34D", outline=ink, width=4)
+    elif kind == "book_stack":
+        for i, c in enumerate(["#F2935B", "#6C9BF0", "#4FB98A", "#F2789F"]):
+            rect(340 - i * 12, 620 - i * 90, 880 + i * 12, 700 - i * 90, c, r=16)
+        ellipse(520, 130, 700, 310, "#FFF9DC")
+        art.star(cv, 610, 220, 46, "#FCD34D", outline=ink, width=5)
+    elif kind == "balloons":
+        for i, (x, c) in enumerate(
+            [
+                (260, "#F2789F"),
+                (400, "#6C9BF0"),
+                (540, "#4FB98A"),
+                (680, "#FCD34D"),
+                (820, "#FF9A66"),
+                (960, "#A78BFA"),
+            ]
+        ):
+            y = 240 + (i % 2) * 60
+            ellipse(x - 60, y - 78, x + 60, y + 78, c, w=6)
+            cv.d.line([cv.p(x, y + 78), cv.p(x + 20, 700)], fill=ink, width=int(4 * art.SS))
+        art.cloud(cv, 180, 150, 130, "#FFFFFF", 180)
+    elif kind == "snack":
+        rect(120, 520, 1080, 620, "#FFE9C9")
+        for i, c in enumerate(["#FF9A66", "#6C9BF0", "#4FB98A"]):
+            rect(300 + i * 220, 430, 400 + i * 220, 530, c, r=12, w=6)
+        ellipse(880, 400, 1060, 520, "#FFFDF7")
+    elif kind == "craft":
+        rect(160, 260, 620, 640, "#FFFDF7", r=22, w=8)
+        rect(620, 340, 1040, 660, "#E8FBEF", r=22, w=8)
+        for i in range(2):
+            cv.d.line(
+                [cv.p(240, 360 + i * 70), cv.p(540, 360 + i * 70)],
+                fill="#D4C5B5",
+                width=int(7 * art.SS),
+            )
+        art.star(cv, 830, 470, 60, "#FCD34D", outline=ink, width=5)
+    else:  # moon：中秋主题（月亮 + 云 + 灯笼）
+        art.glow(cv, 880, 220, 260, "#FFF6D8", 150)
+        ellipse(760, 100, 1000, 340, "#FFF9DC")
+        art.cloud(cv, 240, 190, 170, "#FFFFFF", 210)
+        art.cloud(cv, 520, 620, 150, "#FFFFFF", 180)
+        for x in (300, 520):
+            cv.d.line([cv.p(x, 120), cv.p(x, 300)], fill=ink, width=int(5 * art.SS))
+            rect(x - 70, 300, x + 70, 460, "#F2789F", r=26, w=7)
+            ellipse(x - 70, 420, x + 70, 500, "#FCD34D", w=6)
+
+    art.sparkle(cv, 200, 300, 16, "#FFFFFF", 220)
+    art.paper_grain(cv, alpha=14)
+    # 出 PNG 字节交给 file_storage 统一转码（save_activity_detail_image 内部走 normalize_image）
+    return _png_of(cv)
+
+
+def _png_of(cv) -> bytes:
+    """把 Canvas 降采样为 PNG 字节（写临时文件再读——art.Canvas 只提供 finish(path)）。"""
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as fh:
+        path = fh.name
+    cv.finish(path, quality=None)
+    with open(path, "rb") as r:
+        data = r.read()
+    os.remove(path)
+    return data
+
+
+def _ensure_activity_detail_blocks(db: Session) -> None:
+    """给演示活动写图文详情（2026-09-20 B 批）。
+
+    **每次重写**而不是"有就跳过"：图文是这次演示的门面，内容必须与代码里的文案一致；
+    "有就跳过"会让被手工改过的库永远停在旧版本（清库重建与增量库状态不一致——红线 27 同族）。
+    重写时先记旧图、写完删旧图（regen_covers 的"写新名 + 删旧文件"同款，不留孤儿）。
+    """
+    import json
+
+    from backend.common.file_storage import (
+        read_image_policy,
+        remove_activity_detail_images,
+        save_activity_detail_image,
+    )
+    from backend.domain.activity.models import Activity
+
+    P1 = [
+        "这周我们读的是《Brown Bear, Brown Bear, What Do You See?》——它用一句话反复出现带着孩子"
+        "认识颜色和动物，是英文启蒙里最好上手的绘本之一，第一次来的孩子也不会跟不上。",
+        ("reading_room", "活动场地 · 馆内阅读区"),
+        "活动怎么玩（约 60 分钟）：\n① 前 15 分钟：老师把整本绘本讲一遍，孩子跟着重复句子；\n"
+        "② 中间 25 分钟：每个孩子挑一页最喜欢的画面，用英文说出那只动物的名字，说错了也没关系；\n"
+        "③ 最后 20 分钟：读完做一张自己的小卡片带回家。",
+        ("open_book", "一起读一本，比一个人读更久"),
+        ("book_stack", "每次活动读一本，读完盖一枚小印章"),
+        "适合谁：3–7 岁、能坐下来听 15 分钟故事的孩子，**不需要任何英文基础**。"
+        "家长可以旁听，也可以到隔壁书区自己看书；我们建议第一次来的家长留在旁边，孩子会更放松。",
+        ("balloons", "开场十分钟是热身游戏"),
+        "为什么要来线下读：在家读绘本，孩子读两页就去玩别的了；在馆里有别的孩子一起读、"
+        "有老师接话，一本书能真正读完，读完之后那本书才记得住。",
+        ("snack", "活动后有简单的茶点"),
+        ("craft", "读完做一张属于自己的小卡片"),
+        "名额与报名：每场限 8 个孩子（1 位家长陪同）。点页面下方「立即报名」即可，"
+        "报名后到「我的报名」里出示签到码签到。临时来不了请提前取消，把名额留给别的孩子。",
+    ]
+    P2 = [
+        "免费体验课，家长和孩子一起读一本英文纸板书，读完做一个小手工。",
+        ("craft", "现场手作环节"),
+        "适合 3–6 岁，第一次接触英文绘本的家庭尤其合适。每场 10 组家庭，报满为止。",
+    ]
+    for title, plan in (("周末英文绘本读书会（演示）", P1), ("亲子共读体验课（演示）", P2)):
+        a = db.query(Activity).filter(Activity.title == title, Activity.is_deleted == 0).first()
+        if not a:
+            continue
+        old_paths = {
+            str(b.get("path")) for b in _raw_blocks(a) if b.get("type") == "image" and b.get("path")
+        }
+        policy = read_image_policy(db, "activity_detail")
+        blocks: list[dict] = []
+        for item in plan:
+            if isinstance(item, str):
+                blocks.append({"type": "paragraph", "text": item})
+            else:
+                kind, caption = item
+                rel = save_activity_detail_image(a.id, _draw_activity_scene(kind), ".png", policy)
+                blocks.append({"type": "image", "path": rel, "caption": caption})
+        a.detail_blocks = json.dumps(blocks, ensure_ascii=False)
+        db.flush()
+        keep = {b["path"] for b in blocks if b["type"] == "image"}
+        remove_activity_detail_images(sorted(old_paths - keep))
+        print(f"c 图文详情演示数据：{title}（{len(blocks)} 块 / {len(keep)} 图）")
+
+
+def _raw_blocks(a) -> list[dict]:
+    """活动 detail_blocks 原始块（委托后端单一来源，避免 seed 里再抄一份解析）。"""
+    from backend.domain.activity.detail_blocks import raw_blocks
+
+    return raw_blocks(a)
+
+
+def _ensure_past_activities(db: Session) -> None:
+    """往期活动回顾演示数据（2026-09-20 C 批）：造两场"已办过"的活动。
+
+    状态直接给 finished（不依赖定时任务），并造少量签到/取消报名，
+    让家长端的「往期回顾」既有内容也有"参与人数"可看。
+    """
+    import json
+
+    from backend.common.file_storage import (
+        read_image_policy,
+        save_activity_detail_image,
+    )
+    from backend.domain.activity.models import Activity, ActivityEnrollment
+
+    now = datetime.now()
+    spec = [
+        (
+            "中秋主题共读会（演示）",
+            12,
+            "parent_child",
+            "馆内一层阅读区",
+            [
+                "上个月的中秋主题共读会，20 个家庭一起读了《Thanking the Moon》，"
+                "读完在院子里看了月亮、吃了月饼。",
+                ("moon", "院子里的月亮 · 当天的实景布置"),
+                ("reading_room", "活动场地（不含孩子形象的照片）"),
+                "孩子们最喜欢的环节是「用英文说出一样你感谢的东西」——"
+                "大部分孩子说的是爸爸、妈妈和月饼。",
+                ("snack", "茶点：月饼切成小块，家长和孩子分着吃"),
+            ],
+        ),
+        (
+            "英文绘本亲子手作（演示）",
+            40,
+            "book_club",
+            "馆内二层活动室",
+            [
+                "暑期的手作场次：读完《The Very Hungry Caterpillar》，每个孩子做了一条自己的毛毛虫。",
+                ("craft", "手作台 · 彩纸与贴纸"),
+                ("book_stack", "当期读完的绘本"),
+            ],
+        ),
+    ]
+    for title, days_ago, atype, location, plan in spec:
+        a = db.query(Activity).filter(Activity.title == title, Activity.is_deleted == 0).first()
+        if not a:
+            a = Activity(
+                title=title,
+                activity_type=atype,
+                start_at=now - timedelta(days=days_ago),
+                location=location,
+                max_quota=20,
+                fee=Decimal("0"),
+                description="往期活动回顾（演示数据）。",
+                member_only=False,
+                status=Activity.STATUS_FINISHED,
+            )
+            db.add(a)
+            db.flush()
+        if not _raw_blocks(a):
+            policy = read_image_policy(db, "activity_detail")
+            blocks: list[dict] = []
+            for item in plan:
+                if isinstance(item, str):
+                    blocks.append({"type": "paragraph", "text": item})
+                else:
+                    kind, caption = item
+                    rel = save_activity_detail_image(
+                        a.id, _draw_activity_scene(kind), ".png", policy
+                    )
+                    blocks.append({"type": "image", "path": rel, "caption": caption})
+            a.detail_blocks = json.dumps(blocks, ensure_ascii=False)
+            db.flush()
+            print(f"c 往期活动回顾演示数据：{title}（{len(blocks)} 块）")
+
+        # 参与记录：观察期孩/押金孩 = 已签到；演示孩 = 曾取消（让"我的报名"里也有历史行）
+        kids = db.query(Child).filter(Child.is_deleted == 0).order_by(Child.id).all()
+        want = [
+            (kids[i].id, st)
+            for i, st in ((2, "checked_in"), (3, "checked_in"), (0, "cancelled"))
+            if i < len(kids)
+        ]
+        for child_id, status in want:
+            exist = (
+                db.query(ActivityEnrollment)
+                .filter(
+                    ActivityEnrollment.activity_id == a.id,
+                    ActivityEnrollment.child_id == child_id,
+                )
+                .first()
+            )
+            if exist:
+                exist.status = status
+                exist.checked_in_at = a.start_at if status == "checked_in" else None
+                continue
+            db.add(
+                ActivityEnrollment(
+                    activity_id=a.id,
+                    child_id=child_id,
+                    ticket_code=f"TK9{str(a.id).zfill(4)}{str(child_id).zfill(4)}",
+                    status=status,
+                    checked_in_at=a.start_at if status == "checked_in" else None,
+                )
+            )
+        db.flush()
+
+
 def _ensure_demo_wm13_states(db: Session) -> None:
     """WM13 演示数据（幂等）：1 待审退款 + 1 待审转让——走真实 service 链路（禁直改 DB）。
 
@@ -2344,6 +2636,9 @@ def seed() -> None:
         # 故 t41_data 必须在两者之后（R3 顺序教训：跨段依赖按建序排）
         _ensure_demo_t41_data(db, demo_child)
         _ensure_activity_covers(db)
+        # 活动图文详情 + 往期回顾演示素材（依赖：活动已建、封面已生成——B/C 批）
+        _ensure_past_activities(db)
+        _ensure_activity_detail_blocks(db)
         _ensure_demo_wm13_states(db)
         # WM4-10 批量验收补数（依赖：演示孩/小红家长、WM3 三孩、Activity 1、WM13 退款演示孩
         # ——必须在这些段之后；教训 65：跨段依赖按建序排）

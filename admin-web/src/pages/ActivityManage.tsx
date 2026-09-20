@@ -1,19 +1,23 @@
 import dayjs from "dayjs";
-import { UploadOutlined } from "@ant-design/icons";
+import {
+  ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, PictureOutlined,
+  PlusOutlined, UploadOutlined,
+} from "@ant-design/icons";
 import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
 import PreviewImage from "../components/PreviewImage";
 // 活动管理（WM9：发布/取消/报名/签到/退款审核）
 import { useCallback, useEffect, useState } from "react";
 import {
-  App as AntdApp, Button, DatePicker, Descriptions, Drawer, Form, Input, InputNumber,
-  Modal, Select, Space, Switch, Table, Tabs, Tag, Typography, Upload,
+  Alert, App as AntdApp, Button, DatePicker, Descriptions, Divider, Drawer, Form, Input,
+  InputNumber, Modal, Select, Space, Switch, Table, Tabs, Tag, Typography, Upload,
 } from "antd";
 
 import {
-  activityCoverUrl, apiCancelActivity, apiCreateActivity, apiGetActivityDetail,
-  apiListActivities, apiListEnrollments, apiUpdateActivity, apiUploadActivityCover,
-  type ActivityDetail, type ActivityItem, type EnrollmentItem,
+  activityCoverUrl, activityDetailImageUrl, apiCancelActivity, apiCreateActivity,
+  apiGetActivityDetail, apiListActivities, apiListEnrollments, apiSaveDetailBlocks,
+  apiUpdateActivity, apiUploadActivityCover, apiUploadDetailImage, detailImageName,
+  type ActivityDetail, type ActivityItem, type DetailBlock, type EnrollmentItem,
 } from "../api/activities";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
@@ -34,6 +38,7 @@ const TYPE_FILTER_OPTIONS = [{ value: "", label: "全部" }, ...TYPE_OPTIONS];
 const STATUS_FILTER_OPTIONS = [
   { value: "", label: "全部" },
   { value: "published", label: "已发布" },
+  { value: "finished", label: "已结束" },
   { value: "cancelled", label: "已取消" },
 ];
 
@@ -96,6 +101,10 @@ export default function ActivityManage() {
   // T45（FEAT-082）：编辑（复用创建表单；activity_type 禁改 disabled——Q8 批复）
   const [editTarget, setEditTarget] = useState<ActivityItem | null>(null);
   const [editCover, setEditCover] = useState<string | null>(null);
+  // 图文详情编辑器（2026-09-20 客户需求）：与主表单**分开保存**——它有自己的端点
+  // （活动开始后仍可编辑），保存按钮独立，避免"确定"里两个请求一半成功一半失败的中间态
+  const [detailBlocks, setDetailBlocks] = useState<DetailBlock[]>([]);
+  const [savingBlocks, setSavingBlocks] = useState(false);
   const openEdit = async (a: ActivityItem) => {
     try {
       const d = await apiGetActivityDetail(a.id);
@@ -111,6 +120,11 @@ export default function ActivityManage() {
     } catch (e) {
       message.error((e as Error).message);
     }
+    // 图文详情：与表单同源拉一次详情（编辑器要的是**原始路径**，不是 URL）
+    setDetailBlocks([]);
+    apiGetActivityDetail(a.id)
+      .then((d) => setDetailBlocks(d.detail_blocks || []))
+      .catch((e: Error) => message.warning(`图文详情加载失败：${e.message}`));
   };
 
   const onCoverUpload = async (file: File) => {
@@ -119,6 +133,45 @@ export default function ActivityManage() {
       await apiUploadActivityCover(editTarget.id, file);
       setEditCover(activityCoverUrl(editTarget.id) + `&t=${Date.now()}`);
       message.success("封面已上传");
+    } catch (e) {
+      message.error((e as Error).message);
+    }
+    return false;
+  };
+
+  // ---------- 图文详情编辑器 ----------
+  const saveDetailBlocks = async () => {
+    if (!editTarget) return;
+    setSavingBlocks(true);
+    try {
+      const r = await apiSaveDetailBlocks(editTarget.id, detailBlocks);
+      setDetailBlocks(r.blocks || []);
+      message.success("图文详情已保存");
+    } catch (e) {
+      message.error((e as Error).message);
+    } finally {
+      setSavingBlocks(false);
+    }
+  };
+
+  const moveBlock = (idx: number, delta: number) => {
+    const t = idx + delta;
+    if (t < 0 || t >= detailBlocks.length) return;
+    // 用 map 重排而非下标互写：本项目开了 noUncheckedIndexedAccess，`next[i]` 是可选类型
+    setDetailBlocks(detailBlocks.map((b, k) => {
+      if (k === idx) return detailBlocks[t] as DetailBlock;
+      if (k === t) return detailBlocks[idx] as DetailBlock;
+      return b;
+    }));
+  };
+
+  const onDetailImageUpload = async (file: File) => {
+    if (!editTarget) return false;
+    try {
+      const r = await apiUploadDetailImage(editTarget.id, file);
+      // 上传即插到末尾（运营的直觉：加上去的图在最后，再用箭头调序）
+      setDetailBlocks((prev) => [...prev, { type: "image", path: r.path, caption: "" }]);
+      message.success("配图已上传，记得点「保存图文详情」");
     } catch (e) {
       message.error((e as Error).message);
     }
@@ -375,7 +428,7 @@ export default function ActivityManage() {
         title={editTarget ? "编辑活动" : "发布活动"} open={createOpen}
         okText={editTarget ? "保存" : "发布"} cancelText="取消" destroyOnClose
         onOk={editTarget ? onEditSave : onCreate}
-        onCancel={() => { setCreateOpen(false); setEditTarget(null); }} width={560}
+        onCancel={() => { setCreateOpen(false); setEditTarget(null); }} width={720}
       >
         {editTarget && (
           <div style={{ marginBottom: 12 }}>
@@ -428,6 +481,82 @@ export default function ActivityManage() {
             <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
+
+        {/* 图文详情（2026-09-20 客户需求「像公众号一样，吸引人参加」）：活动开始后仍可编辑，
+            所以保存按钮独立于下方「保存」——两个端点、两种守卫，别混在一次提交里。 */}
+        {editTarget && (
+          <>
+            <Divider style={{ margin: "8px 0 12px" }}>图文详情（活动详情页展示）</Divider>
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message="照片合规：只放不含可辨识孩子的图（场景 / 物品 / 背影，或做马赛克）"
+              description="段落用来写活动亮点、往期回顾；图片建议横图，上传后自动压成 JPEG（长边 1200）。"
+            />
+            <div className="detail-block-editor">
+              {detailBlocks.length === 0 && (
+                <div className="detail-empty">还没有图文内容——加一段介绍或几张现场图，家长端会更有吸引力。</div>
+              )}
+              {detailBlocks.map((b, i) => (
+                <div key={`${b.type}-${i}`} className="detail-block-row">
+                  <div className="detail-block-body">
+                    {b.type === "paragraph" ? (
+                      <Input.TextArea
+                        rows={3}
+                        value={b.text || ""}
+                        placeholder="段落文字（活动亮点 / 内容安排 / 往期回顾…）"
+                        onChange={(e) => setDetailBlocks(detailBlocks.map((b, k) => (
+                          k === i ? { ...b, text: e.target.value } : b
+                        )))}
+                      />
+                    ) : (
+                      <Space align="start" size={12}>
+                        <PreviewImage
+                          src={activityDetailImageUrl(editTarget.id, detailImageName(b.path || ""))}
+                          alt="配图"
+                          width={120}
+                          height={80}
+                        />
+                        <Input
+                          style={{ width: 260 }}
+                          value={b.caption || ""}
+                          placeholder="图注（可选，如「上次活动现场」）"
+                          onChange={(e) => setDetailBlocks(detailBlocks.map((b, k) => (
+                            k === i ? { ...b, caption: e.target.value } : b
+                          )))}
+                        />
+                      </Space>
+                    )}
+                  </div>
+                  <Space direction="vertical" size={4}>
+                    <Button size="small" icon={<ArrowUpOutlined />} disabled={i === 0}
+                      onClick={() => moveBlock(i, -1)} />
+                    <Button size="small" icon={<ArrowDownOutlined />} disabled={i === detailBlocks.length - 1}
+                      onClick={() => moveBlock(i, 1)} />
+                    <Button size="small" danger icon={<DeleteOutlined />}
+                      onClick={() => setDetailBlocks(detailBlocks.filter((_, k) => k !== i))} />
+                  </Space>
+                </div>
+              ))}
+            </div>
+            <Space style={{ marginTop: 8 }} wrap>
+              <Button icon={<PlusOutlined />}
+                onClick={() => setDetailBlocks([...detailBlocks, { type: "paragraph", text: "" }])}>
+                添加段落
+              </Button>
+              <Upload accept="image/*" showUploadList={false} beforeUpload={onDetailImageUpload}>
+                <Button icon={<PictureOutlined />}>添加图片</Button>
+              </Upload>
+              <Button type="primary" ghost loading={savingBlocks} onClick={saveDetailBlocks}>
+                保存图文详情
+              </Button>
+              <Typography.Text type="secondary">
+                共 {detailBlocks.length} 块（图片 {detailBlocks.filter((b) => b.type === "image").length}/30）
+              </Typography.Text>
+            </Space>
+          </>
+        )}
       </Modal>
     </div>
   );

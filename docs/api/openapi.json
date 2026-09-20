@@ -84,6 +84,22 @@
         "title": "ActivityCreateRequest",
         "type": "object"
       },
+      "ActivityDetailBlocksRequest": {
+        "additionalProperties": false,
+        "description": "图文详情全量覆盖写（顺序即展示顺序）。",
+        "properties": {
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/DetailBlock"
+            },
+            "maxItems": 60,
+            "title": "Blocks",
+            "type": "array"
+          }
+        },
+        "title": "ActivityDetailBlocksRequest",
+        "type": "object"
+      },
       "ActivityUpdateRequest": {
         "additionalProperties": false,
         "description": "T45（FEAT-082·Q8 批复）：编辑白名单 9 字段——activity_type 禁改\n（BaseSchema extra=forbid：传入即 422 显式拒绝）。",
@@ -395,6 +411,20 @@
           "file"
         ],
         "title": "Body_upload_activity_cover_api_admin_activities__activity_id__cover_post",
+        "type": "object"
+      },
+      "Body_upload_activity_detail_image_api_admin_activities__activity_id__detail_images_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_activity_detail_image_api_admin_activities__activity_id__detail_images_post",
         "type": "object"
       },
       "Body_upload_audio_api_admin_books__book_id__audio_post": {
@@ -1959,6 +1989,61 @@
           "unpaid_balance"
         ],
         "title": "DepositResponse",
+        "type": "object"
+      },
+      "DetailBlock": {
+        "additionalProperties": false,
+        "description": "一个图文块：`paragraph` 用 text；`image` 用 path（相对 uploads）+ 可选 caption。",
+        "properties": {
+          "caption": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "图注（可选）",
+            "title": "Caption"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "图片相对路径（image 块必填）",
+            "title": "Path"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "段落正文",
+            "title": "Text"
+          },
+          "type": {
+            "description": "paragraph / image",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "DetailBlock",
         "type": "object"
       },
       "EnrollRequest": {
@@ -4016,6 +4101,118 @@
           }
         },
         "summary": "Activity Cover Media",
+        "tags": [
+          "activity-admin"
+        ]
+      }
+    },
+    "/api/admin/activities/{activity_id}/detail-blocks": {
+      "put": {
+        "description": "图文详情编辑（FEAT-057 增补，2026-09-20 客户需求）。\n\n与 `PUT /activities/{id}` 分开成独立端点，因为守卫不同：图文是**纯展示字段**，\n活动开始后/结束后仍可编辑（活动前写招募图文、活动后补往期回顾）；而时间/名额/费用\n继续受\"仅 PUBLISHED 且未开始\"约束（**不在这里放宽**）。",
+        "operationId": "update_activity_detail_blocks_api_admin_activities__activity_id__detail_blocks_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "activity_id",
+            "required": true,
+            "schema": {
+              "title": "Activity Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivityDetailBlocksRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Activity Detail Blocks",
+        "tags": [
+          "activity-admin"
+        ]
+      }
+    },
+    "/api/admin/activities/{activity_id}/detail-images": {
+      "post": {
+        "description": "图文配图上传（活动配图口径：长边 ≤ image_activity_cover_max_edge，转 JPEG）。",
+        "operationId": "upload_activity_detail_image_api_admin_activities__activity_id__detail_images_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "activity_id",
+            "required": true,
+            "schema": {
+              "title": "Activity Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_activity_detail_image_api_admin_activities__activity_id__detail_images_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Upload Activity Detail Image",
         "tags": [
           "activity-admin"
         ]
@@ -9718,6 +9915,67 @@
         ]
       }
     },
+    "/api/miniapp/activities/past": {
+      "get": {
+        "description": "往期活动回顾（2026-09-20 C 批）——**按时间已过取数**（见 service.list_past 的口径说明）。\n\n不需要 child_id：往期是**只读回顾**，不涉及报名资格/名额，也就没有 R-313 可见性矩阵的适用面\n（会员专属的**往期**内容对退会家长同样可见——它不产生任何权益）。返回里**不含任何孩子信息**，\n只有活动本身的标题/封面/时间与参与人数聚合。",
+        "operationId": "activities_past_api_miniapp_activities_past_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activities Past",
+        "tags": [
+          "activity-miniapp"
+        ]
+      }
+    },
     "/api/miniapp/activities/{activity_id}": {
       "get": {
         "operationId": "activity_detail_api_miniapp_activities__activity_id__get",
@@ -9838,6 +10096,83 @@
           }
         },
         "summary": "Activity Cover",
+        "tags": [
+          "activity-miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/activities/{activity_id}/detail-image": {
+      "get": {
+        "description": "活动图文配图（2026-09-20）：**只接受 basename**，服务端自行拼 `activity_detail/` 前缀。\n\n为什么不接受完整相对路径：路径参数化是路径穿越最常见的入口；这里让客户端只能给文件名，\n目录由服务端写死，配合\"文件名前缀 = 活动 id\"的归属校验，越权与穿越同时封死。",
+        "operationId": "activity_detail_image_api_miniapp_activities__activity_id__detail_image_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "activity_id",
+            "required": true,
+            "schema": {
+              "title": "Activity Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "name",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activity Detail Image",
         "tags": [
           "activity-miniapp"
         ]

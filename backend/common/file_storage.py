@@ -49,6 +49,8 @@ class ImagePolicy:
 _POLICY_KEYS = {
     "cover": ("image_cover_max_edge", 1080),
     "activity_cover": ("image_activity_cover_max_edge", 1200),
+    # 活动图文详情/往期回顾的配图：与活动封面同档（横竖混合、手机端满宽展示）
+    "activity_detail": ("image_activity_cover_max_edge", 1200),
     "doc": ("image_doc_max_edge", 1600),  # 收款凭证 / 观察报告：文档类，要看清小字
 }
 
@@ -226,6 +228,52 @@ def save_activity_cover_jpg(activity_id: int, data: bytes, ext: str, policy: Ima
             )
         )
     return rel.replace(os.sep, "/")
+
+
+def save_activity_detail_image(activity_id: int, data: bytes, ext: str, policy: ImagePolicy) -> str:
+    """活动图文详情配图存储（2026-09-20 B 批）：规范化 JPEG；路径 activity_detail/{id}_{token}.jpg。
+
+    独立目录而非塞进 `cover/`：`cover/` 是清理脚本的**可再生目录**白名单，图集是运营上传的
+    不可再生内容，混进去迟早被当孤儿删（`cleanup_uploads.py` 的教训 E-20260915-27 同族）。
+    """
+    _check_ext(ext, "配图")
+    rel = os.path.join("activity_detail", f"{activity_id}_{secrets.token_hex(6)}.jpg")
+    abs_path = os.path.join(_uploads_root(), rel)
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+    with open(abs_path, "wb") as f:
+        f.write(
+            normalize_image(
+                data,
+                max_edge=policy.max_edge,
+                quality=policy.quality,
+                max_input_bytes=policy.max_input_bytes,
+                max_output_bytes=policy.max_output_bytes,
+            )
+        )
+    return rel.replace(os.sep, "/")
+
+
+def remove_activity_detail_images(rels: list[str]) -> int:
+    """删除被移出图文的配图（编排层传入"新块集合里不再出现"的路径）。
+
+    只删 `activity_detail/` 下的文件且路径必须落在 uploads 内（防路径穿越，同 delete_voice_files 口径）。
+    返回值 = 实际删除数。删除失败不抛（孤儿留给清理脚本兜底，不能因为删文件失败让编辑失败）。
+    """
+    root = os.path.abspath(_uploads_root())
+    deleted = 0
+    for rel in rels:
+        full = os.path.abspath(os.path.join(root, rel or ""))
+        if not full.startswith(root + os.sep):
+            continue
+        if not rel.replace(os.sep, "/").startswith("activity_detail/"):
+            continue
+        try:
+            if os.path.isfile(full):
+                os.remove(full)
+                deleted += 1
+        except OSError:  # pragma: no cover - 删不掉不算错误
+            continue
+    return deleted
 
 
 def save_voucher_jpg(order_no: str, data: bytes, ext: str, policy: ImagePolicy) -> str:

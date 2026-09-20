@@ -106,6 +106,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/activities/{activity_id}/detail-blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Activity Detail Blocks
+         * @description 图文详情编辑（FEAT-057 增补，2026-09-20 客户需求）。
+         *
+         *     与 `PUT /activities/{id}` 分开成独立端点，因为守卫不同：图文是**纯展示字段**，
+         *     活动开始后/结束后仍可编辑（活动前写招募图文、活动后补往期回顾）；而时间/名额/费用
+         *     继续受"仅 PUBLISHED 且未开始"约束（**不在这里放宽**）。
+         */
+        put: operations["update_activity_detail_blocks_api_admin_activities__activity_id__detail_blocks_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/activities/{activity_id}/detail-images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Activity Detail Image
+         * @description 图文配图上传（活动配图口径：长边 ≤ image_activity_cover_max_edge，转 JPEG）。
+         */
+        post: operations["upload_activity_detail_image_api_admin_activities__activity_id__detail_images_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/activities/{activity_id}/enrollments": {
         parameters: {
             query?: never;
@@ -1900,6 +1944,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/miniapp/activities/past": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Activities Past
+         * @description 往期活动回顾（2026-09-20 C 批）——**按时间已过取数**（见 service.list_past 的口径说明）。
+         *
+         *     不需要 child_id：往期是**只读回顾**，不涉及报名资格/名额，也就没有 R-313 可见性矩阵的适用面
+         *     （会员专属的**往期**内容对退会家长同样可见——它不产生任何权益）。返回里**不含任何孩子信息**，
+         *     只有活动本身的标题/封面/时间与参与人数聚合。
+         */
+        get: operations["activities_past_api_miniapp_activities_past_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/miniapp/activities/{activity_id}": {
         parameters: {
             query?: never;
@@ -1929,6 +1997,29 @@ export interface paths {
          * @description T45：活动封面（query token 双通道——照书目 covers 先例；封面公开给家长端）。
          */
         get: operations["activity_cover_api_miniapp_activities__activity_id__cover_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/activities/{activity_id}/detail-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Activity Detail Image
+         * @description 活动图文配图（2026-09-20）：**只接受 basename**，服务端自行拼 `activity_detail/` 前缀。
+         *
+         *     为什么不接受完整相对路径：路径参数化是路径穿越最常见的入口；这里让客户端只能给文件名，
+         *     目录由服务端写死，配合"文件名前缀 = 活动 id"的归属校验，越权与穿越同时封死。
+         */
+        get: operations["activity_detail_image_api_miniapp_activities__activity_id__detail_image_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3130,6 +3221,14 @@ export interface components {
             title: string;
         };
         /**
+         * ActivityDetailBlocksRequest
+         * @description 图文详情全量覆盖写（顺序即展示顺序）。
+         */
+        ActivityDetailBlocksRequest: {
+            /** Blocks */
+            blocks?: components["schemas"]["DetailBlock"][];
+        };
+        /**
          * ActivityUpdateRequest
          * @description T45（FEAT-082·Q8 批复）：编辑白名单 9 字段——activity_type 禁改
          *     （BaseSchema extra=forbid：传入即 422 显式拒绝）。
@@ -3247,6 +3346,11 @@ export interface components {
         };
         /** Body_upload_activity_cover_api_admin_activities__activity_id__cover_post */
         Body_upload_activity_cover_api_admin_activities__activity_id__cover_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_upload_activity_detail_image_api_admin_activities__activity_id__detail_images_post */
+        Body_upload_activity_detail_image_api_admin_activities__activity_id__detail_images_post: {
             /** File */
             file: string;
         };
@@ -3896,6 +4000,32 @@ export interface components {
             supplemented_total: string;
             /** Unpaid Balance */
             unpaid_balance: string;
+        };
+        /**
+         * DetailBlock
+         * @description 一个图文块：`paragraph` 用 text；`image` 用 path（相对 uploads）+ 可选 caption。
+         */
+        DetailBlock: {
+            /**
+             * Caption
+             * @description 图注（可选）
+             */
+            caption?: string | null;
+            /**
+             * Path
+             * @description 图片相对路径（image 块必填）
+             */
+            path?: string | null;
+            /**
+             * Text
+             * @description 段落正文
+             */
+            text?: string | null;
+            /**
+             * Type
+             * @description paragraph / image
+             */
+            type: string;
         };
         /** EnrollRequest */
         EnrollRequest: {
@@ -4854,6 +4984,76 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_activity_detail_blocks_api_admin_activities__activity_id__detail_blocks_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                activity_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivityDetailBlocksRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_activity_detail_image_api_admin_activities__activity_id__detail_images_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                activity_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_activity_detail_image_api_admin_activities__activity_id__detail_images_post"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -8284,6 +8484,40 @@ export interface operations {
             };
         };
     };
+    activities_past_api_miniapp_activities_past_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     activity_detail_api_miniapp_activities__activity_id__get: {
         parameters: {
             query: {
@@ -8322,6 +8556,42 @@ export interface operations {
     activity_cover_api_miniapp_activities__activity_id__cover_get: {
         parameters: {
             query?: {
+                token?: string;
+            };
+            header?: {
+                Authorization?: string | null;
+            };
+            path: {
+                activity_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activity_detail_image_api_miniapp_activities__activity_id__detail_image_get: {
+        parameters: {
+            query?: {
+                name?: string;
                 token?: string;
             };
             header?: {

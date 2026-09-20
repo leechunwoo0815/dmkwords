@@ -35,6 +35,9 @@ class Activity(BaseModel):
     member_only = Column(SmallInteger, nullable=False, default=0, comment="1=仅会员")
     enroll_deadline = Column(DateTime, nullable=True, comment="报名截止")
     status = Column(String(20), nullable=False, default=STATUS_PUBLISHED, index=True)
+    # 图文详情块（2026-09-20 客户需求「像公众号一样」）：JSON 数组，块类型仅 paragraph / image。
+    # 存 JSON 文本而非建子表：块是**整体读写的展示快照**，没有独立查询/排序需求（同 card_data 先例）。
+    detail_blocks = Column(Text, nullable=True, comment="图文详情块（JSON 数组）")
 
 
 class ActivityEnrollment(BaseModel):

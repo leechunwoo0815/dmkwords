@@ -14,6 +14,8 @@ Page({
     tab: 'upcoming',
     activities: [],
     myEnrollments: [],
+    // 往期活动回顾（2026-09-20 C 批）：按"开始已过 1 天"取数，覆盖过期但未结束的黑洞活动
+    pastActivities: [],
     loading: true,
     loadError: false,
   },
@@ -31,9 +33,10 @@ Page({
   async load() {
     this.setData({ loading: true, loadError: false })
     try {
-      const [acts, mine] = await Promise.all([
+      const [acts, mine, past] = await Promise.all([
         api.listActivities(this._childId),
         api.myEnrollments(this._childId),
+        api.activitiesPast(30),
       ])
       // R2（插修 16）：卡片封面拼 token（书封面正解同款）；时间去掉秒级精度
       const fmt = (t) => (t ? String(t).replace('T', ' ').slice(0, 16) : '')
@@ -55,7 +58,16 @@ Page({
         checkedInAtText: m.status === 'checked_in' && m.checked_in_at
           ? `已于 ${String(m.checked_in_at).replace('T', ' ').slice(11, 16)} 签到` : '',
       }))
-      this.setData({ activities, myEnrollments })
+      const pastActivities = (past && past.items ? past.items : []).map((a) => ({
+        ...a,
+        cover_url: a.cover_url ? media.fullUrl(a.cover_url, true) : '',
+        start_at: fmt(a.start_at),
+        // 参与人数：优先"实际到过"（已签到），没有签到记录就退回"报名数"
+        peopleText: a.checked_in_total > 0
+          ? `${a.checked_in_total} 位小朋友参加过`
+          : (a.enrolled_total > 0 ? `${a.enrolled_total} 位小朋友报名` : '暂无报名记录'),
+      }))
+      this.setData({ activities, myEnrollments, pastActivities })
     } catch (e) {
       // F-M12/T26：fetch 失败进错误态（点击重试），不再静默空列表
       this.setData({ loadError: true })

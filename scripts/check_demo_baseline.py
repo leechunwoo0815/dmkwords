@@ -30,13 +30,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# 干净基线（`docs/19` §一 第 4 步）：双 seed 定义态的实测值 = 书目 35 / 家长 3 / 孩子 11 / 活动 2。
+# 干净基线（`docs/19` §一 第 4 步）：双 seed 定义态的实测值 = 书目 35 / 家长 3 / 孩子 11 / 活动 4。
+# 2026-09-20 C 批起活动数为 **4**：2 场「可报名」（含演示孩已报名的两场）+ 2 场「往期回顾」演示
+# （`_ensure_past_activities` 造的两场 finished 活动，用于小程序第三个 tab 与只读回顾形态）。
 # 口径变更（种子新增演示数据）时必须**重新实测并同步 docs/19**，别在别处手抄这套数字。
 CLEAN_BASELINE = {
     "books": 35,
     "parents": 3,
     "children": 11,
-    "activities": 2,
+    "activities": 4,
 }
 
 CLEANUP_TEST = "tests/unit/test_p0_t8_rate_limit.py"
@@ -107,7 +109,7 @@ def main() -> int:
 
     drifted = {k: (actual.get(k), v) for k, v in CLEAN_BASELINE.items() if actual.get(k) != v}
     if not drifted:
-        print("\n现场基线 PASS：书目 35 / 家长 3 / 孩子 11 / 活动 2（与 docs/19 一致）")
+        print("\n现场基线 PASS：书目 35 / 家长 3 / 孩子 11 / 活动 4（与 docs/19 一致）")
         return 0
 
     print("\n现场基线 FAIL：", file=sys.stderr)

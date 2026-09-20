@@ -54,6 +54,8 @@ PROTECTED_PREFIXES = (
     "voucher/",
     "observation/",
     "voice/",
+    # 活动图文详情配图（2026-09-20 B 批）：运营上传的**不可再生**内容，绝不自动清理
+    "activity_detail/",
 )
 
 #: 证据目录**后缀**保护。2026-09-20（fix44 R3）实修：原先把 `"-samples/"` 写进
@@ -76,6 +78,17 @@ def collect_referenced(root: str) -> tuple[set[str], list[str]]:
         for (cover,) in db.query(Activity.cover_path).all():
             if cover:
                 rels.add(str(cover))
+        # 活动图文详情配图（2026-09-20）：JSON 里的 image 块路径必须进引用集，
+        # 否则"DB 里有、引用集里没有"的图会被当成孤儿（E-20260915-27 同族形状）
+        for (blocks,) in db.query(Activity.detail_blocks).all():
+            if not blocks:
+                continue
+            try:
+                for b in json.loads(blocks):
+                    if isinstance(b, dict) and b.get("type") == "image" and b.get("path"):
+                        rels.add(str(b["path"]))
+            except (TypeError, ValueError):
+                continue
         for (voucher,) in db.query(Order.voucher_path).all():
             if voucher:
                 rels.add(str(voucher))

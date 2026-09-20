@@ -8,7 +8,9 @@
     <image wx:if="{{activity.cover_url}}" src="{{activity.cover_url}}" mode="aspectFill" class="hero-img" />
     <view class="hero-mask"></view>
     <view class="hero-content">
-      <view class="hero-title">{{activity.title}}</view>
+      <view class="hero-title">
+        <text wx:if="{{activity.is_past}}" class="hero-past">往期活动</text>{{activity.title}}
+      </view>
       <view class="hero-sub">{{activity.start_at}} · {{activity.location}}</view>
     </view>
   </view>
@@ -39,7 +41,7 @@
           <text class="price-label">费用</text>
           <text class="price-value">{{activity.fee_display}}</text>
         </view>
-        <view class="capacity-wrap">
+        <view class="capacity-wrap" wx:if="{{!activity.is_past}}">
           <view class="capacity-header">
             <text>名额</text>
             <text>{{activity.quota_used}} / {{activity.max_quota}}</text>
@@ -63,8 +65,30 @@
     </view>
   </view>
 
+  <!-- 图文详情（2026-09-20 客户需求「像公众号一样，吸引人参加」）：
+       结构化图块只做「段落 / 图片」两种（用户拍板），运营在管理端增删排序，这里按顺序渲染。 -->
+  <view class="section" wx:if="{{detailBlocks.length}}">
+    <view class="section-title sec-head">活动详情</view>
+    <view class="section-body">
+      <view class="detail-card">
+        <block wx:for="{{detailBlocks}}" wx:key="index">
+          <view wx:if="{{item.type === 'paragraph'}}" class="detail-p">{{item.text}}</view>
+          <block wx:else>
+            <image class="detail-img" src="{{item.image_url}}" mode="widthFix"
+              data-src="{{item.image_url}}" bindtap="onPreviewImage" />
+            <view wx:if="{{item.caption}}" class="detail-cap">{{item.caption}}</view>
+          </block>
+        </block>
+      </view>
+    </view>
+  </view>
+
   <view class="action-bar">
-    <block wx:if="{{!activity.my_enrollment}}">
+    <!-- 往期活动（2026-09-20 C 批）：只读回顾，不提供报名入口（后端 enroll 也会拦已开始的活动） -->
+    <block wx:if="{{activity.is_past && !activity.my_enrollment}}">
+      <button class="btn-primary" disabled>往期活动 · 仅供回顾</button>
+    </block>
+    <block wx:elif="{{!activity.my_enrollment}}">
       <button class="btn-primary" bindtap="onEnroll" disabled="{{enrolling}}">
         {{enrolling ? '报名中…' : activity.full ? '已满（到店咨询）' : '立即报名'}}
       </button>

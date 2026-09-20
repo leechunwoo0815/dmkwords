@@ -89,6 +89,13 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
   判定）；`GET /api/miniapp/quiz/status-batch`（书架角标批量，IN 查询禁 N+1）；
   `GET /api/miniapp/activities/carousel`（首页轮播，有封面优先）；
   admin 活动 CRUD 扩展（detail/update/cover 上传——activity_type 禁改、名额下限 422）。
+- **2026-09-20 增补（活动图文详情 + 往期回顾）**：
+  `PUT /api/admin/activities/{id}/detail-blocks`（图文全量覆盖写；**活动开始后/结束后仍可编辑**——纯展示字段，
+  与 `PUT /activities/{id}` 的守卫刻意分开）·
+  `POST /api/admin/activities/{id}/detail-images`（配图上传，口径 `activity_detail` = 长边 ≤1200 JPEG）·
+  `GET /api/miniapp/activities/past`（往期活动回顾，**按"开始已过 24h"取数**，见 `service.PAST_AFTER_HOURS`）·
+  `GET /api/miniapp/activities/{id}/detail-image?name=`（配图出图，**只接受 basename**，目录服务端写死 +
+  文件名前缀必须等于活动 id → 路径穿越与越权同时封死）。
 - **2026-09-12 增补端点族（WM15-A/B + fix33，路径与参数均为代码实取）**：
   `GET /api/miniapp/circle/posts`（`child_id` 必传 → `liked_by_me` 随当前孩子；`likers[].level`；
   帖 1 的 `likers` 含**合成的馆长条目** `{child_id:0, level:"GM", is_admin:true}`）；

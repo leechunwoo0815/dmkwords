@@ -175,6 +175,31 @@
   flex: 1;
 }
 
+/* ---------- 图文详情 ---------- */
+.detail-card {
+  padding: 8rpx 0;
+}
+.detail-p {
+  font-size: 28rpx;
+  line-height: 1.8;
+  color: var(--fg);
+  margin: 0 0 24rpx;
+  white-space: pre-wrap;
+}
+.detail-img {
+  width: 100%;
+  border: 3rpx solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 12rpx;
+  background: var(--surface);
+}
+.detail-cap {
+  font-size: 24rpx;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 28rpx;
+}
+
 /* ---------- 报名状态条（2026-09-20：出码能力已迁往 pages/activity-pkg/ticket）---------- */
 .enroll-strip {
   display: flex;
@@ -240,3 +265,15 @@
   width: 100%;
 }
 
+
+/* 往期标识（2026-09-20 C 批）：贴在标题前的小胶囊 */
+.hero-past {
+  display: inline-block;
+  margin-right: 12rpx;
+  padding: 4rpx 14rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--fg);
+  background: var(--warning-soft-strong);
+  border-radius: 999rpx;
+}

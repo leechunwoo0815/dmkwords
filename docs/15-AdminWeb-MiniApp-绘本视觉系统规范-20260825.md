@@ -825,6 +825,7 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 | 周报/月报 750×1100 | 全屏长图 + 存相册 | JPEG q85 | **781KB → 92KB** |
 | 图书封面 | 列表 340rpx / 详情 220rpx | 长边 ≤1080 JPEG | 600×900 → 32KB |
 | 活动封面（横版） | banner | 长边 ≤1200 JPEG | 900×320 → 18KB |
+| **活动图文配图** | 详情页图文（2026-09-20 新增） | 长边 ≤1200 JPEG | 实测 1200×800 自绘插画 → 38KB |
 | 收款凭证 / 观察报告 | **要放大看清小字** | 长边 ≤1600 JPEG | 1080 宽 → 55KB |
 
 配置键：`image_upload_max_mb` / `image_upload_max_output_kb` / `image_jpeg_quality` /

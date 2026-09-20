@@ -2,6 +2,7 @@
   <view class="tabs">
     <view class="tab {{tab === 'upcoming' ? 'active' : ''}}" data-tab="upcoming" bindtap="onTab">可报名</view>
     <view class="tab {{tab === 'mine' ? 'active' : ''}}" data-tab="mine" bindtap="onTab">我的报名</view>
+    <view class="tab {{tab === 'past' ? 'active' : ''}}" data-tab="past" bindtap="onTab">往期回顾</view>
   </view>
 
   <loading-skeleton wx:if="{{loading && !loadError}}" type="rows" rows="{{3}}" />
@@ -55,6 +56,28 @@
             <button wx:if="{{item.canShowTicket}}" class="mine-btn mine-btn-primary"
               data-id="{{item.id}}" bindtap="goTicket">出示签到码</button>
             <button class="mine-btn" data-id="{{item.activity_id}}" bindtap="goMineDetail">查看活动</button>
+          </view>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <!-- 往期活动回顾（2026-09-20 C 批）：只读内容——用当时的照片与图文回顾，吸引新家长报名 -->
+  <block wx:if="{{!loading && !loadError && tab === 'past'}}">
+    <empty-state wx:if="{{!pastActivities.length}}" icon-name="calendar" title="还没有往期活动"
+      desc="办过的活动会在这里留下照片和回顾" />
+    <view class="activity-list">
+      <view wx:for="{{pastActivities}}" wx:key="id" class="activity-card"
+        data-id="{{item.id}}" bindtap="goDetail">
+        <view class="activity-banner banner-{{index % 3}}">
+          <image wx:if="{{item.cover_url}}" src="{{item.cover_url}}" mode="aspectFill" class="activity-banner-img" />
+          <text class="activity-banner-text past-badge">往期回顾</text>
+        </view>
+        <view class="activity-body">
+          <view class="activity-title">{{item.title}}</view>
+          <view class="activity-meta">
+            <view class="meta-item"><image class="meta-icon" src="/icons/ui/clock.png" mode="aspectFit" />{{item.start_at}}</view>
+            <view class="meta-item"><image class="meta-icon" src="/icons/ui/child.png" mode="aspectFit" />{{item.peopleText}}</view>
           </view>
         </view>
       </view>

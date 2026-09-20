@@ -55,6 +55,7 @@ export interface ActivityDetail extends ActivityItem {
   quota_left: number;
   full: boolean;
   created_at?: string;
+  detail_blocks?: DetailBlock[]; // 图文详情（编辑器可写形态：image 块只有相对路径）
 }
 
 export function apiListActivities(params?: {
@@ -138,4 +139,50 @@ export function activityCoverUrl(id: number): string {
   // TOKEN_KEY 同源 getToken）；cover-media 双通道已支持
   const token = getToken();
   return `/api/admin/activities/${id}/cover-media${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+}
+
+// ---------- 图文详情（2026-09-20 客户需求「像公众号一样」）----------
+
+export interface DetailBlock {
+  type: "paragraph" | "image";
+  text?: string | null;
+  path?: string | null;
+  caption?: string | null;
+}
+
+export interface DetailBlockView {
+  type: "paragraph" | "image";
+  text?: string;
+  image_url?: string;
+  caption?: string;
+}
+
+/** 图文详情全量覆盖写（顺序即展示顺序）。独立端点：活动开始后仍可编辑（纯展示字段）。 */
+export function apiSaveDetailBlocks(
+  id: number,
+  blocks: DetailBlock[],
+): Promise<{ id: number; blocks: DetailBlockView[] }> {
+  return request(`/api/admin/activities/${id}/detail-blocks`, {
+    method: "PUT",
+    body: JSON.stringify({ blocks }),
+  });
+}
+
+/** 上传一张图文配图，返回相对路径（把它塞进 image 块）。 */
+export function apiUploadDetailImage(id: number, file: File): Promise<{ path: string; url: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  return request(`/api/admin/activities/${id}/detail-images`, { method: "POST", body: fd });
+}
+
+/** 管理端预览配图（<img> 不带 Authorization → query token，与封面同款双通道）。 */
+export function activityDetailImageUrl(id: number, name: string): string {
+  const token = getToken();
+  const base = `/api/miniapp/activities/${id}/detail-image?name=${encodeURIComponent(name)}`;
+  return token ? `${base}&token=${encodeURIComponent(token)}` : base;
+}
+
+/** 从相对路径取文件名（端点只接受 basename）。 */
+export function detailImageName(path: string): string {
+  return path.split("/").pop() || path;
 }

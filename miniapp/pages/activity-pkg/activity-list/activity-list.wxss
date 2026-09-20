@@ -175,3 +175,13 @@
   border-color: var(--fg);
   box-shadow: var(--shadow-hard-sm);
 }
+
+/* 往期回顾角标（2026-09-20 C 批）：压在封面右下，与"费用"角标同位不同色 */
+.past-badge {
+  background: var(--muted);
+  color: var(--surface);
+  border-radius: 999rpx;
+  padding: 4rpx 16rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+}
