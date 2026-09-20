@@ -11,6 +11,16 @@ from fastapi.testclient import TestClient
 from tests.unit.test_wm10_concurrency import _h
 
 
+def _future_iso(*, days: int = 0, minutes: int = 0, zulu: bool = False) -> str:
+    """相对未来时间（2026-09-20 fix44）：原先写死 "2026-09-20T15:00:00.000Z"，到点即失效
+    （该日 15:19 门禁实测 4 连红 "开始时间必须在未来"）。相对未来 → 语义不变且不会过期。
+    zulu=True 出带 Z 的 aware 字符串（本文件专测时区剥除）。"""
+    from datetime import datetime, timedelta
+
+    t = datetime.now() + timedelta(days=days, minutes=minutes)
+    return t.strftime("%Y-%m-%dT%H:%M:%S.000Z" if zulu else "%Y-%m-%dT%H:%M:%S")
+
+
 def test_activity_create_with_aware_datetime(client: TestClient):
     """修复前：带 Z 的 aware 时间创建活动 → 500 TypeError（RED）。"""
     h = _h(client)
@@ -19,7 +29,7 @@ def test_activity_create_with_aware_datetime(client: TestClient):
         json={
             "title": "时区活动",
             "activity_type": "book_club",
-            "start_at": "2026-09-20T15:00:00.000Z",
+            "start_at": _future_iso(zulu=True, minutes=15),
             "location": "馆内一层",
             "max_quota": 2,
             "fee": "50",
@@ -33,8 +43,8 @@ def test_activity_create_with_aware_datetime(client: TestClient):
         json={
             "title": "时区活动2",
             "activity_type": "book_club",
-            "start_at": "2026-09-25T15:00:00.000Z",
-            "enroll_deadline": "2026-09-24T15:00:00.000Z",
+            "start_at": _future_iso(zulu=True, days=7),
+            "enroll_deadline": _future_iso(zulu=True, days=6),
             "max_quota": 2,
             "fee": "0",
         },
@@ -51,7 +61,7 @@ def test_activity_create_naive_datetime_regression(client: TestClient):
         json={
             "title": "naive活动",
             "activity_type": "book_club",
-            "start_at": "2026-09-26T15:00:00",
+            "start_at": _future_iso(days=8),
             "max_quota": 2,
             "fee": "0",
         },

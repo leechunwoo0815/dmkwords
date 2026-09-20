@@ -50,12 +50,18 @@ REGENERABLE_PREFIXES = ("cover/", "book_audio/", "circle/", "reports/")
 # 保护名单（即使不在引用集里也绝不删）
 PROTECTED_PREFIXES = (
     "miniapp-audit",
-    "-samples/",
     "posters/",
     "voucher/",
     "observation/",
     "voice/",
 )
+
+#: 证据目录**后缀**保护。2026-09-20（fix44 R3）实修：原先把 `"-samples/"` 写进
+#: PROTECTED_PREFIXES，但 `is_protected` 用的是 `rel.startswith(p)`——真实目录名是
+#: `wm15-samples/…`，rel 以 `wm15` 开头 → **永远匹配不到**，这条保护名存实亡
+#: （当时没出事，只是因为它同时也不在 REGENERABLE_PREFIXES 白名单里）。
+#: 后缀匹配对**路径首段**生效：`wm15-samples/` ✓、`fix34-samples/` ✓、`-samples/` ✓。
+PROTECTED_SUFFIX_DIRS = ("-samples",)
 
 
 def collect_referenced(root: str) -> tuple[set[str], list[str]]:
@@ -93,7 +99,10 @@ def collect_referenced(root: str) -> tuple[set[str], list[str]]:
 
 
 def is_protected(rel: str) -> bool:
-    return any(rel.startswith(p) for p in PROTECTED_PREFIXES)
+    if any(rel.startswith(p) for p in PROTECTED_PREFIXES):
+        return True
+    head = rel.split("/", 1)[0]
+    return any(head.endswith(s) for s in PROTECTED_SUFFIX_DIRS)
 
 
 def main() -> int:

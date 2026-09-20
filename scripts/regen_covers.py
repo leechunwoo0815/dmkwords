@@ -6,7 +6,14 @@
 落到前端 📕 emoji 兜底）。本脚本**写入新文件名并删除旧文件**：①不留孤儿 ②文件名 token 变化 → 小程序
 `<image>` 按 URL 缓存的一层才能真正刷新（原地覆盖 URL 不变，用户永远看旧图，2026-09-15 实测）。
 
-用法：.venv/bin/python scripts/regen_covers.py [--dry-run]
+用法：
+  .venv/bin/python scripts/regen_covers.py            # 默认 dry-run：只打印将重刷的清单，不动任何文件
+  .venv/bin/python scripts/regen_covers.py --apply    # 真正执行（写新文件 + 删旧封面 + 提交）
+
+[Why 默认 dry-run] 2026-09-20（fix44 R4）：本脚本原先安全阀是 **opt-in 的 `--dry-run`**
+（`action="store_true"` → 默认就是"写盘 + 删旧封面 + commit"），与全项目清理脚本纪律
+（红线：清理/重写类脚本默认 dry-run + 正向 apply 开关）相反；`scripts/check_media_discipline.py`
+M3c 现已机化拦截该形状，本脚本按纪律改为 `--apply` 正向开关。
 """
 
 from __future__ import annotations
@@ -56,7 +63,7 @@ def _new_rel(prefix: str, isbn: str | None, code: str | None, bid: int) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--apply", action="store_true", help="真正写盘（默认只打印计划，不动文件）")
     args = ap.parse_args()
 
     db = SessionLocal()
@@ -67,7 +74,7 @@ def main() -> int:
             topic = b.topic if b.topic in TOPICS else TOPICS[b.id % len(TOPICS)]
             data = gen_cover(b.title, b.author or "", b.id, topic)
             rel = _new_rel("cover", b.isbn, b.book_code, b.id)
-            if not args.dry_run:
+            if args.apply:
                 _write(rel, data)
                 _drop_old(b.cover_path)  # 不留孤儿
                 b.cover_path = rel
@@ -78,18 +85,19 @@ def main() -> int:
             # 活动用**横版专用图**（900x320，无字）：竖版裁进横条会被切顶（用户实测）
             data = gen_activity_banner(i)
             rel = _new_rel("cover/activity", None, None, a.id)
-            if not args.dry_run:
+            if args.apply:
                 _write(rel, data)
                 _drop_old(a.cover_path)
                 a.cover_path = rel
             rewritten += 1 if a.cover_path else 0
             added += 0 if a.cover_path else 1
-        if not args.dry_run:
+        if args.apply:
             db.commit()
         print(
-            f"{'[dry-run] ' if args.dry_run else ''}封面重刷完成："
+            f"{'' if args.apply else '[dry-run] '}封面重刷完成："
             f"重写 {rewritten} 张（换新文件名→客户端缓存必失效），补缺失 {added} 张，"
             f"调色板 {len(PALETTES)} 套"
+            + ("" if args.apply else "；未做任何改动（加 --apply 才执行）")
         )
         return 0
     finally:

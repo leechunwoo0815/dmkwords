@@ -11,6 +11,15 @@ from fastapi.testclient import TestClient
 from tests.unit.test_wm10_concurrency import _family, _h
 
 
+def _future_iso(*, days: int = 0, minutes: int = 0, zulu: bool = False) -> str:
+    """相对未来时间（2026-09-20 fix44）：原先写死 "2026-09-20T15:00:00"，到点即失效
+    （该日 15:19 门禁实测 4 连红 "开始时间必须在未来"）。改为相对未来，语义不变且不会过期。"""
+    from datetime import datetime, timedelta
+
+    t = datetime.now() + timedelta(days=days, minutes=minutes)
+    return t.strftime("%Y-%m-%dT%H:%M:%S.000Z" if zulu else "%Y-%m-%dT%H:%M:%S")
+
+
 def _db():
     from backend.database import get_session
 
@@ -23,7 +32,7 @@ def _mk_act(client, h, title="活动单确认测试"):
         json={
             "title": title,
             "activity_type": "book_club",
-            "start_at": "2026-09-20T15:00:00",
+            "start_at": _future_iso(days=7),
             "max_quota": 5,
             "fee": "50",
         },
@@ -70,7 +79,7 @@ def test_admin_activity_order_free_confirm(client: TestClient):
         json={
             "title": "免费活动单",
             "activity_type": "book_club",
-            "start_at": "2026-09-20T15:00:00",
+            "start_at": _future_iso(days=7),
             "max_quota": 5,
             "fee": "0",
         },

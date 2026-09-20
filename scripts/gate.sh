@@ -64,6 +64,8 @@ if [ -f "scripts/check_model_consistency.py" ] && grep -q "dmkwords" scripts/che
 else
   skip "check_model_consistency 旧结构工具待 F0 重写"
 fi
+# 测试卫生两条：A 假绿断言（assert True/False 必须带注释）/ B 时间炸弹（测试里写死的近期未来绝对时间——
+# 2026-09-20 实测 4 连红「开始时间必须在未来」，测试自己到期了；改相对时间或 ≥2050 远期哨兵）
 run python -m scripts.check_fake_assertions
 # E-20260912-01 防复发：小程序数据面断链（wxml 读的顶层变量必须真的进过 data）
 run python scripts/check_miniapp_bindings.py
@@ -74,6 +76,10 @@ run python scripts/check_rbac_consistency.py
 # E-20260913：小程序风格基准（**R1–R13** 规则 + S1–S3 自证；含 R12 悬空类名 / R13 图标槽位 emoji 与资产存在性。
 # 2026-09-20 修正：旧注释写"R1–R7"是陈旧的，规则实际已到 R13（见 docs/08 TD-11/TD-12）。不能替代目视截图）
 run python scripts/check_miniapp_style.py
+# fix44 R4（Q8 机化）：媒体纪律三条——M1 落盘单出口（只有 file_storage / Canvas.finish / save_jpeg
+# 可写媒体文件）/ M2 破缓存单出口（`?v=` 只许出现在 file_utils.media_version）/ M3 清理脚本默认 dry-run。
+# 含 S1 注入自证（--self-test 可单跑）。
+run python scripts/check_media_discipline.py
 
 step 6 "数据库迁移一致性"
 # 首个迁移文件创建后启用：
@@ -94,6 +100,14 @@ fi
 step 8 "契约快照检查（T27：破坏性变更必须改代码+更新快照两步显形）"
 if [ -f "docs/api/openapi.json" ]; then
   run python scripts/export_openapi.py --check
+  # fix44 R2（Q10 治根）：T27 原先只管后端快照，**不管前端类型产物** src/api/schema.d.ts
+  # （docs/18 §五 曾写"漏 pnpm gen:api → gate[8] diff 红"，实际不红——职责空白已补）。
+  # 契约源统一为快照（不再直连 8002），逐字节比对，无服务也能进 CI。
+  if [ -f "admin-web/node_modules/.bin/openapi-typescript" ]; then
+    run bash -c "cd admin-web && pnpm gen:api --check"
+  else
+    skip "admin-web 未安装依赖（pnpm install 后本步启用）"
+  fi
 else
   skip "契约快照未导出（docs/api/openapi.json 不存在）"
 fi

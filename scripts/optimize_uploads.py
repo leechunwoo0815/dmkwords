@@ -46,11 +46,21 @@ from backend.domain.reading_circle.card_render import render_card  # noqa: E402
 DEFAULT_TRASH = "uploads/.trash-optimize"
 
 #: 上传图 → 策略场景（决定长边上限）。凭证与观察报告同为文档类。
+#: 2026-09-20（fix44 R3）：**活动封面必须与书封分开取口径**（activity_cover 1200 ≠ cover 1080）——
+#: 原先只有 `"cover/"` 一条前缀，`cover/activity/` 下的活动封面被按书封口径回压（降到 1080）。
+#: 两者同在前缀 `cover/` 下，只能靠 DB 引用集区分"哪些文件算数"，口径则必须显式按子目录分流。
 _UPLOAD_SCOPES = {
+    "cover/activity/": "activity_cover",
     "cover/": "cover",
     "voucher/": "doc",
     "observation/": "doc",
 }
+
+
+def scope_of(rel: str) -> str | None:
+    """按**最长前缀**取场景（不依赖字典顺序——顺序变了口径就会静默改错）。"""
+    hit = max((p for p in _UPLOAD_SCOPES if rel.startswith(p)), key=len, default=None)
+    return _UPLOAD_SCOPES[hit] if hit else None
 
 
 def _mb(n: int) -> str:
@@ -134,9 +144,9 @@ def backfill_uploads(
     try:
         targets: dict[str, str] = {}  # rel → scope
         for rel in sorted(referenced):
-            for prefix, scope in _UPLOAD_SCOPES.items():
-                if rel.startswith(prefix):
-                    targets[rel] = scope
+            scope = scope_of(rel)
+            if scope:
+                targets[rel] = scope
         for rel, scope in targets.items():
             full = os.path.join(root, rel)
             if not os.path.isfile(full):
