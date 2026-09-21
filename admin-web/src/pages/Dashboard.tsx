@@ -196,7 +196,7 @@ export default function Dashboard() {
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <TeamOutlined style={{ fontSize: 22, color: "var(--paint-ink)" }} />
                 <div>
-                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-display)" }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-mono)" }}>
                     {overview?.admin_count ?? "—"}
                   </div>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -211,7 +211,7 @@ export default function Dashboard() {
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <ClockCircleOutlined style={{ fontSize: 22, color: "var(--paint-ink)" }} />
                 <div>
-                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-display)" }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-mono)" }}>
                     {overview?.today_logins ?? "—"}
                   </div>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -226,7 +226,7 @@ export default function Dashboard() {
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <CheckCircleOutlined style={{ fontSize: 22, color: "var(--paint-secondary)" }} />
                 <div>
-                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-display)" }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-mono)" }}>
                     {overview?.config_count ?? "—"}
                   </div>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -293,7 +293,7 @@ export default function Dashboard() {
                   <BookOutlined style={{ color: "var(--paint-ink-light)" }} />
                 </div>
                 <div style={{ marginTop: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <Typography.Text style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-display)" }}>
+                  <Typography.Text style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-mono)" }}>
                     {cellValue(overview, cell.valueKey) ?? "—"}
                   </Typography.Text>
                   <Tag color="green" style={{ fontSize: 11 }}>{cell.unit}</Tag>

@@ -951,4 +951,4 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 
 > **待用户定（已登记，未擅自改）**：`Layout.tsx`（侧边栏品牌 DmkWords）与 `Login.tsx`（登录页标题）里的英文品牌字目前仍是 `--font-display`——
 > 那是**品牌标识**，换成等宽会失去手写绘本感，故保留原样；用户若觉得刺眼，改 `--font-mono` 即可。
-> 另外 `Dashboard.tsx` 的三个大数字（统计卡）也用着 `--font-display`，同样登记待定。
+> `Dashboard.tsx` 的统计大数字**已改等宽**（2026-09-21 用户第二轮答复：「侧边栏/登录页的 DmkWords 可以不动，但仪表盘上的数字确实过于丑陋了，也换一下吧」）——3 处 24px 数字实测 `ui-monospace`。
