@@ -10,6 +10,7 @@ import {
   apiCreateStaff, apiListStaff, apiResetStaffPassword, apiSetStaffStatus, apiUpdateStaff,
   type AdminUser,
 } from "../api/admin";
+import PageTitle from "../components/PageTitle";
 
 const ROLE_LABEL: Record<string, string> = { superadmin: "超级管理员", staff: "运营专员" };
 
@@ -80,10 +81,8 @@ export default function Staff() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <Typography.Title level={4} style={{ marginBottom: 0 }}>
-          员工管理
-        </Typography.Title>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <PageTitle>员工管理</PageTitle>
         <Space>
           <Button type="primary" onClick={() => setCreateOpen(true)}>新建员工</Button>
         </Space>

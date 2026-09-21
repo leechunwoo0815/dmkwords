@@ -17,6 +17,7 @@ import { apiListConfigs, apiUpdateConfig, type SystemConfig } from "../api/admin
 import { hasPermission, useAuth } from "../auth";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
+import PageTitle from "../components/PageTitle";
 
 const TYPE_LABEL: Record<string, string> = {
   int: "整数",
@@ -86,9 +87,7 @@ export default function SystemConfigPage() {
 
   return (
     <>
-      <Typography.Title level={4} style={{ fontFamily: "var(--font-display)" }}>
-        系统配置
-      </Typography.Title>
+      <PageTitle>系统配置</PageTitle>
       <Typography.Paragraph type="secondary">
         全部业务数值集中管理；修改立即生效并自动记录审计日志。
       </Typography.Paragraph>

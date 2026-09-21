@@ -1,0 +1,50 @@
+<!-- 会员码（借阅台扫码识别用）——2026-09-21 任务包 B 批：
+     孩子到店点首页「会员码」，把这页递给馆员，扫码枪扫二维码即完成身份识别。
+     码由后端生成（不可枚举 + 校验位），本页只展示；二维码 + 条形码 + 文本码三轨兜底。 -->
+<view class="page-bg">
+  <view class="section">
+    <view class="section-title sec-head">会员码</view>
+    <view class="section-body">
+      <view class="mc-owner">
+        <text class="mc-name">{{childName}}</text>
+        <text class="mc-tip">把这一页出示给馆员扫一下即可</text>
+      </view>
+
+      <block wx:if="{{code}}">
+        <!-- 二维码（主）：展示用 <image>（canvasToTempFilePath 产物），不是 canvas 本身 -->
+        <view class="qr-canvas-wrap">
+          <image wx:if="{{qrImage}}" class="qr-canvas" src="{{qrImage}}" mode="scaleToFill" />
+          <text wx:else class="qr-fallback">{{code}}</text>
+        </view>
+        <!-- 条形码（备）：纸质/摄像枪识别不稳时用 -->
+        <view class="bc-canvas-wrap" wx:if="{{bcImage}}">
+          <image class="bc-canvas" src="{{bcImage}}" mode="scaleToFill" />
+        </view>
+        <!-- 文本码（兜底）：扫码枪读不出来时馆员可手输 -->
+        <view class="mc-code" bindtap="copyCode">
+          <text class="mc-code-text">{{code}}</text>
+          <text class="mc-code-copy">{{copied ? '已复制' : '点击复制'}}</text>
+        </view>
+        <view class="qr-hint qr-bright-hint" wx:if="{{brightnessBoosted}}">已把屏幕调到最亮，离开本页自动恢复</view>
+        <view class="mc-hint">会员码只用于到店确认身份，不要发给别人</view>
+      </block>
+
+      <view wx:elif="{{noCode}}" class="mc-empty">
+        <text>这个孩子还没有会员码，请让馆员在后台重新保存一次档案</text>
+      </view>
+      <view wx:else class="mc-empty">
+        <text>正在读取会员码…</text>
+      </view>
+
+      <!-- 底部大按钮（2026-09-21 用户反馈）：真机上左上角返回键太小难按，
+           出示完码点这里直接回首页，不用去够那个小箭头。 -->
+      <button class="mc-close" bindtap="closePage">关闭会员码</button>
+    </view>
+  </view>
+
+  <!-- 出图画布：移出可视区，只作"渲染后端"（展示一律走上面的 <image>） -->
+  <view class="draw-canvas-wrap">
+    <canvas type="2d" id="mc-qr" class="draw-canvas-qr"></canvas>
+    <canvas type="2d" id="mc-bc" class="draw-canvas-bc"></canvas>
+  </view>
+</view>

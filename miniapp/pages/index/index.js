@@ -196,6 +196,13 @@ Page({
     if (!c) return
     wx.navigateTo({ url: `/pages/member-pkg/checkin/checkin?child_id=${c.id}&child_name=${encodeURIComponent(c.name)}` })
   },
+  // 会员码（2026-09-21 B 批）：到店出示给馆员扫码识别身份。码由后端下发（不可枚举，含校验位），
+  // 这里只带当前孩子跳转，码在目标页从 session 缓存读（不在这里算、也不拼 id）。
+  goMemberCode() {
+    const c = this.data.currentChild
+    if (!c) return
+    wx.navigateTo({ url: `/pages/member-pkg/member-code/member-code?child_id=${c.id}` })
+  },
   goAchievement() {
     const c = this.data.currentChild
     if (!c) return

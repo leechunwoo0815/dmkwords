@@ -28,6 +28,7 @@ import {
 } from "../api/deposits";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
+import PageTitle from "../components/PageTitle";
 
 const STATUS_LABEL: Record<string, string> = {
   unpaid: "未缴纳", paid: "已缴纳",
@@ -77,9 +78,7 @@ export default function DepositManage() {
 
   return (
     <>
-      <Typography.Title level={4} style={{ fontFamily: "var(--font-display)" }}>
-        押金与赔偿
-      </Typography.Title>
+      <PageTitle>押金与赔偿</PageTitle>
       <Typography.Paragraph type="secondary">
         押金按孩子独立（${money(cfgNum(configs, "deposit_amount", 1200))} 元/人）；遗失损坏按原价赔偿、优先扣本人押金；不足部分记「待结清」并持续提醒。
       </Typography.Paragraph>

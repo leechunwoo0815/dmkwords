@@ -1,0 +1,165 @@
+/* pages/member-pkg/member-code/member-code.wxss — 会员码页（2026-09-21 B 批）
+   与活动入场券页同一套画布/二维码尺寸口径（尺寸必须与 wxml 的 <image> 及出图画布同比例，
+   否则条形码会被拉伸发虚）。颜色全走 app.wxss 令牌（门禁 R1 禁裸色值）。 */
+.page-bg {
+  min-height: 100vh;
+  background: var(--bg);
+  box-sizing: border-box;
+  padding-bottom: calc(80rpx + env(safe-area-inset-bottom));
+}
+.sec-head {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--fg);
+}
+.section-body {
+  padding: 0 32rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ---------- 持码人 ---------- */
+.mc-owner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  margin-bottom: 24rpx;
+}
+.mc-name {
+  font-size: 40rpx;
+  font-weight: 800;
+  color: var(--fg);
+}
+.mc-tip {
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+/* ---------- 二维码 / 条形码 ---------- */
+.qr-canvas-wrap {
+  width: 440rpx;
+  height: 440rpx;
+  margin-bottom: 16rpx;
+  background: var(--surface);
+  border: 4rpx solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.qr-canvas {
+  width: 420rpx;
+  height: 420rpx;
+}
+.qr-fallback {
+  font-size: 30rpx;
+  color: var(--fg);
+  letter-spacing: 2rpx;
+  padding: 0 24rpx;
+  text-align: center;
+}
+/* 会员码 10 字符（M+8+校验）→ Code128 约 145 模块，比 16 字符券码窄得多，读取余量充足 */
+.bc-canvas-wrap {
+  width: 640rpx;
+  height: 140rpx;
+  margin-bottom: 16rpx;
+  background: var(--surface);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.bc-canvas {
+  width: 620rpx;
+  height: 120rpx;
+}
+
+/* ---------- 文本码 + 提示 ---------- */
+.mc-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 16rpx 28rpx;
+  background: var(--surface);
+  border: 3rpx dashed var(--border);
+  border-radius: var(--radius-sm);
+}
+.mc-code-text {
+  font-family: var(--font-mono);
+  font-size: 40rpx;
+  font-weight: 700;
+  letter-spacing: 6rpx;
+  color: var(--fg);
+}
+.mc-code-copy {
+  font-size: 22rpx;
+  color: var(--accent);
+  text-decoration: underline;
+}
+.qr-hint {
+  font-size: 22rpx;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 12rpx;
+  text-align: center;
+}
+.qr-bright-hint {
+  color: var(--success);
+  font-weight: 600;
+}
+.mc-hint {
+  margin-top: 16rpx;
+  font-size: 22rpx;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ---------- 空态 ---------- */
+.mc-empty {
+  margin-top: 80rpx;
+  padding: 40rpx 32rpx;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 3rpx solid var(--border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-size: 26rpx;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ---------- 出图画布（移出可视区） ---------- */
+.draw-canvas-wrap {
+  position: fixed;
+  left: -9999rpx;
+  top: 0;
+}
+.draw-canvas-qr {
+  width: 420rpx;
+  height: 420rpx;
+}
+.draw-canvas-bc {
+  width: 620rpx;
+  height: 120rpx;
+}
+
+/* 底部关闭按钮（2026-09-21 用户反馈）：胶囊形、主操作观感，够大好按 */
+.mc-close {
+  margin: 40rpx auto 0;
+  width: 520rpx;
+  height: 92rpx;
+  line-height: 92rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--surface);
+  background: var(--accent);
+  border: 4rpx solid var(--fg);
+  border-radius: 999rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+.mc-close::after { border: none; }

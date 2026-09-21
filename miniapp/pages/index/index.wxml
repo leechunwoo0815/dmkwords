@@ -9,6 +9,11 @@
           bindtap="goCheckin">{{todayChecked ? '今日已打卡 ✓' : '去打卡'}}</text>
       </view>
     </view>
+    <!-- 会员码（2026-09-21 B 批）：到店出示给馆员扫码识别身份。
+         2026-09-21 用户反馈后改为**圆形按钮**，与右侧「连续打卡」圆贴成对；颜色用亮黄，别再用灰暗底。 -->
+    <view class="hero-code" bindtap="goMemberCode">
+      <text class="hero-code-text">会员码</text>
+    </view>
     <view class="streak-sticker" bindtap="goCheckin">
       <text class="streak-num">{{currentStreak}}</text>
       <text class="streak-label">连续打卡</text>

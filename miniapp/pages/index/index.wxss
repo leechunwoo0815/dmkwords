@@ -39,6 +39,31 @@
 }
 .badge-done { background: var(--secondary); border-color: var(--fg); color: var(--surface); }
 .badge-todo { background: var(--sun); border-color: var(--fg); color: var(--fg); font-weight: 700; }
+/* 会员码圆形按钮（2026-09-21 B 批；同日按用户反馈改圆+提亮）：
+   与右侧「连续打卡」圆贴同款形制（同尺寸/同描边/同硬阴影），颜色用**太阳黄**——
+   原 --sky-soft 太灰暗，"都看不清"（用户原话）。 */
+.hero-code {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 128rpx;
+  height: 128rpx;
+  flex: none;
+  margin-left: auto;
+  margin-right: 20rpx;
+  border-radius: 50%;
+  background: var(--sun);
+  border: 4rpx solid var(--fg);
+  box-shadow: var(--shadow-hard-sm);
+}
+.hero-code-text {
+  font-family: var(--font-display);
+  font-size: 24rpx;
+  font-weight: 800;
+  color: var(--fg);
+  line-height: 1.15;
+  text-align: center;
+}
 .streak-sticker {
   display: flex;
   flex-direction: column;

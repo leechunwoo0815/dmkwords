@@ -200,7 +200,11 @@ export default function BookDetail() {
     <>
       <Space style={{ marginBottom: 12 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate("/books")}>返回</Button>
-        <Typography.Title level={4} style={{ margin: 0, fontFamily: "var(--font-display)" }}>
+        {/* 书名是**内容**不是页面名——不进标题框（2026-09-21 用户反馈一：「太大了，也很丑」；
+            反馈二：「字体可以用刚才那个，原来的字体看英文很难受，歪歪扭扭的」→ 书名改用等宽 --font-mono）。
+            等宽字 + 字距 3px 的标签框适合短页面名，长英文标题会被撑成一个大黑框）。
+            留白口径仍与全站一致：margin 0。 */}
+        <Typography.Title level={4} style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 20 }}>
           {book.title}
         </Typography.Title>
         {book.status === 1 ? <Tag color="green">上架</Tag> : <Tag>下架</Tag>}

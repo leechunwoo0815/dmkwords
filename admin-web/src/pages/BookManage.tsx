@@ -35,6 +35,7 @@ import {
 import { GRADE_OPTIONS } from "../constants/grade";
 import { AR_LEVEL_RULE } from "../constants/book";
 import { usePaintPagination } from "../hooks/usePaintPagination";
+import PageTitle from "../components/PageTitle";
 
 export default function BookManage() {
   const { message } = AntdApp.useApp();
@@ -182,10 +183,8 @@ export default function BookManage() {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <Typography.Title level={4} style={{ fontFamily: "var(--font-display)", marginBottom: 0 }}>
-          图书管理
-        </Typography.Title>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <PageTitle>图书管理</PageTitle>
         <Space>
           <Button onClick={() => { apiDownloadImportTemplate().catch((e) => message.error((e as Error).message)); }}>下载导入模板</Button>
           <Button onClick={() => setImportOpen(true)}>Excel 批量导入</Button>

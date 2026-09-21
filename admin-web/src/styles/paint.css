@@ -51,6 +51,9 @@
 
   --font-display: 'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-body: 'Nunito', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', system-ui, sans-serif;
+  /* 等宽栈（2026-09-21 用户反馈「原来的字体看英文很难受，歪歪扭扭的」）：
+     用于英文/编号类标题与需要科技感的短标签；中文标题仍走 --font-display。 */
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
 /* 全局纸质感 */
@@ -665,4 +668,86 @@ h1, h2, h3, h4, h5, h6,
   border: 2px dashed var(--paint-border);
   border-radius: var(--paint-radius);
   text-align: center;
+}
+
+/* ---------- 借阅操作台：两个扫码框配色区分（2026-09-21 用户反馈"界面眼晕"） ----------
+   ① 会员码 = 主色（橙）系  ② 图书 ISBN = 次色（绿）系
+   只用于"这是第几步、扫哪一类码"的空间区分，不改变任何交互语义。 */
+.scan-block {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border-left: 4px solid transparent;
+}
+.scan-block-member {
+  background: var(--paint-primary-soft, #ffede5);
+  border-left-color: var(--paint-primary, #ff6b35);
+}
+.scan-block-book {
+  background: var(--paint-secondary-soft, #e0fcea);
+  border-left-color: var(--paint-secondary, #4ade80);
+}
+.scan-step {
+  font-weight: 700;
+  font-size: 14px;
+}
+.scan-step-member { color: var(--paint-primary, #ff6b35); }
+.scan-step-book { color: #1f9d55; }
+
+/* ---------- 页面大标题（样稿，2026-09-21） ----------
+   默认 = 暖色绘本版：纸感底 + 深墨粗描边 + 硬阴影 + 主色橙左条；
+   字体用等宽（与正文/正文标题区分开，撑出"科技感"），颜色全部走站点令牌，
+   所以与周围的 Tabs、按钮、卡片是同一套语言。
+   `.page-title-chip--neon` 是第一版（深底霓虹绿），留着方便对比，不默认使用。 */
+.page-title-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 18px 6px 14px;
+  margin-bottom: 12px;
+  background: linear-gradient(180deg, var(--paint-paper, #fffdf7) 0%, var(--paint-paper-dim, #fff5e6) 100%);
+  border: 3px solid var(--paint-ink, #3b2f2f);
+  border-radius: 12px;
+  box-shadow: var(--shadow-hard-sm, 0 3px 0 rgba(59, 47, 47, 0.35));
+}
+.page-title-bar {
+  width: 6px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--paint-primary, #ff6b35);
+}
+.page-title-text.page-title-text {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: var(--paint-ink, #3b2f2f);
+  margin: 0;
+}
+.page-title-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--paint-yellow, #fcd34d);
+  border: 2px solid var(--paint-ink, #3b2f2f);
+}
+/* ---- 第一版：深底霓虹绿（用户反馈"不太搭"，保留供对比） ---- */
+.page-title-chip--neon {
+  background: linear-gradient(180deg, #241e1c 0%, #17120f 100%);
+  border-color: var(--paint-secondary, #4ade80);
+  box-shadow:
+    0 0 0 3px rgba(74, 222, 128, 0.12),
+    0 4px 0 rgba(59, 47, 47, 0.35);
+}
+.page-title-chip--neon .page-title-bar {
+  background: var(--paint-secondary, #4ade80);
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.8);
+}
+.page-title-chip--neon .page-title-text.page-title-text {
+  color: #d6ffe4;
+  text-shadow: 0 0 8px rgba(74, 222, 128, 0.55);
+}
+.page-title-chip--neon .page-title-dot {
+  background: var(--paint-secondary, #4ade80);
+  border: none;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.9);
 }

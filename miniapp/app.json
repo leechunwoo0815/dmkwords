@@ -33,7 +33,8 @@
         "profile-card/profile-card",
         "observation-report/observation-report",
         "report/report",
-        "purchase/purchase"
+        "purchase/purchase",
+        "member-code/member-code"
       ]
     },
     {

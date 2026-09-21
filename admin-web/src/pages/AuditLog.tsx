@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { App as AntdApp, Select, Space, Table, Tag, Typography } from "antd";
+import PageTitle from "../components/PageTitle";
+
 import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
 
@@ -91,9 +93,7 @@ export default function AuditLogPage() {
 
   return (
     <>
-      <Typography.Title level={4} style={{ fontFamily: "var(--font-display)" }}>
-        审计日志
-      </Typography.Title>
+      <PageTitle>审计日志</PageTitle>
       <Typography.Paragraph type="secondary">
         敏感操作（登录 / 配置变更 / 资金操作 / 人工放行）的留痕记录；只读不可篡改。
       </Typography.Paragraph>

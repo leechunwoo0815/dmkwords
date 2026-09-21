@@ -220,7 +220,7 @@ export function apiRunTask(taskName: string): Promise<{ task: string; status: st
   return request(`/api/admin/tasks/${taskName}/run`, { method: "POST" });
 }
 
-async function downloadExcel(path: string, filename: string): Promise<void> {
+export async function downloadExcel(path: string, filename: string): Promise<void> {
   const token = getToken();
   const res = await fetch(path, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
   if (!res.ok) throw new ApiError(res.status, ((await res.json().catch(() => ({}))) as { detail?: string }).detail ?? "导出失败");

@@ -865,6 +865,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/circulation/children/by-code/{member_code}/card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Child Card By Code
+         * @description 按**会员码**取孩子卡片（借阅台扫"会员码"框走这里，2026-09-21 A 批）。
+         *
+         *     声明在 `/{child_id}/card` **之前**——否则 "by-code" 会被当成 int 路径参数解析（同活动域
+         *     `activities/past` 的先例）。码不合法与查无此人是**两种**错误：前者 422 提示"码不合法"，
+         *     后者 404 提示"未找到该会员码对应的孩子"，让馆员分得清"扫错码"还是"这孩子没建档"。
+         */
+        get: operations["child_card_by_code_api_admin_circulation_children_by_code__member_code__card_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/circulation/children/{child_id}/card": {
         parameters: {
             query?: never;
@@ -891,6 +915,46 @@ export interface paths {
         };
         /** Overdue List */
         get: operations["overdue_list_api_admin_circulation_overdue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circulation/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Records
+         * @description 借还记录查询（2026-09-21 D 批）：借出与归还两条时间线、**含归还操作人**、分页 + 多条件。
+         */
+        get: operations["list_records_api_admin_circulation_records_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circulation/records/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Records
+         * @description 借还记录导出 Excel（**按当前筛选**导出，不是全量）。
+         */
+        get: operations["export_records_api_admin_circulation_records_export_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -927,6 +991,28 @@ export interface paths {
         put?: never;
         /** Return Book */
         post: operations["return_book_api_admin_circulation_return_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/circulation/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Scan Code
+         * @description 扫码统一入口（2026-09-21 C 批）：**扫会员码 → 孩子卡片；扫 ISBN → 自动判借/还/核销**。
+         *
+         *     馆员不再需要按"借出"按钮：一个枪、两个框（先会员后图书），扫完即出结果。
+         */
+        post: operations["scan_code_api_admin_circulation_scan_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3572,12 +3658,22 @@ export interface components {
             /** Book Id */
             book_id: number;
             /**
+             * Book Title
+             * @default
+             */
+            book_title: string;
+            /**
              * Borrowed At
              * Format: date-time
              */
             borrowed_at: string;
             /** Child Id */
             child_id: number;
+            /**
+             * Copy Code
+             * @default
+             */
+            copy_code: string;
             /** Copy Id */
             copy_id: number;
             /**
@@ -3647,6 +3743,13 @@ export interface components {
             active_borrows: number;
             /** Available Quota */
             available_quota: number;
+            /** Borrow Block */
+            borrow_block?: string | null;
+            /**
+             * Borrow Block Hard
+             * @default false
+             */
+            borrow_block_hard: boolean;
             /** Borrow Limit */
             borrow_limit: number;
             /** Child Id */
@@ -3732,6 +3835,11 @@ export interface components {
             has_orders: boolean;
             /** Id */
             id: number;
+            /**
+             * Member Code
+             * @description 会员码（M+8 位随机+校验位，借阅台扫码识别用；2026-09-21 A 批）
+             */
+            member_code?: string | null;
             /** Member Expire */
             member_expire: string | null;
             /** Member Start */
@@ -3791,6 +3899,11 @@ export interface components {
             has_orders: boolean;
             /** Id */
             id: number;
+            /**
+             * Member Code
+             * @description 会员码（M+8 位随机+校验位，借阅台扫码识别用；2026-09-21 A 批）
+             */
+            member_code?: string | null;
             /** Member Expire */
             member_expire: string | null;
             /** Member Start */
@@ -4388,6 +4501,38 @@ export interface components {
              */
             total: number;
         };
+        /** PaginatedResponse[RecordItemResponse] */
+        PaginatedResponse_RecordItemResponse_: {
+            /**
+             * Has Next
+             * @description 是否有下一页
+             * @default false
+             */
+            has_next: boolean;
+            /**
+             * Items
+             * @description 数据列表
+             */
+            items?: components["schemas"]["RecordItemResponse"][];
+            /**
+             * Page
+             * @description 当前页码
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @description 每页数量
+             * @default 20
+             */
+            page_size: number;
+            /**
+             * Total
+             * @description 总数
+             * @default 0
+             */
+            total: number;
+        };
         /** ParentCreateRequest */
         ParentCreateRequest: {
             /** Name */
@@ -4542,6 +4687,52 @@ export interface components {
              */
             ids: number[];
         };
+        /**
+         * RecordItemResponse
+         * @description 借还记录一行（2026-09-21 D 批）。操作人姓名为"未记录"时表示该行没记过（不编造）。
+         */
+        RecordItemResponse: {
+            /** Book Id */
+            book_id: number;
+            /** Book Title */
+            book_title: string;
+            /**
+             * Borrowed At
+             * Format: date-time
+             */
+            borrowed_at: string;
+            /** Borrowed By Name */
+            borrowed_by_name: string;
+            /** Child Id */
+            child_id: number;
+            /** Child Name */
+            child_name: string;
+            /** Copy Code */
+            copy_code: string;
+            /** Copy Id */
+            copy_id: number;
+            /** Days Overdue */
+            days_overdue: number;
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /** Parent Phone */
+            parent_phone: string;
+            /** Record Id */
+            record_id: number;
+            /** Renew Used */
+            renew_used: number;
+            /** Returned At */
+            returned_at?: string | null;
+            /** Returned By Name */
+            returned_by_name: string;
+            /** Returned Condition */
+            returned_condition?: string | null;
+            /** Status */
+            status: string;
+        };
         /** RefundApplyRequest */
         RefundApplyRequest: {
             /** Child Id */
@@ -4662,6 +4853,48 @@ export interface components {
              * @default
              */
             remark: string;
+        };
+        /** ScanRequest */
+        ScanRequest: {
+            /**
+             * Child Id
+             * @description 当前读者（借阅台已选中的孩子）
+             */
+            child_id: number;
+            /**
+             * Code
+             * @description 扫码枪读到的码：会员码或图书 ISBN
+             */
+            code: string;
+        };
+        /**
+         * ScanResponse
+         * @description 扫码判定结果（2026-09-21 C 批）。
+         *
+         *     只覆盖**成功路径**（member / borrow / return / checkout）；"不能借/不能还"一律走既有异常
+         *     （409/422 + 中文原因），前端沿用同一套提示与「人工放行」弹窗，不新增第二套错误协议。
+         */
+        ScanResponse: {
+            /**
+             * Action
+             * @description member=扫到会员码 / borrow / return / checkout
+             */
+            action: string;
+            /** Book Title */
+            book_title?: string | null;
+            card?: components["schemas"]["ChildCardResponse"] | null;
+            /** Copy Id */
+            copy_id?: number | null;
+            /** Due At */
+            due_at?: string | null;
+            /** Message */
+            message: string;
+            record?: components["schemas"]["BorrowRecordResponse"] | null;
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
         };
         /** SigninRequest */
         SigninRequest: {
@@ -6478,6 +6711,37 @@ export interface operations {
             };
         };
     };
+    child_card_by_code_api_admin_circulation_children_by_code__member_code__card_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                member_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChildCardResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     child_card_api_admin_circulation_children__child_id__card_get: {
         parameters: {
             query?: never;
@@ -6525,6 +6789,81 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OverdueItemResponse"][];
+                };
+            };
+        };
+    };
+    list_records_api_admin_circulation_records_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description 孩子名 / 家长手机号 / 书名 / ISBN / 副本码 */
+                keyword?: string | null;
+                /** @description active/overdue/returned/lost */
+                status?: string | null;
+                /** @description 按借出时间(borrowed)或归还时间(returned)筛 */
+                date_field?: string;
+                date_from?: string | null;
+                date_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedResponse_RecordItemResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_records_api_admin_circulation_records_export_get: {
+        parameters: {
+            query?: {
+                keyword?: string | null;
+                status?: string | null;
+                date_field?: string;
+                date_from?: string | null;
+                date_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6582,6 +6921,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BorrowRecordResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scan_code_api_admin_circulation_scan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScanRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanResponse"];
                 };
             };
             /** @description Validation Error */

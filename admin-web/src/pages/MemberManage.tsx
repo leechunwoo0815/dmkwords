@@ -62,6 +62,7 @@ import {
 } from "../api/members";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
+import PageTitle from "../components/PageTitle";
 
 const MEMBER_LABEL: Record<string, string> = {
   none: "未入会", observation: "观察期", pending_evaluation: "待评估",
@@ -384,10 +385,8 @@ export default function MemberManage() {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <Typography.Title level={4} style={{ fontFamily: "var(--font-display)", margin: 0 }}>
-          会员管理
-        </Typography.Title>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <PageTitle>会员管理</PageTitle>
         <Space>
           <Button onClick={() => {
             childForm.resetFields();

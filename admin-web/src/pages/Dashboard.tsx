@@ -28,6 +28,7 @@ import {
 import { hasPermission, useAuth } from "../auth";
 import { useTodoCounts } from "../hooks/useTodoCounts";
 import type { components } from "../api/schema";
+import PageTitle from "../components/PageTitle";
 
 type Overview = components["schemas"]["DashboardOverviewResponse"];
 
@@ -158,9 +159,7 @@ export default function Dashboard() {
   return (
     <>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-        <Typography.Title level={4} style={{ fontFamily: "var(--font-display)", marginBottom: 0 }}>
-          今日概览
-        </Typography.Title>
+        <PageTitle>今日概览</PageTitle>
         <div style={{ display: "flex", gap: 8 }}>
           <Button
             icon={<DownloadOutlined />}
@@ -293,7 +292,7 @@ export default function Dashboard() {
                   <Typography.Text type="secondary">{cell.label}</Typography.Text>
                   <BookOutlined style={{ color: "var(--paint-ink-light)" }} />
                 </div>
-                <div style={{ marginTop: 6, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div style={{ marginTop: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <Typography.Text style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-display)" }}>
                     {cellValue(overview, cell.valueKey) ?? "—"}
                   </Typography.Text>
