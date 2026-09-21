@@ -5,6 +5,7 @@ from datetime import date, datetime
 from sqlalchemy import Column, Date, DateTime, Index, Integer, Numeric, SmallInteger, String, Text
 
 from backend.common.base_model import BaseModel
+from backend.domain.identity.member_code import generate_member_code
 
 
 class Parent(BaseModel):
@@ -74,6 +75,18 @@ class Child(BaseModel):
     operation_locked = Column(
         SmallInteger, nullable=False, default=0, comment="操作冻结（转让/退会审核中）"
     )
+
+    # 会员码（2026-09-21 任务包 A 批）：借阅台扫码识别的身份码。
+    # 用列默认值而不是"只在 service 里生成"——seed/测试/任何直插路径都绕不过去，
+    # 避免又一类"某条创建路径漏了赋值"。算法单一来源见 identity/member_code.py。
+    member_code = Column(
+        String(12),
+        nullable=True,
+        default=generate_member_code,
+        comment="会员码（M+8 位随机+校验位，扫码识别用，不可枚举）",
+    )
+
+    __table_args__ = (Index("uq_child_member_code", "member_code", "is_deleted", unique=True),)
 
     def can_transition(self, new_status: str) -> bool:
         return new_status in self.ALLOWED_TRANSITIONS.get(self.member_status, set())

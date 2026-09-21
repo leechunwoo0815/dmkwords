@@ -29,4 +29,7 @@ class BorrowRecord(BaseModel):
     status = Column(String(20), nullable=False, default=STATUS_ACTIVE, index=True)
     renew_used = Column(Integer, nullable=False, default=0, comment="已用续借次数（上限1）")
     borrowed_by = Column(Integer, nullable=True, comment="办理借书的馆员ID")
+    # 归还操作人（2026-09-21 任务包 D 批，用户拍板"要归还操作人"）：此前只记借出人，
+    # 还书这一步"谁办的"查不到——借还记录查询要能追到人。历史行 NULL = 未记录（如实展示"未记录"）。
+    returned_by = Column(Integer, nullable=True, comment="办理归还的馆员ID（历史行 NULL=未记录）")
     override_reason = Column(String(200), nullable=True, comment="人工放行原因（异常借书留痕）")

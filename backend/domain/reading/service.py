@@ -327,18 +327,9 @@ class ReservationService:
                 block_reason = "有未结清赔偿款"
             raise ValidationError(f"{block_reason}，不能预约")
         now = datetime.now()
-        overdue = (
-            self.db.query(func.count(BorrowRecord.id))
-            .filter(
-                BorrowRecord.child_id == child.id,
-                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
-                BorrowRecord.due_at < now,
-                BorrowRecord.is_deleted == 0,
-            )
-            .scalar()
-        )
-        if overdue:
-            raise ValidationError("有逾期未还图书，请先归还")
+        # 2026-09-21 甲方口径：逾期不拦截（全端统一）——原先此处对"有逾期未还"硬拦
+        # （raise "有逾期未还图书，请先归还"）已按裁定移除；逾期只占借阅额度里的一个名额
+        # （见 PRD §5.4 现行口径与 CLAUDE.md §二 借阅并发红线）。
         # 同书进行中预约唯一
         dup = (
             self.db.query(func.count(Reservation.id))

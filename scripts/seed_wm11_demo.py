@@ -493,7 +493,15 @@ def _ensure_demo_quiz_journey(db: Session, child) -> None:
 
 
 def _ensure_demo_fav_reservation(db: Session, child) -> None:
-    """演示收藏 2 本 + 预约 1 条（书架页三 tab 有真实数据可验）。先查后插幂等。"""
+    """演示收藏 2 本 + 预约历史 1 条（书架页三 tab 有真实数据可验）。先查后插幂等。
+
+    **2026-09-21 修数据自相矛盾**（用户目视发现"可借 27 而不是 28"）：原实现在
+    "词数最大的书"上给演示孩锁了一册，而 `_ensure_demo_t41_data` 又把"id 最大的书"
+    改成逾期借出——两处独立取书，撞到同一本时会产生**同一孩子既在借又预约**、
+    **预约锁着的副本却是 borrowed** 的鬼状态（核销必然报"副本状态异常"），
+    且那条预约永远占着 1 个额度（30−2−1=27）。
+    现在：演示孩只留一条 **已借出（checked_out）** 的预约历史（不占额度、可演示"借到即释放"），
+    在用的 active 预约挂到观察期孩（预约管理仍有活单可核销）。"""
     from backend.domain.catalog.models import Book
     from backend.domain.reading.models import Favorite, Reservation
 
@@ -512,41 +520,136 @@ def _ensure_demo_fav_reservation(db: Session, child) -> None:
         for b in fav_books:
             db.add(Favorite(child_id=child.id, book_id=b.id))
         db.flush()
+    from backend.domain.catalog.models import BookCopy
+
+    # 演示孩：**已借出**的预约历史（不占额度；正好演示"预约成功借阅 → 预约转已借出"）
     if (
         not db.query(Reservation)
         .filter(Reservation.child_id == child.id, Reservation.is_deleted == 0)
         .first()
     ):
-        from backend.domain.catalog.models import BookCopy
-
-        pick = (
+        book_done = (
             db.query(Book)
             .filter(Book.is_deleted == 0, Book.status == Book.STATUS_ON, Book.word_count > 1000)
             .order_by(Book.word_count.desc())
             .first()
         )
-        if pick is not None:
-            copy = (
+        if book_done is not None:
+            # copy_id 是 NOT NULL（表结构如此）——历史行也得指一册；随便指该书当前一册即可，
+            # 它已借出/已还都不影响：这条只是"预约成功借阅过"的历史留痕。
+            any_copy = (
                 db.query(BookCopy)
-                .filter(
-                    BookCopy.book_id == pick.id,
-                    BookCopy.status == BookCopy.STATUS_AVAILABLE,
-                    BookCopy.is_deleted == 0,
-                )
+                .filter(BookCopy.book_id == book_done.id, BookCopy.is_deleted == 0)
+                .order_by(BookCopy.id)
                 .first()
             )
-            if copy is not None:
-                copy.status = BookCopy.STATUS_RESERVED
+            if any_copy is not None:
                 db.add(
                     Reservation(
                         child_id=child.id,
-                        book_id=pick.id,
-                        copy_id=copy.id,
-                        status=Reservation.STATUS_ACTIVE,
-                        expires_at=datetime.now() + timedelta(hours=72),
+                        book_id=book_done.id,
+                        copy_id=any_copy.id,
+                        status=Reservation.STATUS_CHECKED_OUT,
+                        expires_at=datetime.now() - timedelta(days=1),
                     )
                 )
-            db.flush()
+                db.flush()
+
+
+def _pick_idle_book_for(db, owner, Book, BookCopy):
+    """给指定孩子挑一本"在馆可约"且他自己没在借、也没被别人约定的书（预约演示数据用）。"""
+    from backend.domain.circulation.models import BorrowRecord
+    from backend.domain.reading.models import Reservation
+
+    held = {
+        row[0]
+        for row in db.query(BorrowRecord.book_id)
+        .filter(
+            BorrowRecord.child_id == owner.id,
+            BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
+            BorrowRecord.is_deleted == 0,
+        )
+        .all()
+    }
+    reserved_books = {
+        row[0]
+        for row in db.query(Reservation.book_id)
+        .filter(Reservation.status == Reservation.STATUS_ACTIVE, Reservation.is_deleted == 0)
+        .all()
+    }
+    candidates = (
+        db.query(Book)
+        .filter(Book.is_deleted == 0, Book.status == Book.STATUS_ON, Book.word_count > 1000)
+        .order_by(Book.word_count.asc())
+        .limit(30)
+        .all()
+    )
+    for b in candidates:
+        if b.id in held or b.id in reserved_books:
+            continue
+        copy = (
+            db.query(BookCopy)
+            .filter(
+                BookCopy.book_id == b.id,
+                BookCopy.status == BookCopy.STATUS_AVAILABLE,
+                BookCopy.is_deleted == 0,
+            )
+            .first()
+        )
+        if copy is not None:
+            return b, copy
+    return None, None
+
+
+def _ensure_watcher_active_reservation(db: Session) -> None:
+    """给**观察期孩**造一条在用的预约（预约管理页有活单可核销）。
+
+    **为什么单独一个函数、且必须在 WM3 家族建完之后调用**：本段原先是塞在
+    `_ensure_demo_fav_reservation` 里的，而它在 `_ensure_demo_wm3_states` **之前**跑——
+    那时观察期孩还不存在，整段被静默跳过（演示现场"预约管理只有一条已借出历史"就是这么来的）。
+    seed 的顺序就是契约：跨段依赖必须按建序排（教训 65 的同族）。
+    """
+    from backend.domain.catalog.models import Book, BookCopy
+    from backend.domain.identity.models import Child
+    from backend.domain.reading.models import Reservation
+
+    wm3_parent = (
+        db.query(Parent).filter(Parent.phone == "13800007777", Parent.is_deleted == 0).first()
+    )
+    if not wm3_parent:
+        return
+    watcher = (
+        db.query(Child)
+        .filter(Child.parent_id == wm3_parent.id, Child.name == "观察期孩", Child.is_deleted == 0)
+        .first()
+    )
+    if not watcher:
+        return
+    already = (
+        db.query(Reservation)
+        .filter(
+            Reservation.child_id == watcher.id,
+            Reservation.status == Reservation.STATUS_ACTIVE,
+            Reservation.is_deleted == 0,
+        )
+        .first()
+    )
+    if already:
+        return
+    pick, copy = _pick_idle_book_for(db, watcher, Book, BookCopy)
+    if pick is None or copy is None:
+        return
+    copy.status = BookCopy.STATUS_RESERVED
+    db.add(
+        Reservation(
+            child_id=watcher.id,
+            book_id=pick.id,
+            copy_id=copy.id,
+            status=Reservation.STATUS_ACTIVE,
+            expires_at=datetime.now() + timedelta(hours=72),
+        )
+    )
+    db.flush()
 
 
 def _upsert_notification(db: Session, parent: Parent, **kw) -> None:
@@ -717,26 +820,52 @@ def _ensure_demo_t41_data(db: Session, child) -> None:
         .first()
     )
     if not overdue_exists:
-        book = (
+        from backend.domain.reading.models import Reservation
+
+        # 挑"逾期演示书"的两条硬约束（2026-09-21 修：原实现只按 id 取最大的书，会与
+        # 预约块/其他孩子的在借撞车，造出"同一孩子既借又约"或"锁着的副本已借出"的鬼状态）：
+        #  ① 该孩子名下不能已有这本书的进行中借阅（同书重复借本身就违反借书守卫）
+        #  ② 这本书不能有任何在用预约（否则逾期借出会占掉别人锁定中的副本）
+        held = {
+            row[0]
+            for row in db.query(BorrowRecord.book_id)
+            .filter(
+                BorrowRecord.child_id == child.id,
+                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
+                BorrowRecord.is_deleted == 0,
+            )
+            .all()
+        }
+        reserved_books = {
+            row[0]
+            for row in db.query(Reservation.book_id)
+            .filter(Reservation.status == Reservation.STATUS_ACTIVE, Reservation.is_deleted == 0)
+            .all()
+        }
+        book = None
+        copy = None
+        for cand in (
             db.query(Book)
             .filter(Book.is_deleted == 0, Book.status == Book.STATUS_ON)
             .order_by(Book.id.desc())
-            .first()
-        )
-        if book:
-            copy = (
+            .limit(30)
+            .all()
+        ):
+            if cand.id in held or cand.id in reserved_books:
+                continue
+            c = (
                 db.query(BookCopy)
-                .filter(BookCopy.book_id == book.id, BookCopy.is_deleted == 0)
+                .filter(
+                    BookCopy.book_id == cand.id,
+                    BookCopy.status == BookCopy.STATUS_AVAILABLE,
+                    BookCopy.is_deleted == 0,
+                )
                 .first()
             )
-            if not copy:
-                copy = BookCopy(
-                    book_id=book.id,
-                    copy_code=f"DEMO-OVERDUE-{book.id}",
-                    status=BookCopy.STATUS_AVAILABLE,
-                )
-                db.add(copy)
-                db.flush()
+            if c is not None:
+                book, copy = cand, c
+                break
+        if book and copy:
             copy.status = BookCopy.STATUS_BORROWED
             db.add(
                 BorrowRecord(
@@ -2635,6 +2764,8 @@ def seed() -> None:
         # 逾期借阅依赖演示孩（if 块内造）；押金孩依赖 WM3 家长（wm3_states 造）——
         # 故 t41_data 必须在两者之后（R3 顺序教训：跨段依赖按建序排）
         _ensure_demo_t41_data(db, demo_child)
+        # 观察期孩的在用预约（依赖 WM3 家族已建 → 必须排在 wm3_states 之后）
+        _ensure_watcher_active_reservation(db)
         _ensure_activity_covers(db)
         # 活动图文详情 + 往期回顾演示素材（依赖：活动已建、封面已生成——B/C 批）
         _ensure_past_activities(db)

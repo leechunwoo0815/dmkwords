@@ -198,10 +198,12 @@ def test_overdue_deduction_and_list(client: TestClient, db):
     # 逾期列表出现
     overdue = client.get("/api/admin/circulation/overdue", headers=h).json()
     assert any(o["record_id"] == record["id"] for o in overdue)
-    # 可借额度 = 30 - 1(逾期) - 1(在借) = 28
+    # 可借额度 = 30 − 在借总数 1（该本已逾期，逾期**不再额外扣减**）= 29
+    # 〔2026-09-21 口径修订：旧实现扣两次（-逾期 -在借）给出 28，用户报障后统一为只扣一次〕
     card = client.get(f"/api/admin/circulation/children/{c['id']}/card", headers=h).json()
     assert card["overdue_count"] == 1
-    assert card["available_quota"] == 28
+    assert card["active_borrows"] == 1
+    assert card["available_quota"] == 29
     # 逾期书续借拒绝
     r = client.post("/api/admin/circulation/renew", json={"record_id": record["id"]}, headers=h)
     assert r.status_code == 422

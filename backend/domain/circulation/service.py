@@ -22,6 +22,13 @@ from backend.common.notifications import (
 )
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.catalog.models import Book, BookCopy
+from backend.domain.circulation.borrow_gate import (
+    HARD,
+    OVERRIDABLE,
+    deposit_gate,
+    first_block,
+    member_gate,
+)
 from backend.domain.circulation.models import BorrowRecord
 from backend.domain.identity.models import Child, Parent
 
@@ -31,6 +38,17 @@ class CirculationService:
         self.db = db
 
     # ---------- 查询 ----------
+    def child_id_by_member_code(self, member_code: str) -> int:
+        """会员码 → child_id（借阅台扫会员码；未命中抛 404，调用方应先做格式校验）。"""
+        row = (
+            self.db.query(Child.id)
+            .filter(Child.member_code == member_code, Child.is_deleted == 0)
+            .first()
+        )
+        if not row:
+            raise NotFoundError("未找到该会员码对应的孩子")
+        return row[0]
+
     def child_card(self, child_id: int) -> dict:
         """借阅操作台的孩子卡片（WM5 核心视图）。"""
         child = (
@@ -61,15 +79,82 @@ class CirculationService:
             .filter(Deposit.child_id == child_id, Deposit.is_deleted == 0)
             .first()
         )
+        # 预约占额度：卡面与 borrow() 必须同公式（上限 − 在借总数(含逾期) − 预约中）。
+        # 2026-09-21 甲方口径修订：逾期只占它自己那一个在借名额，不再额外扣减。
+        # 历史 bug（两个方向）：旧式 max(0, borrow_limit - len(overdue) - len(active)) 里 active 已含逾期
+        #   → 每本逾期多扣 1（无预约时卡面比 borrow() 放行的少 1，用户 2026-09-21 报障"扣 2 本"）；
+        #   同时又完全没减预约中 → 有预约时反而多报。两类误差在"1 本逾期 + 1 个预约"时正好抵消
+        #   （演示孩现场就是这种巧合），所以只能靠同源公式 + 回归测试锁死，不能靠肉眼对数字。
+        from backend.domain.reading.models import Reservation
+
+        reservation_count = (
+            self.db.query(func.count(Reservation.id))
+            .filter(
+                Reservation.child_id == child_id,
+                Reservation.status == Reservation.STATUS_ACTIVE,
+                Reservation.is_deleted == 0,
+            )
+            .scalar()
+        )
+        # 借书资格（单一来源；顺序与 borrow() 一致：先会员状态、后押金）
+        _gate_m = member_gate(
+            member_status=child.member_status,
+            is_active_member=child.is_active_member,
+            allow_unpaid=ConfigService(self.db).get_value("allow_unpaid_offline_borrow") == "true",
+            override_reason=None,
+            held=len(active),
+            withdrawn_status=Child.MEMBER_WITHDRAWN,
+            none_status=Child.MEMBER_NONE,
+        )
+        _gate_d = deposit_gate(
+            deposit_status=dep.status if dep else None,
+            deposit_unpaid_balance=int(dep.unpaid_balance or 0) if dep else 0,
+            override_reason=None,
+            unpaid_status=Deposit.STATUS_UNPAID,
+            fully_deducted_status=Deposit.STATUS_FULLY_DEDUCTED,
+        )
+        _hit = first_block(_gate_m, _gate_d)
+        _block = (_hit.reason, _hit.kind == HARD) if _hit else None
+
+        # 在借记录附上书名/副本码（2026-09-21 用户反馈：在借表只显示日期看不出是哪本书）
+        _book_ids = {r.book_id for r in active}
+        _copy_ids = {r.copy_id for r in active}
+        _titles = (
+            {
+                bid: title
+                for bid, title in self.db.query(Book.id, Book.title)
+                .filter(Book.id.in_(_book_ids))
+                .all()
+            }
+            if _book_ids
+            else {}
+        )
+        _codes = (
+            {
+                cid: code
+                for cid, code in self.db.query(BookCopy.id, BookCopy.copy_code)
+                .filter(BookCopy.id.in_(_copy_ids))
+                .all()
+            }
+            if _copy_ids
+            else {}
+        )
+        for _r in active:
+            _r.book_title = _titles.get(_r.book_id, "")
+            _r.copy_code = _codes.get(_r.copy_id, "")
         return {
             "child": child,
             "parent": parent,
             "active_borrows": len(active),
             "overdue_count": len(overdue),
-            "available_quota": max(0, borrow_limit - len(overdue) - len(active)),
+            "available_quota": max(0, borrow_limit - len(active) - reservation_count),
             "borrow_limit": borrow_limit,
             "deposit_status": dep.status if dep else "unpaid",
             "deposit_available": str(dep.available_amount) if dep else "0",
+            # 卡面"能不能借、为什么不能"（2026-09-21 用户反馈：未入会竟然显示可借 30 本）——
+            # 与 borrow() 同一判定来源；hard=True 表示放行也没用（退会/开关未开/未入会已借满）
+            "borrow_block": _block[0] if _block else None,
+            "borrow_block_hard": bool(_block and _block[1]),
             "active_records": active,
             "overdue_records": overdue,
         }
@@ -166,45 +251,33 @@ class CirculationService:
         # ---- 校验链 ----
         warnings: list[str] = []
         unpaid_override = False  # 未入会放行借阅：72 小时借期（R-313）
-        if not child.is_active_member:
-            # R-313 借书矩阵行：未缴费=开关+放行+限 1 本；过期=软提示可放行；退会=禁
-            if child.member_status == Child.MEMBER_WITHDRAWN:
-                raise ValidationError("孩子已退会，禁止借书（R-313）")
-            if child.member_status == Child.MEMBER_NONE:
-                # 未入会：默认硬拦截；开关开启 + 放行原因才可借，且每次限 1 本（R-313/C15）
-                allow = ConfigService(self.db).get_value("allow_unpaid_offline_borrow") == "true"
-                if not allow or not override_reason:
-                    raise ValidationError(
-                        f"孩子会员状态为 {child.member_status}，"
-                        + (
-                            "未入会临时借书开关未开启"
-                            if not allow
-                            else "未入会借书需管理员放行并填写原因"
-                        )
-                    )
-                held = (
-                    self.db.query(func.count(BorrowRecord.id))
-                    .filter(
-                        BorrowRecord.child_id == child_id,
-                        BorrowRecord.status.in_(
-                            [BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]
-                        ),
-                        BorrowRecord.is_deleted == 0,
-                    )
-                    .scalar()
-                )
-                if held >= 1:
-                    raise ValidationError(
-                        f"未入会临时借书每次限 1 本（当前已借 {held} 本未还），"
-                        "请先归还或办理入会（R-313）"
-                    )
-                unpaid_override = True
-                warnings.append(f"未入会临时借书（原因：{override_reason}）：72 小时内归还或入会")
-            else:
-                # 过期（状态 expired 或 formal 已到期未落库）：软提示，馆员放行即可，不吃未入会开关（D3/C17）
-                if not override_reason:
-                    raise ValidationError("孩子会员已过期，需馆员放行并填写原因（可放行）")
-                warnings.append(f"会员已过期，馆员放行借书（原因：{override_reason}）")
+        # 会员状态段判定：**单一来源**（与卡面提示共用 borrow_gate.member_gate，别在两处各写一遍）
+        allow_unpaid = ConfigService(self.db).get_value("allow_unpaid_offline_borrow") == "true"
+        held_now = (
+            self.db.query(func.count(BorrowRecord.id))
+            .filter(
+                BorrowRecord.child_id == child_id,
+                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
+                BorrowRecord.is_deleted == 0,
+            )
+            .scalar()
+        )
+        gate_m = member_gate(
+            member_status=child.member_status,
+            is_active_member=child.is_active_member,
+            allow_unpaid=allow_unpaid,
+            override_reason=override_reason,
+            held=held_now,
+            withdrawn_status=Child.MEMBER_WITHDRAWN,
+            none_status=Child.MEMBER_NONE,
+        )
+        if gate_m.code and not (gate_m.kind == OVERRIDABLE and override_reason):
+            raise ValidationError(gate_m.reason)
+        if gate_m.code == "unpaid" and not gate_m.reason:
+            unpaid_override = True
+            warnings.append(f"未入会临时借书（原因：{override_reason}）：72 小时内归还或入会")
+        elif gate_m.code == "expired" and not gate_m.reason:
+            warnings.append(f"会员已过期，馆员放行借书（原因：{override_reason}）")
 
         # 押金校验
         from backend.domain.billing.models import Deposit
@@ -214,23 +287,18 @@ class CirculationService:
             .filter(Deposit.child_id == child_id, Deposit.is_deleted == 0)
             .first()
         )
-        if (
-            not dep
-            or dep.status == Deposit.STATUS_UNPAID
-            or dep.status == Deposit.STATUS_FULLY_DEDUCTED
-            or (dep.unpaid_balance or 0) > 0
-        ):
-            # B-12（第二批 T12）：押金扣光/有未结清赔偿款与未缴纳同险，同口径拦截；
-            # 人工放行通道保留（线下馆员 + 留痕）
-            if not dep or dep.status == Deposit.STATUS_UNPAID:
-                block_reason = "押金未缴纳"
-            elif dep.status == Deposit.STATUS_FULLY_DEDUCTED:
-                block_reason = "押金已扣光"
-            else:
-                block_reason = "有未结清赔偿款"
-            if not override_reason:
-                raise ValidationError(f"{block_reason}（可人工放行并填写原因）")
-            warnings.append(f"{block_reason}，馆员放行")
+        # 押金段判定：同样走单一来源（B-12/T12 口径：未缴/扣光/未结清赔偿款同险，可人工放行）
+        gate_d = deposit_gate(
+            deposit_status=dep.status if dep else None,
+            deposit_unpaid_balance=int(dep.unpaid_balance or 0) if dep else 0,
+            override_reason=override_reason,
+            unpaid_status=Deposit.STATUS_UNPAID,
+            fully_deducted_status=Deposit.STATUS_FULLY_DEDUCTED,
+        )
+        if gate_d.code and not (gate_d.kind == OVERRIDABLE and override_reason):
+            raise ValidationError(gate_d.reason)
+        if gate_d.code and not gate_d.reason:
+            warnings.append(f"{gate_d.code.removeprefix('deposit_')}，馆员放行")
 
         # 借阅上限：30 − 在借数 − active 预约数（E-9 单次扣减 + B-11/T13 预约占额度
         # 双向执行：预约 create 已计入，borrow 侧同步计入，防 28 在借+2 预约仍可再借）
@@ -308,6 +376,34 @@ class CirculationService:
         self.db.add(record)
         copy.status = BookCopy.STATUS_BORROWED
         self.db.flush()
+        # 借到手 = 预约目的达成：把该孩子对**这本书**的在用预约一并关掉（转"已借出"）。
+        # 为什么要在这里做（用户 2026-09-21 反馈"预约的书成功借阅了就应该释放预约"）：
+        # 预约占额度（FEAT-036），若借到书后预约还停在 active，它会**一直占着 1 个名额**，
+        # 且预约管理页长期挂着一条永远核销不掉的单；走预约核销的路径已在 checkout 里置过，
+        # 这里兜住"没走核销、直接借出/扫码借出"的路径（幂等：只改 ACTIVE）。
+        from backend.domain.reading.models import Reservation as _Res
+
+        for _r in (
+            self.db.query(_Res)
+            .filter(
+                _Res.child_id == child_id,
+                _Res.book_id == book.id,
+                _Res.status == _Res.STATUS_ACTIVE,
+                _Res.is_deleted == 0,
+            )
+            .all()
+        ):
+            _r.status = _Res.STATUS_CHECKED_OUT
+            # 顺带把这条预约锁着的**另一册**放回在馆：预约关了却还锁着书，是"鬼锁"——
+            # 那册谁都借不走、预约管理页也不再显示它（同书另一副本被借走的场景）。
+            if _r.copy_id and _r.copy_id != copy.id:
+                _locked = (
+                    self.db.query(BookCopy)
+                    .filter(BookCopy.id == _r.copy_id, BookCopy.is_deleted == 0)
+                    .first()
+                )
+                if _locked and _locked.status == BookCopy.STATUS_RESERVED:
+                    _locked.status = BookCopy.STATUS_AVAILABLE
         publish_audit(
             self.db,
             admin=admin,
@@ -383,6 +479,7 @@ class CirculationService:
         record.status = BorrowRecord.STATUS_RETURNED
         record.returned_at = datetime.now()
         record.returned_condition = condition
+        record.returned_by = admin.id  # 归还操作人（2026-09-21 D 批：借还记录要追得到人）
         if condition == "normal":
             copy.status = BookCopy.STATUS_AVAILABLE
         elif condition == "maintenance":

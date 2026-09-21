@@ -56,6 +56,9 @@ class ChildResponse(BaseSchema):
     member_expire: date | None
     ar_level: str | None
     avatar: str | None = Field(None, description="WM15 系统内置头像 id（空=默认头像）")
+    member_code: str | None = Field(
+        None, description="会员码（M+8 位随机+校验位，借阅台扫码识别用；2026-09-21 A 批）"
+    )
     has_orders: bool = Field(False, description="存在未删订单（WM3-B1 守卫）")
 
 

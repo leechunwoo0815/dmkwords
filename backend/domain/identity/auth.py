@@ -97,6 +97,9 @@ def children_payload(db, parent_id: int) -> list[dict]:
             "avatar": c.avatar,
             # fix34 R4：带等级（前端按等级映射头像框档位；批查一次，禁逐条）
             "level": lv.get(c.id, "A"),
+            # 会员码（2026-09-21 任务包 A 批）：小程序「会员码」页出示给借阅台扫码。
+            # 历史行为空时前端走"联系馆员"兜底文案，不要把 None 当码显示。
+            "member_code": c.member_code,
         }
         for c in children
     ]
