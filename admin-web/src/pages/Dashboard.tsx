@@ -28,6 +28,7 @@ import {
 import { hasPermission, useAuth } from "../auth";
 import { useTodoCounts } from "../hooks/useTodoCounts";
 import type { components } from "../api/schema";
+import DashboardCharts from "../components/DashboardCharts";
 import PageTitle from "../components/PageTitle";
 
 type Overview = components["schemas"]["DashboardOverviewResponse"];
@@ -183,6 +184,10 @@ export default function Dashboard() {
       <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
         门店运营实时数据；经营看板覆盖藏书/借阅/会员/测验/里程碑，支持 Excel 导出。
       </Typography.Paragraph>
+
+      {/* 图形区（2026-09-21 用户需求：仪表盘要有"很酷炫的图"，且要投到店外电视上）。
+          用既有 /api/admin/dashboard 的数据渲染，不改后端；数字卡片按用户裁定照旧留在下方。 */}
+      {overview && <DashboardCharts data={overview} />}
 
       <TodoCard counts={counts} failed={failed} reload={reload} isSuper={isSuper} />
 

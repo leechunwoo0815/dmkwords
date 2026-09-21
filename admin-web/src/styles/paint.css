@@ -751,3 +751,98 @@ h1, h2, h3, h4, h5, h6,
   border: none;
   box-shadow: 0 0 8px rgba(74, 222, 128, 0.9);
 }
+
+/* ---------- 仪表盘图形区（2026-09-21，投屏可读） ---------- */
+.chart-card {
+  min-width: 260px;
+  background: var(--paint-paper);
+}
+.chart-donut {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.chart-center-num {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 800;
+  fill: var(--paint-ink);
+}
+.chart-center-sub {
+  font-size: 11px;
+  fill: var(--paint-ink-light);
+}
+.chart-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.chart-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--paint-ink);
+}
+.chart-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--paint-ink);
+}
+.chart-legend-value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+.chart-flow {
+  display: flex;
+  gap: 26px;
+  align-items: flex-end;
+  padding: 6px 8px 0;
+}
+.chart-flow-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.chart-flow-track {
+  width: 58px;
+  height: 128px;
+  border: 3px solid var(--paint-ink);
+  border-radius: 10px;
+  background: var(--paint-paper-dim);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.chart-flow-fill {
+  width: 100%;
+  transition: height 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.chart-flow-num {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--paint-ink);
+}
+.chart-flow-label {
+  font-size: 13px;
+  color: var(--paint-ink-light);
+}
+.chart-ring {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.chart-ring-num {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 800;
+  fill: var(--paint-ink);
+}
+.chart-ring-label {
+  font-size: 13px;
+  color: var(--paint-ink-light);
+}
