@@ -561,7 +561,7 @@ admin-web 端未按本规范原定的 4 个迭代分阶段实施，而是一次�
 
 ### miniapp 小程序端绘本风（2026-08-30 已落地）
 
-- **已实施**：`miniapp/app.wxss` 落地整套绘本令牌（改值不改名，43 个页面 wxss 零改动继承）；`miniapp/components/avatar-ring/` 等级头像框叠层组件；`miniapp/icons/frames/` 四档头像框资产。
+- **已实施**：`miniapp/app.wxss` 落地整套绘本令牌（改值不改名，**全部页面 wxss 零改动继承**——2026-09-20 实测 39 个 `.wxss`，原文写的"43 个"是估数）；`miniapp/components/avatar-ring/` 等级头像框叠层组件；`miniapp/icons/frames/` 四档头像框资产。
 - **机械门禁**：`scripts/check_miniapp_style.py`（R1-**R14** 规则 + S1-S3 三重自证），已进 `scripts/gate.sh` 第 5 步「契约与反假绿」。
 
 ---
@@ -661,8 +661,9 @@ admin-web 列表页统一使用绘本风分页底栏，替代 antd 原生 Pagina
 
 ### 13.3 组件用法
 
-`admin-web/src/components/PreviewImage.tsx`（当前 7 处已接入：BookDetail 封面、MemberManage 收款凭证
-回看 + 凭证/评估报告选图本地预览、CircleManage 成就卡片、GrowthManage 周报/月报、ActivityManage 详情封面与编辑封面）
+`admin-web/src/components/PreviewImage.tsx`（当前 8 处已接入：BookDetail 封面、MemberManage 收款凭证
+回看 + 凭证/评估报告选图本地预览、CircleManage 成就卡片、GrowthManage 周报/月报、ActivityManage 详情封面
+与编辑封面、**ActivityManage 图文详情配图块预览**〔2026-09-20 新增〕）
 
 ```tsx
 // ① 缩略图 + 点开（固定画框；height 省略 = 按原图比例撑满 width，用于长图报告）
@@ -784,7 +785,7 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 > 后续若要收口，做法同 §15.2（用 `gen_ui_icons.py` 出资产 + 换 `icon-name`），
 > **不要**零散手写 emoji 继续扩散。
 
-### 15.5 机械门禁 R13（`scripts/check_miniapp_style.py`）
+### 15.6 机械门禁 R13（`scripts/check_miniapp_style.py`）
 
 | 规则 | 判定 |
 |---|---|
@@ -793,6 +794,17 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 
 三重自证：注入 emoji 必命中、注入不存在的图标名必命中、**存在的图标名不得误报**（首版把
 `check-result-icon` 的 ✓、`fc-close-icon` 的 ✕ 误报成违规，已加白名单并留自证）。
+
+### 15.7 机械门禁 R14：WXML 结构（2026-09-20 补，`scripts/check_miniapp_style.py`）
+
+| 规则 | 判定 |
+|---|---|
+| R14 | WXML 注释必须以 `-->` 收尾（**写成 JS 风格 `/* */` 会吞掉半个模板**）；标签必须正确配对 |
+
+来由（活动模块 B 批施工自伤）：我在 wxml 里写了 JS 风格注释，编译报错行**指向别处**（实测差 60 行），
+模拟器还一直停在旧帧骗人——最后靠读开发者工具自己的日志 + 写忠实解析器才定位。
+教训入库错误记忆库 **§八十三**（含"轻量按行扫描器会撒谎：它报闭合 ✓，编译器报错"）。
+检查器含注入自证（喂坏注释必红）。
 
 ### 14.4 边界（如实标注，别把规矩说过头）
 
@@ -830,6 +842,8 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 
 配置键：`image_upload_max_mb` / `image_upload_max_output_kb` / `image_jpeg_quality` /
 `image_generated_jpeg_quality` / `image_cover_max_edge` / `image_activity_cover_max_edge` / `image_doc_max_edge`。
+（**活动封面与活动图文配图共用 `image_activity_cover_max_edge`**〔2026-09-20〕——图文配图没另立配置键，
+落盘口径 `file_storage._POLICY_KEYS["activity_detail"]` 直接引用它。）
 
 ### 16.3 三条工程约束（踩过才知道）
 
@@ -872,6 +886,8 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 | ① | `cleanup_uploads` 的**证据目录保护名存实亡** | `PROTECTED_PREFIXES` 里写 `"-samples/"`，判定用 `rel.startswith(p)`——真实目录名是 `wm15-samples/…` → **永远匹配不到**；当时没出事只因它同时也不在可再生白名单里 | 新增 `PROTECTED_SUFFIX_DIRS`，按**路径首段后缀**匹配（`wm15-samples/` ✓ `fix34-samples/` ✓） |
 | ② | `cover/activity/` 与书封**同前缀不同口径**，回压会串 | 回压脚本靠 DB 引用集区分"哪些文件算数"，口径却按前缀一刀切 | `_UPLOAD_SCOPES` 增 `"cover/activity/"` + 新增 `scope_of()` **最长前缀**匹配（与字典顺序解耦） |
 | ③ | 活动封面被按书封口径回压 | 前缀只有 `"cover/"` → `activity_cover`(1200) 当成 `cover`(1080) | 同上；回归测试另断言两个口径的默认长边**必须不同**（哪天被改成同值就该有人回头看） |
+| ④ | **新增媒体目录未进清理脚本 → 被当孤儿删**（2026-09-20 活动图文配图） | `cleanup_uploads` 有两张名单：**引用集**（DB 里被引用的文件）与**保护名单**；新目录一处漏接就会被清掉 | `"activity_detail/"` 入 `PROTECTED_PREFIXES` + 引用集解析 `Activity.detail_blocks` 图片路径（`cleanup_uploads.py`）；测试 `test_wm9b_activity_detail_blocks.py::test_cleanup_registers_detail_images` |
+| ⑤ | 图文配图**不在** `optimize_uploads` 的回压范围 | 回压脚本的 `_UPLOAD_SCOPES` 只覆盖封面/凭证/观察报告（`cover/`、`cover/activity/`、`voucher/`、`observation/`），**没有** `activity_detail/` | 如实登记，不假装已覆盖：图文配图目前只靠**落盘时**的 `activity_detail` 口径（长边 1200 JPEG）控制体积；若将来需要回压，先加 scope 再跑（别直接改前缀，见 ②） |
 
 > 回归锁：`tests/unit/test_fix44_media_scope.py`（3 例）。这三条属"守住了但靠运气"——
 > 靠运气的东西迟早会输，故一律改成显式规则 + 测试锁死。
@@ -900,3 +916,39 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 *日期：2026-08-25（运营增强同步至 2026-08-28；媒体预览统一与后端出图规范同步至 2026-09-15；图片体积规范同步至 2026-09-17；媒体纪律机械门禁同步至 2026-09-20）*
 *版本：V1.5*  
 *关联文档：theme-paint.ts, Layout.tsx, BookManage.tsx, BookDetail.tsx, Dashboard.tsx, PreviewImage.tsx, reading_circle/art.py, growth/report_service.py, miniapp/app.wxss*
+
+
+---
+
+## 十七、页面大标题统一（`PageTitle`，2026-09-21 用户裁定后全站铺开）
+
+**用户原话**：「最上面的大标题改个字体增加个底色框……其他很多页面都留了太多白，都统一成会员管理这种留白。」
+第一版做成深底霓虹绿（`tone="neon"`），用户反馈「颜色风格好像不太搭」→ 定稿走**暖色绘本版**。
+
+| 项 | 口径 |
+|---|---|
+| 组件 | `admin-web/src/components/PageTitle.tsx`（**一处改、全站一致**；两版配色都在 CSS 里，`tone` 一个 prop 切换） |
+| 字体 | 等宽栈（`ui-monospace / SF Mono / Menlo / Consolas`）+ 字距 3px——与正文/卡片标题区分开，"科技感"由**字体与字距**提供，不靠冷色 |
+| 配色 | 纸感底（`--paint-paper → --paint-paper-dim` 渐变）+ 深墨 3px 描边 + 硬阴影（`--shadow-hard-sm`）+ 主色橙左条 + 黄点收口；**全部走令牌**，与导航/Tabs/按钮同族 |
+| 留白口径 | 标题 `margin: 0`——AntD `Typography.Title` 默认 `margin-top: 1.2em`（≈26px）是"顶上一大片白"的真凶；改后实测"内容区顶边→标题"= **24px**（会员管理参照 27px） |
+| 已铺开页面（**9 页，实测无残留 level-4 标题**） | 仪表盘（今日概览）/ 图书管理 / 图书详情 / 会员管理 / 押金与赔偿 / 借阅操作台 / 员工管理 / 系统配置 / 审计日志（带右侧按钮的表头行同步把 `alignItems: baseline → center` 与标题框居中对齐） |
+| **未铺开（本身没有大标题，等用户定）** | `线下活动`/`成长与测验`/`预约管理`/`退款中心`/`通知中心`/`任务看板` 顶部直接是搜索行或按钮行、**原本就没有页面大标题**；`阅读圈`用的是 `Card title="阅读圈"`。给这些页面**新加大标题属于新增设计**，未擅自做——用户若要求统一，再补（组件已就绪，每页一行） |
+
+| **使用边界（用户实测后定）** | **只给"页面名"用**（2–6 字固定标签）；**书名/人名等动态内容不许用**——长度不可控，等宽字距会把标题撑成大黑框（图书详情页试过，用户当场否掉"太大了，也很丑"），那类页面用普通 `Typography.Title` + `margin: 0` |
+
+> 复现核对：浏览器里量 `document.querySelector(".page-title-chip")` 与 `.ant-layout-content` 的 `top` 差值，应 ≈24px；页面应无残留的 `Typography.Title level={4}`。
+
+
+### 17.1 字体分工（2026-09-21 用户反馈后定）
+
+用户原话：「字体可以用刚才那个，因为原来的字体看英文很难受，歪歪扭扭的。」
+
+| 内容 | 字体 | 说明 |
+|---|---|---|
+| 中文标题 / 卡片标题 / 区块标题 | `--font-display`（ZCOOL KuaiLe） | 绘本风主字体，排中文最合适 |
+| **英文 / 编号 / 数码类内容**（书名、动态英文标题、等宽标签） | **`--font-mono`**（`ui-monospace / SF Mono / Menlo / Consolas`） | ZCOOL KuaiLe 的拉丁字形偏"歪"，排英文可读性差；图书详情页书名已按此改（实测 `ui-monospace` 20px） |
+| 正文 / 表格 / 表单 | `--font-body`（Nunito + 系统栈） | 既有口径不变 |
+
+> **待用户定（已登记，未擅自改）**：`Layout.tsx`（侧边栏品牌 DmkWords）与 `Login.tsx`（登录页标题）里的英文品牌字目前仍是 `--font-display`——
+> 那是**品牌标识**，换成等宽会失去手写绘本感，故保留原样；用户若觉得刺眼，改 `--font-mono` 即可。
+> 另外 `Dashboard.tsx` 的三个大数字（统计卡）也用着 `--font-display`，同样登记待定。

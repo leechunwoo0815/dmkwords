@@ -74,6 +74,9 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
   ⚠️ miniapp 侧**部分清偿，仅剩 reading 一处**：`identity/miniapp_router.py:91`、
   `reading_circle/miniapp_router.py:44` 均已改 `Query(ge=1)`；`reading/miniapp_router.py:58`
   仍为裸默认值（`page: int = 1`，无 Query 约束）——归 T29 sweep 处置。
+  **另注（2026-09-20）**：`GET /activities/past` 用的是 `limit: int = 30, offset: int = 0`
+  裸默认（`activity/miniapp_router.py:27-28`），既不是 `page/page_size` 也无 `Query` 约束——
+  它刻意沿用"列表取一段"的轻分页（往期回顾只需前 30 条），**不是笔误**；要统一口径时一并改它。
 - 媒体流（音频/封面/报告图）：query token 传鉴权（`?token=`），组件无法带
   Authorization 头的历史约束；归属校验见 P0-F1/T25。
 - **媒体消费点纪律（2026-09-09 增补，封面三断链教训）**：新增媒体字段（cover_url 类）
@@ -84,6 +87,11 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
   `media_version`/`book_cover_url`/`activity_cover_url`）——`<image>` 按 URL 缓存，换图后
   不带 v 用户永远看旧图；消费端新增小程序 `miniapp/libs/qrcode.js`、`miniapp/libs/code128.js`、
   `miniapp/utils/ticket-code.js`。
+- **两条 token 渠道，别混用（2026-09-20 实缺陷教训）**：小程序 `<image>` 必须走
+  `media.fullUrl(url, true)`——**第二参 true 才是"绝对 URL + token"**，漏了它拿到相对路径 → 图全裂；
+  管理端 `<img>` 走 query token 渠道 `authorize_media`（`xxxUrl()` helper 拼 `?token=`），
+  **且必须用 admin 自己的端点**：拿家长 token 的 miniapp 端点去喂管理员 token 会 **401**（两类 token 不通用）。
+  活动图文配图正好两条渠道各一份，翻车就翻在这里（错误记忆库 §八十五）。
 - **2026-09 增补端点族**（契约快照执法，改动必须走 contract-change 两步显形）：
   `GET /api/miniapp/books/{id}/audio-permission`（播放入口预检，与 audio 流共享 guards
   判定）；`GET /api/miniapp/quiz/status-batch`（书架角标批量，IN 查询禁 N+1）；
@@ -93,9 +101,20 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
   `PUT /api/admin/activities/{id}/detail-blocks`（图文全量覆盖写；**活动开始后/结束后仍可编辑**——纯展示字段，
   与 `PUT /activities/{id}` 的守卫刻意分开）·
   `POST /api/admin/activities/{id}/detail-images`（配图上传，口径 `activity_detail` = 长边 ≤1200 JPEG）·
+  `GET /api/admin/activities/{id}/detail-image?name=&token=`（**管理端编辑器预览**，query token 渠道走
+  `authorize_media`；路径校验与小程序端点同源 `detail_blocks.resolve_image_file`）·
   `GET /api/miniapp/activities/past`（往期活动回顾，**按"开始已过 24h"取数**，见 `service.PAST_AFTER_HOURS`）·
   `GET /api/miniapp/activities/{id}/detail-image?name=`（配图出图，**只接受 basename**，目录服务端写死 +
-  文件名前缀必须等于活动 id → 路径穿越与越权同时封死）。
+  文件名前缀必须等于活动 id → 路径穿越与越权同时封死；家长 token 渠道，query token 或 Authorization 头均可）。
+  注：`PUT …/detail-blocks` 的响应是**原始块**（图片为相对路径），不是渲染视图——要让前端展示时须自己拼 URL。
+- **2026-09-21 增补（借阅台扫码闭环，任务包 A–D 批）**：
+  `GET /api/admin/circulation/children/by-code/{member_code}/card`（扫会员码取卡片；**必须声明在 `/{child_id}/card` 之前**——
+  否则 `by-code` 会被当成 int 路径参数解析；码不合法 422 与查无此人 404 **分开报**，馆员分得清"扫错码"还是"没建档"）·
+  `POST /api/admin/circulation/scan`（**扫码统一判定**：`member` 扫到会员码 / `borrow` / `return` / `checkout` 自己的预约自动核销；
+  **不能办的情况一律走 409/422 异常**（别人借出/别人预约锁定/维护/遗失），不新增第二套错误协议）·
+  `GET /api/admin/circulation/records`（借还记录：分页 + 关键词/状态/时间段，含**借出与归还操作人**）·
+  `GET /api/admin/circulation/records/export`（xlsx，**按当前筛选**导出，非全量）·
+  小程序 `children` 载荷（`identity/auth.py` 单一序列化出口）新增 **`member_code`**（会员码：M+8 位随机+校验位，客户端只展示不派生）。
 - **2026-09-12 增补端点族（WM15-A/B + fix33，路径与参数均为代码实取）**：
   `GET /api/miniapp/circle/posts`（`child_id` 必传 → `liked_by_me` 随当前孩子；`likers[].level`；
   帖 1 的 `likers` 含**合成的馆长条目** `{child_id:0, level:"GM", is_admin:true}`）；

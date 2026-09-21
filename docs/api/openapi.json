@@ -865,6 +865,11 @@
             "title": "Book Id",
             "type": "integer"
           },
+          "book_title": {
+            "default": "",
+            "title": "Book Title",
+            "type": "string"
+          },
           "borrowed_at": {
             "format": "date-time",
             "title": "Borrowed At",
@@ -873,6 +878,11 @@
           "child_id": {
             "title": "Child Id",
             "type": "integer"
+          },
+          "copy_code": {
+            "default": "",
+            "title": "Copy Code",
+            "type": "string"
           },
           "copy_id": {
             "title": "Copy Id",
@@ -1041,6 +1051,22 @@
           "available_quota": {
             "title": "Available Quota",
             "type": "integer"
+          },
+          "borrow_block": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borrow Block"
+          },
+          "borrow_block_hard": {
+            "default": false,
+            "title": "Borrow Block Hard",
+            "type": "boolean"
           },
           "borrow_limit": {
             "title": "Borrow Limit",
@@ -1312,6 +1338,18 @@
             "title": "Id",
             "type": "integer"
           },
+          "member_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "会员码（M+8 位随机+校验位，借阅台扫码识别用；2026-09-21 A 批）",
+            "title": "Member Code"
+          },
           "member_expire": {
             "anyOf": [
               {
@@ -1533,6 +1571,18 @@
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "member_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "会员码（M+8 位随机+校验位，借阅台扫码识别用；2026-09-21 A 批）",
+            "title": "Member Code"
           },
           "member_expire": {
             "anyOf": [
@@ -2725,6 +2775,48 @@
         "title": "PaginatedResponse[ParentWithStatsResponse]",
         "type": "object"
       },
+      "PaginatedResponse_RecordItemResponse_": {
+        "properties": {
+          "has_next": {
+            "default": false,
+            "description": "是否有下一页",
+            "title": "Has Next",
+            "type": "boolean"
+          },
+          "items": {
+            "description": "数据列表",
+            "items": {
+              "$ref": "#/components/schemas/RecordItemResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "default": 1,
+            "description": "当前页码",
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "default": 20,
+            "description": "每页数量",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "default": 0,
+            "description": "总数",
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "title": "PaginatedResponse[RecordItemResponse]",
+        "type": "object"
+      },
       "ParentCreateRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3095,6 +3187,116 @@
         "title": "ReadNotificationsRequest",
         "type": "object"
       },
+      "RecordItemResponse": {
+        "additionalProperties": false,
+        "description": "借还记录一行（2026-09-21 D 批）。操作人姓名为\"未记录\"时表示该行没记过（不编造）。",
+        "properties": {
+          "book_id": {
+            "title": "Book Id",
+            "type": "integer"
+          },
+          "book_title": {
+            "title": "Book Title",
+            "type": "string"
+          },
+          "borrowed_at": {
+            "format": "date-time",
+            "title": "Borrowed At",
+            "type": "string"
+          },
+          "borrowed_by_name": {
+            "title": "Borrowed By Name",
+            "type": "string"
+          },
+          "child_id": {
+            "title": "Child Id",
+            "type": "integer"
+          },
+          "child_name": {
+            "title": "Child Name",
+            "type": "string"
+          },
+          "copy_code": {
+            "title": "Copy Code",
+            "type": "string"
+          },
+          "copy_id": {
+            "title": "Copy Id",
+            "type": "integer"
+          },
+          "days_overdue": {
+            "title": "Days Overdue",
+            "type": "integer"
+          },
+          "due_at": {
+            "format": "date-time",
+            "title": "Due At",
+            "type": "string"
+          },
+          "parent_phone": {
+            "title": "Parent Phone",
+            "type": "string"
+          },
+          "record_id": {
+            "title": "Record Id",
+            "type": "integer"
+          },
+          "renew_used": {
+            "title": "Renew Used",
+            "type": "integer"
+          },
+          "returned_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned At"
+          },
+          "returned_by_name": {
+            "title": "Returned By Name",
+            "type": "string"
+          },
+          "returned_condition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned Condition"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "record_id",
+          "child_id",
+          "child_name",
+          "parent_phone",
+          "book_id",
+          "book_title",
+          "copy_id",
+          "copy_code",
+          "status",
+          "borrowed_at",
+          "due_at",
+          "renew_used",
+          "days_overdue",
+          "borrowed_by_name",
+          "returned_by_name"
+        ],
+        "title": "RecordItemResponse",
+        "type": "object"
+      },
       "RefundApplyRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3359,6 +3561,111 @@
           "approve"
         ],
         "title": "ReviewRequest",
+        "type": "object"
+      },
+      "ScanRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "child_id": {
+            "description": "当前读者（借阅台已选中的孩子）",
+            "title": "Child Id",
+            "type": "integer"
+          },
+          "code": {
+            "description": "扫码枪读到的码：会员码或图书 ISBN",
+            "maxLength": 40,
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "child_id",
+          "code"
+        ],
+        "title": "ScanRequest",
+        "type": "object"
+      },
+      "ScanResponse": {
+        "additionalProperties": false,
+        "description": "扫码判定结果（2026-09-21 C 批）。\n\n只覆盖**成功路径**（member / borrow / return / checkout）；\"不能借/不能还\"一律走既有异常\n（409/422 + 中文原因），前端沿用同一套提示与「人工放行」弹窗，不新增第二套错误协议。",
+        "properties": {
+          "action": {
+            "description": "member=扫到会员码 / borrow / return / checkout",
+            "title": "Action",
+            "type": "string"
+          },
+          "book_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Book Title"
+          },
+          "card": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChildCardResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "copy_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Copy Id"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "record": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BorrowRecordResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "action",
+          "message"
+        ],
+        "title": "ScanResponse",
         "type": "object"
       },
       "SigninRequest": {
@@ -6566,6 +6873,54 @@
         ]
       }
     },
+    "/api/admin/circulation/children/by-code/{member_code}/card": {
+      "get": {
+        "description": "按**会员码**取孩子卡片（借阅台扫\"会员码\"框走这里，2026-09-21 A 批）。\n\n声明在 `/{child_id}/card` **之前**——否则 \"by-code\" 会被当成 int 路径参数解析（同活动域\n`activities/past` 的先例）。码不合法与查无此人是**两种**错误：前者 422 提示\"码不合法\"，\n后者 404 提示\"未找到该会员码对应的孩子\"，让馆员分得清\"扫错码\"还是\"这孩子没建档\"。",
+        "operationId": "child_card_by_code_api_admin_circulation_children_by_code__member_code__card_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "member_code",
+            "required": true,
+            "schema": {
+              "title": "Member Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChildCardResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Child Card By Code",
+        "tags": [
+          "circulation"
+        ]
+      }
+    },
     "/api/admin/circulation/children/{child_id}/card": {
       "get": {
         "operationId": "child_card_api_admin_circulation_children__child_id__card_get",
@@ -6638,6 +6993,263 @@
           }
         ],
         "summary": "Overdue List",
+        "tags": [
+          "circulation"
+        ]
+      }
+    },
+    "/api/admin/circulation/records": {
+      "get": {
+        "description": "借还记录查询（2026-09-21 D 批）：借出与归还两条时间线、**含归还操作人**、分页 + 多条件。",
+        "operationId": "list_records_api_admin_circulation_records_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "孩子名 / 家长手机号 / 书名 / ISBN / 副本码",
+            "in": "query",
+            "name": "keyword",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "孩子名 / 家长手机号 / 书名 / ISBN / 副本码",
+              "title": "Keyword"
+            }
+          },
+          {
+            "description": "active/overdue/returned/lost",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "active/overdue/returned/lost",
+              "title": "Status"
+            }
+          },
+          {
+            "description": "按借出时间(borrowed)或归还时间(returned)筛",
+            "in": "query",
+            "name": "date_field",
+            "required": false,
+            "schema": {
+              "default": "borrowed",
+              "description": "按借出时间(borrowed)或归还时间(returned)筛",
+              "title": "Date Field",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_RecordItemResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Records",
+        "tags": [
+          "circulation"
+        ]
+      }
+    },
+    "/api/admin/circulation/records/export": {
+      "get": {
+        "description": "借还记录导出 Excel（**按当前筛选**导出，不是全量）。",
+        "operationId": "export_records_api_admin_circulation_records_export_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "keyword",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Keyword"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_field",
+            "required": false,
+            "schema": {
+              "default": "borrowed",
+              "title": "Date Field",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Export Records",
         "tags": [
           "circulation"
         ]
@@ -6730,6 +7342,53 @@
           }
         ],
         "summary": "Return Book",
+        "tags": [
+          "circulation"
+        ]
+      }
+    },
+    "/api/admin/circulation/scan": {
+      "post": {
+        "description": "扫码统一入口（2026-09-21 C 批）：**扫会员码 → 孩子卡片；扫 ISBN → 自动判借/还/核销**。\n\n馆员不再需要按\"借出\"按钮：一个枪、两个框（先会员后图书），扫完即出结果。",
+        "operationId": "scan_code_api_admin_circulation_scan_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Scan Code",
         "tags": [
           "circulation"
         ]
