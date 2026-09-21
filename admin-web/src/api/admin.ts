@@ -220,6 +220,13 @@ export function apiRunTask(taskName: string): Promise<{ task: string; status: st
   return request(`/api/admin/tasks/${taskName}/run`, { method: "POST" });
 }
 
+export type DashboardCharts = components["schemas"]["DashboardChartsResponse"];
+
+/** 仪表盘图形区数据（2026-09-21）：近 N 天借还趋势 / 热门书 TOP / 会员构成。 */
+export function apiDashboardCharts(days = 14, top = 5): Promise<DashboardCharts> {
+  return request(`/api/admin/dashboard/charts?days=${days}&top=${top}`);
+}
+
 export async function downloadExcel(path: string, filename: string): Promise<void> {
   const token = getToken();
   const res = await fetch(path, { headers: token ? { Authorization: `Bearer ${token}` } : {} });

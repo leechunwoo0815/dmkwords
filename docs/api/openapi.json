@@ -1004,6 +1004,31 @@
         "title": "BorrowRequest",
         "type": "object"
       },
+      "BorrowTrendPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "borrowed": {
+            "title": "Borrowed",
+            "type": "integer"
+          },
+          "date": {
+            "description": "MM-DD",
+            "title": "Date",
+            "type": "string"
+          },
+          "returned": {
+            "title": "Returned",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "borrowed",
+          "returned"
+        ],
+        "title": "BorrowTrendPoint",
+        "type": "object"
+      },
       "CheckOutResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1750,6 +1775,35 @@
         "title": "CopyStatusUpdateRequest",
         "type": "object"
       },
+      "DashboardChartsResponse": {
+        "additionalProperties": false,
+        "description": "仪表盘图形区数据（2026-09-21）：一次返回多张图所需聚合，前端 60s 轮询。",
+        "properties": {
+          "borrow_trend": {
+            "items": {
+              "$ref": "#/components/schemas/BorrowTrendPoint"
+            },
+            "title": "Borrow Trend",
+            "type": "array"
+          },
+          "hot_books": {
+            "items": {
+              "$ref": "#/components/schemas/HotBookItem"
+            },
+            "title": "Hot Books",
+            "type": "array"
+          },
+          "member_status": {
+            "items": {
+              "$ref": "#/components/schemas/MemberStatusItem"
+            },
+            "title": "Member Status",
+            "type": "array"
+          }
+        },
+        "title": "DashboardChartsResponse",
+        "type": "object"
+      },
       "DashboardOverviewResponse": {
         "additionalProperties": false,
         "properties": {
@@ -2191,6 +2245,30 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HotBookItem": {
+        "additionalProperties": false,
+        "properties": {
+          "book_id": {
+            "title": "Book Id",
+            "type": "integer"
+          },
+          "borrow_count": {
+            "title": "Borrow Count",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "book_id",
+          "title",
+          "borrow_count"
+        ],
+        "title": "HotBookItem",
+        "type": "object"
+      },
       "ImportResultResponse": {
         "additionalProperties": false,
         "properties": {
@@ -2274,6 +2352,25 @@
           }
         },
         "title": "MemberStatusActionRequest",
+        "type": "object"
+      },
+      "MemberStatusItem": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "count"
+        ],
+        "title": "MemberStatusItem",
         "type": "object"
       },
       "NotificationReadStatusRequest": {
@@ -7559,6 +7656,65 @@
           }
         ],
         "summary": "Dashboard Overview",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/dashboard/charts": {
+      "get": {
+        "description": "仪表盘图形区聚合（2026-09-21）：近 N 天借还趋势 / 近 30 天热门书 TOP / 会员构成。\n\n与 `/dashboard` 分开：图形区可独立刷新（投屏时 60s 轮询），不必连带拉待办与配置变更。",
+        "operationId": "dashboard_charts_api_admin_dashboard_charts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 14,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "top",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "title": "Top",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardChartsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Dashboard Charts",
         "tags": [
           "admin"
         ]

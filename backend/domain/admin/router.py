@@ -9,6 +9,7 @@ from backend.domain.admin.schemas import (
     AdminNotificationHandleRequest,
     AdminUserResponse,
     AuditLogResponse,
+    DashboardChartsResponse,
     DashboardOverviewResponse,
     LoginRequest,
     LoginResponse,
@@ -92,6 +93,22 @@ def list_audit_logs(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/dashboard/charts", response_model=DashboardChartsResponse)
+def dashboard_charts(
+    days: int = 14,
+    top: int = 5,
+    admin: AdminUser = Depends(require_perm("dashboard.view")),
+    db: Session = Depends(get_db),
+):
+    """仪表盘图形区聚合（2026-09-21）：近 N 天借还趋势 / 近 30 天热门书 TOP / 会员构成。
+
+    与 `/dashboard` 分开：图形区可独立刷新（投屏时 60s 轮询），不必连带拉待办与配置变更。
+    """
+    from backend.domain.admin.charts_service import DashboardChartsService
+
+    return DashboardChartsService(db).charts(days=days, top=top)
 
 
 @router.get("/dashboard", response_model=DashboardOverviewResponse)

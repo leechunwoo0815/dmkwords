@@ -1087,6 +1087,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/dashboard/charts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dashboard Charts
+         * @description 仪表盘图形区聚合（2026-09-21）：近 N 天借还趋势 / 近 30 天热门书 TOP / 会员构成。
+         *
+         *     与 `/dashboard` 分开：图形区可独立刷新（投屏时 60s 轮询），不必连带拉待办与配置变更。
+         */
+        get: operations["dashboard_charts_api_admin_dashboard_charts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/dashboard/export": {
         parameters: {
             query?: never;
@@ -3717,6 +3739,18 @@ export interface components {
              */
             override_reason?: string | null;
         };
+        /** BorrowTrendPoint */
+        BorrowTrendPoint: {
+            /** Borrowed */
+            borrowed: number;
+            /**
+             * Date
+             * @description MM-DD
+             */
+            date: string;
+            /** Returned */
+            returned: number;
+        };
         /** CheckOutResponse */
         CheckOutResponse: {
             /** Borrow Record Id */
@@ -3974,6 +4008,18 @@ export interface components {
              */
             status: string;
         };
+        /**
+         * DashboardChartsResponse
+         * @description 仪表盘图形区数据（2026-09-21）：一次返回多张图所需聚合，前端 60s 轮询。
+         */
+        DashboardChartsResponse: {
+            /** Borrow Trend */
+            borrow_trend?: components["schemas"]["BorrowTrendPoint"][];
+            /** Hot Books */
+            hot_books?: components["schemas"]["HotBookItem"][];
+            /** Member Status */
+            member_status?: components["schemas"]["MemberStatusItem"][];
+        };
         /** DashboardOverviewResponse */
         DashboardOverviewResponse: {
             /**
@@ -4197,6 +4243,15 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HotBookItem */
+        HotBookItem: {
+            /** Book Id */
+            book_id: number;
+            /** Borrow Count */
+            borrow_count: number;
+            /** Title */
+            title: string;
+        };
         /** ImportResultResponse */
         ImportResultResponse: {
             /**
@@ -4231,6 +4286,13 @@ export interface components {
              * @default
              */
             reason: string;
+        };
+        /** MemberStatusItem */
+        MemberStatusItem: {
+            /** Count */
+            count: number;
+            /** Status */
+            status: string;
         };
         /** NotificationReadStatusRequest */
         NotificationReadStatusRequest: {
@@ -7073,6 +7135,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardOverviewResponse"];
+                };
+            };
+        };
+    };
+    dashboard_charts_api_admin_dashboard_charts_get: {
+        parameters: {
+            query?: {
+                days?: number;
+                top?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardChartsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

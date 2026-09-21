@@ -846,3 +846,107 @@ h1, h2, h3, h4, h5, h6,
   font-size: 13px;
   color: var(--paint-ink-light);
 }
+
+/* ---------- 仪表盘图形区：三列等宽网格（2026-09-21，用户要求"至少 6 个图"，两行对齐） ---------- */
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+@media (max-width: 1100px) {
+  .chart-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .chart-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.chart-card .ant-card-body {
+  min-height: 212px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.chart-empty {
+  color: var(--paint-ink-light);
+  font-size: 13px;
+  text-align: center;
+  padding: 28px 0;
+}
+/* 趋势折线 */
+.chart-trend-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--paint-ink-light);
+  margin-top: 2px;
+}
+.chart-trend-legend {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  margin-top: 6px;
+}
+/* 热门书条形 */
+.chart-hot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chart-hot-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 74px 26px;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--paint-ink);
+}
+.chart-hot-rank {
+  font-family: var(--font-mono);
+  font-weight: 800;
+  color: var(--paint-primary);
+}
+.chart-hot-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chart-hot-track {
+  height: 12px;
+  border: 2px solid var(--paint-ink);
+  border-radius: 8px;
+  background: var(--paint-paper-dim);
+  overflow: hidden;
+}
+.chart-hot-fill {
+  display: block;
+  height: 100%;
+  background: var(--paint-primary);
+}
+.chart-hot-num {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-align: right;
+}
+/* 小读者构成 */
+.chart-member {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chart-member-bar {
+  display: flex;
+  height: 26px;
+  border: 3px solid var(--paint-ink);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--paint-paper-dim);
+}
+.chart-member-seg {
+  display: block;
+  height: 100%;
+}
+.chart-member-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}

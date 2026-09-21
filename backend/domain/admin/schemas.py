@@ -127,3 +127,28 @@ class DashboardOverviewResponse(BaseSchema):
     quiz_pass_rate: float = 0.0
     milestone_count: int = 0
     pending_evaluation_count: int = 0
+
+
+class BorrowTrendPoint(BaseSchema):
+    date: str = Field(..., description="MM-DD")
+    borrowed: int
+    returned: int
+
+
+class HotBookItem(BaseSchema):
+    book_id: int
+    title: str
+    borrow_count: int
+
+
+class MemberStatusItem(BaseSchema):
+    status: str
+    count: int
+
+
+class DashboardChartsResponse(BaseSchema):
+    """仪表盘图形区数据（2026-09-21）：一次返回多张图所需聚合，前端 60s 轮询。"""
+
+    borrow_trend: list[BorrowTrendPoint] = Field(default_factory=list)
+    hot_books: list[HotBookItem] = Field(default_factory=list)
+    member_status: list[MemberStatusItem] = Field(default_factory=list)

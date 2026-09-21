@@ -107,6 +107,8 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
   `GET /api/miniapp/activities/{id}/detail-image?name=`（配图出图，**只接受 basename**，目录服务端写死 +
   文件名前缀必须等于活动 id → 路径穿越与越权同时封死；家长 token 渠道，query token 或 Authorization 头均可）。
   注：`PUT …/detail-blocks` 的响应是**原始块**（图片为相对路径），不是渲染视图——要让前端展示时须自己拼 URL。
+- **2026-09-21 增补（仪表盘图形区）**：`GET /api/admin/dashboard/charts?days=&top=`
+  （近 N 天借还趋势「连续日期序列、缺日补 0」+ 近 30 天热门书 TOP + 会员构成聚合；与 `/dashboard` 分开是为了让**图形区独立刷新**——投屏场景 60 秒轮询，不必连带拉待办与配置变更）。
 - **2026-09-21 增补（借阅台扫码闭环，任务包 A–D 批）**：
   `GET /api/admin/circulation/children/by-code/{member_code}/card`（扫会员码取卡片；**必须声明在 `/{child_id}/card` 之前**——
   否则 `by-code` 会被当成 int 路径参数解析；码不合法 422 与查无此人 404 **分开报**，馆员分得清"扫错码"还是"没建档"）·
