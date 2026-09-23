@@ -176,7 +176,12 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 | **A 级** | 仅 `admin-web/**` 纯前端文件 | `cd admin-web && pnpm exec tsc --noEmit` | ✅ 可以 | push 后 CI 会跑全量 gate；本地 commit 前只需 tsc 绿 |
 | **B 级** | 仅 `backend/**` 或 `tests/**` 单域 | 相关域 pytest 单文件 + `ruff check backend/ tests/` | ❌ 推荐再跑 `bash scripts/gate.sh full` 但非强制 | 例：`pytest tests/unit/test_wm2_catalog.py -q`（约 20-60s） |
 | **C 级** | `models/`、迁移、公共层、跨域调用 | `bash scripts/gate.sh full` | ❌ 必须本地绿 | 高传播面，本地全量 + CI 绿 |
+| **B′ 级（2026-09-21 补）** | 仅 `miniapp/**`（页面/组件/样式/文案） | `.venv/bin/python -m scripts.check_miniapp_style` + `check_miniapp_bindings` + `check_media_discipline`（**再加一次真机截图目视**，见 docs/15 §二十） | ❌ 不必本地全量 | 小程序**没有 pytest/tsc 可跑**——它的"测试"就是那三个检查器 + 截图；`gate.sh` 第 [5] 步与它们同源 |
+| **B″ 级（2026-09-21 补）** | 仅 `scripts/**`（一次性生成器/运维脚本/检查器；**不含**改 schema 或业务逻辑） | `ruff check backend/ tests/ features/ scripts/` + `ruff format --check .` + **跑引用该脚本的测试**（`grep -rln "<脚本名>" tests/`） | ❌ 不必本地全量 | 数据性改动（如 seed 里改演示书名）**不触发全量门禁**；改了检查器本身则务必 check+format 两条都跑（红线 46） |
 | **D 级** | 仅文档/文字：`docs/**`、`*.md`、`error_list/**`、`外部专家意见/**`、代码注释文字 | **不跑门禁**（无代码语义变更） | ❌ **不单独推、不等 CI** | 攒批合并进下一次推送（红线 37）；判据：`git diff --name-only` 全落在上述路径 |
+
+> **2026-09-21 用户质问「该文档为什么要跑门禁？」后的订正**：上面 B′/B″ 两行是补的空白——此前表里只有 admin-web/backend/models/docs 四类，
+> **`miniapp/**` 与 `scripts/**` 没有归级**，我（模型）于是习惯性对"改了 seed 一处书名 + 交接文档"也开全量门禁，白跑 15 分钟。**分级照改动面判定，验证成本与风险成正比**（本条与本节开头那句同源）。
 
 ### 不变纪律
 
