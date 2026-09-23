@@ -1282,6 +1282,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/media/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Media Health
+         * @description 最新一份盘点报告 + 回收站统计（只读，不改任何文件）。
+         */
+        get: operations["media_health_api_admin_media_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/media/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Media Trash
+         * @description 把孤儿图移入回收站（**仅超管**；只移动不物理删除，可还原）。
+         */
+        post: operations["media_trash_api_admin_media_trash_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/media/trash/empty": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Media Empty Trash
+         * @description 清空回收站（**仅超管**）：跳过 30 天等待期永久删除，但**复检闸门照跑**——
+         *     仍被数据库引用的条目会被当场救回原位（见响应里的 `restored`），不会删掉。
+         */
+        post: operations["media_empty_trash_api_admin_media_trash_empty_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/media/trash/{entry_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Media Restore
+         * @description 从回收站还原（**仅超管**；原位置被占用时拒绝，不覆盖）。
+         */
+        post: operations["media_restore_api_admin_media_trash__entry_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/members/children": {
         parameters: {
             query?: never;
@@ -1974,6 +2055,9 @@ export interface paths {
         /**
          * Serve Upload
          * @description 上传文件访问（鉴权下发；封面后续小程序端另行开放只读路由）。
+         *
+         *     回收站目录**不下发**（2026-09-23，docs/15 §22.2 第 4 道防线）——已判定孤儿的文件在回收站里
+         *     等还原或到期清除，不该还能从 Web 访问到。路径口径单一来源：`backend/common/media_paths`。
          */
         get: operations["serve_upload_api_admin_uploads__path__get"];
         put?: never;
@@ -4277,6 +4361,161 @@ export interface components {
             /** Permissions */
             permissions: string[];
             user: components["schemas"]["AdminUserResponse"];
+        };
+        /**
+         * MediaBreakdownItem
+         * @description 按一级目录的孤儿明细（cover/ circle/ reports/ book_audio/）。
+         */
+        MediaBreakdownItem: {
+            /** Bucket */
+            bucket: string;
+            /** Bytes */
+            bytes: number;
+            /** Files */
+            files: number;
+        };
+        /**
+         * MediaCensusResponse
+         * @description 一次盘点的报告——运营在任务看板看到的"孤儿图 N 张 / X MB"就是这里的两个字段。
+         */
+        MediaCensusResponse: {
+            /** Breakdown */
+            breakdown?: components["schemas"]["MediaBreakdownItem"][];
+            /** Created At */
+            created_at: string;
+            /** Files Total */
+            files_total: number;
+            /** Id */
+            id: number;
+            /** Missing Refs */
+            missing_refs: number;
+            /** Orphan Bytes */
+            orphan_bytes: number;
+            /** Orphan Files */
+            orphan_files: number;
+            /** Protected Total */
+            protected_total: number;
+            /** Referenced Total */
+            referenced_total: number;
+            /**
+             * Trigger
+             * @description scheduled/manual/after_trash/after_restore
+             */
+            trigger: string;
+        };
+        /** MediaEmptyTrashRequest */
+        MediaEmptyTrashRequest: {
+            /**
+             * Reason
+             * @description 清空原因（必填；永久删除不可恢复，审计留痕）
+             */
+            reason: string;
+        };
+        /**
+         * MediaEmptyTrashResponse
+         * @description 清空回收站的结果：`restored > 0` 说明复检闸门当场救回了"又被引用"的图。
+         */
+        MediaEmptyTrashResponse: {
+            census: components["schemas"]["MediaCensusResponse"];
+            /** Purged */
+            purged: number;
+            /** Purged Bytes */
+            purged_bytes: number;
+            /** Restored */
+            restored: number;
+        };
+        /** MediaHealthResponse */
+        MediaHealthResponse: {
+            census?: components["schemas"]["MediaCensusResponse"] | null;
+            trash: components["schemas"]["MediaTrashSummary"];
+        };
+        /** MediaRestoreResponse */
+        MediaRestoreResponse: {
+            census: components["schemas"]["MediaCensusResponse"];
+            /** Rel Path */
+            rel_path: string;
+        };
+        /** MediaTrashItem */
+        MediaTrashItem: {
+            /** Actor Name */
+            actor_name: string;
+            /** Batch */
+            batch: string;
+            /** Bucket */
+            bucket: string;
+            /** Bytes */
+            bytes: number;
+            /** Created At */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Rel Path */
+            rel_path: string;
+            /** Restore Until */
+            restore_until: string;
+        };
+        /** MediaTrashRequest */
+        MediaTrashRequest: {
+            /**
+             * All Orphans
+             * @description true = 清理当前盘点出的全部孤儿（运营按钮主路径）
+             * @default false
+             */
+            all_orphans: boolean;
+            /**
+             * Paths
+             * @description 要清理的相对路径（与 all_orphans 二选一）
+             */
+            paths?: string[];
+            /**
+             * Reason
+             * @description 清理原因（必填，审计留痕）
+             */
+            reason: string;
+        };
+        /** MediaTrashResponse */
+        MediaTrashResponse: {
+            /** Batch */
+            batch: string;
+            census: components["schemas"]["MediaCensusResponse"];
+            /** Moved */
+            moved: number;
+            /** Moved Bytes */
+            moved_bytes: number;
+            /** Skipped */
+            skipped?: components["schemas"]["MediaTrashSkippedItem"][];
+        };
+        /** MediaTrashSkippedItem */
+        MediaTrashSkippedItem: {
+            /** Path */
+            path: string;
+            /** Reason */
+            reason: string;
+        };
+        /** MediaTrashSummary */
+        MediaTrashSummary: {
+            /** Bytes */
+            bytes: number;
+            /** Files */
+            files: number;
+            /** Items */
+            items?: components["schemas"]["MediaTrashItem"][];
+            /**
+             * Min Age Minutes
+             * @description 最小年龄闸门（分钟）
+             */
+            min_age_minutes: number;
+            /**
+             * Retain Days
+             * @description 回收站保留天数（到期复检后清除）
+             */
+            retain_days: number;
+            /**
+             * Unmanaged
+             * @description 回收站里没有记账的文件数（清场重建等外部清库造成；下次盘点自动接管，不删文件）
+             * @default 0
+             */
+            unmanaged: number;
         };
         /** MemberStatusActionRequest */
         MemberStatusActionRequest: {
@@ -7453,6 +7692,123 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+        };
+    };
+    media_health_api_admin_media_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaHealthResponse"];
+                };
+            };
+        };
+    };
+    media_trash_api_admin_media_trash_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MediaTrashRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaTrashResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    media_empty_trash_api_admin_media_trash_empty_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MediaEmptyTrashRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaEmptyTrashResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    media_restore_api_admin_media_trash__entry_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaRestoreResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

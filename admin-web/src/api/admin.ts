@@ -196,6 +196,9 @@ export interface TaskSpecItem {
   display_name: string;
   group: string;
   interval_seconds: number;
+  /** cron 任务的钟点文案（例：每天 08:00）；interval 任务由前端按秒数折算 */
+  schedule_text?: string | null;
+  cron_expr?: string | null;
   last_run?: { status: string; processed: number; error: string | null; started_at: string } | null;
 }
 
@@ -218,6 +221,43 @@ export function apiTaskRuns(limit = 20): Promise<{ items: TaskRunItem[] }> {
 
 export function apiRunTask(taskName: string): Promise<{ task: string; status: string; processed?: number; error?: string }> {
   return request(`/api/admin/tasks/${taskName}/run`, { method: "POST" });
+}
+
+// ---------- 媒体体检（docs/15 §二十二） ----------
+
+export type MediaHealth = components["schemas"]["MediaHealthResponse"];
+type MediaTrashRequest = components["schemas"]["MediaTrashRequest"];
+export type MediaTrashResult = components["schemas"]["MediaTrashResponse"];
+export type MediaCensus = components["schemas"]["MediaCensusResponse"];
+
+/** 最新盘点报告 + 回收站统计（专员可看，只读）。 */
+export function apiMediaHealth(): Promise<MediaHealth> {
+  return request("/api/admin/media/health");
+}
+
+/** 把孤儿图移入回收站（**仅超管**；allOrphans=true 表示清当前全部孤儿）。 */
+export function apiMediaTrash(
+  reason: string,
+  allOrphans = true,
+  paths: string[] = []
+): Promise<MediaTrashResult> {
+  const body: MediaTrashRequest = { reason, all_orphans: allOrphans, paths };
+  return request("/api/admin/media/trash", { method: "POST", body: JSON.stringify(body) });
+}
+
+/** 从回收站还原（**仅超管**）。 */
+export function apiMediaRestore(entryId: number): Promise<components["schemas"]["MediaRestoreResponse"]> {
+  return request(`/api/admin/media/trash/${entryId}/restore`, { method: "POST" });
+}
+
+/** 清空回收站（**仅超管**；永久删除，但删除前仍复检引用，被引用的条目会自动还原）。 */
+export function apiMediaEmptyTrash(
+  reason: string
+): Promise<components["schemas"]["MediaEmptyTrashResponse"]> {
+  return request("/api/admin/media/trash/empty", {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
 }
 
 export type DashboardCharts = components["schemas"]["DashboardChartsResponse"];

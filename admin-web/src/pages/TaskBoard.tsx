@@ -12,6 +12,7 @@ import { PlayCircleOutlined, ReloadOutlined } from "@ant-design/icons";
 
 import PaintEmpty from "../components/PaintEmpty";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
+import MediaHealthPanel from "../components/MediaHealthPanel";
 import {
   apiRunTask,
   apiTaskRuns,
@@ -25,6 +26,7 @@ const GROUP_COLORS: Record<string, string> = {
   借阅: "green",
   资金: "red",
   活动: "orange",
+  系统: "purple",
 };
 
 function statusTag(status: string): React.ReactNode {
@@ -111,6 +113,7 @@ export default function TaskBoard() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <MediaHealthPanel />
       <Card
         title="定时任务"
         extra={
@@ -138,8 +141,14 @@ export default function TaskBoard() {
               title: "执行周期",
               dataIndex: "interval_seconds",
               width: 110,
-              render: (s: number) =>
-                s >= 86400 ? "每天" : s >= 3600 ? `每 ${s / 3600} 小时` : `每 ${s / 60} 分钟`,
+              // 后端给 schedule_text（cron 任务要显示钟点，例：每天 08:00）；老字段兜底保留
+              render: (_: number, r: TaskSpecItem) =>
+                r.schedule_text ??
+                (r.interval_seconds >= 86400
+                  ? "每天"
+                  : r.interval_seconds >= 3600
+                    ? `每 ${r.interval_seconds / 3600} 小时`
+                    : `每 ${r.interval_seconds / 60} 分钟`),
             },
             {
               title: "上次运行",
