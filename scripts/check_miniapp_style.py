@@ -29,7 +29,15 @@
                  专治「注释写成 `*/`（JS 习惯）→ 注释吞掉半页模板 → 标签配对错位」：
                  2026-09-20 实测该错误让小程序整页编译失败，且**报错行指向的是别处**
                  （`.wxml:79: expect end-tag view, near block`），模拟器停在旧帧极难定位。
-  ↑ R1–R7 为最初七条；R8–R11 为后续插修补入；R12/R13 为 2026-09-16 两批补入；R14 为 2026-09-20 补入。
+  R16 类名两端对账（2026-09-23，G2 定标；规则见 docs/15 §15.8）:
+                 **R16a 死类名** = 本页 wxss 定义了、但本页 wxml（含插值可判部分）+ js 文本里都找不到
+                 → 死样式或"名字对不上"；基线按**文件计数**（首扫 725 条 / 26 文件，只减不增）。
+                 **R16b JS 提供的类名必须存在** = JS 里以类名身份给出的字符串（`cls:`/`className:`/
+                 `class:` 的值）必须在本页 wxss 作用域内有定义 → 否则端上**静默不生效**。
+                 专治 R12 的反方向盲区：订单图标 JS 给 `type1`、WXSS 写 `.order-icon-type1`
+                 → 底色从上线起从未生效、且无任何报错（错误库 §一百）。
+  ↑ R1–R7 为最初七条；R8–R11 为后续插修补入；R12/R13 为 2026-09-16 两批补入；R14 为 2026-09-20 补入；
+    R16 为 2026-09-23 补入（G2 定标：先立 docs/15 §15.8 规范，再设门禁）。
     **以 main() 实际打印的规则清单为准**（历史教训：docstring 只列七条、实现已十一条，
     2026-09-20 又发现漏列 R13——文档与代码不同步是这类检查器的惯犯，改规则必改本清单）。
 
@@ -686,6 +694,168 @@ def scan_undefined_classes(base: Path = MINIAPP):
     return new, baseline_hits
 
 
+# ---------------- R16 类名两端对账（2026-09-23，G2 定标；规则见 docs/15 §15.8）----------------
+# 来由：R12 只查「WXML→WXSS」一个方向；反方向（WXSS 定义了、名字对不上/没人用）是盲区——
+# 订单类型图标 JS 给 `type1`、WXSS 写 `.order-icon-type1` → **底色从上线起从未生效且无报错**。
+#
+# R16a 死类名：本页 wxss 定义、但本页 wxml（含插值可判部分）+ js 文本都找不到 → 死样式/名字对不上。
+#   基线 = **每文件计数**（首扫实测 725 条 / 26 个文件；逐条列 725 个名字太臃肿，按文件计数等价：
+#   同文件新增死类名即超基线 → 红）。**只减不增**；清理单列任务（docs/09 §十二 挂账）。
+R16_BASELINE: dict[str, int] = {
+    # 2026-09-23 首扫实测（只减不增）；清理见 docs/09 G9。
+    # 2026-09-23 口径修正：作用域**镜像 R12**（页面 = 同目录 wxml/js；组件 = 同名）——
+    #   原按"同名 wxml/js"配对，把 `refund-apply/` 下 `refund-calc.wxml` 用的 `calc-*` 误判成死类
+    #   （照此误删 13 处定义、**被 R12 当场拦下**）；修正后 725 → 714：
+    #   refund-apply 67→58 / circle.share 3→2 / circle.profile 2→1。
+    # 2026-09-23 G9 清理（两批做完）：725 首扫 → 714（口径修正）→ **72**
+    #   （第一批四个大户 286→29；第二批 21 个文件 + 组件；共删选择器 ~500 个、
+    #    reader.wxss 27.5KB→10.2KB 等）。**残留 72 条**全部是"与活类共处同一组合选择器"的
+    #    （如 `.progress-fill.active`），保守口径不删——它们规则整条还活着，删了要拆选择器。
+    "pages/reading-pkg/reader/reader.wxss": 13,
+    "pages/member-pkg/checkin/checkin.wxss": 10,
+    "pages/order-pkg/benefit-transfer/benefit-transfer.wxss": 9,
+    "pages/reading-pkg/book-detail/book-detail.wxss": 9,
+    "pages/order-pkg/refund-apply/refund-apply.wxss": 5,
+    "pages/order-pkg/reservation/reservation.wxss": 5,
+    "pages/reading-pkg/quiz/quiz.wxss": 5,
+    "pages/member/member.wxss": 3,
+    "pages/order-pkg/order-history/order-history.wxss": 3,
+    "pages/order-pkg/withdrawal/withdrawal.wxss": 3,
+    "pages/member-pkg/achievement/achievement.wxss": 2,
+    "pages/member-pkg/profile-card/profile-card.wxss": 2,
+    "pages/login/login.wxss": 1,
+    "pages/member-pkg/leaderboard/leaderboard.wxss": 1,
+    "pages/reading-pkg/quiz-result/quiz-result.wxss": 1,
+}
+R16_BASELINE_TOTAL = 72
+
+# R16b JS 提供的类名：`cls:` / `className:` / `class:` 的值必须是**全名**且本页 wxss 有定义。
+# 这条直接锁住订单图标那族 bug（前缀留在模板里拼 = 两端对不上，任何静态检查都救不了）。
+RE_JS_CLASS_VALUE = re.compile(
+    r"\b(?:cls|className|class|extraCls|stateClass|chipCls)\s*:\s*['\"]([^'\"]+)['\"]"
+)
+
+
+RE_WXSS_COMMENT = re.compile(r"/\*.*?\*/", re.S)
+
+
+def _wxss_defined_classes(path: Path) -> set[str]:
+    """单文件定义的类名——**只取选择器区**。
+
+    2026-09-23 修正（R16a 首扫踩的坑）：早先直接在全文上正则 `\\.(\\w+)`，把
+    `@import "../x.wxss"` 的 `wxss`、`url(x.png)` 的 `png` 也当成类名（首扫 769 条里混着这类噪声）。
+    正确做法：去注释 → 去 @import → 只对「每个 `{` 之前的选择器文本」抽 `.类名`。
+    """
+    text = RE_WXSS_COMMENT.sub(" ", path.read_text(encoding="utf-8"))
+    text = re.sub(r"@import[^;]*;", " ", text)
+    out: set[str] = set()
+    for m in re.finditer(r"([^{}]*)\{", text):
+        out |= set(re.findall(r"\.(-?[A-Za-z_][A-Za-z0-9_\-]*)", m.group(1)))
+    return out
+
+
+def _wxss_scope_files(css_paths, seen=None) -> list[Path]:
+    """作用域内的 wxss 文件清单（含 @import 链；与 `_wxss_scope` 同口径）。"""
+    seen = seen if seen is not None else set()
+    out: list[Path] = []
+    for p in css_paths:
+        p = Path(p)
+        if p in seen or not p.exists():
+            continue
+        seen.add(p)
+        out.append(p)
+        raw = p.read_text(encoding="utf-8")
+        for imp in re.findall(r"@import\s+[\"']([^\"']+)[\"']", raw):
+            out += _wxss_scope_files([(p.parent / imp).resolve()], seen)
+    return out
+
+
+def scan_dead_classes(base: Path = MINIAPP):
+    """R16a: 本页 wxss 定义的类，在本页 wxml + js 里都找不到（死类名 / 名字对不上）。
+
+    与 R12 的分工：R12 管「模板用了没样式」，R16a 管「样式写了没人用」——同一族的两端。
+    保守口径（宁漏勿误）：**js 文本里出现过该名字即算"用到了"**（样式可能由 setData 拼出来），
+    只报"wxml 和 js 两处都查无此名"的类，避免把动态类名误判成死类名。
+    """
+    out: list[tuple[str, str, str]] = []  # (wxss 相对路径, 类名, 备注)
+    for css in sorted(base.rglob("*.wxss")):
+        if "__pycache__" in css.parts:
+            continue
+        rel = str(css.relative_to(base))
+        if rel == "app.wxss":
+            continue  # 全局样式：跨页共享，按页判"没人用"会整片误报
+        own = _wxss_defined_classes(css)  # 只算**本文件**定义的类
+        if not own:
+            continue
+        # 作用域口径必须**镜像 R12**（2026-09-23 教训：此处原先只配同名 wxml/js，而
+        # `refund-apply/` 目录下有 `refund-apply.wxml` + `refund-calc.wxml` 两个模板共享该目录
+        # wxss → 兄弟模板用的 `calc-*` 被误判成死类，误删 13 处定义，**被 R12 当场拦下**）：
+        #   页面 = 同目录全部 wxml/js（WXSS 按目录/页隔离）；组件 = 同名 wxml/js（同 R12 的分支）。
+        if "components" in css.parts:
+            scope_wxml = [css.with_suffix(".wxml")]
+            scope_js = [css.with_suffix(".js")]
+        else:
+            scope_wxml = sorted(css.parent.glob("*.wxml"))
+            scope_js = sorted(css.parent.glob("*.js"))
+        used: set[str] = set()
+        for wxml in scope_wxml:
+            if not wxml.exists():
+                continue
+            text = wxml.read_text(encoding="utf-8")
+            for m in re.finditer(r'class\s*=\s*"([^"]*)"', text):
+                used |= _class_tokens_from_attr(m.group(1))
+        js_text = "\n".join(js.read_text(encoding="utf-8") for js in scope_js if js.exists())
+        for name in sorted(own - used):
+            if name in js_text:
+                continue  # 保守：JS 里提过就当"可能在用"（动态拼类名）
+            out.append((rel, name, "wxml+js 都未引用"))
+    return out
+
+
+def r16a_over_baseline(findings: list[tuple[str, str, str]]):
+    """按**文件**比对 R16_BASELINE：某文件死类名数超过基线即违规（只减不增）。"""
+    from collections import Counter
+
+    per = Counter(f for f, _n, _c in findings)
+    over = [
+        (f, c, R16_BASELINE.get(f, 0)) for f, c in sorted(per.items()) if c > R16_BASELINE.get(f, 0)
+    ]
+    return over, sum(per.values())
+
+
+def scan_js_class_names(base: Path = MINIAPP):
+    """R16b: JS 以类名身份给出的字符串（cls/className/class 的值），本页 wxss 必须有定义。
+
+    作用域与 R12 同口径（同目录 wxss + app.wxss + @import 链）；WXSS 按页隔离，别的页面定义了不算。
+    """
+    out: list[tuple[str, int, str]] = []
+    for js in sorted(base.rglob("*.js")):
+        if "__pycache__" in js.parts or "libs" in js.parts:
+            continue
+        rel = str(js.relative_to(base))
+        text = js.read_text(encoding="utf-8")
+        hits = list(RE_JS_CLASS_VALUE.finditer(text))
+        if not hits:
+            continue
+        scope_css: list[Path] = [base / "app.wxss"]
+        if "components" in js.parts and (js.with_suffix(".wxss")).exists():
+            scope_css.append(js.with_suffix(".wxss"))
+        else:
+            scope_css += sorted(js.parent.glob("*.wxss"))
+        defined: set[str] = set()
+        for css in _wxss_scope_files(scope_css):
+            defined |= _wxss_defined_classes(css)
+        for m in hits:
+            # 组合类名（'a b'）按空格拆开逐个判；只判"名字形状"合法的 token，
+            # 模板表达式（{{...}}）与路径/枚举不判（防误报）。
+            for name in m.group(1).split():
+                if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_\-]*", name):
+                    continue
+                if name not in defined:
+                    out.append((rel, text[: m.start()].count("\n") + 1, name))
+    return out
+
+
 # R13 图标槽位（2026-09-16）：两件事必须机器看得住
 #   a) 图标槽位（class 含 icon/emoji）里**不许出现 emoji**——三端渲染不一致、颜色与令牌无关；
 #   b) 引用的图标资产必须真的存在（`/icons/ui/x.png` / `icon-name="x"`）。
@@ -959,6 +1129,17 @@ def self_test(tokens: set[str]) -> list[str]:
         (tmp / "pages/ghost.wxml").write_text(
             "<view class=\"ghost {{ok ? 'a' : 'missing-cond'}}\">x</view>\n", encoding="utf-8"
         )
+        # R16 注入样本（2026-09-23）：r16.wxss 定义两个类、wxml 只用 used-cls
+        #   → dead-cls-x 必须被判死（R16a）；used-cls 不许误报
+        #   r16.js 给出 cls 值：used-cls 合规 / no-such-cls-zzz 必须判违规（R16b）
+        (tmp / "pages/r16.wxss").write_text(
+            ".used-cls { color: #fff; }\n.dead-cls-x { color: #fff; }\n", encoding="utf-8"
+        )
+        (tmp / "pages/r16.wxml").write_text('<view class="used-cls">x</view>\n', encoding="utf-8")
+        (tmp / "pages/r16.js").write_text(
+            "const t = { cls: 'used-cls' }\nconst u = { cls: 'no-such-cls-zzz' }\n",
+            encoding="utf-8",
+        )
 
         app_wxss = tmp / "app.wxss"
         toks = token_values(app_wxss.read_text(encoding="utf-8"))
@@ -995,6 +1176,16 @@ def self_test(tokens: set[str]) -> list[str]:
             failures.append(f"S1 悬空类名漏检: {r12_new}")
         if "a" in r12_hits:
             failures.append(f"S1 悬空类名误报（.a 在 demo.wxss 已定义）: {r12_new}")
+        dead = {(f, n) for f, n, _c in scan_dead_classes(base=tmp)}
+        if ("pages/r16.wxss", "dead-cls-x") not in dead:
+            failures.append(f"S1 死类名漏检（R16a）: {sorted(dead)}")
+        if ("pages/r16.wxss", "used-cls") in dead:
+            failures.append("S1 死类名误报（R16a：used-cls 在 wxml 用了）")
+        js_cls = {n for _f, _l, n in scan_js_class_names(base=tmp)}
+        if "no-such-cls-zzz" not in js_cls:
+            failures.append(f"S1 JS 类名未定义漏检（R16b）: {sorted(js_cls)}")
+        if "used-cls" in js_cls:
+            failures.append("S1 JS 类名误报（R16b：used-cls 在 wxss 已定义）")
         r13e = scan_icon_emoji(base=tmp)
         r13a = scan_icon_assets(base=tmp)
         if not r13e:
@@ -1064,6 +1255,9 @@ def main() -> int:
     nofb = scan_component_fallback(wxss)
     selv = scan_selector_var(wxss)
     undef_new, undef_base = scan_undefined_classes()
+    dead_cls = scan_dead_classes()
+    dead_over, dead_total = r16a_over_baseline(dead_cls)
+    js_cls_bad = scan_js_class_names()
     icon_emoji = scan_icon_emoji()
     copy_emoji = scan_copy_emoji()
     wxml_calls = scan_wxml_calls()
@@ -1100,6 +1294,11 @@ def main() -> int:
         f"R12 悬空类名(WXML 用到、本页 wxss 无定义): 新违规 {len(undef_new)} / "
         f"基线待清 {n_base} 个类名（命中 {len(undef_base)} 处引用，只许减）"
     )
+    print(
+        f"R16a 死类名(本页 wxss 定义、wxml+js 都没用): 违规文件 {len(dead_over)} / "
+        f"待清总量 {dead_total}（基线 {R16_BASELINE_TOTAL}，只许减）"
+    )
+    print(f"R16b JS 提供的类名(本页 wxss 必须有定义): 违规 {len(js_cls_bad)}")
     print(f"豁免白名单: {len(WHITELIST)} 条（初始 0 条，遇一例议一例）")
     for suffix, pattern, reason, date in WHITELIST:
         print(f"  - {suffix} /{pattern}/ {reason} ({date})")
@@ -1132,6 +1331,11 @@ def main() -> int:
     dump("R10 组件缺字面兜底", nofb)
     dump("R11 非法选择器", selv)
     dump("R12 悬空类名（新违规，必须修）", undef_new)
+    dump("R16b JS 提供的类名在本页 wxss 无定义（端上静默不生效）", js_cls_bad)
+    dump(
+        "R16a 死类名待清（按文件计数基线，只减不增；清理见 docs/09 §十二）",
+        sorted(dead_cls, key=lambda r: r[0])[:24],
+    )
     dump("R13a 图标槽位 emoji（必须换 /icons/ui 资产）", icon_emoji)
     dump("R13c 文案 emoji（图标走 /icons/ui 资产；排版字形白名单除外）", copy_emoji)
     dump("R15 WXML 表达式里的方法调用（判定逻辑必须放 JS）", wxml_calls)
@@ -1144,6 +1348,12 @@ def main() -> int:
         errors.append(f"R11 {f}:{ln} 非法选择器（选择器位置出现 var）: {d}")
     for f, ln, d in undef_new:
         errors.append(f"R12 {f}:{ln} 悬空类名 .{d}（WXML 用到但本页 wxss 无定义）")
+    for f, got, limit in dead_over:
+        errors.append(
+            f"R16a {f}: 死类名 {got} 处 > 基线 {limit}（本页 wxss 定义了但 wxml+js 都没用；只减不增）"
+        )
+    for f, ln, name in js_cls_bad:
+        errors.append(f"R16b {f}:{ln} JS 提供的类名 .{name} 在本页 wxss 无定义（端上会静默不生效）")
     for f, ln, ch in icon_emoji:
         errors.append(f"R13a {f}:{ln} 图标槽位里是 emoji {ch!r}（改用 /icons/ui/*.png）")
     for f, ln, name in icon_asset:
