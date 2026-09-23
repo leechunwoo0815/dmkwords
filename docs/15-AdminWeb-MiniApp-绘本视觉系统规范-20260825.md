@@ -1083,3 +1083,15 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 | 口径边界（2026-09-21 补，接手会话实测后明确） | 本轮清的是**小程序端**。**管理端与后端导出仍有同族残留**（实测：`ErrorBoundary.tsx` 的 🎨、`CircleManage.tsx` 的「🌟 已赞」、`ScanCheckin.tsx` 的 ✅/⚠、`records_service.py` 借还导出 xlsx 单元格里的 ⚠）——**已登记为欠账**（`docs/09 §十二`）。口径目标定为：**用户可见文案清零**（含导出文件），而不是只清小程序 |
 | 替换原则 | 图标位 → 自家 `/icons/ui/*.png` 资产（emoji 无令牌、三端渲染不一致）；纯文案 → 直接去掉；勾选/叉等**排版形态**保留字形 |
 | 落地页 | 首页（继续听/今日推荐/空态/推荐卡角标）、阅读圈（馆长赞标记→crown 资产）、书籍详情、听书页、书架、购买页、我的（头像兜底）、共享组件 `error-view`（四种态→warning/globe/empty/lock 资产） |
+
+### 21.3 文案 emoji 口径扩到管理端与导出文件（机械门禁 R13d，2026-09-23 落地）
+
+§21.2 把口径定为「**用户可见文案清零（含导出文件）**」，但机械门禁当时**只覆盖小程序**——
+管理端与后端导出的同族残留靠人眼。本节把门禁补齐（`docs/09 G6` 落地）：
+
+| 口径 | 说明 |
+|---|---|
+| **R13d（新增机械门禁）** | ① `admin-web/src/**/*.{ts,tsx}`：emoji **必须为 0**（去注释后扫；`TYPO_GLYPHS` 排版字形放行）；② `backend/**/*.py`：**字符串字面量**里的 emoji 必须为 0——按 AST 取 `Constant[str]`，**docstring 跳过**（文档不是用户文案） |
+| 落地清理（2026-09-23） | `ScanCheckin.tsx` 的 `⚠`→「注意」（`✕` 是白名单排版字形，保留）、成功 toast 去掉冗余 `✅`（`message.success` 自带绿勾）；`ErrorBoundary.tsx` 的 🎨→`WarningOutlined` 图标；`CircleManage.tsx` 的「🌟 已赞」→「已赞」（金色 Tag 即为标记）；`records_service.py` 导出 xlsx 单元格 `⚠ 共 N 条…`→`注意：共 N 条…` |
+| 替换原则（同 §21.2） | 图标位 → **组件/资产**（管理端用 AntD 图标、小程序用 `/icons/ui/*.png`）；纯文案 → 直接去掉或换文字；勾选/叉等排版形态保留字形 |
+| 红线（沿用 §二 前端宪法） | 金额/规则文案仍一律后端配置下发；本节的 emoji 检查只管**符号形态**，不改文案来源 |
