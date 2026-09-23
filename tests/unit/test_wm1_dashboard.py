@@ -8,8 +8,8 @@ def test_dashboard_overview_fields(client: TestClient, admin_headers: dict) -> N
     body = resp.json()
     assert body["admin_count"] == 2  # admin + staff01
     assert (
-        body["config_count"] == 47
-    )  # 29 基础键 + ar_warning_range（C16）+ book_onboarding_check（D1）+ 6 项 WM11 提醒配置（2026-08-29）+ 3 项阅读圈配置（circle_daily_post_limit / circle_books_count_nodes / circle_breakthrough_min_words，WM14-A/B）+ 7 项图片体积配置（image_upload_max_mb / image_upload_max_output_kb / image_jpeg_quality / image_generated_jpeg_quality / image_cover_max_edge / image_activity_cover_max_edge / image_doc_max_edge，2026-09-17）
+        body["config_count"] == 49
+    )  # 29 基础键 + ar_warning_range（C16）+ book_onboarding_check（D1）+ 6 项 WM11 提醒配置（2026-08-29）+ 3 项阅读圈配置（circle_daily_post_limit / circle_books_count_nodes / circle_breakthrough_min_words，WM14-A/B）+ 7 项图片体积配置（image_upload_max_mb / image_upload_max_output_kb / image_jpeg_quality / image_generated_jpeg_quality / image_cover_max_edge / image_activity_cover_max_edge / image_doc_max_edge，2026-09-17）+ 2 项媒体体检配置（media_trash_min_age_minutes / media_trash_retain_days，2026-09-23）
     assert body["today_logins"] >= 1  # admin_headers fixture 的登录
     assert isinstance(body["recent_config_changes"], list)
 

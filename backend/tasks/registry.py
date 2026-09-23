@@ -31,6 +31,10 @@ class TaskSpec:
     group: str
     interval_seconds: int
     fn: Callable[[Session], int]
+    #: 可选 cron（分 时 日 月 周，Asia/Shanghai）：给"必须固定钟点跑"的任务用
+    #: （例：媒体体检要**每天早上**出一份报告——用 interval 会随每次重启向后漂移）。
+    #: 为 None 时按 interval_seconds 跑；interval_seconds 仍要填，它是看板"执行周期"的展示源。
+    cron_expr: str | None = None
 
 
 def _member_expire_check(db: Session) -> int:
@@ -126,8 +130,26 @@ def _circle_image_cleanup(db: Session) -> int:
     return CircleImageCleanupService(db).cleanup_orphan_images()
 
 
-# 15 项定时任务（WM13-4 新增 transfer_expiring_warn 后 12→13；WM14-B 新增
-# circle_rank_snapshot / circle_image_cleanup 后 13→15；周月报定时生成不在本批）
+def _media_census(db: Session) -> int:
+    """媒体体检（docs/15 §二十二）：盘点孤儿图 + 回收站对账 + 到期处理。
+
+    返回值 = **孤儿图张数**——就是管理端任务看板上那个"数字"。
+    顺序不能换：先**对账**（把清场重建抹掉记账的文件重新管起来），再**到期清除**（清除前复检引用，
+    又被引用的自动还原）——五道防线的第 5/6 道。
+    """
+    from backend.domain.admin.media_models import MediaCensus
+    from backend.domain.admin.media_service import MediaHealthService
+
+    service = MediaHealthService(db)
+    report = service.record_census(MediaCensus.TRIGGER_SCHEDULED)
+    service.reconcile_trash()
+    service.purge_expired()
+    return int(report["orphan_files"])
+
+
+# 16 项定时任务（WM13-4 新增 transfer_expiring_warn 后 12→13；WM14-B 新增
+# circle_rank_snapshot / circle_image_cleanup 后 13→15；2026-09-23 新增 media_census 后 15→16；
+# 周月报定时生成不在本批）
 TASKS: dict[str, TaskSpec] = {
     "member_expire_check": TaskSpec(
         "member_expire_check", "会员过期落库", "会员", 300, _member_expire_check
@@ -169,6 +191,16 @@ TASKS: dict[str, TaskSpec] = {
     # WM14-B：孤儿卡片图清理（每日；30 天阈值下多跑无害）
     "circle_image_cleanup": TaskSpec(
         "circle_image_cleanup", "阅读圈卡片图清理", "阅读圈", 86400, _circle_image_cleanup
+    ),
+    # 媒体体检（2026-09-23 用户裁定；docs/15 §二十二）：每天早上 08:00 盘点孤儿图并出报告
+    # ——"数字悄悄变大"要能被人看见，这是这个任务的唯一目的（只看不删；清理由超管在管理端点按钮）
+    "media_census": TaskSpec(
+        "media_census",
+        "媒体体检（孤儿图盘点+回收站到期）",
+        "系统",
+        86400,
+        _media_census,
+        cron_expr="0 8 * * *",
     ),
 }
 
@@ -260,16 +292,24 @@ def start_scheduler() -> None:
 
     scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
     for spec in TASKS.values():
-        scheduler.add_job(
-            run_task,
-            trigger="interval",
-            args=[spec.name],
-            seconds=spec.interval_seconds,
-            id=spec.name,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=120,
-        )
+        job_kwargs: dict = {
+            "args": [spec.name],
+            "id": spec.name,
+            "max_instances": 1,
+            "coalesce": True,
+            "misfire_grace_time": 120,
+        }
+        if spec.cron_expr:
+            # 固定钟点任务（例：媒体体检每天 08:00）——interval 会随每次重启向后漂移
+            from apscheduler.triggers.cron import CronTrigger
+
+            job_kwargs["trigger"] = CronTrigger.from_crontab(
+                spec.cron_expr, timezone="Asia/Shanghai"
+            )
+        else:
+            job_kwargs["trigger"] = "interval"
+            job_kwargs["seconds"] = spec.interval_seconds
+        scheduler.add_job(run_task, **job_kwargs)
     scheduler.start()
     _scheduler = scheduler
     logger.info("APScheduler started with %d tasks", len(TASKS))
@@ -282,6 +322,24 @@ def stop_scheduler() -> None:
         _scheduler = None
 
 
+def _schedule_text(spec: TaskSpec) -> str:
+    """看板"执行周期"列的可读文案（cron 优先，否则按 interval 折算）。"""
+    if spec.cron_expr:
+        fields = spec.cron_expr.split()
+        if len(fields) == 5:
+            return f"每天 {int(fields[1]):02d}:{int(fields[0]):02d}"
+        return spec.cron_expr
+    return format_interval(spec.interval_seconds)
+
+
+def format_interval(seconds: int) -> str:
+    if seconds >= 86400:
+        return "每天"
+    if seconds >= 3600:
+        return f"每 {seconds / 3600:g} 小时"
+    return f"每 {seconds / 60:g} 分钟"
+
+
 def list_task_specs() -> list[dict]:
     return [
         {
@@ -289,6 +347,8 @@ def list_task_specs() -> list[dict]:
             "display_name": s.display_name,
             "group": s.group,
             "interval_seconds": s.interval_seconds,
+            "cron_expr": s.cron_expr,
+            "schedule_text": _schedule_text(s),
         }
         for s in TASKS.values()
     ]

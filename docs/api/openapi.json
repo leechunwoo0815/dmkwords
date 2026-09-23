@@ -2340,6 +2340,360 @@
         "title": "MeResponse",
         "type": "object"
       },
+      "MediaBreakdownItem": {
+        "additionalProperties": false,
+        "description": "按一级目录的孤儿明细（cover/ circle/ reports/ book_audio/）。",
+        "properties": {
+          "bucket": {
+            "title": "Bucket",
+            "type": "string"
+          },
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "files": {
+            "title": "Files",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bucket",
+          "files",
+          "bytes"
+        ],
+        "title": "MediaBreakdownItem",
+        "type": "object"
+      },
+      "MediaCensusResponse": {
+        "additionalProperties": false,
+        "description": "一次盘点的报告——运营在任务看板看到的\"孤儿图 N 张 / X MB\"就是这里的两个字段。",
+        "properties": {
+          "breakdown": {
+            "items": {
+              "$ref": "#/components/schemas/MediaBreakdownItem"
+            },
+            "title": "Breakdown",
+            "type": "array"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "files_total": {
+            "title": "Files Total",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "missing_refs": {
+            "title": "Missing Refs",
+            "type": "integer"
+          },
+          "orphan_bytes": {
+            "title": "Orphan Bytes",
+            "type": "integer"
+          },
+          "orphan_files": {
+            "title": "Orphan Files",
+            "type": "integer"
+          },
+          "protected_total": {
+            "title": "Protected Total",
+            "type": "integer"
+          },
+          "referenced_total": {
+            "title": "Referenced Total",
+            "type": "integer"
+          },
+          "trigger": {
+            "description": "scheduled/manual/after_trash/after_restore",
+            "title": "Trigger",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "trigger",
+          "created_at",
+          "files_total",
+          "referenced_total",
+          "protected_total",
+          "orphan_files",
+          "orphan_bytes",
+          "missing_refs"
+        ],
+        "title": "MediaCensusResponse",
+        "type": "object"
+      },
+      "MediaEmptyTrashRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "description": "清空原因（必填；永久删除不可恢复，审计留痕）",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "MediaEmptyTrashRequest",
+        "type": "object"
+      },
+      "MediaEmptyTrashResponse": {
+        "additionalProperties": false,
+        "description": "清空回收站的结果：`restored > 0` 说明复检闸门当场救回了\"又被引用\"的图。",
+        "properties": {
+          "census": {
+            "$ref": "#/components/schemas/MediaCensusResponse"
+          },
+          "purged": {
+            "title": "Purged",
+            "type": "integer"
+          },
+          "purged_bytes": {
+            "title": "Purged Bytes",
+            "type": "integer"
+          },
+          "restored": {
+            "title": "Restored",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "purged",
+          "purged_bytes",
+          "restored",
+          "census"
+        ],
+        "title": "MediaEmptyTrashResponse",
+        "type": "object"
+      },
+      "MediaHealthResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "census": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MediaCensusResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trash": {
+            "$ref": "#/components/schemas/MediaTrashSummary"
+          }
+        },
+        "required": [
+          "trash"
+        ],
+        "title": "MediaHealthResponse",
+        "type": "object"
+      },
+      "MediaRestoreResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "census": {
+            "$ref": "#/components/schemas/MediaCensusResponse"
+          },
+          "rel_path": {
+            "title": "Rel Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rel_path",
+          "census"
+        ],
+        "title": "MediaRestoreResponse",
+        "type": "object"
+      },
+      "MediaTrashItem": {
+        "additionalProperties": false,
+        "properties": {
+          "actor_name": {
+            "title": "Actor Name",
+            "type": "string"
+          },
+          "batch": {
+            "title": "Batch",
+            "type": "string"
+          },
+          "bucket": {
+            "title": "Bucket",
+            "type": "string"
+          },
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "rel_path": {
+            "title": "Rel Path",
+            "type": "string"
+          },
+          "restore_until": {
+            "title": "Restore Until",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "rel_path",
+          "bucket",
+          "bytes",
+          "batch",
+          "created_at",
+          "restore_until",
+          "actor_name"
+        ],
+        "title": "MediaTrashItem",
+        "type": "object"
+      },
+      "MediaTrashRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "all_orphans": {
+            "default": false,
+            "description": "true = 清理当前盘点出的全部孤儿（运营按钮主路径）",
+            "title": "All Orphans",
+            "type": "boolean"
+          },
+          "paths": {
+            "description": "要清理的相对路径（与 all_orphans 二选一）",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Paths",
+            "type": "array"
+          },
+          "reason": {
+            "description": "清理原因（必填，审计留痕）",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "MediaTrashRequest",
+        "type": "object"
+      },
+      "MediaTrashResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "batch": {
+            "title": "Batch",
+            "type": "string"
+          },
+          "census": {
+            "$ref": "#/components/schemas/MediaCensusResponse"
+          },
+          "moved": {
+            "title": "Moved",
+            "type": "integer"
+          },
+          "moved_bytes": {
+            "title": "Moved Bytes",
+            "type": "integer"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/MediaTrashSkippedItem"
+            },
+            "title": "Skipped",
+            "type": "array"
+          }
+        },
+        "required": [
+          "batch",
+          "moved",
+          "moved_bytes",
+          "census"
+        ],
+        "title": "MediaTrashResponse",
+        "type": "object"
+      },
+      "MediaTrashSkippedItem": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "reason"
+        ],
+        "title": "MediaTrashSkippedItem",
+        "type": "object"
+      },
+      "MediaTrashSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "files": {
+            "title": "Files",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MediaTrashItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "min_age_minutes": {
+            "description": "最小年龄闸门（分钟）",
+            "title": "Min Age Minutes",
+            "type": "integer"
+          },
+          "retain_days": {
+            "description": "回收站保留天数（到期复检后清除）",
+            "title": "Retain Days",
+            "type": "integer"
+          },
+          "unmanaged": {
+            "default": 0,
+            "description": "回收站里没有记账的文件数（清场重建等外部清库造成；下次盘点自动接管，不删文件）",
+            "title": "Unmanaged",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "files",
+          "bytes",
+          "min_age_minutes",
+          "retain_days"
+        ],
+        "title": "MediaTrashSummary",
+        "type": "object"
+      },
       "MemberStatusActionRequest": {
         "additionalProperties": false,
         "properties": {
@@ -8182,6 +8536,175 @@
         ]
       }
     },
+    "/api/admin/media/health": {
+      "get": {
+        "description": "最新一份盘点报告 + 回收站统计（只读，不改任何文件）。",
+        "operationId": "media_health_api_admin_media_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaHealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Media Health",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/media/trash": {
+      "post": {
+        "description": "把孤儿图移入回收站（**仅超管**；只移动不物理删除，可还原）。",
+        "operationId": "media_trash_api_admin_media_trash_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaTrashRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaTrashResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Media Trash",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/media/trash/empty": {
+      "post": {
+        "description": "清空回收站（**仅超管**）：跳过 30 天等待期永久删除，但**复检闸门照跑**——\n仍被数据库引用的条目会被当场救回原位（见响应里的 `restored`），不会删掉。",
+        "operationId": "media_empty_trash_api_admin_media_trash_empty_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaEmptyTrashRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaEmptyTrashResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Media Empty Trash",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/media/trash/{entry_id}/restore": {
+      "post": {
+        "description": "从回收站还原（**仅超管**；原位置被占用时拒绝，不覆盖）。",
+        "operationId": "media_restore_api_admin_media_trash__entry_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaRestoreResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Media Restore",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/admin/members/children": {
       "get": {
         "operationId": "list_children_page_api_admin_members_children_get",
@@ -10525,7 +11048,7 @@
     },
     "/api/admin/uploads/{path}": {
       "get": {
-        "description": "上传文件访问（鉴权下发；封面后续小程序端另行开放只读路由）。",
+        "description": "上传文件访问（鉴权下发；封面后续小程序端另行开放只读路由）。\n\n回收站目录**不下发**（2026-09-23，docs/15 §22.2 第 4 道防线）——已判定孤儿的文件在回收站里\n等还原或到期清除，不该还能从 Web 访问到。路径口径单一来源：`backend/common/media_paths`。",
         "operationId": "serve_upload_api_admin_uploads__path__get",
         "parameters": [
           {

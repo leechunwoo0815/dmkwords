@@ -25,6 +25,10 @@ ADMIN_TABLES = [
     "notifications",
     "task_run_logs",
     "dead_letters",
+    # 媒体体检（2026-09-23）：盘点报告与回收站条目——每测试清空，否则"最新一份报告"
+    # 会跨测试串台（下个用例的盘点断言读到上个用例的行）
+    "media_trash_entries",
+    "media_censuses",
     "observation_reports",
     "transfer_requests",
     "withdrawal_requests",

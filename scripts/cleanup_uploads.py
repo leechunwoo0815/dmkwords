@@ -33,89 +33,35 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import shutil
 from collections import defaultdict
 
-from backend.database import SessionLocal
-from backend.domain.activity.models import Activity
-from backend.domain.catalog.models import Book
-from backend.domain.identity.models import ObservationReport, Order
-from backend.domain.reading_circle.models import CirclePost
-
-# 可再生目录（允许清理其中的孤儿）
-REGENERABLE_PREFIXES = ("cover/", "book_audio/", "circle/", "reports/")
-
-# 保护名单（即使不在引用集里也绝不删）
-PROTECTED_PREFIXES = (
-    "miniapp-audit",
-    "posters/",
-    "voucher/",
-    "observation/",
-    "voice/",
-    # 活动图文详情配图（2026-09-20 B 批）：运营上传的**不可再生**内容，绝不自动清理
-    "activity_detail/",
+from backend.common.media_paths import (
+    PROTECTED_PREFIXES,  # noqa: F401 — 下面文档字符串与保护判定共用同一份名单
+    PROTECTED_SUFFIX_DIRS,  # noqa: F401
+    REGENERABLE_PREFIXES,  # noqa: F401
+    TRASH_DIRNAME,
+    is_protected,
 )
+from backend.database import SessionLocal
 
-#: 证据目录**后缀**保护。2026-09-20（fix44 R3）实修：原先把 `"-samples/"` 写进
-#: PROTECTED_PREFIXES，但 `is_protected` 用的是 `rel.startswith(p)`——真实目录名是
-#: `wm15-samples/…`，rel 以 `wm15` 开头 → **永远匹配不到**，这条保护名存实亡
-#: （当时没出事，只是因为它同时也不在 REGENERABLE_PREFIXES 白名单里）。
-#: 后缀匹配对**路径首段**生效：`wm15-samples/` ✓、`fix34-samples/` ✓、`-samples/` ✓。
-PROTECTED_SUFFIX_DIRS = ("-samples",)
+# 引用口径**单一来源**（2026-09-23，红线 51）：此前本脚本自己写了一份 `collect_referenced`，
+# 管理端媒体体检又写一份 → 两份口径迟早分叉（R16a/R12 那次的误删就是这么来的，错误库 §一百零二）。
+# 现在两边共用 `backend/domain/admin/media_service.collect_referenced`；
+# 目录白名单/保护名单共用 `backend/common/media_paths`。
+from backend.domain.admin.media_service import collect_referenced as _collect_referenced
 
 
 def collect_referenced(root: str) -> tuple[set[str], list[str]]:
     """DB 里所有被引用的相对路径 + 引用存在但磁盘缺失的清单（诊断用）。"""
     db = SessionLocal()
-    rels: set[str] = set()
     try:
-        for cover, audio in db.query(Book.cover_path, Book.audio_path).all():
-            for p in (cover, audio):
-                if p:
-                    rels.add(str(p))
-        for (cover,) in db.query(Activity.cover_path).all():
-            if cover:
-                rels.add(str(cover))
-        # 活动图文详情配图（2026-09-20）：JSON 里的 image 块路径必须进引用集，
-        # 否则"DB 里有、引用集里没有"的图会被当成孤儿（E-20260915-27 同族形状）
-        for (blocks,) in db.query(Activity.detail_blocks).all():
-            if not blocks:
-                continue
-            try:
-                for b in json.loads(blocks):
-                    if isinstance(b, dict) and b.get("type") == "image" and b.get("path"):
-                        rels.add(str(b["path"]))
-            except (TypeError, ValueError):
-                continue
-        for (voucher,) in db.query(Order.voucher_path).all():
-            if voucher:
-                rels.add(str(voucher))
-        for (images,) in db.query(ObservationReport.images).all():
-            if not images:
-                continue
-            try:
-                rels.update(str(x) for x in json.loads(images) if x)
-            except (TypeError, ValueError):
-                pass
-        for image, thumb in db.query(CirclePost.image_path, CirclePost.thumb_path).all():
-            for p in (image, thumb):
-                if p:
-                    rels.add(str(p))
+        rels = _collect_referenced(db)
     finally:
         db.close()
-
-    rels = {r.lstrip("/") for r in rels}
     missing = [r for r in sorted(rels) if not os.path.isfile(os.path.join(root, r))]
     return rels, missing
-
-
-def is_protected(rel: str) -> bool:
-    if any(rel.startswith(p) for p in PROTECTED_PREFIXES):
-        return True
-    head = rel.split("/", 1)[0]
-    return any(head.endswith(s) for s in PROTECTED_SUFFIX_DIRS)
 
 
 def main() -> int:
@@ -144,7 +90,11 @@ def main() -> int:
 
     stat: dict[str, list[int]] = defaultdict(lambda: [0, 0])  # prefix -> [文件数, 字节]
     protected_hits = 0
-    for dirpath, _dirnames, filenames in os.walk(root):
+    for dirpath, dirnames, filenames in os.walk(root):
+        if dirpath == root:
+            # 回收站（管理端媒体体检的 .trash/）单独计量：里面的东西是"已判定孤儿"的人质，
+            # 不该再被本脚本当孤儿重复处理（白名单本来也拦得住，这里是显式声明）
+            dirnames[:] = [d for d in dirnames if d != TRASH_DIRNAME]
         for fn in filenames:
             full = os.path.join(dirpath, fn)
             rel = os.path.relpath(full, root).replace(os.sep, "/")

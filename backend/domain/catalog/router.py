@@ -346,10 +346,16 @@ async def import_books_excel(
 
 @router.get("/uploads/{path:path}")
 def serve_upload(path: str, admin: Any = Depends(require_perm("book.manage"))):
-    """上传文件访问（鉴权下发；封面后续小程序端另行开放只读路由）。"""
+    """上传文件访问（鉴权下发；封面后续小程序端另行开放只读路由）。
+
+    回收站目录**不下发**（2026-09-23，docs/15 §22.2 第 4 道防线）——已判定孤儿的文件在回收站里
+    等还原或到期清除，不该还能从 Web 访问到。路径口径单一来源：`backend/common/media_paths`。
+    """
+    from backend.common.media_paths import is_trash_path
+
     root = os.path.abspath(get_settings().UPLOADS_DIR)
     full = os.path.abspath(os.path.join(root, path))
-    if not full.startswith(root):
+    if not full.startswith(root) or is_trash_path(path):
         from backend.common.exceptions import NotFoundError
 
         raise NotFoundError("文件不存在")

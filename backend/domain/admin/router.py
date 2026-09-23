@@ -13,6 +13,12 @@ from backend.domain.admin.schemas import (
     DashboardOverviewResponse,
     LoginRequest,
     LoginResponse,
+    MediaEmptyTrashRequest,
+    MediaEmptyTrashResponse,
+    MediaHealthResponse,
+    MediaRestoreResponse,
+    MediaTrashRequest,
+    MediaTrashResponse,
     MeResponse,
     NotificationReadStatusRequest,
     StaffCreateRequest,
@@ -331,3 +337,60 @@ def staff_reset_password(
 ):
     StaffService(db).reset_password(admin, user_id, body.new_password)
     return {"ok": True}
+
+
+# ---------- 媒体体检（docs/15 §二十二；G6 第一步 + 第二步） ----------
+# 查看权限 = dashboard.view（**专员只读**，删除按钮由前端按角色隐显）；
+# 移入回收站 / 还原 = 仅超管（require_super_admin）。业务规则与五道防线全在 Service。
+
+
+@router.get("/media/health", response_model=MediaHealthResponse)
+def media_health(
+    admin: AdminUser = Depends(require_perm("dashboard.view")),
+    db: Session = Depends(get_db),
+):
+    """最新一份盘点报告 + 回收站统计（只读，不改任何文件）。"""
+    from backend.domain.admin.media_service import MediaHealthService
+
+    return MediaHealthResponse.model_validate(MediaHealthService(db).overview())
+
+
+@router.post("/media/trash", response_model=MediaTrashResponse)
+def media_trash(
+    body: MediaTrashRequest,
+    admin: AdminUser = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    """把孤儿图移入回收站（**仅超管**；只移动不物理删除，可还原）。"""
+    from backend.domain.admin.media_service import MediaHealthService
+
+    return MediaTrashResponse.model_validate(
+        MediaHealthService(db).trash(body.paths, admin, body.reason, all_orphans=body.all_orphans)
+    )
+
+
+@router.post("/media/trash/{entry_id}/restore", response_model=MediaRestoreResponse)
+def media_restore(
+    entry_id: int,
+    admin: AdminUser = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    """从回收站还原（**仅超管**；原位置被占用时拒绝，不覆盖）。"""
+    from backend.domain.admin.media_service import MediaHealthService
+
+    return MediaRestoreResponse.model_validate(MediaHealthService(db).restore(entry_id, admin))
+
+
+@router.post("/media/trash/empty", response_model=MediaEmptyTrashResponse)
+def media_empty_trash(
+    body: MediaEmptyTrashRequest,
+    admin: AdminUser = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    """清空回收站（**仅超管**）：跳过 30 天等待期永久删除，但**复检闸门照跑**——
+    仍被数据库引用的条目会被当场救回原位（见响应里的 `restored`），不会删掉。"""
+    from backend.domain.admin.media_service import MediaHealthService
+
+    return MediaEmptyTrashResponse.model_validate(
+        MediaHealthService(db).empty_trash(admin, body.reason)
+    )

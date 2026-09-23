@@ -152,3 +152,105 @@ class DashboardChartsResponse(BaseSchema):
     borrow_trend: list[BorrowTrendPoint] = Field(default_factory=list)
     hot_books: list[HotBookItem] = Field(default_factory=list)
     member_status: list[MemberStatusItem] = Field(default_factory=list)
+
+
+# ---------- 媒体体检（docs/15 §二十二） ----------
+
+
+class MediaBreakdownItem(BaseSchema):
+    """按一级目录的孤儿明细（cover/ circle/ reports/ book_audio/）。"""
+
+    bucket: str
+    files: int
+    bytes: int
+
+
+class MediaCensusResponse(BaseSchema):
+    """一次盘点的报告——运营在任务看板看到的"孤儿图 N 张 / X MB"就是这里的两个字段。"""
+
+    id: int
+    trigger: str = Field(..., description="scheduled/manual/after_trash/after_restore")
+    created_at: str
+    files_total: int
+    referenced_total: int
+    protected_total: int
+    orphan_files: int
+    orphan_bytes: int
+    missing_refs: int
+    breakdown: list[MediaBreakdownItem] = Field(default_factory=list)
+
+
+class MediaTrashItem(BaseSchema):
+    id: int
+    rel_path: str
+    bucket: str
+    bytes: int
+    batch: str
+    created_at: str
+    restore_until: str
+    actor_name: str
+
+
+class MediaTrashSummary(BaseSchema):
+    files: int
+    bytes: int
+    unmanaged: int = Field(
+        0,
+        description="回收站里没有记账的文件数（清场重建等外部清库造成；下次盘点自动接管，不删文件）",
+    )
+    min_age_minutes: int = Field(..., description="最小年龄闸门（分钟）")
+    retain_days: int = Field(..., description="回收站保留天数（到期复检后清除）")
+    items: list[MediaTrashItem] = Field(default_factory=list)
+
+
+class MediaHealthResponse(BaseSchema):
+    census: MediaCensusResponse | None = None
+    trash: MediaTrashSummary
+
+
+class MediaTrashRequest(BaseSchema):
+    paths: list[str] = Field(
+        default_factory=list,
+        max_length=500,
+        description="要清理的相对路径（与 all_orphans 二选一）",
+    )
+    all_orphans: bool = Field(
+        False, description="true = 清理当前盘点出的全部孤儿（运营按钮主路径）"
+    )
+    reason: str = Field(..., min_length=1, max_length=200, description="清理原因（必填，审计留痕）")
+
+
+class MediaTrashSkippedItem(BaseSchema):
+    path: str
+    reason: str
+
+
+class MediaTrashResponse(BaseSchema):
+    batch: str
+    moved: int
+    moved_bytes: int
+    skipped: list[MediaTrashSkippedItem] = Field(default_factory=list)
+    census: MediaCensusResponse
+
+
+class MediaRestoreResponse(BaseSchema):
+    rel_path: str
+    census: MediaCensusResponse
+
+
+class MediaEmptyTrashRequest(BaseSchema):
+    reason: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description="清空原因（必填；永久删除不可恢复，审计留痕）",
+    )
+
+
+class MediaEmptyTrashResponse(BaseSchema):
+    """清空回收站的结果：`restored > 0` 说明复检闸门当场救回了"又被引用"的图。"""
+
+    purged: int
+    purged_bytes: int
+    restored: int
+    census: MediaCensusResponse
