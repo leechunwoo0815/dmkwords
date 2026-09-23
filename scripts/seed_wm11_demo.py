@@ -243,6 +243,68 @@ def _ensure_demo_deposit(db: Session, child) -> None:
     db.flush()
 
 
+def _ensure_demo_icon_carrier_orders(db: Session, child) -> None:
+    """小程序「我的订单」图标载体（G5，2026-09-23）：**押金单（wallet）+ 自定义单（receipt）**。
+
+    为什么必须造：订单页按 `order_type` 选图标（`wallet`=押金 / `receipt`=其余），而演示库只有
+    observation_fee / formal_fee / activity_fee 三类 → 两枚资产**从未被渲染过**（等于画完没验）。
+    **不能删分支**：押金单（`order_service.TYPE_DEPOSIT`）与自定义单（`TYPE_CUSTOM`）在生产都能被
+    真实创建，删了就是把可达路径藏起来。
+
+    口径：押金单金额读标准配置 `deposit_amount`（与 `_ensure_demo_deposit` 造的 Deposit 同源），
+    状态 paid 与"押金已缴 1200"一致；**刻意不调 confirm**——那会二次建 Deposit + Ledger。
+    幂等：按 (child, order_type) 查重。
+    """
+    from decimal import Decimal
+
+    from backend.common.config_service import ConfigService
+    from backend.domain.admin.models import AdminUser
+    from backend.domain.identity.models import Order, Parent
+
+    parent = db.query(Parent).filter(Parent.id == child.parent_id, Parent.is_deleted == 0).first()
+    if parent is None:
+        return
+    admin = db.query(AdminUser).filter(AdminUser.username == "admin").first()
+    # 押金单金额读**标准配置**（与 billing/service.py 同一读法），不手拍数字
+    deposit_amount = Decimal(ConfigService(db).get_value("deposit_amount"))
+    plans = (
+        (Order.TYPE_DEPOSIT, deposit_amount, "演示数据：入会押金单（订单页 wallet 图标载体）"),
+        (
+            Order.TYPE_CUSTOM,
+            Decimal("200.00"),
+            "演示数据：图书损耗赔偿（自定义单，receipt 图标载体）",
+        ),
+    )
+    for order_type, amount, remark in plans:
+        exists = (
+            db.query(Order)
+            .filter(
+                Order.child_id == child.id,
+                Order.order_type == order_type,
+                Order.is_deleted == 0,
+            )
+            .first()
+        )
+        if exists:
+            continue
+        db.add(
+            Order(
+                order_no=f"DEMO-ICON-{order_type[:6].upper()}-{child.id}",
+                order_type=order_type,
+                parent_id=parent.id,
+                child_id=child.id,
+                amount=amount,
+                status=Order.STATUS_PAID,
+                pay_method="scan",
+                paid_at=datetime.now() - timedelta(days=30),
+                paid_by=admin.id if admin else None,
+                remark=remark,
+            )
+        )
+        db.flush()
+    print("c 订单图标载体就位（押金单 / 自定义单）", flush=True)
+
+
 def _ensure_demo_borrow(db: Session, child) -> None:
     """演示在借（书架「在借」tab 演示）：借出第一本上架书的一个副本，另留一册可约。"""
     from backend.domain.catalog.models import Book, BookCopy
@@ -761,6 +823,98 @@ def _ensure_watcher_active_reservation(db: Session) -> None:
         )
     )
     db.flush()
+
+
+def _ensure_locked_book_carrier(db: Session) -> None:
+    """S21 载体（2026-09-23 走表实测后补）：造一本**没有任何在馆副本**的书。
+
+    为什么必须造：`scan` 的判定顺序是「在馆副本 → 借出」**优先于**「别人预约锁定 → 拦截」，
+    所以只要那本书还剩一册 available，扫它就**永远看不到**拦截文案——2026-09-23 走过表时
+    全库 **0 本**"零在馆副本"的书，只能用临时把闲置副本改「维护」的办法才把这条分支走通。
+    这里把它做成常态载体：在既有「观察期孩的在用预约」之上，把该书剩余的 available 副本
+    预约给**另一个** WM3 演示孩子 → 该书全部副本 reserved ⇒ 扫它必命中「已被 X 预约锁定」。
+
+    幂等：该书已有 ≥2 条 ACTIVE 预约即跳过；候选副本必须 `available` 且未被别的预约占
+    （C6：跨段取数互相排除，别造"预约锁着已借出副本"这类鬼状态）。
+    """
+    from backend.domain.catalog.models import Book, BookCopy
+    from backend.domain.identity.models import Child as ChildModel
+    from backend.domain.reading.models import Reservation
+
+    base = (
+        db.query(Reservation)
+        .filter(
+            Reservation.status == Reservation.STATUS_ACTIVE,
+            Reservation.is_deleted == 0,
+            Reservation.expires_at >= datetime.now(),
+        )
+        .order_by(Reservation.id)
+        .first()
+    )
+    if base is None:
+        return
+    book = db.query(Book).filter(Book.id == base.book_id, Book.is_deleted == 0).first()
+    if book is None:
+        return
+    actives = (
+        db.query(Reservation)
+        .filter(
+            Reservation.book_id == book.id,
+            Reservation.status == Reservation.STATUS_ACTIVE,
+            Reservation.is_deleted == 0,
+            Reservation.expires_at >= datetime.now(),
+        )
+        .all()
+    )
+    if len(actives) >= 2:
+        return  # 已是"全锁"态（幂等）
+    taken = {r.copy_id for r in actives}
+    free_copies = [
+        c
+        for c in (
+            db.query(BookCopy)
+            .filter(
+                BookCopy.book_id == book.id,
+                BookCopy.is_deleted == 0,
+                BookCopy.status == BookCopy.STATUS_AVAILABLE,
+            )
+            .order_by(BookCopy.id)
+            .all()
+        )
+        if c.id not in taken
+    ]
+    if not free_copies:
+        return
+    wm3_parent = (
+        db.query(Parent).filter(Parent.phone == "13800007777", Parent.is_deleted == 0).first()
+    )
+    if wm3_parent is None:
+        return
+    taker = (
+        db.query(ChildModel)
+        .filter(
+            ChildModel.parent_id == wm3_parent.id,
+            ChildModel.name == "待评估孩",
+            ChildModel.is_deleted == 0,
+            ChildModel.id != base.child_id,
+        )
+        .first()
+    )
+    if taker is None:
+        return
+    copy = free_copies[0]
+    copy.status = BookCopy.STATUS_RESERVED
+    db.add(
+        Reservation(
+            child_id=taker.id,
+            book_id=book.id,
+            copy_id=copy.id,
+            status=Reservation.STATUS_ACTIVE,
+            expires_at=datetime.now() + timedelta(hours=72),
+        )
+    )
+    db.flush()
+    print(f"c S21 载体就位：《{book.title}》已无在馆副本（第 2 条预约：{taker.name}）", flush=True)
 
 
 def _upsert_notification(db: Session, parent: Parent, **kw) -> None:
@@ -2493,6 +2647,12 @@ def _ensure_demo_circle_extra(db: Session) -> None:
         .filter(MilestoneAward.child_id == demo_child.id, MilestoneAward.node_words == 100000)
         .first()
     )
+    if ms is not None:
+        # G4（2026-09-23）：awarded_at 每次重建＝当天 → 护照「达成日期」永远显示演示当天，
+        # 与"历史"语义不符。补发仍走真实判定链（GrowthService.check_milestones_now），
+        # 只把演示时间戳归一到 45 天前（同"时间戳错开"口径，seed 每次跑结果一致）。
+        ms.awarded_at = datetime.now() - timedelta(days=45)
+        db.flush()
     if not ms:
         print("c 阅读圈收尾：演示孩未达 10 万词（词账口径），跳过里程碑卡", flush=True)
     else:
@@ -2865,6 +3025,8 @@ def seed() -> None:
         )
         if demo_child is not None:
             _ensure_demo_deposit(db, demo_child)
+            # 订单图标载体（G5）：押金单 wallet / 自定义单 receipt——紧跟押金之后（同域、金额同源）
+            _ensure_demo_icon_carrier_orders(db, demo_child)
             _ensure_demo_borrow(db, demo_child)
             _ensure_demo_growth(db, demo_child)
             _ensure_demo_quiz_journey(db, demo_child)
@@ -2879,6 +3041,8 @@ def seed() -> None:
         _ensure_demo_t41_data(db, demo_child)
         # 观察期孩的在用预约（依赖 WM3 家族已建 → 必须排在 wm3_states 之后）
         _ensure_watcher_active_reservation(db)
+        # S21 载体：在既有预约之上把该书剩余副本也锁掉（全锁书 → 扫它才看得到"预约锁定"拦截）
+        _ensure_locked_book_carrier(db)
         _ensure_activity_covers(db)
         # 活动图文详情 + 往期回顾演示素材（依赖：活动已建、封面已生成——B/C 批）
         _ensure_past_activities(db)
