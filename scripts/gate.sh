@@ -81,6 +81,10 @@ run python scripts/check_miniapp_style.py
 # 可写媒体文件）/ M2 破缓存单出口（`?v=` 只许出现在 file_utils.media_version）/ M3 清理脚本默认 dry-run。
 # 含 S1 注入自证（--self-test 可单跑）。
 run python scripts/check_media_discipline.py
+# G6（docs/09）+ docs/15 §21.3：**文案 emoji 口径扩到管理端与后端导出**（R13d；2026-09-23）
+# ① admin-web/src/**/*.{ts,tsx} 去注释后零 emoji；② backend/**/*.py 字符串字面量零 emoji
+# （AST 判定、docstring 跳过）。排版字形（✓ ✕ ★ ☆ 等）白名单放行；含 S1–S3 三重自证。
+run python scripts/check_copy_emoji.py
 
 step 6 "数据库迁移一致性"
 # 首个迁移文件创建后启用：

@@ -201,7 +201,7 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 | 2 | 单测 + 覆盖率 | `pytest tests/ -q --cov=backend --cov-fail-under=25`（**passed 数以 `gate-runs/` 最新一次输出为准**：2026-09-17 gate-115422 = **477 passed / 84%**；阈值 25% 是"防覆盖率塌方"下限，不是目标值） |
 | 3 | BDD | `behave features/ --no-capture -q`（当前 8 features / 30 scenarios / 103 steps） |
 | 4 | 架构关 | `python -m scripts.verify_architecture`（Router 违规 0 / 单文件 ≤800 行 / 域四件套 / import 白名单 / 锁定读 `populate_existing` / 无 sqlite） |
-| 5 | 契约与反假绿 | `check_fake_assertions`（假绿断言 + **时间炸弹**：测试禁写死的近期未来绝对时间） + `check_miniapp_bindings` + `check_docs_code_alignment` + `check_rbac_consistency` + **`check_miniapp_style`**（R1–**R14** + S1–S3 自证；R14 = WXML 注释/标签结构，2026-09-20 补）+ **`check_media_discipline`**（M1 落盘单出口 / M2 破缓存单出口 / M3 清理脚本默认 dry-run + S1 注入自证） |
+| 5 | 契约与反假绿 | `check_fake_assertions`（假绿断言 + **时间炸弹**：测试禁写死的近期未来绝对时间） + `check_miniapp_bindings` + `check_docs_code_alignment` + `check_rbac_consistency` + **`check_miniapp_style`**（R1–**R16** + S1–S3 自证；R14 = WXML 注释/标签结构，2026-09-20 补；**R16 = 类名两端对账**，2026-09-23 补）+ **`check_media_discipline`**（M1 落盘单出口 / M2 破缓存单出口 / M3 清理脚本默认 dry-run + S1 注入自证） + **`check_copy_emoji`**（R13d：管理端与后端导出文案零 emoji，2026-09-23 补） |
 | 6 | 数据库迁移一致性 | `alembic check`（"No new upgrade operations detected"） |
 | 7 | 前端类型检查 | `pnpm exec tsc --noEmit`（admin-web） |
 | 8 | 契约快照（T27） | `python scripts/export_openapi.py --check` + `cd admin-web && pnpm gen:api --check`（端点变更必须"改代码 + 重导快照"两步显形；**前端类型 `schema.d.ts` 自 2026-09-20 起同在此步守**——此前是职责空白，曾漂移 4 天没人发现） |
