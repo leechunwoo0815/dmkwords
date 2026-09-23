@@ -69,7 +69,7 @@ Page({
     if (filters.sort !== 'newest') {
       chips.push({ key: 'sort', label: SORT_OPTIONS[SORT_KEYS.indexOf(filters.sort)] })
     }
-    if (filters.has_audio) chips.push({ key: 'audio', label: '🎧 有音频' })
+    if (filters.has_audio) chips.push({ key: 'audio', label: '有音频' })
     this.setData({ activeChips: chips })
   },
 

@@ -1,33 +1,76 @@
-<view class="page-bg x-cb307e">
-  <view class="report-header">
-    <image class="rh-icon" src="/icons/ui/clipboard.png" mode="aspectFit" />
-    <view>
-      <view class="rh-title">{{childName}} 的观察期评估</view>
-      <view class="rh-period">由馆内老师评估上传 · 每一阶段的成长记录</view>
+<!-- 评估报告（WM10/FEAT-066）：竖版整页展示（docs/15 §十九 报告类图片展示规范） -->
+<view class="page-bg">
+  <view class="obs-hero">
+    <image class="obs-hero-icon" src="/icons/ui/clipboard.png" mode="aspectFit" />
+    <view class="obs-hero-main">
+      <view class="obs-hero-title">{{childName}} 的评估报告</view>
+      <view class="obs-hero-sub">由馆内老师评估上传 · 每一阶段的成长记录</view>
+    </view>
+    <view class="obs-hero-count" wx:if="{{reports.length}}">
+      <text class="obs-hero-count-num">{{reports.length}}</text>
+      <text class="obs-hero-count-unit">期</text>
     </view>
   </view>
 
-  <view class="x-36e383" wx:if="{{loading}}">加载中…</view>
+  <view class="obs-loading" wx:if="{{loading}}">加载中…</view>
 
   <empty-state wx:if="{{!loading && !reports.length}}"
     icon-name="clipboard" title="还没有评估报告" desc="老师上传后这里会展示" />
 
-  <view wx:for="{{reports}}" wx:key="id" class="stat-card x-560223">
-    <view class="x-545127">
-      <text class="x-b9cc9c">{{item.created_at}}</text>
+  <!-- 最新一期：整页展开（家长第一眼要看清的就是它） -->
+  <view class="obs-paper" wx:if="{{latest}}">
+    <view class="obs-paper-head">
+      <view class="obs-issue">最新 · 第 {{latest.issue}} 期</view>
+      <text class="obs-date">{{latest.dateText}}</text>
+      <text class="obs-pages">{{latest.imageUrls.length}} 页</text>
     </view>
-    <view class="x-f09e24" wx:if="{{item.remark}}">
-      {{item.remark}}
+
+    <view class="obs-comment" wx:if="{{latest.remark}}">
+      <image class="obs-comment-icon" src="/icons/ui/tip.png" mode="aspectFit" />
+      <view class="obs-comment-body">
+        <view class="obs-comment-label">老师评语</view>
+        <view class="obs-comment-text">{{latest.remark}}</view>
+      </view>
     </view>
-    <view class="x-12d486">
-      <image class="x-6e6b5a" wx:for="{{item.imageUrls}}" wx:for-item="img" wx:key="*this"
-        src="{{img}}" mode="aspectFill"
-        data-src="{{img}}" bindtap="onPreview" />
+
+    <view class="obs-pages-wrap">
+      <view class="obs-page" wx:for="{{latest.imageUrls}}" wx:key="*this"
+        data-index="{{index}}" bindtap="onPreviewLatest">
+        <image class="obs-page-img" src="{{item}}" mode="widthFix" />
+        <view class="obs-page-no">{{index + 1}}/{{latest.imageUrls.length}}</view>
+      </view>
+    </view>
+
+    <view class="obs-hint">
+      <image class="obs-hint-icon" src="/icons/ui/search.png" mode="aspectFit" />
+      <text>点图可放大看细节 · 长按可保存到相册</text>
     </view>
   </view>
 
-  <view class="x-87d128" wx:if="{{preview}}"
-    bindtap="onClosePreview">
-    <image class="x-9dfda0" src="{{preview}}" mode="aspectFit" />
+  <!-- 往期：默认收起，点标题行展开 -->
+  <view class="obs-hist" wx:if="{{history.length}}">
+    <view class="obs-hist-head" bindtap="toggleHistory">
+      <text class="obs-hist-title">往期报告（{{history.length}} 期）</text>
+      <image class="obs-hist-arrow {{historyOpen ? 'is-open' : ''}}"
+        src="/icons/ui/arrow-down.png" mode="aspectFit" />
+    </view>
+
+    <block wx:if="{{historyOpen}}">
+      <view class="obs-hist-card" wx:for="{{history}}" wx:for-item="rep" wx:key="id"
+        data-report="{{rep.id}}" bindtap="onPreviewHistory">
+        <view class="obs-hist-thumb">
+          <image class="obs-hist-thumb-img" src="{{rep.imageUrls[0]}}" mode="aspectFill" />
+          <view class="obs-thumb-no">{{rep.imageUrls.length}} 页</view>
+        </view>
+        <view class="obs-hist-info">
+          <view class="obs-hist-line">
+            <text class="obs-hist-issue">第 {{rep.issue}} 期</text>
+            <text class="obs-hist-date">{{rep.dateText}}</text>
+          </view>
+          <view class="obs-hist-remark" wx:if="{{rep.remark}}">{{rep.remark}}</view>
+          <view class="obs-hist-more">点开可放大查看</view>
+        </view>
+      </view>
+    </block>
   </view>
 </view>

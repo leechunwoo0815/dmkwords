@@ -14,12 +14,19 @@ Component({
     contactText: { type: String, value: '' },
   },
   data: {
-    icon: '😔',
+    // 图标走自家资产（/icons/ui/*.png）：emoji 三端渲染不一致、颜色与令牌无关，
+    // 且 R13c 已把"JS 数据里的 emoji"纳入门禁（2026-09-21）
+    iconUrl: '/icons/ui/warning.png',
   },
   observers: {
     'type': function(type) {
-      const icons = { error: '😔', network: '📡', empty: '📭', permission: '🔒' };
-      this.setData({ icon: icons[type] || '😔' });
+      const icons = {
+        error: '/icons/ui/warning.png',
+        network: '/icons/ui/globe.png',
+        empty: '/icons/ui/empty.png',
+        permission: '/icons/ui/lock.png',
+      };
+      this.setData({ iconUrl: icons[type] || '/icons/ui/warning.png' });
     }
   },
   methods: {

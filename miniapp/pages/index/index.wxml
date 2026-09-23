@@ -20,7 +20,8 @@
     </view>
   </view>
   <view wx:if="{{!currentChild}}" class="empty-child">
-    <text>🏠 还没有孩子档案，请到店建档</text>
+    <image class="empty-child-icon" src="/icons/ui/child.png" mode="aspectFit" />
+    <text>还没有孩子档案，请到店建档</text>
   </view>
 
   <!-- T45（FEAT-082）：活动轮播位（有封面且未开始的活动，点击进活动中心） -->
@@ -37,13 +38,6 @@
     </swiper-item>
   </swiper>
 
-  <!-- 多孩切换 -->
-  <view wx:if="{{children.length > 1}}" class="child-chips">
-    <view wx:for="{{children}}" wx:key="id"
-      class="chip {{currentChild.id === item.id ? 'chip-on' : ''}}"
-      data-id="{{item.id}}" bindtap="onSwitchChild">{{item.name}}</view>
-  </view>
-
   <!-- 提醒条：未读消息 / 在借 / 预约（有才显示） -->
   <view class="notice-row" wx:if="{{currentChild && (unreadCount > 0 || borrowCount > 0 || reservationCount > 0)}}">
     <view class="notice-item" wx:if="{{unreadCount > 0}}" bindtap="goMessage">
@@ -59,7 +53,10 @@
 
   <!-- 续听卡：在借第一本 + 真实进度 -->
   <view class="section" wx:if="{{currentChild && continueBook}}">
-    <view class="section-title h-section">🎧 继续听</view>
+    <view class="section-title h-section">
+      <image class="h-section-icon" src="/icons/ui/headphone.png" mode="aspectFit" />
+      <text>继续听</text>
+    </view>
     <view class="continue-card" bindtap="goContinue">
       <image class="continue-cover" src="{{continueBook.cover_url}}" mode="aspectFill" />
       <view class="continue-info">
@@ -77,23 +74,31 @@
   <!-- 今日数据 -->
   <view class="stat-row" wx:if="{{currentChild}}">
     <view class="stat-cell" bindtap="goCheckin">
-      <text class="stat-num">{{currentStreak}}</text>
+      <text class="stat-num">{{currentStreak === null ? '—' : currentStreak}}</text>
       <text class="stat-label">连续打卡(天)</text>
     </view>
     <view class="stat-cell" bindtap="goVocabulary">
-      <text class="stat-num">{{totalWords}}</text>
+      <text class="stat-num">{{totalWords === null ? '—' : totalWords}}</text>
       <text class="stat-label">累计词数</text>
     </view>
     <view class="stat-cell" bindtap="goAchievement">
-      <text class="stat-num">{{points}}</text>
+      <text class="stat-num">{{points === null ? '—' : points}}</text>
       <text class="stat-label">积分</text>
     </view>
+  </view>
+  <!-- 数字拿不到时说清原因（未入会被守卫挡下 → 后端 422「入会后可查看」），别让家长对着「—」猜 -->
+  <view class="stat-hint" wx:if="{{currentChild && growthBlocked}}">
+    <image class="stat-hint-icon" src="/icons/ui/lock.png" mode="aspectFit" />
+    <text>累计词数 / 积分：入会后可查看（请到店咨询）</text>
   </view>
 
   <!-- 今日推荐：真实书目横滑 -->
   <view class="section" wx:if="{{recommend.length}}">
     <view class="section-head">
-      <text class="section-title h-section">📖 今日推荐</text>
+      <view class="section-title h-section">
+        <image class="h-section-icon" src="/icons/ui/book.png" mode="aspectFit" />
+        <text>今日推荐</text>
+      </view>
       <text class="section-more" bindtap="goMoreBooks">全部 ›</text>
     </view>
     <scroll-view class="rec-scroll" scroll-x enhanced show-scrollbar="{{false}}">
@@ -102,8 +107,9 @@
           data-book="{{item}}" bindtap="goRecommend">
           <view class="rec-cover-wrap">
             <image wx:if="{{item.cover_url}}" class="rec-cover" src="{{item.cover_url}}" mode="aspectFill" />
-            <view wx:else class="rec-cover rec-cover-fallback">📕</view>
-            <text wx:if="{{item.has_audio}}" class="rec-audio">🎧</text>
+            <view wx:else class="rec-cover rec-cover-fallback">
+            <image class="rec-cover-fallback-icon" src="/icons/ui/cover.png" mode="aspectFit" /></view>
+            <image wx:if="{{item.has_audio}}" class="rec-audio" src="/icons/ui/headphone.png" mode="aspectFit" />
           </view>
           <view class="rec-title">{{item.title}}</view>
           <view class="rec-tags">

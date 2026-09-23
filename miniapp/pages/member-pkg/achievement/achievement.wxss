@@ -28,9 +28,29 @@
   border-radius: 50%;
   background: rgba(var(--surface-rgb), 0.1);
 }
-.level-emoji {
-  font-size: 96rpx;
-  margin-bottom: 16rpx;
+/* 等级盾牌：level_template.png 资产 + 等级字母叠加（不再用 emoji 奖牌） */
+.level-shield {
+  position: relative;
+  width: 150rpx;
+  height: 150rpx;
+  margin: 0 auto 16rpx;
+}
+.level-shield-img {
+  width: 150rpx;
+  height: 150rpx;
+  display: block;
+}
+.level-shield-letter {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 52rpx;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 52rpx;
+  font-weight: 700;
+  color: var(--fg);
+  line-height: 1;
 }
 .level-name {
   font-family: var(--font-display);
@@ -133,28 +153,34 @@
   gap: 24rpx;
   padding: 80rpx 32rpx 32rpx;
 }
+/* 勋章卡两态（docs/15 §二十一）：**已达成要有正向待遇**——金纸痕底 + 墨线实边 + 全彩徽章 + 金色「已达成」；
+   未达成才是淡的：白底 + 虚线边 + 徽章 40% 透明 + 「未达成」淡字。
+   （此前两态只靠"少一行未达成字样"区分，用户口径是"没达到的就是没达到"，同样也要求"达到了要看得见"。） */
 .badge-card {
   width: calc(33.333% - 16rpx);
   background: var(--surface);
-  border: 2rpx solid var(--border);
+  border: 2rpx dashed var(--border);
   border-radius: var(--radius);
   padding: 32rpx 16rpx;
   text-align: center;
   box-sizing: border-box;
 }
-.badge-card.locked {
-  opacity: 0.45;
+.badge-card.is-unlocked {
+  background: var(--warning-soft);
+  border: 3rpx solid var(--fg);
+  box-shadow: var(--shadow-hard-sm);
 }
-.badge-card.locked .badge-icon {
-  filter: grayscale(1);
+.badge-card.is-locked .badge-icon {
+  opacity: 0.4;
 }
-.badge-card.locked .badge-name {
+.badge-card.is-locked .badge-name {
   color: var(--muted);
 }
 .badge-icon {
-  font-size: 72rpx;
-  margin-bottom: 12rpx;
-  position: relative;
+  width: 120rpx;
+  height: 120rpx;
+  display: block;
+  margin: 0 auto 12rpx;
 }
 .badge-colored-locked {
   position: relative;
@@ -188,8 +214,28 @@
   line-height: 44rpx;
   text-align: center;
 }
-.badge-lock-hint {
-  margin-top: 4rpx;
+.badge-state {
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  line-height: 1.3;
+}
+.badge-state.on {
+  display: inline-block;
+  padding: 2rpx 14rpx;
+  border-radius: 999rpx;
+  background: var(--sun);
+  border: 2rpx solid var(--fg);
+  color: var(--fg);
+  font-weight: 700;
+}
+.badge-state.off {
+  color: var(--muted);
+}
+.badge-date {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 20rpx;
+  color: var(--muted);
 }
 .badge-lock-hint .lock-hint-text {
   font-size: 18rpx;
@@ -437,7 +483,7 @@
   margin-bottom: 24rpx;
 }
 .m-name {
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-size: 36rpx;
   font-weight: 700;
   margin-bottom: 12rpx;

@@ -69,6 +69,13 @@
   border-radius: 12rpx;
   margin-top: 12rpx;
 }
+/* 报告类图片的"放大出口"提示（docs/15 §十九）：出口走 wx.previewImage，可双指放大 / 长按保存 */
+.rp-hint {
+  margin-top: 16rpx;
+  font-size: 22rpx;
+  color: var(--muted);
+  text-align: center;
+}
 .rp-loading {
   color: var(--muted-light);
   font-size: 26rpx;

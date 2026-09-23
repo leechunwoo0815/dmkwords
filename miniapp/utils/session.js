@@ -4,9 +4,15 @@ function getChildren() { return wx.getStorageSync('children') || [] }
 function getCurrentChild() {
   const children = getChildren()
   const id = wx.getStorageSync('currentChildId')
-  return children.find((c) => c.id === id) || children[0] || null
+  // 宽松比较（两侧转字符串）：切换时 id 来自 `data-id` 的 dataset，**类型随基础库不定**
+  // （实测可能是 "10" 字符串）。此前 `c.id === id` 严格比较，类型不匹配即静默回落到
+  // children[0] —— 表现就是"切了孩子，页面还显示上一个孩子的数据"（2026-09-21 用户报障同族）。
+  return children.find((c) => String(c.id) === String(id)) || children[0] || null
 }
-function setCurrentChild(id) { wx.setStorageSync('currentChildId', id) }
+function setCurrentChild(id) {
+  // 写入口径统一成数字（页面与接口都按 number 用）；纯数字串转数字，其余原样存
+  wx.setStorageSync('currentChildId', typeof id === 'string' && /^\d+$/.test(id) ? Number(id) : id)
+}
 // WM14-B：局部更新家长资料（改称呼后同步本地缓存，避免重登才生效）
 function patchParent(patch) {
   const p = getParent() || {}

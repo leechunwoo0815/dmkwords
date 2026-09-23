@@ -39,8 +39,8 @@ Page({
       const isMine = !!me && Number(me.id) === Number(p.child_id)
       const birthdayText = p.is_birthday
         ? isMine
-          ? '今天是我的生日！🎂'
-          : `今天是 ${p.english_name} 的生日，送上祝福吧 🎂`
+          ? '今天是我的生日！'
+          : `今天是 ${p.english_name} 的生日，送上祝福吧`
         : ''
       this.setData({
         profile: {

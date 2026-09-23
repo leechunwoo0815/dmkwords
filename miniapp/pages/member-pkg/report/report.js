@@ -24,6 +24,12 @@ Page({
     this.load()
   },
 
+  /** 点报告图 → 原生预览（双指放大看清小字 / 长按保存）；docs/15 §十九 放大出口红线 */
+  onPreviewReport() {
+    if (!this.data.imageUrl) return
+    wx.previewImage({ urls: [this.data.imageUrl], current: this.data.imageUrl })
+  },
+
   async load() {
     if (!this._childId) return
     try {

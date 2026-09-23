@@ -41,7 +41,8 @@
       <view wx:for="{{children}}" wx:key="id"
         class="child-switcher-chip {{currentChild && currentChild.id === item.id ? 'active' : ''}}"
         data-id="{{item.id}}" bindtap="onSwitchChild">
-        <text class="chip-avatar">{{item.name ? item.name[0] : '👶'}}</text>
+        <image wx:if="{{!item.name}}" class="chip-avatar-img" src="/icons/avatars/cat_sun.png" mode="aspectFit" />
+        <text wx:else class="chip-avatar">{{item.name[0]}}</text>
         <text class="chip-text">{{item.name}}</text>
         <text class="chip-status">{{item.statusText}}</text>
       </view>

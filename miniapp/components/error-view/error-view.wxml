@@ -1,7 +1,7 @@
 <!-- frontend/components/error-view/error-view.wxml -->
 <!-- 通用错误视图组件 -->
 <view class="error-view" wx:if="{{visible}}">
-  <view class="error-icon">{{icon}}</view>
+  <image class="error-icon" src="{{iconUrl}}" mode="aspectFit" />
   <view class="error-title">{{title}}</view>
   <view class="error-desc" wx:if="{{desc}}">{{desc}}</view>
   <button class="error-btn" wx:if="{{showRetry}}" bindtap="onRetry">

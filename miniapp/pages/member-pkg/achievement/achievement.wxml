@@ -1,6 +1,9 @@
 <view class="page-bg x-cb307e">
   <view class="level-card" wx:if="{{summary}}">
-    <view class="level-emoji">{{levelEmoji}}</view>
+    <view class="level-shield">
+      <image class="level-shield-img" src="/icons/badges/level_template.png" mode="aspectFit" />
+      <text class="level-shield-letter">{{summary.level}}</text>
+    </view>
     <view class="level-name">{{summary.level}} 级</view>
     <view class="level-desc">
       {{childName}} · 已有效阅读 {{summary.books_total}} 本书（每 {{summary.level_books_threshold}} 本升一级，只升不降）
@@ -31,10 +34,12 @@
 
   <view class="section-label x-03f368">里程碑勋章</view>
   <view class="badges-grid">
-    <view wx:for="{{badges}}" wx:key="node" class="badge-card {{item.unlocked ? '' : 'badge-colored-locked'}}">
-      <view class="badge-icon">{{item.emoji}}</view>
+    <view wx:for="{{badges}}" wx:key="node"
+      class="badge-card {{item.unlocked ? 'is-unlocked' : 'is-locked'}}">
+      <image class="badge-icon" src="{{item.iconUrl}}" mode="aspectFit" />
       <view class="badge-name">{{item.label}}</view>
-      <view wx:if="{{!item.unlocked}}" class="badge-lock-hint">未达成</view>
+      <view class="badge-state {{item.unlocked ? 'on' : 'off'}}">{{item.unlocked ? '已达成' : '未达成'}}</view>
+      <text class="badge-date" wx:if="{{item.unlocked && item.dateText}}">{{item.dateText}} 达成</text>
     </view>
   </view>
 

@@ -201,8 +201,15 @@
 }
 
 .tag-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
   background: rgba(var(--success-rgb), 0.1);
   color: var(--success);
+}
+.tag-time-icon {
+  width: 26rpx;
+  height: 26rpx;
 }
 
 .tag-age {

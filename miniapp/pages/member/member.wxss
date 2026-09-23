@@ -631,6 +631,13 @@
   box-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.85);
 }
 
+.chip-avatar-img {
+  width: 44rpx;
+  height: 44rpx;
+  border: 2rpx solid var(--fg);
+  border-radius: 50%;
+  background: var(--accent-soft);
+}
 .chip-avatar {
   width: 44rpx;
   height: 44rpx;

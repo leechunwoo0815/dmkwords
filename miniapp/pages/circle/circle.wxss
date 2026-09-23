@@ -53,7 +53,8 @@
   align-items: center;
   gap: 16rpx;
 }
-.banner-emoji { font-size: 40rpx; }
+/* 社区横幅图标：原为 globe.png 40rpx，橙底上缩成一团看不清 → 换书本资产并放大（2026-09-21 目视） */
+.banner-icon { width: 48rpx; height: 48rpx; flex-shrink: 0; }
 .banner-text {
   font-size: 28rpx;
   font-weight: 700;
@@ -114,7 +115,7 @@
   font-weight: 800;
   color: var(--fg);
 }
-.admin-mark { font-size: 26rpx; }
+.admin-mark { width: 30rpx; height: 30rpx; }
 .meta {
   display: block;
   margin-top: 6rpx;
@@ -468,7 +469,7 @@
 }
 
 .share-entry-icon { width: 40rpx; height: 40rpx; }
-.banner-emoji { width: 40rpx; height: 40rpx; }
+
 .like-icon { width: 34rpx; height: 34rpx; }
 
 .badge-spark { width: 22rpx; height: 22rpx; margin-left: 4rpx; vertical-align: -3rpx; }

@@ -9,7 +9,9 @@
       <view class="hero-tags">
         <text class="tag-words">{{book.word_count}} 词</text>
         <text wx:if="{{book.ar_level}}" class="tag-ar">AR {{book.ar_level}}</text>
-        <text wx:if="{{book.has_audio && durationText}}" class="tag-time">🎧 {{durationText}}</text>
+        <view wx:if="{{book.has_audio && durationText}}" class="tag-time">
+        <image class="tag-time-icon" src="/icons/ui/headphone.png" mode="aspectFit" /><text>{{durationText}}</text>
+      </view>
       </view>
       <view class="hero-meta">
         <text wx:if="{{book.grade}}" class="meta-chip">{{book.grade}}</text>
@@ -47,7 +49,7 @@
         <text wx:else>已听 {{progress.displayPercent}}%</text>
       </view>
     </view>
-    <view wx:elif="{{quizStatus === 'passed'}}" class="muted-line">本书已通过测验 ✅</view>
+    <view wx:elif="{{quizStatus === 'passed'}}" class="muted-line">本书已通过测验 ✓</view>
     <view wx:else class="muted-line">还没开始听，从第一秒开始吧</view>
   </view>
 
@@ -68,12 +70,12 @@
       <view class="qhc-tip">点卡片看成绩单 ›</view>
     </view>
     <view wx:elif="{{quizStatus === 'available'}}" class="quiz-challenge-card">
-      <view class="qcc-title">{{quizAttemptsUsed > 0 ? '💪 差一点点就过啦！' : '🎯 轮到你挑战啦！'}}</view>
+      <view class="qcc-title">{{quizAttemptsUsed > 0 ? '差一点点就过啦！' : '轮到你挑战啦！'}}</view>
       <view class="qcc-sub">{{quizAttemptsUsed > 0 ? '还剩 ' + quizAttemptsLeft + ' 次机会 · 最佳 ' + quizBest + ' 分' : '共 ' + quizMaxAttempts + ' 次机会，证明你读懂了这本书'}}</view>
       <button class="qcc-btn pulse-anim" bindtap="onQuiz">{{quizAttemptsUsed > 0 ? '再挑战一次！' : '开始挑战！'}}</button>
     </view>
     <view wx:elif="{{quizStatus === 'locked' || quizStatus === 'failed'}}" class="quiz-locked-hint">
-      {{quizStatus === 'failed' ? '🔒 机会用完了，请老师帮忙重置后再来吧' : (progress ? '🔒 听完音频就能解锁挑战哦～（已听 ' + progress.displayPercent + '%）' : '🔒 听完音频就能解锁挑战哦～')}}
+      {{quizStatus === 'failed' ? '挑战机会用完了，请老师帮忙重置后再来吧' : (progress ? '听完音频就能解锁挑战哦～（已听 ' + progress.displayPercent + '%）' : '听完音频就能解锁挑战哦～')}}
     </view>
   </block>
 

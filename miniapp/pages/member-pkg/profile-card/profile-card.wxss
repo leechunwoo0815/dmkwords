@@ -135,19 +135,29 @@
   z-index: 1;
 }
 
+/* 等级徽章 = 盾牌资产 + 字母叠加（与「等级与勋章」页同一套语言，不再用纯色方块） */
 .level-badge-icon {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 24rpx;
-  background: linear-gradient(135deg, var(--gold), var(--gold-dark));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-display);
-  font-size: 44rpx;
-  font-weight: 800;
-  color: var(--surface);
-  box-shadow: 0 8rpx 24rpx rgba(var(--warning-rgb), 0.35);
+  position: relative;
+  width: 92rpx;
+  height: 92rpx;
+  flex-shrink: 0;
+}
+.level-badge-shield {
+  width: 92rpx;
+  height: 92rpx;
+  display: block;
+}
+.level-badge-letter {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 30rpx;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--fg);
+  line-height: 1;
 }
 
 .level-text {
@@ -183,7 +193,7 @@
 .stat-item {
   flex: 1;
   text-align: center;
-  padding: 28rpx 16rpx;
+  padding: 24rpx 12rpx;
   border-right: 2rpx solid rgba(var(--surface-rgb), 0.1);
 }
 
@@ -191,9 +201,11 @@
   border-right: none;
 }
 
+/* 数字走等宽（docs/15 §17.1 字体分工）：手写体数字偏宽且不等宽，
+   "102320" 这种六位数会把 4 等分格子撑到贴边（2026-09-21 目视发现） */
 .stat-val {
-  font-family: var(--font-display);
-  font-size: 44rpx;
+  font-family: var(--font-mono);
+  font-size: 34rpx; /* 手写体数字偏宽且不等宽，"102320" 在 4 等分格子里顶到边；换等宽并降到 34rpx（目视确认两侧留白恢复；miniapp 无文本测宽 API，故以截图为准） */
   font-weight: 700;
   color: var(--surface);
   display: block;
@@ -216,12 +228,73 @@
   z-index: 1;
 }
 
+/* 里程碑两态（docs/15 §二十一）：已达成 = 亮白底 + 实线 + 全彩奖牌；未达成 = 淡底 + 虚线 + 40% 图标 */
 .ach-item {
   flex: 1;
   text-align: center;
   padding: 20rpx 12rpx;
-  background: rgba(var(--surface-rgb), 0.1);
+  background: rgba(var(--surface-rgb), 0.12);
+  border: 2rpx dashed rgba(var(--surface-rgb), 0.4);
   border-radius: 20rpx;
+}
+.ach-item.is-unlocked {
+  background: rgba(var(--surface-rgb), 0.96);
+  border: 3rpx solid var(--fg);
+  box-shadow: var(--shadow-hard-sm);
+}
+.ach-item.is-locked .ach-icon {
+  opacity: 0.4;
+}
+.ach-item.is-locked .ach-name {
+  color: var(--surface);
+  opacity: 0.8;
+}
+/* 状态行：已达成=金色贴片（与勋章页同款），未达成=淡字 */
+.ach-state {
+  margin-top: 6rpx;
+  font-size: 18rpx;
+  line-height: 1.25;
+  white-space: nowrap; /* 格宽仅 52pt：「已达成」不许折成"已达/成"（2026-09-21 目视） */
+}
+.ach-state.on {
+  display: inline-block;
+  padding: 2rpx 8rpx;
+  border-radius: 999rpx;
+  background: var(--sun);
+  border: 2rpx solid var(--fg);
+  color: var(--fg);
+  font-weight: 700;
+}
+.ach-state.off {
+  color: var(--surface);
+  opacity: 0.7;
+}
+.ach-date {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 18rpx;
+  color: var(--muted);
+}
+/* 里程碑标题行：解锁进度 + 下一枚目标 */
+.milestone-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+  position: relative;
+  z-index: 1;
+}
+.milestone-title {
+  font-family: var(--font-display);
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--surface);
+}
+.milestone-next {
+  font-size: 22rpx;
+  color: var(--surface);
+  opacity: 0.9;
 }
 
 .ach-icon {
@@ -234,6 +307,11 @@
   font-size: 22rpx;
   opacity: 0.85;
   color: var(--surface);
+}
+.ach-item.is-unlocked .ach-name {
+  color: var(--fg);
+  font-weight: 700;
+  opacity: 1;
 }
 
 /* Divider */

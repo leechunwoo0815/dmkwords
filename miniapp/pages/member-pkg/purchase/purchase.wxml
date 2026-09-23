@@ -5,8 +5,8 @@
     <view class="plan-badge">观察期会员</view>
     <view class="plan-price">价格以到店公示为准</view>
     <view>
-      <view class="plan-feat">🌱 面向新入会孩子的适应期方案</view>
-      <view class="plan-feat">📖 到店借阅 + 线上听读测验全功能</view>
+      <view class="plan-feat">面向新入会孩子的适应期方案</view>
+      <view class="plan-feat">到店借阅 + 线上听读测验全功能</view>
       <view class="plan-feat">⏱ 到期后可转正式会员（馆方核定）</view>
     </view>
   </view>
@@ -15,9 +15,9 @@
     <view class="plan-badge plan-badge-gold">正式会员</view>
     <view class="plan-price">价格以到店公示为准</view>
     <view>
-      <view class="plan-feat">📚 全馆藏书借阅额度与预约</view>
-      <view class="plan-feat">🏆 等级/积分/榜单/护照完整成长体系</view>
-      <view class="plan-feat">👨‍👩‍👧 馆内活动优先报名</view>
+      <view class="plan-feat">全馆藏书借阅额度与预约</view>
+      <view class="plan-feat">等级/积分/榜单/护照完整成长体系</view>
+      <view class="plan-feat">馆内活动优先报名</view>
     </view>
   </view>
 

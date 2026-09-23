@@ -20,8 +20,8 @@
         <text class="order-status badge-{{item.status === 'paid' ? 'paid' : item.status === 'refunded' ? 'refunded' : 'pending'}}">{{item.statusText}}</text>
       </view>
       <view class="order-body">
-        <view class="order-icon {{item.icon}}">
-          <text class="order-icon-text">{{item.typeText[0]}}</text>
+        <view class="order-icon {{item.iconCls}}">
+          <image class="order-icon-img" src="{{item.iconUrl}}" mode="aspectFit" />
         </view>
         <view class="order-info">
           <view class="order-type">{{item.typeText}}</view>

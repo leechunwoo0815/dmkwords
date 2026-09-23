@@ -4,7 +4,7 @@
     <view class="book-author">{{childName}} 正在听 · {{book.author || '佚名'}}</view>
     <view class="book-meta">
       <text class="meta-tag">已覆盖 {{coveragePercent}}%</text>
-      <text wx:if="{{finished}}" class="meta-tag x-691250">✅ 已读完</text>
+      <text wx:if="{{finished}}" class="meta-tag x-691250">✓ 已读完</text>
     </view>
   </view>
 
@@ -43,7 +43,7 @@
       <view class="lookup-btn" bindtap="onDictSearch">查</view>
     </view>
     <view wx:if="{{showDict}}" class="dict-result show">
-      <view wx:if="{{dictLoading}}" class="dict-loading">🔍 正在查词…</view>
+      <view wx:if="{{dictLoading}}" class="dict-loading">正在查词…</view>
       <block wx:elif="{{dictResult}}">
         <view class="dr-word">{{dictResult.word}}</view>
         <view class="dr-phonetic">{{dictResult.phonetic}}</view>

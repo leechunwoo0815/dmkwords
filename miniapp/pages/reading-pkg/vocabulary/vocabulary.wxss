@@ -1,300 +1,196 @@
-/* vocabulary.wxss — aligned with design/user-end/vocabulary.html */
+/* pages/reading-pkg/vocabulary/vocabulary.wxss — 生词本（成就页，2026-09-21 重排）
+   呈现口径：docs/15 §二十一 成就类页面呈现规范
+   （成就头卡 + 四指标等高 + 书封锚点 + 三层信息 + 行内无删除按钮）。 */
 
-/* Nav Bar */
-.nav-bar {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  padding: 24rpx 32rpx;
-  background: var(--surface);
-  border-bottom: 2rpx solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.nav-bar .back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 20rpx;
-}
-
-.nav-bar .back-arrow {
-  font-size: 40rpx;
-}
-
-.nav-bar .title {
-  font-family: var(--font-display);
-  font-size: 34rpx;
-  font-weight: 600;
-}
-
-.nav-bar .nav-subtitle {
-  font-size: 24rpx;
-  font-weight: 400;
-  color: var(--muted);
-}
-
-.nav-bar .right-btn {
-  margin-left: auto;
-}
-
-.nav-bar .right-btn .right-btn-text {
-  font-size: 26rpx;
-  color: var(--accent);
-  font-weight: 500;
-}
-
-/* Page Hint（2026-09-15 补：原先 .vocab-hint 在 wxss 里**完全没有规则**，
-   提示语零左内边距紧贴屏幕左缘、并折行成一个孤字「习」） */
 .page-bg.vocab-page {
-  padding-bottom: calc(60rpx + env(safe-area-inset-bottom));
+  min-height: 100vh;
+  background: var(--bg);
+  padding: 24rpx 24rpx calc(60rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
 }
 
-.vocab-hint {
+/* ---------- 成就头卡 ---------- */
+.vocab-hero {
   display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-  padding: 32rpx 32rpx 8rpx;
-}
-
-.vocab-hint .vh-title {
-  font-family: var(--font-display);
-  font-size: 40rpx;
-  font-weight: 700;
-  color: var(--fg);
-  line-height: 1.3;
-}
-
-.vocab-hint .vh-sub {
-  font-size: 24rpx;
-  color: var(--muted);
-  line-height: 1.45;
-}
-
-/* Stats Row */
-.stats-row {
-  display: flex;
-  gap: 16rpx;
-  margin: 24rpx 32rpx;
-}
-
-.stats-row .st {
-  flex: 1;
-  background: var(--surface);
-  border: 2rpx solid var(--border);
-  border-radius: 20rpx;
-  padding: 24rpx;
-  text-align: center;
-}
-
-.st .st-val {
-  font-family: var(--font-display);
-  font-size: 40rpx;
-  font-weight: 700;
-  display: block;
-}
-
-.st .st-label {
-  font-size: 22rpx;
-  color: var(--muted);
-  display: block;
-}
-
-.st.learning .st-val {
-  color: var(--accent);
-}
-
-.st.mastered .st-val {
-  color: var(--success);
-}
-
-/* Tabs */
-.tabs {
-  display: flex;
-  margin: 0 32rpx;
-  background: var(--surface);
-  border: 2rpx solid var(--border);
-  border-radius: 20rpx;
-  overflow: hidden;
-}
-
-.tab-btn {
-  flex: 1;
-  padding: 18rpx;
-  font-size: 26rpx;
-  font-weight: 500;
-  color: var(--muted);
-  text-align: center;
-}
-
-.tab-btn.active {
-  background: var(--accent);
+  align-items: center;
+  gap: 20rpx;
+  padding: 28rpx 24rpx;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
   color: var(--surface);
 }
-
-/* Sort Bar */
-.sort-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20rpx 32rpx;
+.vh-icon {
+  width: 48rpx;
+  height: 48rpx;
+  flex-shrink: 0;
 }
-
-.sort-bar .count {
-  font-size: 24rpx;
-  color: var(--muted);
-}
-
-.sort-bar .sort-select {
-  font-size: 24rpx;
-  border: 2rpx solid var(--border);
-  border-radius: 12rpx;
-  padding: 8rpx 16rpx;
-  background: var(--surface);
-  color: var(--fg);
-}
-
-/* Word List */
-.word-list {
-  padding: 0 32rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-}
-
-.word-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 24rpx;
-  background: var(--surface);
-  border: 3rpx solid var(--border);
-  border-radius: 24rpx 28rpx 20rpx 30rpx;
-  padding: 26rpx 28rpx;
-  box-shadow: var(--shadow-hard-sm);
-}
-
-.word-item:active {
-  transform: scale(0.99);
-}
-
-.word-main {
+.vh-main {
   flex: 1;
   min-width: 0;
 }
-
-/* 生词是这张卡的主角：大字 + 强调色（2026-09-15 用户点名「分不清哪个是我查过的词」） */
-.word-main .w-head {
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-  flex-wrap: wrap;
-}
-
-.word-main .w-word {
+.vh-title {
   font-family: var(--font-display);
-  font-size: 42rpx;
+  font-size: 34rpx;
   font-weight: 700;
-  color: var(--accent-dark);
-  line-height: 1.2;
 }
-
-.word-main .w-phonetic {
-  font-size: 24rpx;
-  color: var(--muted);
-  display: block;
-  margin-top: 6rpx;
-}
-
-.word-main .w-def {
-  font-size: 28rpx;
-  color: var(--fg);
-  margin-top: 8rpx;
-  display: block;
-  line-height: 1.45;
-}
-
-/* 来源书单独占一行、更小更淡 —— 不让书名和生词抢视觉、也不挤在同一行 */
-.word-main .w-src {
+.vh-sub {
   font-size: 22rpx;
-  color: var(--muted);
-  display: block;
-  margin-top: 10rpx;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin-top: 6rpx;
+  opacity: 0.92;
 }
-
-.word-tag {
-  font-size: 20rpx;
-  padding: 6rpx 16rpx;
-  border-radius: 999rpx;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.word-tag.learning {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.word-tag.mastered {
-  background: var(--success-soft);
-  color: var(--success);
-}
-
-.word-actions {
-  display: flex;
-  gap: 8rpx;
-}
-
-.word-actions .action-btn {
-  /* 2026-09-15 修复：原 width:60rpx 是「图标」尺寸，但 wxml 里是文字「删除」
-     → 两字撑出 60rpx 溢出卡片右缘。改按文字自适应。 */
-  min-width: 60rpx;
-  height: 60rpx;
-  padding: 0 22rpx;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 16rpx;
-  color: var(--muted);
-}
-
-.word-actions .action-btn .action-icon {
-  font-size: 32rpx;
-}
-
-/* Empty State */
-.empty-state {
+.vh-count {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 120rpx 40rpx;
+  width: 108rpx;
+  height: 108rpx;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  box-shadow: var(--shadow-hard-sm);
+  flex-shrink: 0;
+}
+.vh-count-num {
+  font-family: var(--font-display);
+  font-size: 46rpx;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent);
+}
+.vh-count-unit {
+  font-size: 18rpx;
   color: var(--muted);
+  margin-top: 2rpx;
 }
 
-.empty-state .emoji {
-  font-size: 80rpx;
-  margin-bottom: 20rpx;
+/* ---------- 四指标（等高一行） ---------- */
+.vocab-stats {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 20rpx;
 }
-
-.empty-state .text {
-  font-size: 28rpx;
+.vs-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20rpx 6rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 20rpx;
+  box-shadow: var(--shadow-hard-sm);
 }
-
-.empty-state .text-sub {
-  font-size: 24rpx;
+.vs-val {
+  font-family: var(--font-mono);
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--accent-darker);
+  line-height: 1.1;
+}
+.vs-label {
+  font-size: 20rpx;
   color: var(--muted);
+  margin-top: 8rpx;
+}
+
+/* ---------- 列表 ---------- */
+.word-list {
   margin-top: 24rpx;
 }
+.word-item {
+  display: flex;
+  gap: 20rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+.word-item:active {
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none;
+}
+.wi-main {
+  flex: 1;
+  min-width: 0;
+}
+.wi-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14rpx;
+  flex-wrap: wrap;
+}
+/* 第一层：主体（词最大最重、等宽字体、主色） */
+.wi-word {
+  font-family: var(--font-mono);
+  font-size: 40rpx;
+  font-weight: 700;
+  color: var(--accent-darker);
+  line-height: 1.2;
+}
+/* 「查 N 次」= 积累感的来源，只给重复查过的词 */
+.wi-tag {
+  font-size: 20rpx;
+  font-weight: 700;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  background: var(--sun);
+  border: 2rpx solid var(--fg);
+  color: var(--fg);
+}
+/* 第二层：属性（音标 mono / 释义正文） */
+.wi-phonetic {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 24rpx;
+  color: var(--muted);
+  margin-top: 6rpx;
+}
+.wi-def {
+  display: block;
+  font-size: 30rpx;
+  color: var(--fg);
+  line-height: 1.5;
+  margin-top: 8rpx;
+}
+/* 第三层：出处（书名 + 日期，比主体淡一档，禁与主体同色同字号） */
+.wi-foot {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  margin-top: 12rpx;
+  flex-wrap: wrap;
+}
+/* 出处用"书签小片"承载（不用封面图：列表里几十张网络图会拖慢渲染，用户裁定） */
+.wi-src {
+  font-size: 22rpx;
+  color: var(--sky-ink);
+  background: var(--sky-soft);
+  border-radius: 8rpx;
+  padding: 4rpx 12rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70%;
+}
+.wi-date {
+  margin-left: auto; /* 日期靠右，书名自己截断，别让两个都在左边挤半行 */
+  flex-shrink: 0;
+  font-size: 22rpx;
+  color: var(--muted-light);
+}
+.list-hint {
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--muted);
+  padding: 8rpx 0 16rpx;
+}
 
-/* Loading */
 .loading {
   display: flex;
   align-items: center;
@@ -303,10 +199,10 @@
   color: var(--muted);
 }
 
-/* Flashcard Overlay */
+/* ---------- 闪卡（点词看释义） ---------- */
 .flashcard-overlay {
   position: fixed;
-    box-sizing: border-box;
+  box-sizing: border-box;
   top: 0;
   left: 0;
   right: 0;
@@ -318,318 +214,136 @@
   justify-content: center;
   visibility: hidden;
   opacity: 0;
-  box-sizing: border-box;
 }
-
 .flashcard-overlay.show {
   visibility: visible;
   opacity: 1;
 }
-
 .flashcard {
-  width: 600rpx;
-  height: 760rpx;
+  width: 620rpx;
+  max-height: 78vh;
   background: var(--surface);
-  border-radius: var(--radius-lg);
-  padding: 48rpx;
+  border: 3rpx solid var(--fg);
+  border-radius: 32rpx;
+  padding: 44rpx 40rpx 36rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   text-align: center;
-  gap: 24rpx;
-  box-shadow: 0 32rpx 96rpx rgba(var(--fg-rgb), 0.15);
+  box-shadow: var(--shadow-hard);
   position: relative;
 }
-
-.flashcard .fc-word {
-  font-family: var(--font-display);
-  font-size: 64rpx;
-  font-weight: 700;
+.fc-close {
+  position: absolute;
+  top: 16rpx;
+  right: 16rpx;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2rpx solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-
-.flashcard .fc-phonetic {
-  font-size: 32rpx;
+.fc-close-icon {
+  font-size: 28rpx;
   color: var(--muted);
 }
-
-.flashcard .fc-def {
-  font-size: 36rpx;
-  color: var(--fg);
+/* 卡头：大词 + 音标（不放封面图，与列表同口径） */
+.fc-top {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding-right: 48rpx;
 }
-
-/* 英文释义：比中文翻译轻一档，避免两段同权重打架 */
+.fc-topmain {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.flashcard .fc-word {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 56rpx;
+  font-weight: 700;
+  color: var(--accent-darker);
+  line-height: 1.15;
+  word-break: break-all;
+}
+.flashcard .fc-phonetic {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 28rpx;
+  color: var(--muted);
+  margin-top: 8rpx;
+}
+.fc-rule {
+  width: 100%;
+  height: 2rpx;
+  background: var(--border);
+  margin: 28rpx 0 24rpx;
+}
+/* 释义/出处左对齐：多行释义居中会参差（闪卡 = 字典卡，按阅读习惯排）。
+   ⚠️ 必须配 align-self: stretch——.flashcard 是 align-items:center 的 flex 容器，
+   子项会收缩到内容宽，光写 text-align:left 是**不生效的空话**（本轮目视抓到）。 */
+.flashcard .fc-def {
+  align-self: stretch;
+  text-align: left;
+  font-size: 38rpx;
+  color: var(--fg);
+  line-height: 1.5;
+}
+/* 英文释义：比中文轻一档，避免两段同权重打架 */
 .flashcard .fc-def-en {
+  align-self: stretch;
+  text-align: left;
   font-size: 26rpx;
   color: var(--muted);
-  line-height: 1.5;
-  padding: 0 24rpx;
+  line-height: 1.6;
+  margin-top: 14rpx;
+  padding: 0 12rpx;
 }
-
+.fc-src-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16rpx;
+  width: 100%;
+  margin-top: 22rpx;
+}
 .flashcard .fc-hint {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
   font-size: 24rpx;
   color: var(--muted);
-  margin-top: 16rpx;
 }
-
+/* 「N月N日 收录」不许被折成两行（源书名换行可以，日期换行是排版事故） */
+.fc-hint-date {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 24rpx;
+  color: var(--muted-light);
+}
 .fc-actions {
   display: flex;
   gap: 24rpx;
   margin-top: 32rpx;
 }
-
 .fc-btn {
-  padding: 20rpx 40rpx;
+  padding: 20rpx 44rpx;
   border-radius: 999rpx;
   font-size: 28rpx;
   font-weight: 600;
 }
-
 .fc-btn.again {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--warning-soft);
+  border: 2rpx solid var(--fg);
+  color: var(--fg);
 }
-
 .fc-btn.got {
-  background: var(--success);
-  color: var(--surface);
-}
-
-.fc-close {
-  position: absolute;
-  top: 20rpx;
-  right: 20rpx;
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  background: rgba(var(--fg-rgb), 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.fc-close .fc-close-icon {
-  font-size: 32rpx;
-  color: var(--surface);
-}
-
-/* Review Progress Bar */
-.review-progress-bar {
-  position: absolute;
-  top: 80rpx;
-  left: 48rpx;
-  right: 48rpx;
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  z-index: 31;
-}
-
-.review-progress-track {
-  flex: 1;
-  height: 8rpx;
-  background: rgba(var(--surface-rgb), 0.3);
-  border-radius: 4rpx;
-  overflow: hidden;
-}
-
-.review-progress-fill {
-  height: 100%;
-  background: var(--surface);
-  border-radius: 4rpx;
-  transition: width 0.3s ease;
-}
-
-.review-progress-text {
-  font-size: 24rpx;
-  color: rgba(var(--surface-rgb), 0.9);
-  white-space: nowrap;
-  font-weight: 600;
-}
-
-/* Review Complete Overlay */
-.review-complete-overlay {
-  position: fixed;
-    box-sizing: border-box;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, var(--success-soft), rgba(var(--success-rgb), 0.75));
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  visibility: hidden;
-  opacity: 0;
-  box-sizing: border-box;
-}
-
-.review-complete-overlay.show {
-  visibility: visible;
-  opacity: 1;
-  animation: completeFadeIn 0.3s ease;
-}
-
-@keyframes completeFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.review-complete-card {
-  width: 560rpx;
-  background: var(--surface);
-  border-radius: 32rpx;
-  padding: 64rpx 48rpx;
-  text-align: center;
-  box-shadow: 0 16rpx 64rpx rgba(var(--fg-rgb), 0.2);
-  animation: completeScaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes completeScaleIn {
-  0% {
-    transform: scale(0.3);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-.review-complete-emoji {
-  font-size: 120rpx;
-  display: block;
-  margin-bottom: 24rpx;
-}
-
-.review-complete-title {
-  font-size: 44rpx;
-  font-weight: 700;
-  color: var(--fg);
-  display: block;
-  margin-bottom: 12rpx;
-}
-
-.review-complete-desc {
-  font-size: 28rpx;
-  color: var(--muted);
-  display: block;
-  margin-bottom: 48rpx;
-}
-
-.review-complete-btn {
-  width: 360rpx;
-  margin: 0 auto;
-  background: var(--success);
-  color: var(--surface);
-  border-radius: 999rpx;
-  font-size: 30rpx;
-  font-weight: 600;
-  border: none;
-  line-height: 88rpx;
-  height: 88rpx;
-  padding: 0;
-}
-
-/* 排序选择器 - 字体 */
-.sort-bar .sort-select {
-  font-family: var(--font-body);
-}
-
-/* 选项 active 态 */
-.action-btn:active {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-
-/* ============================================
-   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
-   ============================================ */
-/* 按钮：胶囊贴纸 */
-.btn, button, .primary-btn, .secondary-btn, .action-btn {
-  border: 3rpx solid var(--fg);
-  border-radius: 999rpx;
-  box-shadow: var(--shadow-hard-sm);
-  font-weight: 700;
-}
-.btn-primary, .primary, button[type="primary"], .primary-btn {
-  background: var(--accent);
-  color: var(--surface);
-}
-.btn-secondary, .secondary, .secondary-btn {
-  background: var(--surface);
-  color: var(--fg);
-}
-.btn:active, button:active, .primary-btn:active, .secondary-btn:active {
-  transform: translate(2rpx, 2rpx);
-  box-shadow: none;
-}
-
-/* 标签/徽章：圆角贴纸 */
-.tag, .badge, .pill, .tag-primary, .tag-secondary, .tag-success, .tag-warning {
-  border: 2rpx solid rgba(var(--fg-rgb), 0.6);
-  border-radius: 999rpx;
-  font-weight: 700;
-}
-.tag-primary, .badge-primary { background: var(--accent-soft); color: var(--accent-dark); }
-.tag-secondary, .badge-secondary { background: var(--secondary-soft); color: var(--secondary-ink); }
-.tag-success, .badge-success { background: var(--success-soft); color: var(--success); }
-.tag-warning, .badge-warning { background: var(--warning-soft); color: var(--warning-dark); }
-
-.item, .row, .cell {
   background: var(--surface);
   border: 2rpx solid var(--fg);
-  border-radius: 24rpx 28rpx 20rpx 30rpx;
-  box-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.55);
-}
-
-/* 列表容器：加间距 */
-.list, .grid, .list-container {
-  gap: 16rpx;
-}
-
-
-/* ============================================
-   2026-09-15 生词本改造收尾（必须放在上面的「绘本风精修覆盖块」之后才生效）
-   ============================================ */
-/* 删除是低频破坏性动作，必须比生词本身轻：上面覆盖块把 .action-btn 统一成了
-   粗边+硬阴影+加粗的主按钮观感，导致「删除」成了整张卡最重的元素、喧宾夺主。 */
-.word-actions .action-btn {
-  border: 2rpx solid var(--border);
-  box-shadow: none;
-  font-weight: 500;
-  background: var(--bg);
-  color: var(--muted);
-}
-
-/* 统计卡与生词卡同款卡片语汇（原 2rpx 细边无阴影，比下方的卡「平」一档） */
-.stats-row .st {
-  border: 3rpx solid var(--border);
-  border-radius: 24rpx 28rpx 20rpx 30rpx;
-  box-shadow: var(--shadow-hard-sm);
-}
-
-/* 闪卡：原固定 760rpx 高 + 内容居中 → 上下各留一大片空（内容只占 58%）。
-   改成由内容撑高 + 上下限，短词卡不再被拉成空盒子。 */
-.flashcard {
-  width: 600rpx;
-  height: auto;
-  min-height: 520rpx;
-  max-height: 820rpx;
-  padding: 64rpx 48rpx;
-}
-
-/* 「移出生词本」是破坏性动作，原先用 --success 绿＝「成功/达成」语义打反；
-   改软红，并保留它是卡内次要动作的份量 */
-.flashcard .fc-btn.got {
-  background: var(--error-soft);
-  color: var(--error);
-}
-
-/* 「知道了」才是这一屏的主操作：上面两个都成了软底浅字后主次不分，主按钮改实心 */
-.flashcard .fc-btn.again {
-  background: var(--accent);
-  color: var(--surface);
+  color: var(--accent-darker);
 }

@@ -11,24 +11,43 @@ const MEMBER_STATUS_TEXT = {
 Page({
   data: {
     parent: null,
-    children: [],
     currentChild: null,
     statusText: '',
     todayChecked: false,
-    currentStreak: 0,
+    // 连续打卡（null = 未知，渲染成「—」；不拿 0 冒充）
+    currentStreak: null,
     // 续听卡（在借第一本 + 真实进度）
     continueBook: null,
-    // 今日数据条
-    totalWords: 0,
-    points: 0,
-    // 提醒条
+    // 今日数据条（null = 未知/不可见 → 「—」）
+    totalWords: null,
+    points: null,
+    growthBlocked: false, // 未入会等被守卫挡下：数字不可得，页面要说清原因
+    // 提醒条（unreadCount 是家长级，不随孩子切换清空）
     unreadCount: 0,
-    borrowCount: 0,
-    reservationCount: 0,
+    borrowCount: null,
+    reservationCount: null,
     // 今日推荐（真实书目，横滑）
     recommend: [],
     // T45（FEAT-082）：活动轮播位（有封面未开始 ≤5）
     carousel: [],
+  },
+
+  /** 换孩子时必须清空的一整套"属于某个孩子"的状态。
+   *  为什么必须有：切换后若新孩子的数据拉不到（如未入会被 422 挡下），
+   *  旧的静默 catch 会把**上一个孩子的数字继续挂在屏幕上**——
+   *  用户实测「切换了孩子，打卡天数同步了，积分和词数还是显示上一个孩子的」（2026-09-21）。
+   *  这里先清场再加载：任何失败都只会显示「—」，绝不显示别人的数据（禁假 0 同族）。 */
+  _childScopedReset() {
+    this.setData({
+      todayChecked: false,
+      currentStreak: null,
+      totalWords: null,
+      points: null,
+      growthBlocked: false,
+      continueBook: null,
+      borrowCount: null,
+      reservationCount: null,
+    })
   },
 
   onShow() {
@@ -42,14 +61,14 @@ Page({
 
   refresh() {
     const parent = session.getParent()
-    const children = session.getChildren().map((c) => ({
-      ...c,
-      statusText: MEMBER_STATUS_TEXT[c.member_status] || c.member_status,
-    }))
     const currentChild = session.getCurrentChild()
+    // 孩子换了（「我的」页切的孩子）→ 先清场再加载，绝不拿上一个孩子的数字顶着
+    if (this._loadedChildId !== (currentChild ? currentChild.id : null)) {
+      this._loadedChildId = currentChild ? currentChild.id : null
+      this._childScopedReset()
+    }
     this.setData({
       parent,
-      children,
       currentChild,
       statusText: currentChild ? (MEMBER_STATUS_TEXT[currentChild.member_status] || currentChild.member_status) : '',
     })
@@ -92,7 +111,11 @@ Page({
     try {
       const res = await api.getCheckins(childId, 60)
       this.setData({ todayChecked: !!res.today_checked, currentStreak: res.current_streak || 0 })
-    } catch (e) { /* 静默 */ }
+    } catch (e) {
+      // 拉不到 → 未知（null 渲染「—」）。**不许保留上一个孩子的天数**：静默 catch 会把
+      // 别人的数据留在屏幕上（2026-09-21 用户实测的那半个 bug）
+      this.setData({ todayChecked: false, currentStreak: null })
+    }
   },
 
   async loadGrowth(childId) {
@@ -101,34 +124,36 @@ Page({
       this.setData({
         totalWords: g.words_total || 0,
         points: g.points_total || 0,
+        growthBlocked: false,
       })
-    } catch (e) { /* 静默 */ }
+    } catch (e) {
+      // 未入会的孩子取不到成长数据（后端 422「入会后可查看」）→ 显示「—」并把原因讲清楚；
+      // 关键：这里必须**清空**而不是静默保留，否则屏幕上会挂着上一个孩子的词数/积分
+      this.setData({ totalWords: null, points: null, growthBlocked: true })
+    }
   },
 
   // 续听卡：最近一本"有进度未读完"（finish=0 的最近一本；读完/无进度不显示）
   async loadContinue(childId) {
-    try {
-      const [borrows, cont] = await Promise.all([
-        api.currentBorrows(childId).catch(() => []),
-        api.continueListening(childId).catch(() => null),
-      ])
-      this.setData({ borrowCount: (borrows || []).length })
-      if (!cont || !cont.book) {
-        this.setData({ continueBook: null })
-        return
-      }
-      this.setData({
-        continueBook: {
-          ...media.formatBook(cont.book),
-          id: cont.book.id,
-          percent: cont.percent || 0,
-          lastPosition: cont.last_position || 0,
-          dueText: cont.due_at ? this.dueText(cont) : '可续听',
-        },
-      })
-    } catch (e) {
+    // 两个请求各自兜底：都失败也只是「未知」（null），不会把上一个孩子的数字留在屏幕上
+    const [cont, borrows] = await Promise.all([
+      api.continueListening(childId).catch(() => null),
+      api.currentBorrows(childId).catch(() => null),
+    ])
+    this.setData({ borrowCount: borrows ? borrows.length : null })
+    if (!cont || !cont.book) {
       this.setData({ continueBook: null })
+      return
     }
+    this.setData({
+      continueBook: {
+        ...media.formatBook(cont.book),
+        id: cont.book.id,
+        percent: cont.percent || 0,
+        lastPosition: cont.last_position || 0,
+        dueText: cont.due_at ? this.dueText(cont) : '可续听',
+      },
+    })
   },
 
   dueText(borrow) {
@@ -154,6 +179,8 @@ Page({
       // F-M1/T26：后端枚举是 active（waiting/ready 不存在，枚举错配同族第 4 案）
       const active = (rsRes.value || []).filter((r) => r.status === 'active')
       this.setData({ reservationCount: active.length })
+    } else {
+      this.setData({ reservationCount: null }) // 取不到 = 未知（不许留着上一个孩子的计数）
     }
   },
 
@@ -163,12 +190,6 @@ Page({
       const res = await api.listBooks('', 1, 6)
       this.setData({ recommend: media.formatBooks(res.items || []) })
     } catch (e) { /* 静默 */ }
-  },
-
-  onSwitchChild(e) {
-    const id = e.currentTarget.dataset.id
-    session.setCurrentChild(id)
-    this.refresh()
   },
 
   goContinue() {

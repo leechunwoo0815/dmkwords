@@ -28,7 +28,7 @@
       <view class="asset-info">
         <view class="asset-title">{{item.title}}</view>
         <view class="asset-meta">{{item.author}}</view>
-        <view class="due-pill {{item.overdue ? 'due-over' : ''}}">{{item.overdue ? '⚠ ' : ''}}{{item.dueText}}</view>
+        <view class="due-pill {{item.overdue ? 'due-over' : ''}}">{{item.overdue ? '！' : ''}}{{item.dueText}}</view>
       </view>
       <view class="asset-actions">
         <view class="btn-mini btn-main" data-book="{{item}}" catchtap="goListen">▶ 续听</view>
@@ -63,8 +63,8 @@
         <view class="btn-mini btn-main" data-book="{{item}}" catchtap="goDetail">去详情</view>
       </view>
     </view>
-    <empty-state wx:if="{{!loading && !favorites.length}}" icon="⭐" title="还没有收藏"
-      desc="在书籍详情页点 ♥ 收藏想读的书" >
+    <empty-state wx:if="{{!loading && !favorites.length}}" icon-name="star" title="还没有收藏"
+      desc="在书籍详情页点「收藏想读」的书会出现在这里" >
       <view class="empty-btn" bindtap="goBooks">去图书馆逛逛</view>
     </empty-state>
   </block>

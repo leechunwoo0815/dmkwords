@@ -55,7 +55,7 @@
 
   <!-- 社区横幅（WM14-B）：本周全馆共读 -->
   <view wx:if="{{bannerWordsText}}" class="banner">
-    <image class="banner-emoji" src="/icons/ui/globe.png" mode="aspectFit" />
+    <image class="banner-icon" src="/icons/ui/book.png" mode="aspectFit" />
     <text class="banner-text">本周全馆共读 {{bannerWordsText}} 词 · {{bannerKids}} 位小朋友在坚持</text>
   </view>
 
@@ -79,7 +79,7 @@
         <view class="head-main">
           <view class="name-row">
             <text class="child-name">{{item.child_name}}</text>
-            <text wx:if="{{item.admin_liked}}" class="admin-mark">🌟</text>
+            <image wx:if="{{item.admin_liked}}" class="admin-mark" src="/icons/ui/crown.png" mode="aspectFit" />
           </view>
           <text class="meta">{{item.parent_name}} · {{item.card_type_label}} · {{item.relTime}}</text>
         </view>
@@ -106,7 +106,7 @@
           <image class="like-icon" src="/icons/ui/{{item.liked_by_me ? 'heart' : 'heart-off'}}.png" mode="aspectFit" />
           <text class="like-count">{{item.like_count}}</text>
         </view>
-        <text wx:if="{{item.admin_liked}}" class="admin-like-label">馆长亲赞 ✨</text>
+        <text wx:if="{{item.admin_liked}}" class="admin-like-label">馆长亲赞</text>
         <view wx:if="{{item.likers.length}}" class="liker-wall">
           <view wx:for="{{item.likers}}" wx:for-item="lk" wx:key="child_id"
             class="liker-slot {{lk.is_admin ? 'liker-slot-gm' : ''}}">
@@ -129,8 +129,8 @@
       </view>
       <view class="gm-title">馆长亲赞！</view>
       <view class="gm-text">{{celebrate}}</view>
-      <view class="gm-sub">馆内最高荣誉 · 已点缀在你的帖子上 ✨</view>
-      <view class="gm-btn">太棒了 ✨</view>
+      <view class="gm-sub">馆内最高荣誉 · 已点缀在你的帖子上</view>
+      <view class="gm-btn">太棒了</view>
     </view>
   </view>
 

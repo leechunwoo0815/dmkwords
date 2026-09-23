@@ -43,7 +43,9 @@
 
   <view class="section-card x-c92966">
     <view class="section-title">报告图片</view>
-    <image wx:if="{{imageUrl}}" class="rp-image" src="{{imageUrl}}" mode="widthFix" show-menu-by-longpress="true" />
+    <image wx:if="{{imageUrl}}" class="rp-image" src="{{imageUrl}}" mode="widthFix"
+      show-menu-by-longpress="true" bindtap="onPreviewReport" />
+    <view class="rp-hint" wx:if="{{imageUrl}}">点图可放大看细节 · 长按可保存到相册</view>
     <view wx:else class="rp-loading">生成中，请稍后……</view>
   </view>
 </view>

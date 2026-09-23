@@ -143,6 +143,10 @@
   flex-shrink: 0;
 }
 
+.order-icon-img {
+  width: 52rpx;
+  height: 52rpx;
+}
 .order-icon-type3 {
   background: var(--accent-soft);
 }

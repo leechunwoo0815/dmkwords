@@ -91,16 +91,18 @@
 }
 
 /* ---------- 多孩切换 ---------- */
-.child-chips { display: flex; gap: 16rpx; margin-top: 20rpx; flex-wrap: wrap; }
-.chip {
-  padding: 10rpx 30rpx;
-  background: var(--surface);
-  border: 3rpx solid var(--border);
-  border-radius: 999rpx;
-  font-size: 26rpx;
+/* 数字拿不到时的原因提示（未入会 → 「入会后可查看」）。孩子切换入口已按用户裁定
+   从首页移除（只在「我的」页切换），故 .child-chips/.chip 一组样式一并删除。 */
+.stat-hint {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin-top: 12rpx;
+  padding: 0 4rpx;
+  font-size: 22rpx;
   color: var(--muted);
 }
-.chip-on { background: var(--accent); border-color: var(--fg); color: var(--surface); font-weight: 700; }
+.stat-hint-icon { width: 26rpx; height: 26rpx; opacity: 0.75; }
 
 /* ---------- 提醒条 ---------- */
 .notice-row { display: flex; gap: 16rpx; margin-top: 20rpx; flex-wrap: wrap; }
@@ -223,6 +225,8 @@
   font-size: 64rpx;
 }
 .rec-audio {
+  width: 32rpx;
+  height: 32rpx;
   position: absolute;
   right: 8rpx;
   bottom: 8rpx;
@@ -319,7 +323,10 @@
 .carousel-sub { color: var(--surface); opacity: 0.85; font-size: 22rpx; margin-top: 4rpx; }
 
 /* ===== 2026-09-14 回归修复（对照 HEAD 逐条核回被批处理误删的声明）===== */
-.h-section { font-size: 34rpx; margin-bottom: 20rpx; }
+.h-section { display: flex; align-items: center; gap: 12rpx; font-size: 34rpx; margin-bottom: 20rpx; }
+.h-section-icon { width: 36rpx; height: 36rpx; }
+.empty-child-icon { width: 72rpx; height: 72rpx; margin-bottom: 12rpx; }
+.rec-cover-fallback-icon { width: 64rpx; height: 64rpx; opacity: 0.6; }
 
 .hero-left { flex: 1; min-width: 0; }
 .badge-member { background: var(--accent-soft); border-color: var(--fg); color: var(--accent-darker); }

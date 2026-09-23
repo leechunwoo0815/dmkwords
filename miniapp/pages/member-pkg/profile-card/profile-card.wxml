@@ -8,7 +8,8 @@
         <view class="card-date">累计有效阅读 · 永不丢失</view>
       </view>
       <view class="level-badge-icon">
-        <text class="x-8928aa">{{passport.level}}</text>
+        <image class="level-badge-shield" src="/icons/badges/level_template.png" mode="aspectFit" />
+        <text class="level-badge-letter">{{passport.level}}</text>
       </view>
     </view>
 
@@ -40,10 +41,17 @@
       </view>
     </view>
 
+    <view class="milestone-head">
+      <text class="milestone-title">里程碑 {{unlockedCount}} / {{milestones.length}} 枚已解锁</text>
+      <text class="milestone-next" wx:if="{{nextHint}}">{{nextHint}}</text>
+    </view>
     <view class="achievements">
-      <view class="ach-item" wx:for="{{passport.milestone_nodes}}" wx:key="*this">
-        <image class="ach-icon" src="/icons/ui/{{passport.milestones_awarded.indexOf(item) !== -1 ? 'trophy' : 'lock'}}.png" mode="aspectFit" />
-        <text class="ach-name">{{item >= 10000 ? (item / 10000) + '万词' : item + '词'}}</text>
+      <view class="ach-item {{item.unlocked ? 'is-unlocked' : 'is-locked'}}"
+        wx:for="{{milestones}}" wx:key="node">
+        <image class="ach-icon" src="{{item.iconUrl}}" mode="aspectFit" />
+        <text class="ach-name">{{item.label}}</text>
+        <view class="ach-state {{item.unlocked ? 'on' : 'off'}}">{{item.unlocked ? '已达成' : '未达成'}}</view>
+        <text class="ach-date" wx:if="{{item.unlocked && item.dateText}}">{{item.dateText}}</text>
       </view>
     </view>
 

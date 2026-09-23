@@ -25,11 +25,17 @@ const TABS = [
   { key: 'refunded', label: '已退款' },
 ]
 
-const TYPE_ICON = {
-  observation_fee: 'type1', formal_fee: 'type2',
-  first_activity_fee: 'type3', activity_fee: 'type3',
-  deposit: 'type2', deposit_supplement: 'type2',
+// 订单类型 → 样式类 + 图标资产。**类名必须写全**：原来 JS 只给 'type1'，
+// 而 WXSS 里是 `.order-icon-type1` → 选择器匹配不上，底色一直没生效（2026-09-21 目视发现）。
+const TYPE_STYLE = {
+  observation_fee: { cls: 'order-icon-type1', icon: '/icons/ui/card.png' },
+  formal_fee: { cls: 'order-icon-type2', icon: '/icons/ui/card.png' },
+  first_activity_fee: { cls: 'order-icon-type3', icon: '/icons/ui/ticket.png' },
+  activity_fee: { cls: 'order-icon-type3', icon: '/icons/ui/ticket.png' },
+  deposit: { cls: 'order-icon-type2', icon: '/icons/ui/wallet.png' },
+  deposit_supplement: { cls: 'order-icon-type2', icon: '/icons/ui/wallet.png' },
 }
+const DEFAULT_TYPE_STYLE = { cls: 'order-icon-type1', icon: '/icons/ui/receipt.png' }
 
 Page({
   data: {
@@ -55,7 +61,8 @@ Page({
         ...o,
         typeText: labels.orderTypeText(o.order_type),  // 唯一映射源（custom 也翻成中文）
         statusText: STATUS_TEXT[o.status] || o.status,
-        icon: TYPE_ICON[o.order_type] || 'type1',
+        iconCls: (TYPE_STYLE[o.order_type] || DEFAULT_TYPE_STYLE).cls,
+        iconUrl: (TYPE_STYLE[o.order_type] || DEFAULT_TYPE_STYLE).icon,
         refundText: o.refund_status ? (REFUND_STATUS_TEXT[o.refund_status] || o.refund_status) : '',
         timeText: (o.paid_at || o.created_at || '').replace('T', ' ').slice(0, 16),
       }))

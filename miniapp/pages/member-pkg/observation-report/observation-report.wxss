@@ -1,400 +1,6 @@
-/* frontend/pages/observation-report/observation-report.wxss */
-
-/* Nav Bar */
-.nav-bar {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  padding: 24rpx 32rpx;
-  background: var(--surface);
-  border-bottom: 2rpx solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-.nav-bar .back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 20rpx;
-}
-.nav-bar .back-icon {
-  font-size: 40rpx;
-}
-.nav-bar .title {
-  font-family: var(--font-display);
-  font-size: 34rpx;
-  font-weight: 600;
-}
-
-/* Report Header */
-.report-header {
-  margin: 32rpx 32rpx 0;
-  padding: 40rpx;
-  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-  border-radius: var(--radius-lg);
-  color: var(--surface);
-  position: relative;
-  overflow: hidden;
-}
-.rh-deco {
-  position: absolute;
-  top: -40rpx;
-  right: -40rpx;
-  width: 200rpx;
-  height: 200rpx;
-  border-radius: 50%;
-  background: var(--white-ghost);
-}
-.rh-icon {
-  font-size: 64rpx;
-  margin-bottom: 16rpx;
-}
-.rh-title {
-  font-family: var(--font-display);
-  font-size: 36rpx;
-  font-weight: 700;
-}
-.rh-child {
-  font-size: 28rpx;
-  margin-top: 8rpx;
-  opacity: 0.9;
-}
-.rh-period {
-  display: inline-flex;
-  align-items: center;
-  gap: 12rpx;
-  margin-top: 20rpx;
-  padding: 12rpx 24rpx;
-  background: rgba(var(--surface-rgb), 0.15);
-  border-radius: 999rpx;
-  font-size: 24rpx;
-  font-weight: 500;
-}
-
-/* Section Label */
-.section-label {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  font-family: var(--font-display);
-  font-size: 30rpx;
-  font-weight: 600;
-  padding: 40rpx 32rpx 20rpx;
-}
-.section-label-icon {
-  font-size: 36rpx;
-  color: var(--accent);
-}
-
-/* Stat Grid */
-.stat-grid {
-  display: flex;
-  gap: 20rpx;
-  padding: 0 32rpx;
-}
-.stat-card {
-  flex: 1;
-  background: var(--surface);
-  border: 2rpx solid var(--border);
-  border-radius: var(--radius);
-  padding: 32rpx 20rpx;
-  text-align: center;
-}
-.sc-icon {
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 20rpx;
-  margin: 0 auto 16rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 36rpx;
-}
-.sc-icon.blue { background: var(--accent-soft); }
-.sc-icon.green { background: var(--success-soft); }
-.sc-icon.yellow { background: rgba(var(--warning-rgb), 0.12); }
-.sc-icon.purple { background: var(--sky-soft); }
-.sc-val {
-  font-family: var(--font-display);
-  font-size: 44rpx;
-  font-weight: 700;
-  line-height: 1.2;
-}
-.sc-label {
-  font-size: 22rpx;
-  color: var(--muted);
-  margin-top: 8rpx;
-}
-.sc-unit {
-  font-size: 24rpx;
-  font-weight: 400;
-  color: var(--muted);
-}
-
-/* Level Card */
-.level-card {
-  margin: 0 32rpx;
-  padding: 32rpx;
-  background: var(--surface);
-  border: 2rpx solid var(--border);
-  border-radius: var(--radius);
-  display: flex;
-  align-items: center;
-  gap: 28rpx;
-}
-.lc-badge {
-  width: 104rpx;
-  height: 104rpx;
-  border-radius: 28rpx;
-  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--surface);
-  font-family: var(--font-display);
-  font-size: 48rpx;
-  font-weight: 800;
-  box-shadow: 0 8rpx 32rpx var(--accent-soft);
-  flex-shrink: 0;
-}
-.lc-info { flex: 1; }
-.lc-name {
-  font-family: var(--font-display);
-  font-size: 32rpx;
-  font-weight: 700;
-}
-.lc-desc {
-  font-size: 24rpx;
-  color: var(--muted);
-  margin-top: 4rpx;
-}
-.lc-progress { margin-top: 16rpx; }
-.lc-progress-bar {
-  height: 12rpx;
-  background: var(--bg);
-  border-radius: 6rpx;
-  overflow: hidden;
-}
-.lc-progress-fill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 6rpx;
-}
-.lc-progress-text {
-  display: flex;
-  justify-content: space-between;
-  font-size: 22rpx;
-  color: var(--muted);
-  margin-top: 8rpx;
-}
-
-/* Comment Card */
-.comment-card {
-  margin: 0 32rpx;
-  padding: 32rpx;
-  background: rgba(var(--warning-rgb), 0.12);
-  border: 2rpx solid rgba(var(--warning-rgb), 0.25);
-  border-radius: var(--radius);
-}
-.cc-header {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  margin-bottom: 20rpx;
-}
-.cc-avatar {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  background: rgba(var(--warning-rgb), 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28rpx;
-}
-.cc-meta { flex: 1; }
-.cc-name {
-  font-family: var(--font-display);
-  font-size: 26rpx;
-  font-weight: 600;
-}
-.cc-role {
-  font-size: 22rpx;
-  color: var(--muted);
-}
-.cc-text {
-  font-size: 28rpx;
-  line-height: 1.7;
-  color: var(--fg);
-}
-.cc-quote {
-  display: inline-block;
-  margin-right: 8rpx;
-  color: rgba(var(--warning-rgb), 0.8);
-  font-size: 36rpx;
-  font-weight: 700;
-  line-height: 1;
-  vertical-align: -4rpx;
-}
-
-/* Chart Card */
-.chart-card {
-  margin: 0 32rpx;
-  padding: 32rpx;
-  background: var(--surface);
-  border: 2rpx solid var(--border);
-  border-radius: var(--radius);
-}
-.chart-title {
-  font-family: var(--font-display);
-  font-size: 28rpx;
-  font-weight: 600;
-  margin-bottom: 28rpx;
-}
-.chart-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 12rpx;
-  height: 220rpx;
-  padding-top: 16rpx;
-  border-bottom: 2rpx solid var(--border);
-}
-.chart-bar-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6rpx;
-  height: 100%;
-  justify-content: flex-end;
-  position: relative;
-}
-.chart-bar {
-  width: 100%;
-  border-radius: 6rpx 6rpx 0 0;
-  min-height: 6rpx;
-  transition: height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-  background: linear-gradient(180deg, var(--sky-soft), var(--accent));
-  box-shadow: 0 2rpx 8rpx var(--sky-soft);
-}
-.chart-bar.today {
-  background: linear-gradient(180deg, var(--success-soft), var(--success));
-  box-shadow: 0 2rpx 12rpx var(--success-soft);
-}
-.chart-bar-label {
-  font-size: 20rpx;
-  color: var(--muted);
-}
-.chart-bar-val {
-  font-size: 20rpx;
-  font-weight: 600;
-  color: var(--accent);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-.chart-bar-val.show {
-  opacity: 1;
-}
-
-/* CTA Section */
-.cta-section {
-  margin: 40rpx 32rpx 0;
-  padding: 40rpx;
-  background: linear-gradient(135deg, var(--success-soft), var(--sky-soft));
-  border: 2rpx solid var(--sky-soft);
-  border-radius: var(--radius-lg);
-  text-align: center;
-}
-.cta-icon {
-  font-size: 80rpx;
-  margin-bottom: 20rpx;
-}
-.cta-title {
-  font-family: var(--font-display);
-  font-size: 34rpx;
-  font-weight: 700;
-  margin-bottom: 12rpx;
-}
-.cta-desc {
-  font-size: 26rpx;
-  color: var(--muted);
-  margin-bottom: 32rpx;
-  line-height: 1.6;
-}
-.cta-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 12rpx;
-  padding: 24rpx 64rpx;
-  border-radius: 999rpx;
-  background: var(--accent);
-  color: var(--surface);
-  font-size: 30rpx;
-  font-weight: 600;
-}
-.cta-btn:active {
-  background: var(--accent-hover);
-}
-.cta-btn-icon {
-  font-size: 32rpx;
-}
-
-/* Bottom Space */
-.bottom-space { height: 40rpx; }
-
-
-/* ============================================
-   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
-   ============================================ */
-/* 卡片：粗黑边 + 硬阴影 + 手绘圆角 */
-.card, .section-card, .card-wrapper, .section, .panel, .info-card, .form-card {
-  background: var(--surface);
-  border: 3rpx solid var(--fg);
-  border-radius: 28rpx 32rpx 24rpx 36rpx;
-  box-shadow: var(--shadow-hard-sm);
-}
-
-/* 标题圆体 */
-.page-title, .card-title, .header-title, .title, .name {
-  font-family: var(--font-display);
-  font-weight: 700;
-}
-
-
-/* 绘本风精修补充：顶部报告头 */
-.report-header {
-  border: 3rpx solid var(--fg);
-  border-radius: 28rpx 32rpx 24rpx 36rpx;
-  box-shadow: var(--shadow-hard-sm);
-  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-}
-.report-header .rh-title {
-  font-family: var(--font-display);
-  font-weight: 800;
-  text-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.35);
-}
-.stat-card {
-  border: 3rpx solid var(--fg);
-  border-radius: 28rpx 32rpx 24rpx 36rpx;
-  box-shadow: var(--shadow-hard-sm);
-}
-
-
-/* ===== 2026-09-13 内联样式迁移（机械生成，勿手改） ===== */
-.x-cb307e { min-height: 100vh; padding: 24rpx; }
-.x-36e383 { text-align: center; color: var(--muted); padding: 60rpx; }
-.x-87ddc0 { color: var(--muted); }
-.x-560223 { margin-bottom: 24rpx; background: var(--surface); border-radius: 20rpx; padding: 24rpx; }
-.x-545127 { display: flex; align-items: center; margin-bottom: 16rpx; }
-.x-b9cc9c { font-size: 26rpx; color: var(--muted); }
-.x-f09e24 { font-size: 28rpx; color: var(--fg); margin-bottom: 16rpx; }
-.x-12d486 { display: flex; flex-wrap: wrap; gap: 12rpx; }
-.x-6e6b5a { width: 200rpx; height: 200rpx; border-radius: 12rpx; background: var(--border); }
-.x-87d128 { position: fixed; inset: 0; background: rgba(var(--fg-rgb), 0.9); display: flex; align-items: center; justify-content: center; z-index: 99; }
-.x-9dfda0 { width: 100%; height: 100%; }
+/* pages/member-pkg/observation-report/observation-report.wxss — 评估报告（2026-09-21 重排）
+   用户报障「看不清、太简陋」→ 展示口径见 docs/15 §十九：竖版整页展示 + 原生缩放预览 +
+   「老师评语」前置 + 最新一期展开 / 往期折叠。 */
 
 .page-bg {
   min-height: 100vh;
@@ -403,4 +9,277 @@
   padding: 20rpx 24rpx calc(60rpx + env(safe-area-inset-bottom));
 }
 
-.rh-icon { width: 48rpx; height: 48rpx; }
+/* ---------- 顶部：孩子 + 期数 ---------- */
+.obs-hero {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 28rpx 24rpx;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+  color: var(--surface);
+}
+.obs-hero-icon {
+  width: 48rpx;
+  height: 48rpx;
+  flex-shrink: 0;
+}
+.obs-hero-main {
+  flex: 1;
+  min-width: 0;
+}
+.obs-hero-title {
+  font-family: var(--font-display);
+  font-size: 34rpx;
+  font-weight: 700;
+}
+.obs-hero-sub {
+  font-size: 22rpx;
+  margin-top: 6rpx;
+  opacity: 0.92;
+}
+.obs-hero-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  box-shadow: var(--shadow-hard-sm);
+  flex-shrink: 0;
+}
+.obs-hero-count-num {
+  font-family: var(--font-display);
+  font-size: 42rpx;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent);
+}
+.obs-hero-count-unit {
+  font-size: 18rpx;
+  color: var(--muted);
+  margin-top: 2rpx;
+}
+
+/* ---------- 状态 ---------- */
+.obs-loading {
+  text-align: center;
+  color: var(--muted);
+  padding: 60rpx;
+}
+
+/* ---------- 报告纸卡（最新一期） ---------- */
+.obs-paper {
+  margin-top: 24rpx;
+  padding-bottom: 24rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+  overflow: hidden;
+}
+.obs-paper-head {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 24rpx 24rpx 16rpx;
+}
+.obs-issue {
+  font-family: var(--font-display);
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--accent-darker);
+  background: var(--warning-soft);
+  border: 2rpx solid var(--fg);
+  border-radius: 999rpx;
+  padding: 6rpx 20rpx;
+}
+.obs-date {
+  flex: 1;
+  font-size: 24rpx;
+  color: var(--muted);
+}
+.obs-pages {
+  font-size: 22rpx;
+  color: var(--muted);
+}
+
+/* ---------- 老师评语（图之前：能直接读的先给家长） ---------- */
+.obs-comment {
+  display: flex;
+  gap: 16rpx;
+  margin: 0 24rpx 20rpx;
+  padding: 24rpx;
+  background: var(--warning-soft);
+  border: 2rpx dashed var(--warning);
+  border-radius: 24rpx;
+}
+.obs-comment-icon {
+  width: 40rpx;
+  height: 40rpx;
+  flex-shrink: 0;
+}
+.obs-comment-body {
+  flex: 1;
+  min-width: 0;
+}
+.obs-comment-label {
+  font-family: var(--font-display);
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--warning-dark);
+}
+.obs-comment-text {
+  margin-top: 8rpx;
+  font-size: 30rpx;
+  line-height: 1.85;
+  color: var(--fg);
+  text-indent: 60rpx;
+}
+
+/* ---------- 整页报告图（满卡宽：给足像素才看得清） ---------- */
+.obs-pages-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+.obs-page {
+  position: relative;
+  background: var(--bg);
+}
+.obs-page-img {
+  width: 100%;
+  display: block;
+}
+.obs-page-no {
+  position: absolute;
+  right: 16rpx;
+  top: 16rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  background: var(--sun);
+  border: 2rpx solid var(--fg);
+  color: var(--fg);
+  font-size: 22rpx;
+  font-weight: 700;
+}
+.obs-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  margin: 20rpx 24rpx 0;
+  font-size: 22rpx;
+  color: var(--muted);
+}
+.obs-hint-icon {
+  width: 28rpx;
+  height: 28rpx;
+  opacity: 0.75;
+}
+
+/* ---------- 往期（默认收起） ---------- */
+.obs-hist {
+  margin-top: 28rpx;
+}
+.obs-hist-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22rpx 24rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 24rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+.obs-hist-title {
+  font-family: var(--font-display);
+  font-size: 28rpx;
+  font-weight: 700;
+}
+.obs-hist-arrow {
+  width: 32rpx;
+  height: 32rpx;
+  transition: transform 0.2s;
+}
+.obs-hist-arrow.is-open {
+  transform: rotate(180deg);
+}
+.obs-hist-card {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 20rpx;
+  padding: 24rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--fg);
+  border-radius: 28rpx 32rpx 24rpx 36rpx;
+  box-shadow: var(--shadow-hard-sm);
+}
+/* 缩略图比例必须竖版（≥3:4）——方形裁切会把报告首尾砍掉（docs/15 §十九） */
+.obs-hist-thumb {
+  position: relative;
+  width: 240rpx;
+  height: 320rpx;
+  flex-shrink: 0;
+  border-radius: 16rpx;
+  border: 2rpx solid var(--border);
+  overflow: hidden;
+  background: var(--bg);
+}
+.obs-hist-thumb-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.obs-hist-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.obs-hist-line {
+  display: flex;
+  align-items: baseline;
+  gap: 14rpx;
+  margin-bottom: 12rpx;
+}
+.obs-hist-issue {
+  font-family: var(--font-display);
+  font-size: 28rpx;
+  font-weight: 700;
+}
+.obs-hist-date {
+  font-size: 22rpx;
+  color: var(--muted);
+}
+.obs-thumb-no {
+  position: absolute;
+  right: 8rpx;
+  bottom: 8rpx;
+  padding: 0 12rpx;
+  border-radius: 999rpx;
+  background: var(--fg);
+  color: var(--surface);
+  font-size: 20rpx;
+}
+.obs-hist-remark {
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.obs-hist-more {
+  margin-top: auto;
+  padding-top: 12rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--accent-darker);
+}
