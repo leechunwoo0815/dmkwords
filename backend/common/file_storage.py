@@ -188,45 +188,74 @@ def _check_ext(ext: str, what: str) -> None:
         raise ValidationError(f"{what}格式仅支持 JPG/JPEG/PNG/WebP: {ext}")
 
 
+def content_tag(data: bytes, length: int = 12) -> str:
+    """生成图文件名的**内容指纹**（内容寻址的唯一来源）。
+
+    为什么不用随机 tag（2026-09-23 G7 落地）：门禁/测试与 dev 共库，每轮"清库 + 双 seed"都会把
+    演示封面/活动封面/报告图/阅读圈卡图重画一遍——随机名 ⇒ 每轮新增 76 cover + 40 circle 个孤儿文件
+    （实测单 ISBN 累积 57~59 个同名变体、uploads 涨到 168MB）。内容寻址后**同内容同名**：落盘即复用
+    （连重绘都省），**内容改了才换名 ⇒ URL 变 ⇒ 端上不吃旧图**——破缓存语义与 docs/15 §16.3 第 2 条一致。
+    报告图早已按 `sha256(report_data)[:10]` 幂等（同节第 3 条），本函数把它提为统一口径。
+    """
+    import hashlib
+
+    return hashlib.sha256(data).hexdigest()[:length]
+
+
+def save_generated_media(rel_dir: str, stem: str, data: bytes, ext: str = ".jpg") -> str:
+    """**生成图**按内容指纹落盘（同内容同名复用），返回 uploads/ 下的相对路径。
+
+    `stem` 是语义前缀（例：`thumb_v4_streak` / `card_breakout` / `9780439064873`），指纹加在末尾
+    ——`media_version()` 取文件名末段作**破缓存令牌**的契约不变（内容变 ⇒ 令牌变 ⇒ 端上不吃旧图）。
+    已存在同名文件时**不重写**（幂等）：这是 G7 的根治点——见 `content_tag` 的说明。
+    """
+    rel = os.path.join(rel_dir, f"{stem}_{content_tag(data)}{ext}")
+    abs_path = os.path.join(_uploads_root(), rel)
+    if not os.path.isfile(abs_path):
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+        with open(abs_path, "wb") as fh:
+            fh.write(data)
+    return rel.replace(os.sep, "/")
+
+
 def save_cover_jpg(book, data: bytes, ext: str, policy: ImagePolicy) -> str:
-    """封面存储：规范化 JPEG（长边 ≤ policy.max_edge）；路径 cover/{isbn前4位}/{code}_{token}.jpg。"""
+    """封面存储：规范化 JPEG（长边 ≤ policy.max_edge）；路径 cover/{isbn前4位}/{code}_{内容指纹}.jpg。"""
     _check_ext(ext, "封面")
+    norm = normalize_image(
+        data,
+        max_edge=policy.max_edge,
+        quality=policy.quality,
+        max_input_bytes=policy.max_input_bytes,
+        max_output_bytes=policy.max_output_bytes,
+    )
+    tag = content_tag(norm)
     rel = (
-        os.path.join("cover", book.isbn[:4], f"{book.isbn}_{secrets.token_hex(6)}.jpg")
+        os.path.join("cover", book.isbn[:4], f"{book.isbn}_{tag}.jpg")
         if book.isbn
-        else os.path.join("cover", "local", f"{book.book_code}_{secrets.token_hex(6)}.jpg")
+        else os.path.join("cover", "local", f"{book.book_code}_{tag}.jpg")
     )
     abs_path = os.path.join(_uploads_root(), rel)
     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
     with open(abs_path, "wb") as f:
-        f.write(
-            normalize_image(
-                data,
-                max_edge=policy.max_edge,
-                quality=policy.quality,
-                max_input_bytes=policy.max_input_bytes,
-                max_output_bytes=policy.max_output_bytes,
-            )
-        )
+        f.write(norm)
     return rel.replace(os.sep, "/")
 
 
 def save_activity_cover_jpg(activity_id: int, data: bytes, ext: str, policy: ImagePolicy) -> str:
-    """T45（FEAT-082）：活动封面存储——规范化 JPEG；路径 cover/activity/{id}_{hex}.jpg。"""
+    """T45（FEAT-082）：活动封面存储——规范化 JPEG；路径 cover/activity/{id}_{内容指纹}.jpg。"""
     _check_ext(ext, "封面")
-    rel = os.path.join("cover", "activity", f"{activity_id}_{secrets.token_hex(6)}.jpg")
+    norm = normalize_image(
+        data,
+        max_edge=policy.max_edge,
+        quality=policy.quality,
+        max_input_bytes=policy.max_input_bytes,
+        max_output_bytes=policy.max_output_bytes,
+    )
+    rel = os.path.join("cover", "activity", f"{activity_id}_{content_tag(norm)}.jpg")
     abs_path = os.path.join(_uploads_root(), rel)
     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
     with open(abs_path, "wb") as f:
-        f.write(
-            normalize_image(
-                data,
-                max_edge=policy.max_edge,
-                quality=policy.quality,
-                max_input_bytes=policy.max_input_bytes,
-                max_output_bytes=policy.max_output_bytes,
-            )
-        )
+        f.write(norm)
     return rel.replace(os.sep, "/")
 
 
@@ -300,23 +329,23 @@ def save_observation_image(child_id: int, data: bytes, ext: str, policy: ImagePo
     """观察期评估报告图（WM10/FEAT-066）：**2026-09-17 起走统一管线**。
 
     此前是 `open(...,"wb")` 原始字节直存 → 运营传 9 张手机原图可落几十 MB。
-    现与凭证同口径（doc 类：家长端要看清报告小字），路径 observation/child_{id}/{uuid}.jpg。
+    现与凭证同口径（doc 类：家长端要看清报告小字），路径 observation/child_{id}/{内容指纹}.jpg
+    （2026-09-23：seed 每次重建演示报告都会重传一次 → 随机名必堆文件，改内容寻址）。
     """
     _check_ext(ext, "图片")
     rel_dir = os.path.join("observation", f"child_{child_id}")
     out_dir = os.path.join(_uploads_root(), rel_dir)
     os.makedirs(out_dir, exist_ok=True)
-    name = f"{secrets.token_hex(16)}.jpg"
+    norm = normalize_image(
+        data,
+        max_edge=policy.max_edge,
+        quality=policy.quality,
+        max_input_bytes=policy.max_input_bytes,
+        max_output_bytes=policy.max_output_bytes,
+    )
+    name = f"{content_tag(norm, 16)}.jpg"
     with open(os.path.join(out_dir, name), "wb") as f:
-        f.write(
-            normalize_image(
-                data,
-                max_edge=policy.max_edge,
-                quality=policy.quality,
-                max_input_bytes=policy.max_input_bytes,
-                max_output_bytes=policy.max_output_bytes,
-            )
-        )
+        f.write(norm)
     return os.path.join(rel_dir, name).replace(os.sep, "/")
 
 

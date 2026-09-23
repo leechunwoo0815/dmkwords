@@ -9,7 +9,6 @@
 """
 
 import os
-import secrets
 
 from backend.common.file_storage import _mp3_duration
 from backend.database import SessionLocal
@@ -693,19 +692,20 @@ def gen_activity_banner(palette_idx: int) -> bytes:
 
 
 def store_cover(book: Book, data: bytes) -> str:
-    from backend.common.file_storage import _uploads_root
+    """演示封面落盘（**内容寻址**，2026-09-23 起）。
+
+    为什么改：门禁/pytest 与 dev 共库 → 每轮"清库 + seed"都把 35 本书重画一遍，随机 token 名
+    ⇒ **每轮新增 76 个孤儿封面**（实测单 ISBN 累积 57~59 个同名变体、uploads 涨到 168MB）。
+    `gen_cover` 用的是**带种子的 RNG**（同书同参数 ⇒ 同字节），故按内容摘要命名即可让重复重建
+    落到同一个文件上；内容真变了（改名/换风格）摘要自然变 ⇒ 端上仍不吃旧图（docs/15 §16.3 第 2 条）。
+    """
+    from backend.common.file_storage import save_generated_media
 
     if book.isbn:
-        rel = os.path.join("cover", book.isbn[:4], f"{book.isbn}_{secrets.token_hex(6)}.jpg")
+        rel_dir, stem = os.path.join("cover", book.isbn[:4]), book.isbn
     else:
-        rel = os.path.join(
-            "cover", "local", f"{book.book_code or book.id}_{secrets.token_hex(6)}.jpg"
-        )
-    abs_path = os.path.join(_uploads_root(), rel)
-    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-    with open(abs_path, "wb") as fh:
-        fh.write(data)
-    return rel
+        rel_dir, stem = os.path.join("cover", "local"), str(book.book_code or book.id)
+    return save_generated_media(rel_dir, stem, data)
 
 
 QUIZ_TEMPLATES = [

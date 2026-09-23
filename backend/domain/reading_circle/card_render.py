@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import os
-import uuid
 
 from sqlalchemy.orm import Session
 
@@ -166,24 +165,44 @@ def _circle_dir() -> str:
     return out_dir
 
 
+def jpeg_bytes(img, quality: int) -> bytes:
+    """把 PIL 图编码成 JPEG 字节（参数与 `save_jpeg` 完全一致）。
+
+    内容寻址需要**先拿到字节**才能算指纹定文件名（2026-09-23 G7），故把编码与落盘拆开。
+    """
+    import io
+
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, "JPEG", quality=quality, optimize=True, progressive=True)
+    return buf.getvalue()
+
+
 def save_jpeg(img, path: str, quality: int) -> str:
     """生成图统一落盘（JPEG，optimize + progressive）——**唯一出口**，禁止各处自己 save。
 
     2026-09-17 用户裁定「自动生成的图片也要控体积」：带 paper_grain 噪点的插画 PNG
     压不动（卡片 769KB），JPEG q85 实测 67KB（8.8%）。
+    2026-09-23：新代码优先走 `file_storage.save_generated_media`（内容寻址命名），本函数保留
+    给"路径已定"的场景（M1 白名单出口）。
     """
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    img.convert("RGB").save(path, "JPEG", quality=quality, optimize=True, progressive=True)
+    with open(path, "wb") as fh:
+        fh.write(jpeg_bytes(img, quality))
     return path
 
 
 def render_thumb(card_data: dict, *, jpeg_quality: int = DEFAULT_JPEG_QUALITY) -> str:
-    """只输出缩略图（存量回填用，不落大图）：内容 = 完整版插画区的裁切。"""
+    """只输出缩略图（存量回填用，不落大图）：内容 = 完整版插画区的裁切。
+
+    2026-09-23：文件名改**内容指纹**（同内容同名复用；随机 tag 时代每次 seed 重建都多一堆孤儿）。
+    """
+    from backend.common.file_storage import save_generated_media
+
     card_type = card_data.get("card_type", "x")
-    name = f"thumb_{THUMB_SPEC_VERSION}_{card_type}_{uuid.uuid4().hex[:8]}.jpg"
     _, thumb = card_images(card_data)
-    save_jpeg(thumb, os.path.join(_circle_dir(), name), jpeg_quality)
-    return f"circle/{name}"
+    return save_generated_media(
+        "circle", f"thumb_{THUMB_SPEC_VERSION}_{card_type}", jpeg_bytes(thumb, jpeg_quality)
+    )
 
 
 def ensure_circle_thumbs(db: Session) -> dict:
@@ -211,7 +230,9 @@ def ensure_circle_thumbs(db: Session) -> dict:
         except Exception:  # 单帖失败不影响整批
             skipped += 1
             continue
-        if old_rel:
+        if old_rel and old_rel != post.thumb_path:
+            # 2026-09-23：内容寻址后"重渲结果与旧文件同名"是常态（内容没变）——
+            # 必须比对路径，否则会把刚写好的文件删掉，post.thumb_path 指向空气。
             old_full = os.path.abspath(os.path.join(root, old_rel))
             if old_full.startswith(circle_dir) and os.path.isfile(old_full):
                 try:
@@ -231,18 +252,22 @@ def render_card(card_data: dict, *, jpeg_quality: int = DEFAULT_JPEG_QUALITY) ->
     两文件同为 uploads/circle/ 运行时产物，生命周期绑定同一帖
     （删帖由 CircleImageCleanupService 两列一起清）。
 
-    2026-09-17：落盘改 JPEG（大图 769KB→67KB、缩略图 317KB→28KB）；文件名带随机 tag
-    ⇒ URL 必变 ⇒ 客户端不吃旧缓存。
+    2026-09-17：落盘改 JPEG（大图 769KB→67KB、缩略图 317KB→28KB）。
+    2026-09-23：文件名改**内容指纹**（`sha256(字节)[:12]`）——内容变⇒名字变⇒客户端不吃旧缓存；
+    内容不变⇒同名复用（不重绘、不堆文件）。此前用随机 tag，清库+seed 每轮新增 40 个孤儿（G7）。
     """
-    out_dir = _circle_dir()
+    from backend.common.file_storage import save_generated_media
+
     card_type = card_data.get("card_type", "x")
-    tag = uuid.uuid4().hex[:8]
     full, thumb = card_images(card_data)
-    image_name = f"card_{card_type}_{tag}.jpg"
-    thumb_name = f"thumb_{THUMB_SPEC_VERSION}_{card_type}_{tag}.jpg"
-    save_jpeg(full, os.path.join(out_dir, image_name), jpeg_quality)
-    save_jpeg(thumb, os.path.join(out_dir, thumb_name), jpeg_quality)
-    return {"image_path": f"circle/{image_name}", "thumb_path": f"circle/{thumb_name}"}
+    return {
+        "image_path": save_generated_media(
+            "circle", f"card_{card_type}", jpeg_bytes(full, jpeg_quality)
+        ),
+        "thumb_path": save_generated_media(
+            "circle", f"thumb_{THUMB_SPEC_VERSION}_{card_type}", jpeg_bytes(thumb, jpeg_quality)
+        ),
+    }
 
 
 def _uploads_root() -> str:
