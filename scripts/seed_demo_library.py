@@ -163,10 +163,12 @@ NEW_BOOKS = [
     ),
     (
         "9780439064873",
-        "Harry Potter and the Sorcerer's Stone",
+        # 2026-09-21 修正：该 ISBN 是《Chamber of Secrets》（第二部），原写第一部书名 →
+        # 与 id35（9780590353427 = 第一部）重名，收藏/图书馆并列两条同名书（用户裁定按 ISBN 改）
+        "Harry Potter and the Chamber of Secrets",
         "J.K. Rowling",
-        15500,
-        "5.2",
+        85000,  # 真实词数约 85,141；演示库口径取整（与 id35 第一部 78,000 同口径）
+        "6.7",  # AR 真实值（第二部 6.7；第一部 5.5）
         3,
         "奇幻章节书",
     ),

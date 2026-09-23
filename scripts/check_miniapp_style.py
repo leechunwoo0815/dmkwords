@@ -21,6 +21,10 @@
                  颜色与令牌无关）；R13b = 引用的图标资产必须真实存在（`/icons/ui/*.png` 与
                  `icon-name`）。排版字形（✓ ✕ ★ ☆ ▶ 等 TYPO_GLYPHS）是设计系统文字符号，
                  在白名单内、不算 emoji（R13a 误报源，已实证）。
+  R15 WXML 表达式: `{{ }}` 里**禁止方法调用**（WXML 不是 JS：indexOf/split/map 之类在模板
+                 表达式里不可用 → 静默得 undefined → 条件恒真/恒假）。2026-09-21 实锤：
+                 护照里程碑 `{{passport.milestones_awarded.indexOf(item) !== -1 ? ...}}` 恒真，
+                 六枚里程碑全部显示"已达成"（真机 computedStyle 六格全 rgba(.92) 实线）。
   R14 WXML 结构: wxml **注释必须以 `-->` 收尾**、标签必须正确闭合（跨行标签也算）。
                  专治「注释写成 `*/`（JS 习惯）→ 注释吞掉半页模板 → 标签配对错位」：
                  2026-09-20 实测该错误让小程序整页编译失败，且**报错行指向的是别处**
@@ -712,6 +716,83 @@ def scan_icon_emoji(base: Path = MINIAPP):
     return out
 
 
+def scan_copy_emoji(base: Path = MINIAPP):
+    """R13c: **文案层的 emoji**（wxml + js 全量，排除注释与 TYPO_GLYPHS 排版字形）。
+
+    为什么补这条（2026-09-21 目视发现）：R13a 只扫"图标槽位里的**字面量**"，
+    emoji 一旦从 JS 数据里来（例：勋章页 `NODE_EMOJI = ['🌱','🌿',...]`、错误组件
+    `icons = { error: '😔', network: '📡' }`）或落在非 icon 槽位（`section-title` 里的 🎧/📖），
+    检查器**全瞎**——实测全库仍有 31 处 UI emoji 而 R13a 报 0。口径与 R13a 同源：
+    图标一律走自家 `/icons/ui/*.png` 资产，排版字形（✓ ✕ ★ ☆ ▶ 等）白名单放行。
+    """
+    out: list[tuple[str, int, str]] = []
+    for f in sorted(list(base.rglob("*.wxml")) + list(base.rglob("*.js"))):
+        if "__pycache__" in f.parts or "icons" in f.parts:
+            continue
+        for i, line in enumerate(f.read_text(encoding="utf-8").split("\n"), 1):
+            stripped = line.strip()
+            # 注释不算文案（⚠️ 这类出现在说明注释里是允许的）
+            if stripped.startswith(("//", "/*", "*")) or stripped.startswith("<!--"):
+                continue
+            if "<!--" in line and line.index("<!--") < min(
+                [line.index(c) for c in RE_EMOJI.findall(line)] or [len(line)]
+            ):
+                continue
+            hit = next((c for c in RE_EMOJI.findall(line) if c not in TYPO_GLYPHS), None)
+            if hit:
+                out.append((str(f.relative_to(base)), i, hit))
+    return out
+
+
+RE_WXML_MUSTACHE = re.compile(r"\{\{(.*?)\}\}", re.S)
+RE_WXML_CALL = re.compile(r"[A-Za-z_$][\w$]*\s*\(")
+
+
+def _calls_outside_strings(expr: str) -> list[str]:
+    """表达式里"不在字符串字面量内"的方法调用。
+
+    必须逐字符走、在 `{{ }}` 内部跳过引号内容：**不能**对整行做字符串剥离
+    （WXML 的表达式基本都写在 `class="..."` 这类双引号属性里，整行剥离会把表达式一起剥掉
+    —— 2026-09-21 首版就这么写的，S1 自证当场逮到"漏检"）。
+    """
+    out: list[str] = []
+    buf: list[str] = []
+    i, n = 0, len(expr)
+    while i < n:
+        ch = expr[i]
+        if ch in "'\"":
+            i += 1
+            while i < n and expr[i] != ch:
+                i += 1
+            i += 1
+            buf.append("''")  # 字面量整体塌成空串，里面的括号不再算调用
+            continue
+        buf.append(ch)
+        i += 1
+    for m in RE_WXML_CALL.finditer("".join(buf)):
+        out.append(m.group(0))
+    return out
+
+
+def scan_wxml_calls(base: Path = MINIAPP):
+    """R15: WXML `{{ }}` 表达式里禁止方法调用（含 `xxx.indexOf(...)` 这类）。
+
+    WXML 不是 JS——模板表达式只支持受限语法，`indexOf/split/map/...` 一律不可用，
+    **静默返回 undefined**，于是 `!== -1` 之类的判断恒真、页面进入错误分支且毫无报错。
+    2026-09-21 实锤：护照里程碑判定恒真 → 六枚全显示"已达成"（老版本是全奖杯图标），
+    用户问"10 万词成就怎么表现出来"时才发现。判定逻辑要放页面 JS 里算好再绑定。
+    """
+    out: list[tuple[str, int, str]] = []
+    for f in sorted(base.rglob("*.wxml")):
+        if "__pycache__" in f.parts:
+            continue
+        for i, line in enumerate(f.read_text(encoding="utf-8").split("\n"), 1):
+            for expr in RE_WXML_MUSTACHE.findall(line):
+                for call in _calls_outside_strings(expr):
+                    out.append((str(f.relative_to(base)), i, call[:40]))
+    return out
+
+
 def scan_icon_assets(base: Path = MINIAPP):
     """R13b: 图标引用必须落到真实资产（/icons/ui/*.png 与 icon-name）。"""
     have = {p.stem for p in (base / "icons" / "ui").glob("*.png")}
@@ -864,6 +945,17 @@ def self_test(tokens: set[str]) -> list[str]:
             '<empty-state icon-name="nosuchicon" title="x" />\n',
             encoding="utf-8",
         )
+        (tmp / "pages/call.wxml").write_text(
+            "<view class=\"x {{list.indexOf(item) !== -1 ? 'a' : ''}}\">y</view>\n"
+            '<view class="x {{(n + 1) * 2}}">ok</view>\n',  # 第二行是合法算术，不该报
+            encoding="utf-8",
+        )
+        (tmp / "pages/copy.js").write_text(
+            "const T = ['\U0001f331', '\U0001f451']\n"  # 违规：JS 文案里的 emoji
+            "// \u26a0\ufe0f 注释里的 emoji 不算违规\n"  # 合规：注释
+            "const OK = '\u2713 \u2715'\n",  # 合规：排版字形
+            encoding="utf-8",
+        )
         (tmp / "pages/ghost.wxml").write_text(
             "<view class=\"ghost {{ok ? 'a' : 'missing-cond'}}\">x</view>\n", encoding="utf-8"
         )
@@ -907,6 +999,16 @@ def self_test(tokens: set[str]) -> list[str]:
         r13a = scan_icon_assets(base=tmp)
         if not r13e:
             failures.append("S1 图标槽位 emoji 漏检")
+        r15 = scan_wxml_calls(base=tmp)
+        if len(r15) != 1:
+            failures.append(f"S1 WXML 方法调用漏检/误报: {r15}")
+        r13c = scan_copy_emoji(base=tmp)
+        if not r13c:
+            failures.append("S1 文案 emoji 漏检（R13c）")
+        if any(
+            "// " in (tmp / f).read_text(encoding="utf-8").split("\n")[ln - 1] for f, ln, _c in r13c
+        ):
+            failures.append(f"S1 文案 emoji 误报（注释行不应计入）: {r13c}")
         if not any(n == "nosuchicon" for _f, _l, n in r13a):
             failures.append(f"S1 图标资产缺失漏检: {r13a}")
         if any(n == "calendar" for _f, _l, n in r13a):
@@ -963,6 +1065,8 @@ def main() -> int:
     selv = scan_selector_var(wxss)
     undef_new, undef_base = scan_undefined_classes()
     icon_emoji = scan_icon_emoji()
+    copy_emoji = scan_copy_emoji()
+    wxml_calls = scan_wxml_calls()
     icon_asset = scan_icon_assets()
 
     n_token_equal = sum(1 for c in colors if c[3] == "token-equal")
@@ -988,6 +1092,8 @@ def main() -> int:
     print(f"R10 组件变量兜底: {len(nofb)}")
     print(f"R11 非法选择器(选择器位置 var): {len(selv)}")
     print(f"R13 图标槽位 emoji: {len(icon_emoji)} / 图标资产缺失: {len(icon_asset)}")
+    print(f"R13c 文案 emoji（wxml+js 全量，注释与排版字形除外）: {len(copy_emoji)}")
+    print(f"R15 WXML 表达式方法调用（应为 0，判定逻辑放 JS）: {len(wxml_calls)}")
     print(f"R14 WXML 结构: 违规 {len(wxml_struct)}")
     n_base = sum(len(v) for v in R12_BASELINE.values())
     print(
@@ -1027,6 +1133,8 @@ def main() -> int:
     dump("R11 非法选择器", selv)
     dump("R12 悬空类名（新违规，必须修）", undef_new)
     dump("R13a 图标槽位 emoji（必须换 /icons/ui 资产）", icon_emoji)
+    dump("R13c 文案 emoji（图标走 /icons/ui 资产；排版字形白名单除外）", copy_emoji)
+    dump("R15 WXML 表达式里的方法调用（判定逻辑必须放 JS）", wxml_calls)
     dump("R13b 图标资产缺失", icon_asset)
     dump("R14 WXML 结构（注释/标签必须闭合）", wxml_struct)
 
@@ -1040,6 +1148,12 @@ def main() -> int:
         errors.append(f"R13a {f}:{ln} 图标槽位里是 emoji {ch!r}（改用 /icons/ui/*.png）")
     for f, ln, name in icon_asset:
         errors.append(f"R13b {f}:{ln} 图标资产不存在: {name}")
+    for f, ln, expr in wxml_calls:
+        errors.append(f"R15 {f}:{ln} WXML 表达式里调了方法: {expr}")
+    for f, ln, ch in copy_emoji:
+        errors.append(
+            f"R13c {f}:{ln} 文案里是 emoji {ch!r}（图标改用 /icons/ui/*.png；排版字形白名单除外）"
+        )
     for f, ln, d in wxml_struct:
         errors.append(f"R14 {f}:{ln} WXML 结构: {d}")
     for f, ln, d in nofb:

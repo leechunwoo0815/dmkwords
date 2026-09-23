@@ -601,6 +601,117 @@ def _pick_idle_book_for(db, owner, Book, BookCopy):
     return None, None
 
 
+def _ensure_demo_observation_reports(db: Session) -> None:
+    """WM10/FEAT-066：给演示孩子造**评估报告图**（2026-09-21 补）。
+
+    **为什么必须 seed 造**：PRD §3.3 承诺"报告会展示在小程序的孩子档案页"，
+    而报告页唯一的验收点是"家长看得清吗"——此前库中**一张报告图都没有**，
+    现场只能靠管理端手传才看得到页面（T47-2 同族缺口：验收路径没有载体）。
+
+    载体（与 docs/04 §10.3 增补表 5 对齐）：
+      观察期孩 = 2 期（第 1 期 1 张；第 2 期 2 张 + 评语）→ 验"最新展开 / 往期折叠 / 多页页码"
+      待评估孩 = 1 期（1 张 + 评语）→ 验"单期不出现往期区"
+      押金孩   = 0 期 → 空态载体
+
+    真实链路造数（E-20260904-01 铁律）：走 `ObservationReportService.upload`（存档 + 审计 + 通知），
+    图片由 `scripts/gen_demo_progress_report.render_report` 按外教报告真实形态（竖版 1:1.40）生成。
+    幂等：该孩子已有报告即整段跳过——**不覆盖用户手传的报告**。
+    """
+    import io
+
+    from backend.domain.admin.models import AdminUser
+    from backend.domain.identity.models import Child, ObservationReport
+    from backend.domain.identity.observation_service import ObservationReportService
+    from scripts.gen_demo_progress_report import render_report
+
+    wm3_parent = (
+        db.query(Parent).filter(Parent.phone == "13800007777", Parent.is_deleted == 0).first()
+    )
+    admin = db.query(AdminUser).filter(AdminUser.username == "admin").first()
+    if not (wm3_parent and admin):
+        return
+
+    plans = (
+        (
+            "观察期孩",
+            [
+                (
+                    1,
+                    "第一阶段：字母与拼读启蒙。听音辨音准确，每次到馆都能安静坐下来读完整本小书。",
+                    ["Butterfly A"],
+                ),
+                (
+                    2,
+                    "第二阶段：能读完整本分级读物，朗读流畅度明显提升，开始主动用英文回答问题。",
+                    ["Butterfly B", "Butterfly B"],
+                ),
+            ],
+        ),
+        (
+            "待评估孩",
+            [(1, "观察期小结：进步稳定，建议进入正式会员阶段继续保持每日听读。", ["Ladybird A"])],
+        ),
+    )
+
+    class _DemoFile:
+        """满足 `ObservationReportService.upload` 的鸭子类型（filename + file.read()）。"""
+
+        def __init__(self, filename: str, data: bytes):
+            self.filename = filename
+            self.file = io.BytesIO(data)
+
+    svc = ObservationReportService(db)
+    created = 0
+    for child_name, issues in plans:
+        child = (
+            db.query(Child)
+            .filter(
+                Child.parent_id == wm3_parent.id, Child.name == child_name, Child.is_deleted == 0
+            )
+            .first()
+        )
+        if child is None:
+            continue
+        exists = (
+            db.query(ObservationReport)
+            .filter(ObservationReport.child_id == child.id, ObservationReport.is_deleted == 0)
+            .first()
+        )
+        if exists:
+            continue
+        for issue, remark, courses in issues:
+            files = [
+                _DemoFile(
+                    f"progress_report_{issue}_{i}.jpg",
+                    render_report(
+                        student=child.english_name or child.name,
+                        teacher="Demo Teacher",
+                        course=course,
+                        year=str(datetime.now().year),
+                        issue=issue,
+                        comment=(
+                            f"{child.english_name or child.name} has been very engaged and shows "
+                            "great effort in reading. Phonics and listening are progressing well, "
+                            "and attention in class is steady. Speaking more during activities will "
+                            "help pronunciation and overall fluency."
+                        ),
+                    ),
+                )
+                for i, course in enumerate(courses, start=1)
+            ]
+            res = svc.upload(admin, child, files, remark)
+            # 期次要有"时间跨度"才看得懂：第 1 期回拨 28 天（与 seed 的"相对日期每次新鲜"同惯例，
+            # 例：临期孩 = today+3）。不这么做两期同日期，家长看不出"一期一期攒起来"的意思。
+            if issue < len(issues):
+                row = db.query(ObservationReport).filter(ObservationReport.id == res["id"]).first()
+                if row is not None:
+                    row.created_at = datetime.now() - timedelta(days=28 * (len(issues) - issue))
+                    db.commit()
+            created += 1
+    if created:
+        print(f"c WM10 评估报告演示数据：{created} 期（观察期孩 2 期 / 待评估孩 1 期）", flush=True)
+
+
 def _ensure_watcher_active_reservation(db: Session) -> None:
     """给**观察期孩**造一条在用的预约（预约管理页有活单可核销）。
 
@@ -2761,6 +2872,8 @@ def seed() -> None:
             _ensure_demo_vocabulary(db, demo_child)
         _ensure_demo_activity(db)
         _ensure_demo_wm3_states(db)
+        # WM10 评估报告图（依赖：WM3 观察期孩/待评估孩 —— 必须在 wm3_states 之后）
+        _ensure_demo_observation_reports(db)
         # 逾期借阅依赖演示孩（if 块内造）；押金孩依赖 WM3 家长（wm3_states 造）——
         # 故 t41_data 必须在两者之后（R3 顺序教训：跨段依赖按建序排）
         _ensure_demo_t41_data(db, demo_child)
