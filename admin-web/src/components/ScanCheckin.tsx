@@ -26,7 +26,7 @@ function fmtTime(iso: string): string {
 // 失败四类：券码不存在 / 已签到过 / 报名状态不可签 / 活动已取消或结束。
 // 后端文案已区分（NotFoundError/ConflictError/ValidationError），这里只做视觉分级。
 function classify(msg: string): { level: "warning" | "error"; icon: string } {
-  if (msg.includes("已签到过")) return { level: "warning", icon: "⚠" };
+  if (msg.includes("已签到过")) return { level: "warning", icon: "注意" };
   if (msg.includes("不存在")) return { level: "error", icon: "✕" };
   if (msg.includes("取消") || msg.includes("结束")) return { level: "error", icon: "✕" };
   return { level: "error", icon: "✕" };
@@ -59,8 +59,8 @@ export default function ScanCheckin({
         const mismatch = activityTitle && r.activity_title !== activityTitle;
         message.success({
           content: mismatch
-            ? `✅ ${label} 签到成功（${fmtTime(r.checked_in_at)}）⚠ 该券不属于本场活动`
-            : `✅ ${label} 签到成功（${fmtTime(r.checked_in_at)}）`,
+            ? `${label} 签到成功（${fmtTime(r.checked_in_at)}）—— 注意：该券不属于本场活动`
+            : `${label} 签到成功（${fmtTime(r.checked_in_at)}）`,
           duration: 3,
         });
         seqRef.current += 1;

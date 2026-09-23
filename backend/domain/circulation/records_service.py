@@ -190,7 +190,7 @@ class BorrowRecordsService:
             )
         if total > len(rows):
             ws.append([])
-            ws.append([f"⚠ 共 {total} 条，本次导出前 {len(rows)} 条（超出上限被截断）"])
+            ws.append([f"注意：共 {total} 条，本次导出前 {len(rows)} 条（超出上限被截断）"])
         buf = BytesIO()
         wb.save(buf)
         return buf.getvalue()

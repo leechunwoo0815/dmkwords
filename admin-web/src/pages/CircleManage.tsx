@@ -217,7 +217,7 @@ export default function CircleManage() {
         dataIndex: "admin_liked",
         width: 90,
         render: (v: boolean) =>
-          v ? <Tag color="gold">🌟 已赞</Tag> : <Tag bordered={false}>未赞</Tag>,
+          v ? <Tag color="gold">已赞</Tag> : <Tag bordered={false}>未赞</Tag>,
       },
       {
         title: "置顶",

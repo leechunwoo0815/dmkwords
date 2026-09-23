@@ -1,3 +1,4 @@
+import { WarningOutlined } from "@ant-design/icons";
 import { Component, type ReactNode } from "react";
 
 // R1（插修 15）：渲染异常兜底——E-20260831-04 白屏欠账（无 ErrorBoundary 时
@@ -27,7 +28,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             justifyContent: "center", height: "100vh", gap: 12,
           }}
         >
-          <div style={{ fontSize: 40 }}>🎨</div>
+          <WarningOutlined style={{ fontSize: 40, color: "#FAAD14" }} />
           <div style={{ fontSize: 16, fontWeight: 600 }}>页面出错了</div>
           <div style={{ color: "rgba(0,0,0,0.45)", fontSize: 13 }}>
             请刷新重试；若持续出现请联系管理员
