@@ -9,33 +9,6 @@
   padding-bottom: calc(60rpx + env(safe-area-inset-bottom));
 }
 
-/* Nav Bar */
-.nav-bar {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  padding: 24rpx 32rpx;
-  background: var(--surface);
-  border-bottom: 2rpx solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.nav-bar .back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-}
-
-.nav-bar .back-icon {
-  font-size: 40rpx;
-  color: var(--fg);
-}
-
 .nav-bar .title {
   font-family: var(--font-display);
   font-size: 34rpx;
@@ -75,27 +48,12 @@
   border-width: 4rpx;
 }
 
-.avatar {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40rpx;
-  flex-shrink: 0;
-}
-
 .avatar.a {
   background: rgba(var(--accent-rgb), 0.15);
 }
 
 .avatar.b {
   background: rgba(var(--success-rgb), 0.15);
-}
-
-.info {
-  flex: 1;
 }
 
 .name {
@@ -128,11 +86,6 @@
   border-color: var(--accent);
 }
 
-.check-icon {
-  font-size: 24rpx;
-  color: var(--border);
-}
-
 .check-circle.checked .check-icon {
   color: var(--surface);
 }
@@ -150,43 +103,8 @@
   color: var(--muted);
 }
 
-/* Days Info */
-.days-info {
-  margin: 0 32rpx 32rpx;
-  background: var(--surface);
-  border: 2rpx solid var(--border);
-  border-radius: var(--radius);
-  padding: 32rpx;
-}
-
-.info-heading {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: var(--fg);
-  margin-bottom: 24rpx;
-  display: block;
-}
-
-.days-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16rpx 0;
-  font-size: 28rpx;
-}
-
 .days-row .label {
   color: var(--muted);
-}
-
-.days-row .value {
-  font-weight: 600;
-  color: var(--fg);
-}
-
-.days-row.highlight .value {
-  color: var(--accent);
-  font-size: 36rpx;
 }
 
 /* Check List */
@@ -318,11 +236,6 @@
   gap: 12rpx;
   margin-bottom: 8rpx;
 }
-.record-source, .record-target {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: var(--fg);
-}
 .record-arrow {
   font-size: 24rpx;
   color: var(--muted);
@@ -331,10 +244,6 @@
   display: flex;
   align-items: center;
   gap: 16rpx;
-}
-.record-date {
-  font-size: 22rpx;
-  color: var(--muted);
 }
 .record-status {
   font-size: 22rpx;
@@ -354,13 +263,6 @@
   color: var(--error);
   background: var(--error-soft);
 }
-.empty-records {
-  margin: 0 32rpx 32rpx;
-  text-align: center;
-  color: var(--muted);
-  font-size: 26rpx;
-  padding: 40rpx 0;
-}
 
 /* Submit Button
    2026-09-15：本页 .submit-wrap 用在「转让条件核对」卡片**内部**，样式却是 HTML 稿的
@@ -372,32 +274,6 @@
 /* 回到文档流后按钮按内容宽收缩，「条件不全，暂不能提交」被折成两行 → 补满宽 */
 .submit-wrap .btn-primary {
   width: 100%;
-}
-
-
-.submit-btn text {
-  color: var(--surface);
-  font-size: 30rpx;
-  font-weight: 600;
-}
-
-.submit-btn.disabled {
-  opacity: 0.5;
-}
-
-/* Loading */
-.loading-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 120rpx 0;
-  color: var(--muted);
-  font-size: 28rpx;
-}
-
-/* 提交按钮禁用态 */
-.submit-btn[disabled] {
-  opacity: 0.5;
 }
 
 /* 提交按钮文字颜色 */
@@ -413,26 +289,9 @@
   color: rgba(var(--gold-rgb), 0.9);
 }
 
-/* 权益信息高亮行 */
-.days-row.highlight .value {
-  font-size: 36rpx;
-}
-
 /* 检查项失败图标颜色 */
 .check-icon-wrap.fail .check-result-icon {
   color: var(--error);
-}
-
-/* 提交按钮文字颜色 */
-.submit-btn text {
-  color: var(--surface);
-  font-size: 30rpx;
-  font-weight: 600;
-}
-
-/* 提交按钮禁用态 */
-.submit-btn[disabled] {
-  opacity: 0.5;
 }
 
 /* 子选项选中勾选样式 */
@@ -449,60 +308,23 @@
   color: var(--error);
 }
 
-/* 权益信息高亮行 */
-.days-row.highlight .value {
-  color: var(--accent);
-  font-size: 36rpx;
-}
-
 /* 提示卡片文字颜色 */
 .tip-card {
   color: rgba(var(--gold-rgb), 0.9);
-}
-
-
-/* ============================================
-   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
-   ============================================ */
-/* 卡片：粗黑边 + 硬阴影 + 手绘圆角 */
-.card, .section-card, .card-wrapper, .section, .panel, .info-card, .form-card {
-  background: var(--surface);
-  border: 3rpx solid var(--fg);
-  border-radius: 28rpx 32rpx 24rpx 36rpx;
-  box-shadow: var(--shadow-hard-sm);
-}
-
-/* 按钮：胶囊贴纸 */
-.btn, button, .primary-btn, .secondary-btn, .action-btn {
+}button{
   border: 3rpx solid var(--fg);
   border-radius: 999rpx;
   box-shadow: var(--shadow-hard-sm);
   font-weight: 700;
-}
-.btn-primary, .primary, button[type="primary"], .primary-btn {
+}.btn-primary, button[type="primary"]{
   background: var(--accent);
   color: var(--surface);
-}
-.btn-secondary, .secondary, .secondary-btn {
-  background: var(--surface);
-  color: var(--fg);
-}
-.btn:active, button:active, .primary-btn:active, .secondary-btn:active {
+}button:active{
   transform: translate(2rpx, 2rpx);
   box-shadow: none;
-}
-
-/* 标题圆体 */
-.page-title, .card-title, .header-title, .title, .name {
+}.title, .name{
   font-family: var(--font-display);
   font-weight: 700;
-}
-
-.item, .row, .cell {
-  background: var(--surface);
-  border: 2rpx solid var(--fg);
-  border-radius: 24rpx 28rpx 20rpx 30rpx;
-  box-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.55);
 }
 
 
@@ -529,15 +351,6 @@
 .check-circle.checked {
   background: var(--accent);
   border-color: var(--fg);
-}
-.days-info {
-  border: 2rpx solid var(--fg);
-  border-radius: 20rpx 24rpx 18rpx 26rpx;
-  background: var(--surface);
-}
-.days-row.highlight .value {
-  color: var(--accent);
-  font-weight: 800;
 }
 .check-list {
   border: 2rpx solid var(--fg);

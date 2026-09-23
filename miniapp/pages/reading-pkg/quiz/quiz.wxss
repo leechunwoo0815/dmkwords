@@ -46,19 +46,6 @@
   color: var(--surface);
 }
 
-/* check-icon */
-.check-icon {
-  width: 44rpx;
-  height: 44rpx;
-  flex-shrink: 0;
-  opacity: 1;
-  color: var(--success);
-  font-size: 32rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .option.wrong .check-icon {
   color: var(--error);
 }
@@ -111,28 +98,8 @@
 
 .next-btn:active {
   opacity: 0.85;
-}
-
-.next-btn:disabled,
-.btn-disabled {
+}.next-btn:disabled{
   opacity: 0.5;
-}
-
-.quiz-submit {
-  flex: 1;
-  padding: 28rpx;
-  border-radius: var(--radius);
-  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-  color: var(--surface);
-  font-size: 30rpx;
-  font-weight: 600;
-  text-align: center;
-  line-height: 1;
-  border: none;
-}
-
-.submit-btn::after {
-  border: none;
 }
 
 /* Header */
@@ -235,16 +202,6 @@
   background: var(--accent-soft);
 }
 
-.option-correct {
-  border-color: var(--success);
-  background: var(--success-soft);
-}
-
-.option-wrong {
-  border-color: var(--error);
-  background: var(--error-soft);
-}
-
 .option-letter {
   width: 64rpx;
   height: 64rpx;
@@ -265,26 +222,12 @@
   color: var(--surface);
 }
 
-.option-letter-correct {
-  background: var(--success);
-  color: var(--surface);
-}
-
-.option-letter-wrong {
-  background: var(--error);
-  color: var(--surface);
-}
-
 .option-text {
   flex: 1;
   font-size: 30rpx;
   line-height: 1.5;
   color: var(--fg);
-}
-
-.option-selected .check-icon,
-.option-correct .check-icon,
-.option-wrong .check-icon {
+}.option-selected .check-icon{
   opacity: 1;
 }
 
@@ -399,19 +342,6 @@
 .cd-confirm {
   background: var(--accent);
   color: var(--surface);
-}
-
-
-/* C2 家长辅助模式：听题按钮 */
-.tts-btn {
-  display: inline-block;
-  margin-left: 16rpx;
-  padding: 6rpx 20rpx;
-  font-size: 24rpx;
-  font-weight: normal;
-  color: var(--primary, var(--sky));
-  background: var(--sky-soft);
-  border-radius: 24rpx;
 }
 
 /* ============================================

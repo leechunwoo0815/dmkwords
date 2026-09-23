@@ -81,32 +81,12 @@
   font-size: 26rpx;
   padding: 40rpx 0;
   text-align: center;
-}
-
-/* ============================================
-   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
-   ============================================ */
-/* 卡片：粗黑边 + 硬阴影 + 手绘圆角 */
-.card, .section-card, .card-wrapper, .section, .panel, .info-card, .form-card {
+}.section-card{
   background: var(--surface);
   border: 3rpx solid var(--fg);
   border-radius: 28rpx 32rpx 24rpx 36rpx;
   box-shadow: var(--shadow-hard-sm);
-}
-
-/* 标签/徽章：圆角贴纸 */
-.tag, .badge, .pill, .tag-primary, .tag-secondary, .tag-success, .tag-warning {
-  border: 2rpx solid rgba(var(--fg-rgb), 0.6);
-  border-radius: 999rpx;
-  font-weight: 700;
-}
-.tag-primary, .badge-primary { background: var(--accent-soft); color: var(--accent-dark); }
-.tag-secondary, .badge-secondary { background: var(--secondary-soft); color: var(--secondary-ink); }
-.tag-success, .badge-success { background: var(--success-soft); color: var(--success); }
-.tag-warning, .badge-warning { background: var(--warning-soft); color: var(--warning-dark); }
-
-/* 标题圆体 */
-.page-title, .card-title, .header-title, .title, .name {
+}.name{
   font-family: var(--font-display);
   font-weight: 700;
 }
@@ -133,11 +113,6 @@
   color: var(--fg);
   border-color: var(--fg);
   box-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.85);
-}
-.report-image-card {
-  border: 3rpx solid var(--fg);
-  border-radius: 28rpx 32rpx 24rpx 36rpx;
-  box-shadow: var(--shadow-hard-sm);
 }
 
 

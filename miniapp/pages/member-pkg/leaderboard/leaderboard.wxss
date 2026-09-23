@@ -7,52 +7,10 @@
   padding-bottom: 160rpx;
 }
 
-/* Nav bar */
-.nav-bar {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  padding: 24rpx 32rpx;
-  background: var(--surface);
-  border-bottom: 2rpx solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.nav-bar .back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 20rpx;
-}
-
-.nav-bar .title {
-  font-family: var(--font-display);
-  font-size: 34rpx;
-  font-weight: 600;
-}
-
-.nav-bar .spacer {
-  flex: 1;
-}
-
 /* 周期标签 */
 .period-tabs {
   background: var(--surface);
   border-bottom: 2rpx solid var(--border);
-}
-.period-scroll {
-  white-space: nowrap;
-  padding: 24rpx 32rpx;
-  overflow-x: auto;
-  scrollbar-width: none;
-  display: flex;
-}
-.period-scroll::-webkit-scrollbar {
-  display: none;
 }
 .period-tab {
   display: inline-block;
@@ -71,153 +29,6 @@
   background: var(--accent);
   color: var(--surface);
   border-color: var(--accent);
-}
-
-/* 级别筛选 */
-.filter-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16rpx 32rpx 24rpx;
-  background: var(--surface);
-  border-bottom: 2rpx solid var(--border);
-}
-.filter-label {
-  font-size: 24rpx;
-  color: var(--muted);
-}
-.level-select {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  padding: 12rpx 24rpx;
-  border-radius: var(--radius-sm);
-  border: 2rpx solid var(--border);
-  background: var(--bg);
-  font-size: 26rpx;
-  color: var(--fg);
-}
-.filter-arrow {
-  font-size: 20rpx;
-  opacity: 0.5;
-}
-
-/* 领奖台 */
-.podium {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 24rpx;
-  padding: 48rpx 32rpx 0;
-}
-.podium-card {
-  flex: 1;
-  max-width: 240rpx;
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 32rpx 16rpx 28rpx;
-  text-align: center;
-  border: 2rpx solid var(--border);
-  position: relative;
-}
-.podium-card .rank-badge {
-  position: absolute;
-  top: -20rpx;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 48rpx;
-  line-height: 1;
-}
-.podium-avatar {
-  width: 104rpx;
-  height: 104rpx;
-  border-radius: 50%;
-  margin: 16rpx auto 12rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 48rpx;
-  border: 4rpx solid var(--border);
-  background: var(--bg);
-}
-.podium-name {
-  font-family: var(--font-display);
-  font-size: 28rpx;
-  font-weight: 600;
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.podium-words {
-  font-size: 24rpx;
-  color: var(--muted);
-  margin-top: 4rpx;
-  display: block;
-}
-.podium-score {
-  font-family: var(--font-display);
-  font-size: 32rpx;
-  font-weight: 700;
-  margin-top: 8rpx;
-  color: var(--accent);
-  display: block;
-}
-
-/* 金牌 */
-.podium-card.gold {
-  border-color: rgba(var(--warning-rgb), 0.5);
-  background: linear-gradient(180deg, rgba(var(--warning-rgb), 0.08) 0%, var(--surface) 100%);
-  box-shadow: 0 8rpx 40rpx rgba(var(--warning-rgb), 0.15);
-  padding-top: 44rpx;
-}
-.podium-card.gold .podium-avatar {
-  width: 128rpx;
-  height: 128rpx;
-  font-size: 60rpx;
-  border-color: rgba(var(--warning-rgb), 0.4);
-  background: rgba(var(--warning-rgb), 0.08);
-}
-.podium-card.gold .podium-name {
-  font-size: 30rpx;
-}
-.podium-card.gold .podium-score {
-  color: rgba(var(--warning-rgb), 0.85);
-}
-
-/* 银牌 */
-.podium-card.silver {
-  border-color: rgba(var(--fg-rgb), 0.5);
-  background: linear-gradient(180deg, rgba(var(--fg-rgb), 0.06) 0%, var(--surface) 100%);
-}
-.podium-card.silver .podium-avatar {
-  border-color: rgba(var(--fg-rgb), 0.4);
-  background: rgba(var(--fg-rgb), 0.08);
-}
-.podium-card.silver .podium-score {
-  color: rgba(var(--fg-rgb), 0.7);
-}
-
-/* 铜牌 */
-.podium-card.bronze {
-  border-color: rgba(var(--gold-rgb), 0.4);
-  background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.06) 0%, var(--surface) 100%);
-}
-.podium-card.bronze .podium-avatar {
-  border-color: rgba(var(--gold-rgb), 0.4);
-  background: rgba(var(--gold-rgb), 0.06);
-}
-.podium-card.bronze .podium-score {
-  color: rgba(var(--gold-rgb), 0.8);
-}
-
-/* 分区标签 */
-.section-label {
-  font-family: var(--font-display);
-  font-size: 26rpx;
-  font-weight: 600;
-  color: var(--muted);
-  padding: 16rpx 32rpx 8rpx;
 }
 
 /* 排行列表 */
@@ -247,18 +58,6 @@
   color: var(--muted);
   flex-shrink: 0;
 }
-.rank-avatar {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 36rpx;
-  background: var(--bg);
-  border: 2rpx solid var(--border);
-  flex-shrink: 0;
-}
 .rank-info {
   flex: 1;
   min-width: 0;
@@ -276,13 +75,6 @@
   font-size: 24rpx;
   color: var(--muted);
   display: block;
-}
-.rank-score {
-  font-family: var(--font-display);
-  font-size: 30rpx;
-  font-weight: 700;
-  color: var(--accent);
-  flex-shrink: 0;
 }
 
 /* 规则卡片 */
@@ -308,120 +100,19 @@
   display: block;
 }
 
-/* 底部我的排名 */
-.my-rank-bar {
-  position: fixed;
-    box-sizing: border-box;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(var(--surface-rgb), 0.96);
-  border-top: 2rpx solid var(--border);
-  padding: 24rpx 40rpx;
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom, 24rpx));
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  z-index: 20;
-  box-sizing: border-box;
-}
-.my-avatar {
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32rpx;
-  background: var(--sky-soft);
-  border: 4rpx solid var(--accent);
-  flex-shrink: 0;
-}
-.my-info {
-  flex: 1;
-}
-.my-label {
-  font-size: 22rpx;
-  color: var(--muted);
-  display: block;
-}
-.my-detail {
-  font-family: var(--font-display);
-  font-size: 28rpx;
-  font-weight: 600;
-  display: block;
-}
-.my-highlight {
-  color: var(--accent);
-}
-.my-position {
-  font-family: var(--font-display);
-  font-size: 40rpx;
-  font-weight: 700;
-  color: var(--accent);
-  flex-shrink: 0;
-}
-
-/* 底部导航（隐藏，用 my-rank-bar 替代） */
-.bottom-nav {
-  display: none;
-}
-
-/* 周期标签滚动隐藏 scrollbar */
-.period-scroll::-webkit-scrollbar {
-  display: none;
-}
-
 /* 排行项目 - 我的排名高亮 */
 .rank-item-me {
   border-color: var(--accent);
   background: var(--sky-soft);
 }
 
-/* 底部导航（隐藏，用 my-rank-bar 替代） */
-.bottom-nav {
-  display: none;
-}
-
-/* 周期标签滚动隐藏 scrollbar */
-.period-scroll::-webkit-scrollbar {
-  display: none;
-}
-
 /* 排行项目 - 我的排名高亮 */
 .rank-item-me {
   border-color: var(--accent);
   background: var(--sky-soft);
-}
-
-
-/* ============================================
-   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
-   ============================================ */
-/* 卡片：粗黑边 + 硬阴影 + 手绘圆角 */
-.card, .section-card, .card-wrapper, .section, .panel, .info-card, .form-card {
-  background: var(--surface);
-  border: 3rpx solid var(--fg);
-  border-radius: 28rpx 32rpx 24rpx 36rpx;
-  box-shadow: var(--shadow-hard-sm);
-}
-
-/* 标题圆体 */
-.page-title, .card-title, .header-title, .title, .name {
+}.name{
   font-family: var(--font-display);
   font-weight: 700;
-}
-
-.item, .row, .cell {
-  background: var(--surface);
-  border: 2rpx solid var(--fg);
-  border-radius: 24rpx 28rpx 20rpx 30rpx;
-  box-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.55);
-}
-
-/* 列表容器：加间距 */
-.list, .grid, .list-container {
-  gap: 16rpx;
 }
 
 /* WM15-A2：榜单头像改用系统内置头像图（此前硬编码 🧒/👤，Child.avatar 字段形同虚设） */

@@ -56,15 +56,6 @@
   align-items: center;
   justify-content: center;
 }
-.banner-0 {
-  background: linear-gradient(135deg, var(--sky-soft), var(--secondary-soft));
-}
-.banner-1 {
-  background: linear-gradient(135deg, var(--secondary-soft), var(--accent-soft));
-}
-.banner-2 {
-  background: linear-gradient(135deg, var(--sun-soft), var(--sky-soft));
-}
 .activity-banner-img {
   position: absolute;
   inset: 0;
@@ -134,10 +125,6 @@
 .status-full {
   background: var(--error-soft);
   color: var(--error);
-}
-.status-past {
-  background: var(--bg);
-  color: var(--muted);
 }
 
 /* 2026-09-15（用户两轮反馈"活动页还是遮挡，按钮往上挪不行吗"）：

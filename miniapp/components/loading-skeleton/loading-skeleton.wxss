@@ -30,13 +30,7 @@
 @keyframes shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
-}
-
-/* ============================================
-   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
-   ============================================ */
-/* 列表项：卡片化 */
-.list-item, .item, .row, .cell, .info-row {
+}.row{
   background: var(--surface);
   border: 2rpx solid var(--fg);
   border-radius: 24rpx 28rpx 20rpx 30rpx;

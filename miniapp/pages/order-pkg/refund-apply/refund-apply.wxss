@@ -8,67 +8,12 @@
   padding-bottom: calc(60rpx + env(safe-area-inset-bottom));
 }
 
-/* Nav Bar */
-.nav-bar {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  padding: 24rpx 32rpx;
-  background: var(--surface);
-  border-bottom: 2rpx solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.nav-bar .back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 20rpx;
-  font-size: 40rpx;
-  color: var(--fg);
-}
-
-.nav-title {
-  font-family: var(--font-display);
-  font-size: 34rpx;
-  font-weight: 600;
-  color: var(--fg);
-}
-
 /* Loading & Empty */
 .loading-state {
   text-align: center;
   padding: 120rpx 40rpx;
   color: var(--muted);
   font-size: 28rpx;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 120rpx 40rpx;
-  color: var(--muted);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.empty-icon {
-  font-size: 96rpx;
-  margin-bottom: 24rpx;
-}
-
-
-/* Shared card label */
-.card-label {
-  display: block;
-  font-size: 26rpx;
-  color: var(--muted);
-  margin-bottom: 16rpx;
-  font-weight: 500;
 }
 
 .card-h3 {
@@ -88,79 +33,12 @@
   padding: 32rpx;
 }
 
-.picker-field {
-  height: 80rpx;
-  background: var(--bg);
-  border-radius: var(--radius-sm);
-  padding: 0 24rpx;
-  font-size: 28rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--fg);
-}
-
-.picker-arrow {
-  font-size: 28rpx;
-  color: var(--muted);
-}
-
-/* Info Card */
-.info-card {
-  margin: 32rpx;
-  background: var(--surface);
-  border: 2rpx solid var(--border);
-  border-radius: var(--radius);
-  padding: 32rpx;
-}
-
-.kv-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16rpx 0;
-  font-size: 28rpx;
-}
-
 .kv-label {
   color: var(--muted);
 }
 
 .kv-value {
   font-weight: 500;
-  color: var(--fg);
-}
-
-.info-row-total {
-  border-top: 2rpx solid var(--border);
-  margin-top: 8rpx;
-  padding-top: 24rpx;
-}
-
-.info-value-total {
-  font-family: var(--font-display);
-  font-size: 40rpx;
-  font-weight: 700;
-  color: var(--accent);
-}
-
-/* Days Input */
-.days-card {
-  margin: 0 32rpx 32rpx;
-  background: var(--surface);
-  border: 2rpx solid var(--border);
-  border-radius: var(--radius);
-  padding: 32rpx;
-}
-
-.days-input {
-  width: 100%;
-  height: 80rpx;
-  background: var(--bg);
-  border-radius: var(--radius-sm);
-  padding: 0 24rpx;
-  font-size: 28rpx;
-  box-sizing: border-box;
   color: var(--fg);
 }
 
@@ -173,50 +51,9 @@
   padding: 32rpx;
 }
 
-.calc-step {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  padding: 20rpx 0;
-  font-size: 28rpx;
-}
-
-.calc-dot {
-  width: 48rpx;
-  height: 48rpx;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24rpx;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.calc-dot-n {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.calc-dot-minus {
-  background: var(--error-soft);
-  color: var(--error);
-}
-
-.calc-dot-result {
-  background: var(--success-soft);
-  color: var(--success);
-}
-
 .calc-desc {
   flex: 1;
   color: var(--muted);
-}
-
-.calc-amount {
-  font-weight: 600;
-  color: var(--fg);
-  font-variant-numeric: tabular-nums;
 }
 
 .calc-result {
@@ -279,17 +116,6 @@
   align-items: flex-start;
 }
 
-.tip-icon {
-  font-size: 36rpx;
-  flex-shrink: 0;
-  line-height: 1.2;
-}
-
-.tip-text {
-  flex: 1;
-  line-height: 1.5;
-}
-
 /* Submit
    2026-09-15：本页 .submit-wrap 用在**卡片内部**（退款原因卡 + 退会卡各一个），
    但样式是从 HTML 稿搬来的 position:fixed 底栏 → 两个 fixed bottom:0 的提交区
@@ -301,11 +127,6 @@
 
 .submit-wrap .btn-primary {
   width: 100%;
-}
-
-
-.submit-btn:active {
-  opacity: 0.85;
 }
 
 /* Info Card headings & row variants */
@@ -331,43 +152,9 @@
   color: var(--accent);
 }
 
-/* Calc step dot variants */
-.calc-step .dot {
-  width: 48rpx;
-  height: 48rpx;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24rpx;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
 .calc-step .dot.n {
   background: var(--accent-soft);
   color: var(--accent);
-}
-
-.calc-step .dot.minus {
-  background: var(--error-soft);
-  color: var(--error);
-}
-
-.calc-step .dot.result {
-  background: var(--success-soft);
-  color: var(--success);
-}
-
-.calc-step .desc {
-  flex: 1;
-  color: var(--muted);
-}
-
-.calc-step .amount {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--fg);
 }
 
 .calc-result .label {
@@ -394,52 +181,18 @@
 
 .btn-disabled {
   opacity: 0.5;
-}
-
-
-/* ============================================
-   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
-   ============================================ */
-/* 卡片：粗黑边 + 硬阴影 + 手绘圆角 */
-.card, .section-card, .card-wrapper, .section, .panel, .info-card, .form-card {
-  background: var(--surface);
-  border: 3rpx solid var(--fg);
-  border-radius: 28rpx 32rpx 24rpx 36rpx;
-  box-shadow: var(--shadow-hard-sm);
-}
-
-/* 按钮：胶囊贴纸 */
-.btn, button, .primary-btn, .secondary-btn, .action-btn {
+}button{
   border: 3rpx solid var(--fg);
   border-radius: 999rpx;
   box-shadow: var(--shadow-hard-sm);
   font-weight: 700;
-}
-.btn-primary, .primary, button[type="primary"], .primary-btn {
+}.btn-primary, button[type="primary"]{
   background: var(--accent);
   color: var(--surface);
-}
-.btn-secondary, .secondary, .secondary-btn {
-  background: var(--surface);
-  color: var(--fg);
-}
-.btn:active, button:active, .primary-btn:active, .secondary-btn:active {
+}button:active{
   transform: translate(2rpx, 2rpx);
   box-shadow: none;
-}
-
-/* 标签/徽章：圆角贴纸 */
-.tag, .badge, .pill, .tag-primary, .tag-secondary, .tag-success, .tag-warning {
-  border: 2rpx solid rgba(var(--fg-rgb), 0.6);
-  border-radius: 999rpx;
-  font-weight: 700;
-}
-.tag-primary, .badge-primary { background: var(--accent-soft); color: var(--accent-dark); }
-.tag-secondary, .badge-secondary { background: var(--secondary-soft); color: var(--secondary-ink); }
-.tag-success, .badge-success { background: var(--success-soft); color: var(--success); }
-.tag-warning, .badge-warning { background: var(--warning-soft); color: var(--warning-dark); }
-
-.item, .row, .cell {
+}.cell{
   background: var(--surface);
   border: 2rpx solid var(--fg);
   border-radius: 24rpx 28rpx 20rpx 30rpx;
@@ -452,19 +205,6 @@
   border: 3rpx solid var(--fg);
   border-radius: 28rpx 32rpx 24rpx 36rpx;
   box-shadow: var(--shadow-hard-sm);
-}
-.info-card {
-  border: 3rpx solid var(--fg);
-  border-radius: 28rpx 32rpx 24rpx 36rpx;
-  box-shadow: var(--shadow-hard-sm);
-}
-.picker-field {
-  border: 2rpx solid var(--fg);
-  background: var(--surface);
-  box-shadow: 2rpx 2rpx 0 rgba(var(--fg-rgb), 0.35);
-}
-.kv-row {
-  border-bottom: 1rpx dashed var(--border);
 }
 .info-row:last-child {
   border-bottom: none;
@@ -520,9 +260,6 @@
 .x-510ea6 { display: flex; justify-content: space-between; align-items: center; }
 .x-be6535 { font-size: 24rpx; color: var(--muted); margin-top: 6rpx; }
 .x-ac2bd5 { margin-top: 12rpx; display: flex; justify-content: flex-end; }
-.x-fc3719 { font-size: 24rpx; color: var(--muted); margin-bottom: 12rpx; }
-.x-b95a4c { display: flex; justify-content: flex-end; }
-.x-47d2d4 { margin-top: 16rpx; }
 
 /* ===== 2026-09-14 回归修复：订单行布局已上移到 .x-3fde25（避免与全局 .info-row 重名）===== */
 /* 2026-09-15 回归修复：本页 .tip-card 用作竖排卡片（退款记录 / 退会块），

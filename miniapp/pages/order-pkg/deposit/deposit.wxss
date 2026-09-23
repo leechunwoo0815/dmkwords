@@ -113,61 +113,25 @@
   font-size: 20rpx;
   color: var(--muted-light);
   margin-top: 4rpx;
-}
-
-/* ============================================
-   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
-   ============================================ */
-/* 卡片：粗黑边 + 硬阴影 + 手绘圆角 */
-.card, .section-card, .card-wrapper, .section, .panel, .info-card, .form-card {
+}.section-card{
   background: var(--surface);
   border: 3rpx solid var(--fg);
   border-radius: 28rpx 32rpx 24rpx 36rpx;
   box-shadow: var(--shadow-hard-sm);
-}
-
-/* 按钮：胶囊贴纸 */
-.btn, button, .primary-btn, .secondary-btn, .action-btn {
+}button{
   border: 3rpx solid var(--fg);
   border-radius: 999rpx;
   box-shadow: var(--shadow-hard-sm);
   font-weight: 700;
-}
-.btn-primary, .primary, button[type="primary"], .primary-btn {
+}button[type="primary"]{
   background: var(--accent);
   color: var(--surface);
-}
-.btn-secondary, .secondary, .secondary-btn {
-  background: var(--surface);
-  color: var(--fg);
-}
-.btn:active, button:active, .primary-btn:active, .secondary-btn:active {
+}button:active{
   transform: translate(2rpx, 2rpx);
   box-shadow: none;
-}
-
-/* 标签/徽章：圆角贴纸 */
-.tag, .badge, .pill, .tag-primary, .tag-secondary, .tag-success, .tag-warning {
-  border: 2rpx solid rgba(var(--fg-rgb), 0.6);
-  border-radius: 999rpx;
-  font-weight: 700;
-}
-.tag-primary, .badge-primary { background: var(--accent-soft); color: var(--accent-dark); }
-.tag-secondary, .badge-secondary { background: var(--secondary-soft); color: var(--secondary-ink); }
-.tag-success, .badge-success { background: var(--success-soft); color: var(--success); }
-.tag-warning, .badge-warning { background: var(--warning-soft); color: var(--warning-dark); }
-
-/* 标题圆体 */
-.page-title, .card-title, .header-title, .title, .name {
+}.title, .name{
   font-family: var(--font-display);
   font-weight: 700;
-}
-
-.item, .row, .cell {
-  background: var(--surface);
-  border: 2rpx solid var(--fg);
-  border-radius: 24rpx 28rpx 20rpx 30rpx;
-  box-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.55);
 }
 
 

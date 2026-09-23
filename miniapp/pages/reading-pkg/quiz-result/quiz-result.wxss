@@ -11,27 +11,6 @@
   position: relative;
 }
 
-/* Confetti */
-.confetti-container {
-  position: fixed;
-    box-sizing: border-box;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 99;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-
-.confetti-piece {
-  position: absolute;
-  border-radius: 4rpx;
-  top: -40rpx;
-  animation: confettiFall 2.5s ease-in forwards;
-}
-
 @keyframes confettiFall {
   0% {
     transform: translateY(0) rotate(0deg);
@@ -78,38 +57,6 @@
 
 .result-icon-fail {
   background: rgba(var(--warning-rgb), 0.1);
-}
-
-.icon-check {
-  font-size: 72rpx;
-  font-weight: 700;
-  color: var(--success);
-}
-
-.icon-warning {
-  font-size: 72rpx;
-  font-weight: 700;
-  color: var(--warning);
-}
-
-/* Badge */
-.result-badge {
-  display: inline-block;
-  padding: 8rpx 32rpx;
-  border-radius: 999rpx;
-  font-size: 26rpx;
-  font-weight: 600;
-  margin-bottom: 32rpx;
-}
-
-.badge-pass {
-  background: rgba(var(--success-rgb), 0.1);
-  color: var(--success);
-}
-
-.badge-fail {
-  background: rgba(var(--warning-rgb), 0.1);
-  color: var(--warning);
 }
 
 /* Score Circle */
@@ -226,38 +173,6 @@
   color: var(--muted);
 }
 
-/* Auto Actions */
-.auto-actions {
-  text-align: left;
-  margin-top: 32rpx;
-  padding: 28rpx;
-  border-radius: var(--radius-sm);
-  background: rgba(var(--success-rgb), 0.1);
-  border: 2rpx solid rgba(var(--success-rgb), 0.2);
-}
-
-.aa-title {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: var(--success);
-  margin-bottom: 12rpx;
-}
-
-.aa-item {
-  font-size: 24rpx;
-  color: var(--fg);
-  padding: 4rpx 0;
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-
-.aa-check {
-  color: var(--success);
-  font-weight: 700;
-  font-size: 28rpx;
-}
-
 /* Wrong Questions Review */
 .wrong-review {
   text-align: left;
@@ -290,16 +205,6 @@
   margin-bottom: 8rpx;
 }
 
-.wrong-a {
-  font-size: 24rpx;
-  color: var(--muted);
-}
-
-.wrong-a .correct {
-  color: var(--success);
-  font-weight: 600;
-}
-
 /* Level Up Banner */
 .level-up-banner {
   margin-top: 32rpx;
@@ -316,65 +221,6 @@
   50% { box-shadow: 0 0 40rpx 8rpx rgba(var(--accent-rgb), 0.15); }
 }
 
-.lu-emoji {
-  font-size: 64rpx;
-  display: block;
-  margin-bottom: 16rpx;
-}
-
-.lu-text {
-  font-family: var(--font-display);
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.lu-sub {
-  font-size: 26rpx;
-  color: var(--muted);
-  margin-top: 8rpx;
-}
-
-/* Promotion Celebration Card */
-.promo-card {
-  margin-top: 32rpx;
-  padding: 40rpx;
-  border-radius: var(--radius);
-  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.12), rgba(var(--success-rgb), 0.08));
-  border: 2rpx solid rgba(var(--accent-rgb), 0.15);
-  text-align: center;
-  animation: shimmer 2s ease infinite;
-}
-
-.promo-card .promo-emoji {
-  font-size: 80rpx;
-  margin-bottom: 16rpx;
-}
-
-.promo-card .promo-title {
-  font-family: var(--font-display);
-  font-size: 40rpx;
-  font-weight: 700;
-  color: var(--accent);
-  margin-bottom: 8rpx;
-}
-
-.promo-card .promo-sub {
-  font-size: 26rpx;
-  color: var(--muted);
-  margin-bottom: 24rpx;
-}
-
-.promo-card .promo-link {
-  display: inline-block;
-  padding: 16rpx 40rpx;
-  border-radius: 999rpx;
-  background: var(--accent);
-  color: var(--surface);
-  font-size: 26rpx;
-  font-weight: 600;
-}
-
 /* Button Group */
 .btn-group {
   width: 100%;
@@ -382,10 +228,6 @@
   flex-direction: column;
   gap: 20rpx;
   margin-top: 48rpx;
-}
-
-.btn-block {
-  width: 100%;
 }
 
 .btn-primary {
@@ -417,36 +259,9 @@
   box-sizing: border-box;
 }
 
-/* Level Up Celebration Overlay */
-.level-up-overlay {
-  position: fixed;
-    box-sizing: border-box;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.85), rgba(var(--warning-rgb), 0.75));
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: overlayFadeIn 0.3s ease;
-  box-sizing: border-box;
-}
-
 @keyframes overlayFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-.level-up-card {
-  width: 580rpx;
-  background: var(--surface);
-  border-radius: 32rpx;
-  padding: 64rpx 48rpx;
-  text-align: center;
-  box-shadow: 0 16rpx 64rpx rgba(var(--fg-rgb), 0.25);
-  animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @keyframes scaleIn {
@@ -513,12 +328,6 @@
   color: var(--warning);
   text-align: center;
 }
-
-/* 错题回顾 */
-.wrong-review-section {
-  width: 100%;
-  margin-top: 24rpx;
-}
 .wrong-toggle {
   display: flex;
   align-items: center;
@@ -536,13 +345,6 @@
 }
 .wrong-list {
   margin-top: 16rpx;
-}
-.wrong-list-item {
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 24rpx;
-  margin-bottom: 16rpx;
-  border-left: 6rpx solid var(--error);
 }
 .wrong-q-num {
   font-size: 22rpx;
@@ -567,17 +369,6 @@
   font-size: 24rpx;
   color: var(--success);
   font-weight: 600;
-}
-.wrong-explanation {
-  font-size: 24rpx;
-  color: var(--muted);
-  margin-top: 8rpx;
-  padding-top: 8rpx;
-  border-top: 2rpx solid var(--border);
-}
-.explain-label {
-  font-weight: 600;
-  color: var(--fg);
 }
 
 
@@ -610,12 +401,6 @@
 .result-title {
   font-family: var(--font-display);
   font-weight: 800;
-}
-
-/* 通过徽章：嫩芽绿贴纸 */
-.badge-pass {
-  border: 3rpx solid var(--fg);
-  box-shadow: var(--shadow-hard-sm);
 }
 
 .level-up-emoji { width: 96rpx; height: 96rpx; margin: 0 auto 8rpx; }

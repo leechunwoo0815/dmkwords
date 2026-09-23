@@ -6,30 +6,6 @@
   padding-bottom: 160rpx;
 }
 
-/* Nav Bar */
-.nav-bar {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  padding: 24rpx 32rpx;
-  background: var(--surface);
-  border-bottom: 2rpx solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.nav-bar .back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 20rpx;
-  font-size: 40rpx;
-  color: var(--fg);
-}
-
 .nav-bar .title {
   font-family: var(--font-display);
   font-size: 34rpx;
@@ -67,20 +43,6 @@
   gap: 12rpx;
 }
 
-.section-count {
-  background: var(--accent-soft);
-  color: var(--accent);
-  padding: 2rpx 16rpx;
-  border-radius: 999rpx;
-  font-size: 22rpx;
-  font-weight: 600;
-}
-
-.section-count-muted {
-  background: var(--accent-soft);
-  color: var(--muted);
-}
-
 /* Reservation List */
 .reservation-list {
   padding: 0 32rpx;
@@ -95,26 +57,6 @@
   margin-bottom: 20rpx;
   display: flex;
   gap: 24rpx;
-}
-
-/* Cover */
-.reservation-cover {
-  width: 128rpx;
-  height: 168rpx;
-  border-radius: 16rpx;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 56rpx;
-  border: 2rpx solid var(--border);
-  overflow: hidden;
-  background: linear-gradient(135deg, var(--bg), var(--border)); /* intentional decorative */
-}
-
-.reservation-cover image {
-  width: 100%;
-  height: 100%;
 }
 
 /* Info */
@@ -187,27 +129,6 @@
   align-items: center;
 }
 
-/* Fulfill Button */
-.fulfill-btn {
-  padding: 12rpx 28rpx;
-  border-radius: 999rpx;
-  font-size: 24rpx;
-  font-weight: 600;
-  border: none;
-  color: var(--surface);
-  background: var(--accent);
-  min-height: initial;
-  line-height: 1.5;
-}
-
-.fulfill-btn::after {
-  border: none;
-}
-
-.fulfill-btn:active {
-  opacity: 0.85;
-}
-
 /* Cancel Button */
 .cancel-btn {
   padding: 12rpx 28rpx;
@@ -262,12 +183,6 @@
   font-weight: 600;
 }
 
-/* Expired Reason */
-.expired-reason {
-  font-size: 22rpx;
-  color: var(--muted);
-}
-
 /* Loading State */
 .loading-state {
   text-align: center;
@@ -279,65 +194,27 @@
 /* Safe Bottom */
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
-}
-
-/* ============================================
-   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
-   ============================================ */
-/* 卡片：粗黑边 + 硬阴影 + 手绘圆角 */
-.card, .section-card, .card-wrapper, .section, .panel, .info-card, .form-card {
-  background: var(--surface);
-  border: 3rpx solid var(--fg);
-  border-radius: 28rpx 32rpx 24rpx 36rpx;
-  box-shadow: var(--shadow-hard-sm);
-}
-
-/* 按钮：胶囊贴纸 */
-.btn, button, .primary-btn, .secondary-btn, .action-btn {
+}button{
   border: 3rpx solid var(--fg);
   border-radius: 999rpx;
   box-shadow: var(--shadow-hard-sm);
   font-weight: 700;
-}
-.btn-primary, .primary, button[type="primary"], .primary-btn {
+}button[type="primary"]{
   background: var(--accent);
   color: var(--surface);
-}
-.btn-secondary, .secondary, .secondary-btn {
-  background: var(--surface);
-  color: var(--fg);
-}
-.btn:active, button:active, .primary-btn:active, .secondary-btn:active {
+}button:active{
   transform: translate(2rpx, 2rpx);
   box-shadow: none;
-}
-
-/* 标签/徽章：圆角贴纸 */
-.tag, .badge, .pill, .tag-primary, .tag-secondary, .tag-success, .tag-warning {
-  border: 2rpx solid rgba(var(--fg-rgb), 0.6);
-  border-radius: 999rpx;
-  font-weight: 700;
-}
-.tag-primary, .badge-primary { background: var(--accent-soft); color: var(--accent-dark); }
-.tag-secondary, .badge-secondary { background: var(--secondary-soft); color: var(--secondary-ink); }
-.tag-success, .badge-success { background: var(--success-soft); color: var(--success); }
-.tag-warning, .badge-warning { background: var(--warning-soft); color: var(--warning-dark); }
-
-/* 标题圆体 */
-.page-title, .card-title, .header-title, .title, .name {
+}.title, .name{
   font-family: var(--font-display);
   font-weight: 700;
-}
-
-.item, .row, .cell {
+}.item, .cell{
   background: var(--surface);
   border: 2rpx solid var(--fg);
   border-radius: 24rpx 28rpx 20rpx 30rpx;
   box-shadow: 3rpx 3rpx 0 rgba(var(--fg-rgb), 0.55);
-}
-
-/* 列表容器：加间距 */
-.list, .grid, .list-container {
+}/* 列表容器：加间距 */
+.list{
   gap: 16rpx;
 }
 

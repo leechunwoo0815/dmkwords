@@ -97,10 +97,6 @@
   background: var(--accent-soft);
   color: var(--accent);
 }
-.cat-money { background: var(--success-soft); color: var(--success); }
-.cat-borrow { background: var(--sky-soft); color: var(--sky); }
-.cat-member { background: var(--lavender-soft); color: var(--lavender); }
-.cat-activity { background: var(--sakura-soft); color: var(--sakura); }
 .msg-title {
   flex: 1;
   min-width: 0;

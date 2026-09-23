@@ -16,10 +16,6 @@
   color: var(--muted); background: var(--bg);
   border: 2rpx solid var(--fg); border-radius: 999rpx;
 }
-.big-avatar {
-  width: 168rpx; height: 168rpx; border-radius: 50%;
-  background: var(--surface); border: 3rpx solid rgba(var(--fg-rgb), 0.18);
-}
 .name {
   margin-top: 20rpx;
   font-family: var(--font-display); font-size: 44rpx; font-weight: 800; color: var(--fg);

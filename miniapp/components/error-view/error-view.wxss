@@ -48,33 +48,7 @@
   font-size: 24rpx;
   color: var(--muted);
   text-align: center;
-}
-
-/* ============================================
-   绘本风精修（v3 2026-08-30）— 覆盖块，勿删
-   ============================================ */
-/* 按钮：胶囊贴纸 */
-.btn, .primary-btn, .secondary-btn, .action-btn {
-  border: 3rpx solid var(--fg);
-  border-radius: 999rpx;
-  box-shadow: var(--shadow-hard-sm);
-  font-weight: 700;
-}
-.btn-primary, .primary, .primary-btn {
-  background: var(--accent);
-  color: var(--surface);
-}
-.btn-secondary, .secondary, .secondary-btn {
-  background: var(--surface);
-  color: var(--fg);
-}
-.btn:active, .primary-btn:active, .secondary-btn:active {
-  transform: translate(2rpx, 2rpx);
-  box-shadow: none;
-}
-
-/* 标题圆体 */
-.page-title, .section-title, .card-title, .header-title, .title, .name {
+}.title{
   font-family: var(--font-display);
   font-weight: 700;
 }

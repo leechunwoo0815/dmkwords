@@ -272,11 +272,6 @@
   font-size: 26rpx;
   color: var(--muted-light);
 }
-.empty-state {
-  padding: 120rpx 60rpx;
-  text-align: center;
-}
-.empty-icon { font-size: 96rpx; }
 
 /* fix34 R0：顶部「谁赞了你」通知条 + 展开列表（朋友圈式：未读出现，看完即消） */
 .likes-bar {
