@@ -113,18 +113,23 @@ else
   skip "契约快照未导出（docs/api/openapi.json 不存在）"
 fi
 
-step 9 "交付完整性检查（E-20260903-03：引用文件必须入库——missing files 惯犯第 3 次防呆）"
-# 仅本地有效（CI checkout 工作区天然干净）；外部专家意见/docs/error_list 下出现
-# untracked 文件 = LEDGER/文档引用与文件本体分离，硬失败（机械可判定，防呆原则）
+step 9 "交付完整性检查（E-20260903-03 起源；G1 起扩为全仓 untracked 判红）"
+# 仅本地有效（CI checkout 工作区天然干净）；工作区出现 untracked 文件 = 文件本体没入库，
+# 硬失败（机械可判定，防呆原则）。**2026-09-23（G1）扩面**：原只扫 外部专家意见/docs/error_list，
+# 于是漏掉了 scripts/gen_demo_progress_report.py——它是 seed_wm11_demo 的 **import 依赖**
+# （别人 clone 后 dev.sh restart 会抛 ImportError），却因为不在那三个目录而一路绿灯。
+# 现在改为：**任何 untracked 都判红**，白名单只有工具产物 .zcodeignore。
 # quotepath 假阴性防呆：git 默认对中文路径输出八进制转义（E-20260903-03 同款坑，
 # 专家三批复核时实测中招）——关闭 quotepath 转义后中文路径才可匹配
-UNTRACKED_DOCS=$(git -c core.quotepath=false status --porcelain | grep '^??' | grep -E '外部专家意见/|docs/|error_list/' || true)
-if [ -n "$UNTRACKED_DOCS" ]; then
-  echo "✗ 应入库目录下存在 untracked 文件（LEDGER/文档引用的文件必须同刀或后刀入库）："
-  echo "$UNTRACKED_DOCS"
+UNTRACKED_OTHERS=$(
+  git -c core.quotepath=false status --porcelain | grep '^??' | grep -vE '^\?\? \.zcodeignore$' || true
+)
+if [ -n "$UNTRACKED_OTHERS" ]; then
+  echo "✗ 工作区存在未入库文件（先 git add 或显式忽略；seed 依赖/文档引用的文件尤其不能留）："
+  echo "$UNTRACKED_OTHERS"
   FAILED=1
 else
-  echo "交付完整性 PASS：引用目录零 untracked ✓"
+  echo "交付完整性 PASS：工作区零 untracked（白名单 .zcodeignore）✓"
 fi
 
 sleep 0.3  # E-20260901-04：等 tee 落盘再退出，防日志末行截断

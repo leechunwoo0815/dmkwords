@@ -10,7 +10,8 @@
 1. 清场：`dev.sh stop` → `pytest tests/unit/test_p0_t8_rate_limit.py`（该文件只做失败登录、
    不造业务数据，但 conftest 会在每个测试开始前 TRUNCATE 业务表 → 残留一并清掉）
 2. `dev.sh restart`（MySQL → 迁移 → 双 seed → 后端 → 前端；**注释见 docs/19 §一 第 2 步**）
-3. 计数四张核心业务表（`is_deleted=0`）并与基线比对
+3. 计数四张核心业务表（`is_deleted=0`）**+ 演示孩口径数字**（词账/积分/零头池/勋章/在借/逾期/
+   可借/生词本/押金）并与基线比对——后者 2026-09-23（G3）新增：手册里写死的数字同样要有断言
 
 用法::
 
@@ -26,6 +27,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from decimal import Decimal
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -42,6 +44,58 @@ CLEAN_BASELINE = {
 }
 
 CLEANUP_TEST = "tests/unit/test_p0_t8_rate_limit.py"
+
+#: 演示孩口径数字（**与 `docs/04` §演示账号表同源**；G3，2026-09-23 立）。
+#:
+#: 为什么要有这一组：门禁只断言"四张表有几行"，而手册里**写死了一堆具体数字**
+#: （词账/积分/零头池/勋章/在借/逾期/可借/生词本/押金）供人逐条核对——2026-09-21 书 30 改名把
+#: 演示孩词账从 102,320 抬到 109,320（+7,000 词 / +70 分），手册与现场漂了大半天没人拦（靠人眼发现）。
+#: 口径变更时**必须同时改这里与 docs/04**；两处不一致 → 本命令红。
+DEMO_FIGURES = {
+    "words_total": 109320,
+    "points_total": 1133,
+    "words_remainder": 20,
+    "milestones": [100000],
+    "active_borrows": 2,
+    "overdue_count": 1,
+    "available_quota": 28,
+    "vocabulary": 8,
+    "deposit_available": Decimal("1200.00"),
+    "deposit_status": "paid",
+}
+
+
+def count_demo_figures() -> dict:
+    """读演示家长（13800008888）名下 **演示孩** 的手册口径数字（走服务层，与页面同源）。"""
+    from backend.database import SessionLocal
+    from backend.domain.circulation.service import CirculationService
+    from backend.domain.growth.service import GrowthService
+    from backend.domain.identity.models import Child
+    from backend.domain.reading.models import Vocabulary
+
+    db = SessionLocal()
+    try:
+        child = db.query(Child).filter(Child.name == "演示孩", Child.is_deleted == 0).first()
+        if child is None:
+            return {}
+        card = CirculationService(db).child_card(child.id)
+        summary = GrowthService(db).summary(child)
+        return {
+            "words_total": int(summary["words_total"]),
+            "points_total": int(summary["points_total"]),
+            "words_remainder": int(summary["words_remainder"]),
+            "milestones": list(summary["milestones_awarded"]),
+            "active_borrows": int(card["active_borrows"]),
+            "overdue_count": int(card["overdue_count"]),
+            "available_quota": int(card["available_quota"]),
+            "vocabulary": db.query(Vocabulary)
+            .filter(Vocabulary.child_id == child.id, Vocabulary.is_deleted == 0)
+            .count(),
+            "deposit_available": Decimal(str(card["deposit_available"])),
+            "deposit_status": card["deposit_status"],
+        }
+    finally:
+        db.close()
 
 
 def _run(cmd: list[str], check: bool = True) -> int:
@@ -104,17 +158,30 @@ def main() -> int:
         flag = "" if got == expected else f"  ← 期望 {expected}"
         print(f"  {key:12s} {got}{flag}")
 
+    figures = count_demo_figures()
+    print("\n=== 演示孩口径数字（与 docs/04 演示账号表同源；G3）===")
+    for key, expected in DEMO_FIGURES.items():
+        got = figures.get(key)
+        flag = "" if got == expected else f"  ← 期望 {expected}"
+        print(f"  {key:16s} {got}{flag}")
+
     if args.count_only:
         return 0
 
     drifted = {k: (actual.get(k), v) for k, v in CLEAN_BASELINE.items() if actual.get(k) != v}
-    if not drifted:
-        print("\n现场基线 PASS：书目 35 / 家长 3 / 孩子 11 / 活动 4（与 docs/19 一致）")
+    fig_drifted = {k: (figures.get(k), v) for k, v in DEMO_FIGURES.items() if figures.get(k) != v}
+    if not drifted and not fig_drifted:
+        print(
+            "\n现场基线 PASS：书目 35 / 家长 3 / 孩子 11 / 活动 4（与 docs/19 一致）"
+            "\n                演示孩口径 10 项（与 docs/04 一致）✓"
+        )
         return 0
 
     print("\n现场基线 FAIL：", file=sys.stderr)
     for key, (got, expected) in drifted.items():
-        print(f"  {key}: 实测 {got} / 期望 {expected}", file=sys.stderr)
+        print(f"  [表计数] {key}: 实测 {got} / 期望 {expected}", file=sys.stderr)
+    for key, (got, expected) in fig_drifted.items():
+        print(f"  [演示孩] {key}: 实测 {got} / 期望 {expected}", file=sys.stderr)
     if args.no_clean:
         print(
             "提示：本次用了 --no-clean，读数可能只是门禁残留（behave/pytest 各留一批）。"
