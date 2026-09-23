@@ -250,13 +250,15 @@ class GrowthService:
             for n in ConfigService(self.db).get_value("milestone_nodes").split(",")
             if n.strip()
         ]
-        awarded_nodes = [
-            r.node_words
-            for r in self.db.query(MilestoneAward.node_words)
+        # 达成记录连**日期**一起取（2026-09-21）：护照/勋章页要显示"2026-09-21 达成"——
+        # 只有节点数字的话，前端没法表达"什么时候拿到的"（成就感的另一半在时间上）。
+        award_rows = (
+            self.db.query(MilestoneAward.node_words, MilestoneAward.awarded_at)
             .filter(MilestoneAward.child_id == child.id, MilestoneAward.is_deleted == 0)
             .order_by(MilestoneAward.node_words)
             .all()
-        ]
+        )
+        awarded_nodes = [r.node_words for r in award_rows]
         # 词数/本数/积分以流水为唯一事实源（避免 state 与 ledger 漂移）
         agg = (
             self.db.query(
@@ -285,6 +287,9 @@ class GrowthService:
             ),
             "milestone_nodes": nodes,
             "milestones_awarded": awarded_nodes,
+            "milestone_awards": [
+                {"node": r.node_words, "awarded_at": str(r.awarded_at)} for r in award_rows
+            ],
             "is_z_capped": state.level == letters[-1],
         }
 
