@@ -398,6 +398,52 @@ def test_media_census_task_records_report_and_logs_run(db):
     assert row.orphan_files >= 1
 
 
+def test_cron_catchup_after_sleep_or_restart(db):
+    """钟点任务的"迟到"两道保险：宽限 12h（进程只睡了）+ 启动补跑（进程当时不在）。
+
+    2026-09-24 实测：Mac 睡过 08:00，APScheduler 记为 missed 且超过 120s 宽限被丢弃 →
+    当天根本没出报告。这两道保险合起来才让"每天早上出一份报告"站得住。
+    """
+    from apscheduler.schedulers.background import BackgroundScheduler
+
+    from backend.common.notification_models import TaskRunLog
+    from backend.tasks.registry import (
+        CRON_MISFIRE_GRACE_SECONDS,
+        _schedule_cron_catchup,
+        cron_due_today,
+    )
+
+    # ① 宽限足够大（休眠醒来能补）
+    assert CRON_MISFIRE_GRACE_SECONDS >= 3600
+    # ② 判定"今天该跑时刻"的纯逻辑（用固定时刻，不依赖测试运行时的真实钟点）
+    assert cron_due_today("0 8 * * *", datetime(2026, 9, 24, 9, 44)) == datetime(2026, 9, 24, 8, 0)
+    assert cron_due_today("0 8 * * *", datetime(2026, 9, 24, 7, 0)) is None  # 还没到
+    assert cron_due_today("*/5 * * * *", datetime(2026, 9, 24, 9, 44)) is None  # 非固定钟点不补
+
+    # ③ 启动补跑：只有"今天 08:00 已过且今日无成功记录"才补
+    now = datetime.now()
+    if now.hour < 8:
+        pytest.skip("本地时间未过 08:00——补跑语义不存在（判定逻辑已在 ② 用固定时刻覆盖）")
+    db.query(TaskRunLog).delete()
+    db.commit()
+    scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
+    _schedule_cron_catchup(scheduler)
+    assert "media_census-catchup" in {job.id for job in scheduler.get_jobs()}
+
+    scheduler2 = BackgroundScheduler(timezone="Asia/Shanghai")
+    db.add(
+        TaskRunLog(
+            task_name="media_census",
+            started_at=now,
+            status=TaskRunLog.STATUS_SUCCESS,
+            processed=1,
+        )
+    )
+    db.commit()
+    _schedule_cron_catchup(scheduler2)
+    assert "media_census-catchup" not in {job.id for job in scheduler2.get_jobs()}
+
+
 def test_trash_writes_audit_log(db):
     from backend.domain.admin.models import AuditLog
 

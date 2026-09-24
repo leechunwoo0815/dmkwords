@@ -1129,6 +1129,8 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 ### 22.3 盘点报告（每天自动出）
 
 - 任务 `media_census`（分组「系统」，**每天 08:00**）产出一行 `media_censuses`：`files_total`（uploads 文件总数，不含 `.trash`）/ `referenced_total` / `protected_total` / `orphan_files` / `orphan_bytes` / `missing_refs`（引用悬空数）/ `breakdown`（按目录明细 JSON）/ `trigger`（`scheduled` | `manual` | `after_trash` | `after_restore`）。
+- **钟点任务的迟到保险（2026-09-24 实修）**：机器休眠会把钟点任务记成 missed，宽限太小就直接丢弃——实测 Mac 睡过 08:00 后当天**根本没出报告**（日志 `Run time of job ... was missed by 0:04:04`）。两道保险合起来才让"每天早上出报告"站得住：
+  ① `CRON_MISFIRE_GRACE_SECONDS = 12h`（进程一直在、只是睡了 → 醒来补跑）；② **启动补跑** `_schedule_cron_catchup()`（进程当时不在 → 启动后 30 秒补一次，判据 = **当日**该任务无成功记录）。interval 任务仍是 120 秒宽限（高频，补跑无意义）。
 - 管理端「任务看板 → 媒体体检」卡片：**默认只显示一行摘要**（孤儿张数 / 占用 / 统计时间 + 四个按钮），明细与回收站列表**收起在「明细与回收站」里**（2026-09-23 用户反馈："任务看板具体的功能太往下了，要翻好久才能翻到"——把卡片压到一行，让定时任务表回到首屏）：**专员只读**，**仅超管**能移入回收站 / 还原 / 清空回收站。
 - 审计：`media.trash`（detail 含路径清单、字节、原因）、`media.restore`、**`media.purge`**（清空回收站：永久删除数 + 被复检救回并还原的条目）。**定时到期自动清除不写审计**（无人工操作者），只走 `task_run_logs`。
 

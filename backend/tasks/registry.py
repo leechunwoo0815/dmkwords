@@ -297,7 +297,7 @@ def start_scheduler() -> None:
             "id": spec.name,
             "max_instances": 1,
             "coalesce": True,
-            "misfire_grace_time": 120,
+            "misfire_grace_time": CRON_MISFIRE_GRACE_SECONDS if spec.cron_expr else 120,
         }
         if spec.cron_expr:
             # 固定钟点任务（例：媒体体检每天 08:00）——interval 会随每次重启向后漂移
@@ -312,6 +312,7 @@ def start_scheduler() -> None:
         scheduler.add_job(run_task, **job_kwargs)
     scheduler.start()
     _scheduler = scheduler
+    _schedule_cron_catchup(scheduler)
     logger.info("APScheduler started with %d tasks", len(TASKS))
 
 
@@ -320,6 +321,88 @@ def stop_scheduler() -> None:
     if _scheduler is not None:
         _scheduler.shutdown(wait=False)
         _scheduler = None
+
+
+#: cron 任务的"迟到宽限"（秒）。机器休眠会把钟点任务记成 missed，
+#: 超过宽限就被 APScheduler 直接丢弃——2026-09-24 实测：Mac 睡过 08:00，
+#: 08:00 那场媒体体检被漏掉（日志 `Run time of job ... was missed by 0:04:04`），
+#: 于是"每天早上出一份报告"成了空话。给 12 小时：当天醒来/开机还能补上。
+CRON_MISFIRE_GRACE_SECONDS = 12 * 3600
+
+#: 启动补跑延迟（秒）：进程启动时若发现"今天该跑的 cron 还没跑"，等这么久再补。
+CRON_CATCHUP_DELAY_SECONDS = 30
+
+
+def cron_due_today(cron_expr: str, now: datetime) -> datetime | None:
+    """今天的钟点任务应跑时刻；已过则返回该时刻，未到或表达式不支持则 None。
+
+    只解析标准 5 段的第一、二段（分 时）——本项目 cron 全是 `分 时 日 月 周` 的日级任务。
+    """
+    fields = cron_expr.split()
+    if len(fields) != 5:
+        return None
+    try:
+        minute, hour = int(fields[0]), int(fields[1])
+    except ValueError:
+        return None
+    if "*" in fields[0] or "*" in fields[1] or "," in fields[0] or "/" in fields[0]:
+        return None  # 非"每天固定钟点"形态：交给调度器，不做补跑判断
+    due = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    return due if now >= due else None
+
+
+def _schedule_cron_catchup(scheduler) -> None:
+    """启动补跑：cron 任务今天该跑而没跑（休眠错过 / 进程当时不在）→ 启动后补一次。
+
+    与 `CRON_MISFIRE_GRACE_SECONDS` 互补：宽限管"进程一直在、只睡了"，
+    本函数管"进程当时根本没起来"（开发机天天 restart 就是这种）。判据是**当日**是否
+    已有该任务的成功记录（TaskRunLog），查库失败只告警不阻断启动。
+    """
+    from datetime import timedelta
+
+    now = datetime.now()
+    for spec in TASKS.values():
+        if not spec.cron_expr:
+            continue
+        due = cron_due_today(spec.cron_expr, now)
+        if due is None:
+            continue
+        try:
+            from backend.common.notification_models import TaskRunLog
+            from backend.database import get_session
+
+            session = get_session()
+            try:
+                done = (
+                    session.query(TaskRunLog)
+                    .filter(
+                        TaskRunLog.task_name == spec.name,
+                        TaskRunLog.status == TaskRunLog.STATUS_SUCCESS,
+                        TaskRunLog.started_at >= due,
+                    )
+                    .first()
+                )
+            finally:
+                session.close()
+        except Exception as exc:  # noqa: BLE001 — 启动期不因查库失败而崩
+            logger.warning("cron 补跑检查跳过（查库失败）: %s", exc)
+            continue
+        if done:
+            continue
+        scheduler.add_job(
+            run_task,
+            trigger="date",
+            run_date=now + timedelta(seconds=CRON_CATCHUP_DELAY_SECONDS),
+            args=[spec.name],
+            id=f"{spec.name}-catchup",
+            max_instances=1,
+        )
+        logger.info(
+            "cron 任务 %s 今日 %s 未跑（休眠或进程当时不在），%d 秒后补跑",
+            spec.name,
+            due.strftime("%H:%M"),
+            CRON_CATCHUP_DELAY_SECONDS,
+        )
 
 
 def _schedule_text(spec: TaskSpec) -> str:
