@@ -142,3 +142,48 @@ class ChildCardResponse(ChildWithParentResponse):
     active_borrows: int = Field(0, description="当前在借数")
     overdue_count: int = Field(0, description="逾期未还数")
     deposit_status: str | None = Field(None, description="押金状态（WM4 填充）")
+
+
+# ---------- 支付对账与回调演练（WM12-B，2026-10-08） ----------
+
+
+class PaymentReconcileDiff(BaseSchema):
+    """一条差异（对账只报不改：清单是给人看的证据）。"""
+
+    kind: str = Field(..., description="差异类型（bill_only/local_only/amount_mismatch/...）")
+    ref: str = Field("", description="定位锚点（订单号/退款单号）")
+    message: str = Field("", description="人话说明")
+
+
+class PaymentReconcileReport(BaseSchema):
+    """一轮对账的结果（local=本地一致性审计 / wechat=微信账单比对）。"""
+
+    id: int
+    bill_date: str
+    source: str = Field(..., description="local/wechat")
+    status: str = Field(..., description="ok/diff/skipped/failed")
+    checked_count: int = 0
+    diff_count: int = 0
+    detail: list[PaymentReconcileDiff] = Field(default_factory=list)
+    note: str = Field("", description="跳过/失败原因（status=skipped|failed 时看这里）")
+    trigger: str = Field("manual", description="scheduled/manual")
+    finished_at: str = ""
+
+
+class PaymentReconcileRunResponse(BaseSchema):
+    bill_date: str
+    reports: list[PaymentReconcileReport] = Field(default_factory=list)
+    diff_total: int = 0
+
+
+class PaymentReconcileListResponse(BaseSchema):
+    items: list[PaymentReconcileReport] = Field(default_factory=list)
+
+
+class PaymentSimulateRefundResponse(BaseSchema):
+    """退款回调演练结果（仅 mock 通道）。"""
+
+    http_status: int
+    response: dict
+    out_refund_no: str
+    refund_request_id: int

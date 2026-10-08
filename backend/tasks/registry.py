@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -147,8 +147,60 @@ def _media_census(db: Session) -> int:
     return int(report["orphan_files"])
 
 
-# 16 项定时任务（WM13-4 新增 transfer_expiring_warn 后 12→13；WM14-B 新增
+def _wechat_cert_refresh(db: Session) -> int:
+    """微信平台证书轮换（WM12-A；上线前审查 P2-4）。
+
+    微信平台证书有效期约 1 年，到期后**回调验签全部失败**（钱照收、单不认——最坏的一种故障）。
+    非微信支付通道（mock / 未开线上支付）→ 0，纯 no-op。
+    "刷不到"与"不用刷"必须分开：证书缺失、或 30 天内到期而刷新失败 → **抛错**，
+    让任务在看板上变红，而不是安静地返回 0。
+    """
+    from backend.common.async_utils import run_coro
+    from backend.config import get_settings
+
+    settings = get_settings()
+    if not settings.PAYMENT_ENABLED:
+        return 0
+    if settings.PAYMENT_PROVIDER.strip().lower() != "wechat":
+        return 0
+    from backend.integrations.wechat.pay_v3 import WeChatPayV3
+
+    gateway = WeChatPayV3()
+    if run_coro(gateway.refresh_platform_cert()):
+        return 1
+    cert = getattr(gateway, "platform_cert", None)
+    if cert is None:
+        raise RuntimeError(
+            "微信平台证书缺失且自动下载失败——回调验签会全部失败"
+            "（检查 WECHAT_PRIVATE_KEY_PATH / WECHAT_API_KEY_V3 / 服务器出网）"
+        )
+    expiry = cert.not_valid_after
+    now = datetime.now(expiry.tzinfo) if expiry.tzinfo else datetime.now()
+    if expiry <= now + timedelta(days=30):
+        raise RuntimeError(
+            f"微信平台证书将于 {expiry} 到期而自动轮换未成功——请人工下载新证书并更新配置"
+        )
+    return 0
+
+
+def _payment_reconcile(db: Session) -> int:
+    """每日资金对账（WM12-B；docs/09 WM12-B §一.5/§一.6）。
+
+    返回值 = **差异笔数**（任务看板上那个数：0 才该是绿色的）。
+    本地一致性审计必跑；微信账单比对只在真通道下跑（mock/未开启 → 记 skipped，不算失败）。
+    """
+    from backend.domain.identity.payment_models import PaymentReconciliation
+    from backend.domain.identity.payment_reconcile_service import PaymentReconcileService
+
+    result = PaymentReconcileService(db).run(
+        trigger=PaymentReconciliation.TRIGGER_SCHEDULED,
+    )
+    return int(result["diff_total"])
+
+
+# 18 项定时任务（WM13-4 新增 transfer_expiring_warn 后 12→13；WM14-B 新增
 # circle_rank_snapshot / circle_image_cleanup 后 13→15；2026-09-23 新增 media_census 后 15→16；
+# 2026-10-08 WM12-A 新增 wechat_cert_refresh 后 16→17；同日 WM12-B 新增 payment_reconcile 后 17→18；
 # 周月报定时生成不在本批）
 TASKS: dict[str, TaskSpec] = {
     "member_expire_check": TaskSpec(
@@ -201,6 +253,26 @@ TASKS: dict[str, TaskSpec] = {
         86400,
         _media_census,
         cron_expr="0 8 * * *",
+    ),
+    # 微信支付（WM12-A）：平台证书轮换——有效期约 1 年，到期验签全失败（审查 P2-4）
+    # 固定凌晨钟点跑：避开白天出网高峰，也让"证书快到期"在当天早上就被人看见
+    "wechat_cert_refresh": TaskSpec(
+        "wechat_cert_refresh",
+        "微信平台证书轮换",
+        "系统",
+        86400,
+        _wechat_cert_refresh,
+        cron_expr="0 4 * * *",
+    ),
+    # 每日资金对账（WM12-B）：本地一致性审计 + 微信账单比对；返回值=差异笔数（0 才是绿的）
+    # 03:30 跑：商户平台账单通常凌晨出，且早于 04:00 的证书轮换
+    "payment_reconcile": TaskSpec(
+        "payment_reconcile",
+        "支付对账（本地审计+微信账单）",
+        "资金",
+        86400,
+        _payment_reconcile,
+        cron_expr="30 3 * * *",
     ),
 }
 

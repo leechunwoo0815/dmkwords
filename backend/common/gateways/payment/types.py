@@ -48,8 +48,16 @@ class PaymentRefundRequest:
 
 @dataclass
 class PaymentRefundResponse:
+    """退款受理结果。
+
+    ⚠️ `success=True` 只代表**微信受理了**，不代表钱已退回：微信退款是异步的，
+    必须再看 `state`（SUCCESS/CLOSED/ABNORMAL/PROCESSING）——`PROCESSING` 时业务侧
+    要留在"退款执行中"，等退款结果通知（2026-10-08 WM12-B：钱没到账不能显示已退）。
+    """
+
     success: bool
     refund_id: str = ""
+    state: str = ""
     error_message: str = ""
 
 

@@ -93,7 +93,13 @@ class MockPaymentGateway(PaymentGateway):
             request.reason or "用户申请退款",
         )
 
-        return PaymentRefundResponse(success=True, refund_id=refund_id)
+        return PaymentRefundResponse(
+            success=True,
+            refund_id=refund_id,
+            # mock 通道即时退（与 supports_instant_payment 同语义）：业务层据此直接落"已退款"；
+            # 真通道会回 PROCESSING，那时要留在"执行中"等退款结果通知
+            state="SUCCESS",
+        )
 
     async def verify_callback_signature(
         self, body: str, signature: str, timestamp: str, nonce: str
@@ -112,7 +118,10 @@ class MockPaymentGateway(PaymentGateway):
                 out_trade_no=data.get("out_trade_no", ""),
                 out_refund_no=data.get("out_refund_no", ""),
                 transaction_id=data.get("transaction_id", f"mock_txn_{uuid.uuid4().hex[:16]}"),
-                trade_state="SUCCESS",
+                # 2026-10-08 WM12-A：trade_state 从报文取（默认 SUCCESS）——验收 S4/S6 要演练
+                # 「非成功状态不入账」「退款单忽略支付回调」，写死 SUCCESS 就没法演练了
+                trade_state=data.get("trade_state", "SUCCESS"),
+                refund_status=data.get("refund_status", ""),
                 amount=amount,
                 raw_body=ciphertext,
             )

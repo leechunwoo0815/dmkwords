@@ -19,7 +19,7 @@ from backend.common.admin_notification_models import AdminNotification
 from backend.common.admin_notifications import AdminNotifyService
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
 from backend.domain.catalog.audit_events import publish_audit
-from backend.domain.identity import refund_rules
+from backend.domain.identity import refund_online, refund_rules
 from backend.domain.identity.models import (
     Child,
     Order,
@@ -278,47 +278,7 @@ class RefundService:
         self.db.commit()
         return req
 
-    def my_list(self, child: Child) -> list[dict]:
-        rows = (
-            self.db.query(RefundRequest)
-            .filter(RefundRequest.child_id == child.id, RefundRequest.is_deleted == 0)
-            .order_by(RefundRequest.id.desc())
-            .all()
-        )
-        return [self._view(r) for r in rows]
-
-    def _view(self, r: RefundRequest) -> dict:
-        return {
-            "id": r.id,
-            "kind": r.kind,
-            "order_id": r.order_id,
-            "child_id": r.child_id,
-            "amount": str(r.amount),
-            "reason": r.reason,
-            "status": r.status,
-            "review_remark": r.review_remark,
-            "created_at": str(r.created_at),
-        }
-
     # ---------- 管理端 ----------
-    def admin_list(self, status: str | None = None) -> list[dict]:
-        q = self.db.query(RefundRequest).filter(RefundRequest.is_deleted == 0)
-        if status:
-            q = q.filter(RefundRequest.status == status)
-        rows = q.order_by(RefundRequest.id.desc()).limit(200).all()
-        out = []
-        for r in rows:
-            v = self._view(r)
-            child = self.db.query(Child).filter(Child.id == r.child_id).first()
-            v["child_name"] = child.name if child else f"#{r.child_id}"
-            if r.order_id:
-                order = self.db.query(Order).filter(Order.id == r.order_id).first()
-                if order:
-                    v["order_no"] = order.order_no
-                    v["order_type"] = order.order_type
-                    v["pay_method"] = order.pay_method
-            out.append(v)
-        return out
 
     def review(self, admin, request_id: int, approve: bool, remark: str) -> dict:
         """超管审核（R-308）：approve → approved（待执行）；拒绝 → rejected。
@@ -416,8 +376,7 @@ class RefundService:
         return {"id": req.id, "status": req.status}
 
     def execute(self, admin, request_id: int, success: bool, remark: str) -> dict:
-        """执行退款（R-308：approved/failed → processing → refunded/failed）。
-        线下人工打款登记凭证（remark）即完成；失败可重试。"""
+        """执行退款（R-308：approved/failed → processing → refunded/failed）；线上单自动原路退回。"""
         req = (
             self.db.query(RefundRequest)
             .filter(RefundRequest.id == request_id, RefundRequest.is_deleted == 0)
@@ -457,6 +416,40 @@ class RefundService:
         req.status = RefundRequest.STATUS_PROCESSING
         self.db.flush()
 
+        # WM12-B：渠道跟着**原单**走——线上支付的原路退回，线下收款的照旧人工打款登记
+        handled, channel_note = refund_online.route_online(
+            self.db,
+            admin,
+            req,
+            remark=remark,
+            manual_override=manual_override,
+            finalize=self._finalize_refund,
+        )
+        if handled:
+            return {"id": req.id, "status": req.status, "channel": "wechat"}
+        self._finalize_refund(
+            admin,
+            req,
+            success=success,
+            remark=remark,
+            manual_override=manual_override,
+            channel="offline" if not channel_note else "offline_manual",
+            channel_note=channel_note,
+        )
+        return {"id": req.id, "status": req.status, "channel": "offline"}
+
+    def _finalize_refund(
+        self,
+        admin,
+        req: RefundRequest,
+        *,
+        success: bool,
+        remark: str,
+        manual_override: bool,
+        channel: str,
+        channel_note: str = "",
+    ) -> None:
+        """退款落终态**单一链路**：人工打款与微信原路回调共用；调用方不 commit，本方法内 commit。"""
         if success:
             req.assert_transition(RefundRequest.STATUS_REFUNDED)
             req.status = RefundRequest.STATUS_REFUNDED
@@ -519,12 +512,16 @@ class RefundService:
             admin=admin,
             action="refund.execute",
             target_type="refund_request",
-            target_id=str(request_id),
+            target_id=str(req.id),
             detail={
                 "success": success,
                 "amount": str(req.amount),
                 "kind": req.kind,
                 "manual_override": manual_override,
+                "channel": channel,
+                "gateway_note": channel_note,
+                "out_refund_no": req.out_refund_no or "",
+                "gateway_refund_id": req.gateway_refund_id or "",
             },
             reason=remark or ("退款执行成功" if success else "退款执行失败"),
         )
@@ -562,9 +559,8 @@ class RefundService:
         # 推进失败 → 整体回滚（退款单不落 refunded），不再半提交。
         if success:
             self.db.flush()  # P1-F9：autoflush=False——先刷本事务修改（refunded），聚合推进的查询才可见
-            self._advance_withdrawal(request_id)
+            self._advance_withdrawal(req.id)
         self.db.commit()
-        return {"id": req.id, "status": req.status}
 
     def _complete_refund_withdrawal(self, admin, req: RefundRequest, order: Order) -> None:
         """会员费退款成功（R-310）：child → withdrawn + 自动发起押金退款。

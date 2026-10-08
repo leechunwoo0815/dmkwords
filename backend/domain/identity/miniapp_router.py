@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
 from backend.database import get_db
+from backend.domain.identity import refund_queries
 from backend.domain.identity.auth import child_of_parent, get_current_parent
 from backend.domain.identity.observation_service import ObservationReportService
 from backend.domain.identity.transfer_service import TransferService
@@ -96,6 +97,55 @@ def my_orders(child_id: int, auth: Any = Depends(get_current_parent)):
     return OrderService(db).my_orders(child_id, parent.id)
 
 
+# ---------- 线上支付（WM12-A：下单 / 价格 / 发起支付） ----------
+class OnlineOrderRequest(BaseSchema):
+    child_id: int
+    order_type: str
+
+
+@router.get("/payment/plans")
+def payment_plans(child_id: int, auth: Any = Depends(get_current_parent)):
+    """购买页价格（配置下发，前端零硬编码金额）；`payment_enabled=false` 时前端不渲染支付入口。"""
+    from backend.domain.identity.payment_service import PaymentService
+
+    parent, db = auth
+    child = child_of_parent(db, parent.id, child_id)
+    return PaymentService(db).plans(parent, child)
+
+
+@router.post("/orders")
+def create_online_order(body: OnlineOrderRequest, auth: Any = Depends(get_current_parent)):
+    """家长端在线下单（观察期费/年费/99 元首场/押金）→ 订单进待支付，随后调 `pay` 拉起微信支付。
+
+    只建单不收钱：金额一律服务端按配置重算（`OrderService.price_member_order` 单一来源）。
+    """
+    from backend.domain.identity.payment_service import PaymentService
+
+    parent, db = auth
+    child = child_of_parent(db, parent.id, body.child_id)
+    order = PaymentService(db).create_online_order(parent, child, body.order_type)
+    return {
+        "id": order.id,
+        "order_no": order.order_no,
+        "order_type": order.order_type,
+        "amount": str(order.amount),
+        "status": order.status,
+    }
+
+
+@router.post("/orders/{order_id}/pay", dependencies=[Depends(rate_limit(10, 60))])
+def pay_order(order_id: int, auth: Any = Depends(get_current_parent)):
+    """发起线上支付（三段式：先落状态→调网关→锁内复核）。
+
+    返回 `pay_params` 供小程序 `wx.requestPayment` 拉起；mock 通道 `instant_paid=true`
+    （已即时到账，端上不用再拉起）。重复点按安全：幂等键=订单号（`already_paid=true`）。
+    """
+    from backend.domain.identity.payment_service import PaymentService
+
+    parent, db = auth
+    return PaymentService(db).prepay(parent, order_id)
+
+
 # ---------- WM11 消息中心（家长端站内消息） ----------
 
 
@@ -154,7 +204,7 @@ def refund_apply(body: RefundApplyRequest, auth: Any = Depends(get_current_paren
 def refund_list(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child = child_of_parent(db, parent.id, child_id)
-    return RefundService(db).my_list(child)
+    return refund_queries.my_list(db, child)
 
 
 class RefundCancelRequest(BaseSchema):

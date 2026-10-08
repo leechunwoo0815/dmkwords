@@ -2749,6 +2749,25 @@
         "title": "NotificationReadStatusRequest",
         "type": "object"
       },
+      "OnlineOrderRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "child_id": {
+            "title": "Child Id",
+            "type": "integer"
+          },
+          "order_type": {
+            "title": "Order Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "child_id",
+          "order_type"
+        ],
+        "title": "OnlineOrderRequest",
+        "type": "object"
+      },
       "OrderConfirmRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3430,6 +3449,221 @@
         "title": "ParentWithStatsResponse",
         "type": "object"
       },
+      "PaymentReconcileDiff": {
+        "additionalProperties": false,
+        "description": "一条差异（对账只报不改：清单是给人看的证据）。",
+        "properties": {
+          "kind": {
+            "description": "差异类型（bill_only/local_only/amount_mismatch/...）",
+            "title": "Kind",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "人话说明",
+            "title": "Message",
+            "type": "string"
+          },
+          "ref": {
+            "default": "",
+            "description": "定位锚点（订单号/退款单号）",
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "PaymentReconcileDiff",
+        "type": "object"
+      },
+      "PaymentReconcileListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentReconcileReport"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "title": "PaymentReconcileListResponse",
+        "type": "object"
+      },
+      "PaymentReconcileReport": {
+        "additionalProperties": false,
+        "description": "一轮对账的结果（local=本地一致性审计 / wechat=微信账单比对）。",
+        "properties": {
+          "bill_date": {
+            "title": "Bill Date",
+            "type": "string"
+          },
+          "checked_count": {
+            "default": 0,
+            "title": "Checked Count",
+            "type": "integer"
+          },
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentReconcileDiff"
+            },
+            "title": "Detail",
+            "type": "array"
+          },
+          "diff_count": {
+            "default": 0,
+            "title": "Diff Count",
+            "type": "integer"
+          },
+          "finished_at": {
+            "default": "",
+            "title": "Finished At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "note": {
+            "default": "",
+            "description": "跳过/失败原因（status=skipped|failed 时看这里）",
+            "title": "Note",
+            "type": "string"
+          },
+          "source": {
+            "description": "local/wechat",
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "description": "ok/diff/skipped/failed",
+            "title": "Status",
+            "type": "string"
+          },
+          "trigger": {
+            "default": "manual",
+            "description": "scheduled/manual",
+            "title": "Trigger",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "bill_date",
+          "source",
+          "status"
+        ],
+        "title": "PaymentReconcileReport",
+        "type": "object"
+      },
+      "PaymentReconcileRunResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "bill_date": {
+            "title": "Bill Date",
+            "type": "string"
+          },
+          "diff_total": {
+            "default": 0,
+            "title": "Diff Total",
+            "type": "integer"
+          },
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentReconcileReport"
+            },
+            "title": "Reports",
+            "type": "array"
+          }
+        },
+        "required": [
+          "bill_date"
+        ],
+        "title": "PaymentReconcileRunResponse",
+        "type": "object"
+      },
+      "PaymentRefundSimulateRequest": {
+        "additionalProperties": false,
+        "description": "退款回调演练参数（仅 mock 通道）：`out_refund_no` 形如 `RF{退款单id}-1-1`。",
+        "properties": {
+          "out_refund_no": {
+            "title": "Out Refund No",
+            "type": "string"
+          },
+          "refund_status": {
+            "default": "SUCCESS",
+            "title": "Refund Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "out_refund_no"
+        ],
+        "title": "PaymentRefundSimulateRequest",
+        "type": "object"
+      },
+      "PaymentSimulateRefundResponse": {
+        "additionalProperties": false,
+        "description": "退款回调演练结果（仅 mock 通道）。",
+        "properties": {
+          "http_status": {
+            "title": "Http Status",
+            "type": "integer"
+          },
+          "out_refund_no": {
+            "title": "Out Refund No",
+            "type": "string"
+          },
+          "refund_request_id": {
+            "title": "Refund Request Id",
+            "type": "integer"
+          },
+          "response": {
+            "additionalProperties": true,
+            "title": "Response",
+            "type": "object"
+          }
+        },
+        "required": [
+          "http_status",
+          "response",
+          "out_refund_no",
+          "refund_request_id"
+        ],
+        "title": "PaymentSimulateRefundResponse",
+        "type": "object"
+      },
+      "PaymentSimulateRequest": {
+        "additionalProperties": false,
+        "description": "演练回调参数（仅 mock 通道）：留空 amount=用订单金额，transaction_id=每次随机。",
+        "properties": {
+          "amount": {
+            "default": "",
+            "title": "Amount",
+            "type": "string"
+          },
+          "order_no": {
+            "title": "Order No",
+            "type": "string"
+          },
+          "trade_state": {
+            "default": "SUCCESS",
+            "title": "Trade State",
+            "type": "string"
+          },
+          "transaction_id": {
+            "default": "",
+            "title": "Transaction Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_no"
+        ],
+        "title": "PaymentSimulateRequest",
+        "type": "object"
+      },
       "ProgressReportRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3636,6 +3870,24 @@
           }
         },
         "title": "ReadNotificationsRequest",
+        "type": "object"
+      },
+      "ReconcileRunRequest": {
+        "additionalProperties": false,
+        "description": "跑一轮对账：留空 bill_date=今天；with_wechat=false 只跑本地一致性审计。",
+        "properties": {
+          "bill_date": {
+            "default": "",
+            "title": "Bill Date",
+            "type": "string"
+          },
+          "with_wechat": {
+            "default": true,
+            "title": "With Wechat",
+            "type": "boolean"
+          }
+        },
+        "title": "ReconcileRunRequest",
         "type": "object"
       },
       "RecordItemResponse": {
@@ -10122,6 +10374,196 @@
         ]
       }
     },
+    "/api/admin/payments/reconcile": {
+      "post": {
+        "description": "手动跑一轮资金对账（超管）：本地一致性审计 + 微信账单比对（真通道时）。",
+        "operationId": "admin_run_reconcile_api_admin_payments_reconcile_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentReconcileRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Admin Run Reconcile",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/admin/payments/reconciliations": {
+      "get": {
+        "description": "最近的对账报告（专员可读：这是\"账对不对\"的公开看板，不是敏感资金数据）。",
+        "operationId": "admin_list_reconciliations_api_admin_payments_reconciliations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentReconcileListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Admin List Reconciliations",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/admin/payments/simulate-callback": {
+      "post": {
+        "description": "超管演练微信支付回调（**仅 mock 支付通道可用**）：重复回调 / 金额篡改 / 非成功状态。\n\n为什么需要它：商户号未到位时无法真机验签，但\"重复回调不重复入账\"\"金额不符拒绝\"\n这类判据必须有人能现场演练（判据见 docs/09 WM12-A §三 / docs/04 WM12 步骤 4-6）。",
+        "operationId": "admin_simulate_payment_callback_api_admin_payments_simulate_callback_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentSimulateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Admin Simulate Payment Callback",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/admin/payments/simulate-refund-callback": {
+      "post": {
+        "description": "超管演练微信退款结果通知（**仅 mock 支付通道可用**）：重复通知 / 迟到的失败通知。\n\n判据见 docs/09 WM12-B §三 / docs/04 WM12 步骤 8-10。",
+        "operationId": "admin_simulate_refund_callback_api_admin_payments_simulate_refund_callback_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentRefundSimulateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentSimulateRefundResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Admin Simulate Refund Callback",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
     "/api/admin/questions/{question_id}": {
       "delete": {
         "operationId": "delete_question_api_admin_questions__question_id__delete",
@@ -13981,6 +14423,105 @@
         "tags": [
           "identity-miniapp"
         ]
+      },
+      "post": {
+        "description": "家长端在线下单（观察期费/年费/99 元首场/押金）→ 订单进待支付，随后调 `pay` 拉起微信支付。\n\n只建单不收钱：金额一律服务端按配置重算（`OrderService.price_member_order` 单一来源）。",
+        "operationId": "create_online_order_api_miniapp_orders_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnlineOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Online Order",
+        "tags": [
+          "identity-miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/orders/{order_id}/pay": {
+      "post": {
+        "description": "发起线上支付（三段式：先落状态→调网关→锁内复核）。\n\n返回 `pay_params` 供小程序 `wx.requestPayment` 拉起；mock 通道 `instant_paid=true`\n（已即时到账，端上不用再拉起）。重复点按安全：幂等键=订单号（`already_paid=true`）。",
+        "operationId": "pay_order_api_miniapp_orders__order_id__pay_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "title": "Order Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pay Order",
+        "tags": [
+          "identity-miniapp"
+        ]
       }
     },
     "/api/miniapp/parent/profile": {
@@ -14080,6 +14621,56 @@
         "summary": "Passport",
         "tags": [
           "growth-miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/payment/plans": {
+      "get": {
+        "description": "购买页价格（配置下发，前端零硬编码金额）；`payment_enabled=false` 时前端不渲染支付入口。",
+        "operationId": "payment_plans_api_miniapp_payment_plans_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "child_id",
+            "required": true,
+            "schema": {
+              "title": "Child Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Payment Plans",
+        "tags": [
+          "identity-miniapp"
         ]
       }
     },
@@ -15479,6 +16070,68 @@
         "summary": "Withdrawal Settlement",
         "tags": [
           "identity-miniapp"
+        ]
+      }
+    },
+    "/api/pay/wechat/notify": {
+      "post": {
+        "description": "微信支付结果通知：验签 → 解密 → 金额比对 → 流水号查重 → 幂等入账。\n\n处理细则（三层守卫，模式手册 P3）见 `backend/domain/identity/payment_service.py`。",
+        "operationId": "wechat_pay_notify_api_pay_wechat_notify_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Wechatpay-Signature",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Wechatpay-Signature",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Wechatpay-Timestamp",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Wechatpay-Timestamp",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Wechatpay-Nonce",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Wechatpay-Nonce",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Wechat Pay Notify",
+        "tags": [
+          "payment"
         ]
       }
     },

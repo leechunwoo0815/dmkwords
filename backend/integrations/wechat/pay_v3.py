@@ -23,6 +23,7 @@ V3 优势：
 """
 
 import base64
+import gzip
 import json
 import logging
 import time
@@ -314,7 +315,64 @@ class WeChatPayV3(PaymentGateway):
                 error_msg = f"HTTP {resp.status_code}: {resp.text[:200]}"
             return PaymentRefundResponse(success=False, error_message=error_msg)
         data = resp.json()
-        return PaymentRefundResponse(success=True, refund_id=data.get("refund_id", ""))
+        # WM12-B：受理 ≠ 成功——微信返回 status（SUCCESS/PROCESSING/CLOSED/ABNORMAL），
+        # 业务层按它决定"落已退款"还是"留在执行中等回调"（钱没到账不能显示已退）
+        return PaymentRefundResponse(
+            success=True,
+            refund_id=data.get("refund_id", ""),
+            state=str(data.get("status", "") or ""),
+        )
+
+    async def download_bill(self, bill_date: str, bill_type: str = "ALL") -> str:
+        """下载微信对账单（WM12-B 对账用）→ 返回 CSV 文本。
+
+        两步（微信 V3 规定）：① 申请下载 → 拿 `download_url` + `hash_value`；
+        ② 拉那个临时 URL 拿 gzip 压缩的账单，**先核对 SHA256** 再解压——
+        对账数据自己都不校验完整性，对出来的差异没法信。
+        当日无账单时微信返回 404（NO_BILL_EXIST）→ 抛 PaymentError，由调用方记 `skipped`。
+        """
+        url = f"/v3/bill/tradebill?bill_date={bill_date}&bill_type={bill_type}"
+        async with httpx.AsyncClient(base_url=self.BASE_URL, timeout=30) as client:
+            resp = await client.get(
+                url,
+                headers={
+                    "Authorization": self._build_auth_header("GET", url),
+                    "Accept": "application/json",
+                },
+            )
+            if resp.status_code != 200:
+                try:
+                    error_msg = resp.json().get("message", "未知错误")
+                    code = resp.json().get("code", "")
+                except Exception:
+                    error_msg = f"HTTP {resp.status_code}: {resp.text[:200]}"
+                    code = ""
+                raise PaymentError(f"微信对账单下载失败: {code or error_msg}".strip())
+
+            meta = resp.json()
+            download_url = meta.get("download_url", "")
+            if not download_url:
+                raise PaymentError("微信对账单下载失败: 响应缺少 download_url")
+            file_resp = await client.get(download_url, timeout=60)
+
+        if file_resp.status_code != 200:
+            raise PaymentError(f"微信对账单文件下载失败: HTTP {file_resp.status_code}")
+
+        raw = file_resp.content
+        expected_hash = (meta.get("hash_value") or "").strip().upper()
+        if expected_hash and meta.get("hash_type", "SHA256").upper() == "SHA256":
+            import hashlib
+
+            got = hashlib.sha256(raw).hexdigest().upper()
+            if got != expected_hash:
+                raise PaymentError("微信对账单哈希校验失败（文件可能被篡改或下载不完整）")
+
+        # 账单是 gzip 流；若不是（部分环境直接给明文 CSV）则原样解码
+        try:
+            text = gzip.decompress(raw).decode("utf-8")
+        except OSError:
+            text = raw.decode("utf-8")
+        return text
 
     async def refresh_platform_cert(self) -> bool:
         """从微信 API 下载最新平台证书

@@ -284,6 +284,8 @@ def test_production_rejects_mock_sms_gateway():
         WECHAT_APP_SECRET="sk",
         LOGIN_DEV_CODE="",
         CORS_ORIGINS="https://admin.example.com",
+        # 本用例只考短信通道：线上支付关掉，免得支付四件套校验掺进来（另有专门用例）
+        PAYMENT_ENABLED=False,
     )
     with pytest.raises(RuntimeError) as exc:
         Settings(SMS_ENABLED=True, SMS_PROVIDER="mock", **base).validate_production()

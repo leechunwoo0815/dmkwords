@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema, PaginatedResponse
 from backend.database import get_db
+from backend.domain.identity import refund_queries
 from backend.domain.identity.observation_service import ObservationReportService
 from backend.domain.identity.schemas import (
     ChildCreateRequest,
@@ -21,6 +22,9 @@ from backend.domain.identity.schemas import (
     ParentResponse,
     ParentUpdateRequest,
     ParentWithStatsResponse,
+    PaymentReconcileListResponse,
+    PaymentReconcileRunResponse,
+    PaymentSimulateRefundResponse,
     VoucherUploadResponse,
 )
 from backend.domain.identity.service import ChildService, OrderService, ParentService
@@ -354,7 +358,7 @@ def admin_refund_list(
     db: Session = Depends(get_db),
 ):
     """退款申请列表（订单类 + 押金类统一，超管逐单审）。"""
-    return RefundService(db).admin_list(status)
+    return refund_queries.admin_list(db, status)
 
 
 @router.post("/refund-requests/{request_id}/review")
@@ -431,6 +435,101 @@ def admin_transfer_review(
     db: Session = Depends(get_db),
 ):
     return TransferService(db).review(admin, request_id, body.approve, body.remark)
+
+
+class PaymentSimulateRequest(BaseSchema):
+    """演练回调参数（仅 mock 通道）：留空 amount=用订单金额，transaction_id=每次随机。"""
+
+    order_no: str
+    amount: str = ""
+    trade_state: str = "SUCCESS"
+    transaction_id: str = ""
+
+
+@router.post("/payments/simulate-callback")
+def admin_simulate_payment_callback(
+    body: PaymentSimulateRequest,
+    admin: Any = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    """超管演练微信支付回调（**仅 mock 支付通道可用**）：重复回调 / 金额篡改 / 非成功状态。
+
+    为什么需要它：商户号未到位时无法真机验签，但"重复回调不重复入账""金额不符拒绝"
+    这类判据必须有人能现场演练（判据见 docs/09 WM12-A §三 / docs/04 WM12 步骤 4-6）。
+    """
+    from backend.domain.identity.payment_service import PaymentService
+
+    return PaymentService(db).simulate_callback(
+        admin,
+        body.order_no,
+        amount=body.amount,
+        trade_state=body.trade_state,
+        transaction_id=body.transaction_id,
+    )
+
+
+class PaymentRefundSimulateRequest(BaseSchema):
+    """退款回调演练参数（仅 mock 通道）：`out_refund_no` 形如 `RF{退款单id}-1-1`。"""
+
+    out_refund_no: str
+    refund_status: str = "SUCCESS"
+
+
+@router.post("/payments/simulate-refund-callback", response_model=PaymentSimulateRefundResponse)
+def admin_simulate_refund_callback(
+    body: PaymentRefundSimulateRequest,
+    admin: Any = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    """超管演练微信退款结果通知（**仅 mock 支付通道可用**）：重复通知 / 迟到的失败通知。
+
+    判据见 docs/09 WM12-B §三 / docs/04 WM12 步骤 8-10。
+    """
+    from backend.domain.identity.payment_service import PaymentService
+
+    return PaymentService(db).simulate_refund_callback(
+        admin, body.out_refund_no, refund_status=body.refund_status
+    )
+
+
+class ReconcileRunRequest(BaseSchema):
+    """跑一轮对账：留空 bill_date=今天；with_wechat=false 只跑本地一致性审计。"""
+
+    bill_date: str = ""
+    with_wechat: bool = True
+
+
+@router.post("/payments/reconcile", response_model=PaymentReconcileRunResponse)
+def admin_run_reconcile(
+    body: ReconcileRunRequest,
+    admin: Any = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    """手动跑一轮资金对账（超管）：本地一致性审计 + 微信账单比对（真通道时）。"""
+    from datetime import date as _date
+
+    from backend.domain.identity.payment_models import PaymentReconciliation
+    from backend.domain.identity.payment_reconcile_service import PaymentReconcileService
+
+    day = _date.fromisoformat(body.bill_date) if body.bill_date else _date.today()
+    return PaymentReconcileService(db).run(
+        bill_date=day,
+        with_wechat=body.with_wechat,
+        trigger=PaymentReconciliation.TRIGGER_MANUAL,
+        actor=admin,
+    )
+
+
+@router.get("/payments/reconciliations", response_model=PaymentReconcileListResponse)
+def admin_list_reconciliations(
+    limit: int = Query(10, ge=1, le=50),
+    admin: Any = Depends(require_perm("dashboard.view")),
+    db: Session = Depends(get_db),
+):
+    """最近的对账报告（专员可读：这是"账对不对"的公开看板，不是敏感资金数据）。"""
+    from backend.domain.identity.payment_reconcile_service import PaymentReconcileService
+
+    return {"items": PaymentReconcileService(db).latest(limit)}
 
 
 @router.post("/children/{child_id}/observation-reports")

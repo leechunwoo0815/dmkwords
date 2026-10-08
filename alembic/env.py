@@ -45,6 +45,7 @@ from backend.domain.identity.models import (  # noqa: E402, F401
     TransferRequest,
     WithdrawalRequest,
 )
+from backend.domain.identity.payment_models import PaymentReconciliation  # noqa: E402, F401
 from backend.domain.reading.models import (  # noqa: E402, F401
     CheckIn,
     DictionaryWord,

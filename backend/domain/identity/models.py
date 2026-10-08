@@ -119,7 +119,12 @@ class Order(BaseModel):
     """订单（billing 语义，宿主放 identity 域避免域循环；WM5 后如膨胀再拆 billing 域目录）。"""
 
     __tablename__ = "orders"
-    __table_args__ = (Index("uq_order_no", "order_no", "is_deleted", unique=True),)
+    __table_args__ = (
+        Index("uq_order_no", "order_no", "is_deleted", unique=True),
+        # WM12-A：微信支付单号（回调幂等键）——同一流水号不得关联两笔订单，
+        # 靠 DB 唯一索引兜底（模式手册〇.1：服务层查重只是友好报错，DB 才是最后防线）
+        Index("uq_order_transaction", "transaction_id", "is_deleted", unique=True),
+    )
 
     TYPE_FIRST_ACTIVITY = "first_activity_fee"
     TYPE_OBSERVATION = "observation_fee"
@@ -161,6 +166,9 @@ class Order(BaseModel):
     )
     pay_method = Column(
         String(24), nullable=True, comment="收款方式（wechat/scan/alipay/transfer/card/cash）"
+    )
+    transaction_id = Column(
+        String(64), nullable=True, comment="微信支付单号（WM12-A 回调幂等键，唯一索引兜底）"
     )
     voucher_path = Column(
         String(255), nullable=True, comment="收款凭证图路径（WM3-B2，voucher/ 目录）"
@@ -219,6 +227,17 @@ class RefundRequest(BaseModel):
     reviewed_by = Column(Integer, nullable=True)
     reviewed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.now)
+    # WM12-B：线上原路退款三列。out_refund_no 是**微信侧的幂等键**（同一笔重复提交同号不会重复出款），
+    # 格式 `RF{退款单id}-{第几次}-{第几笔}`——回调只带这个号，靠它反解回退款单（见 payment_service）。
+    out_refund_no = Column(String(64), nullable=True, comment="商户退款单号（微信幂等键）")
+    gateway_refund_id = Column(String(64), nullable=True, comment="微信退款单号（refund_id）")
+    gateway_attempts = Column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+        comment="网关提交次数（重试换新单号）",
+    )
 
 
 class WithdrawalRequest(BaseModel):

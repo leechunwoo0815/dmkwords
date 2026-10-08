@@ -1,5 +1,6 @@
 # backend/config.py — DmkWords 配置（MySQL-only，Pydantic Settings）
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -57,6 +58,13 @@ class Settings(BaseSettings):
     WECHAT_PAY_NOTIFY_URL: str = ""
     WECHAT_REFUND_NOTIFY_URL: str = ""
 
+    # 线上支付（WM12-A 2026-10-08）：收款侧闭环的开关与通道选择
+    # - PAYMENT_ENABLED=false → 小程序不出现支付入口（上线版本"纯人工收款"分支，审查 P0-2）
+    # - PAYMENT_PROVIDER=mock（开发/演示，下单即时到账）/ wechat（生产 V3 真实通道）
+    #   生产禁 mock：mock 的验签永远放行，等于任何订单都能被伪回调置为已支付（validate_production 拒启）
+    PAYMENT_ENABLED: bool = True
+    PAYMENT_PROVIDER: str = "mock"
+
     # 服务器
     BACKEND_PORT: int = 8002
     UPLOADS_DIR: str = "uploads"
@@ -98,8 +106,46 @@ class Settings(BaseSettings):
         if self.SMS_ENABLED and self.SMS_PROVIDER.strip().lower() in ("aliyun", "tencent"):
             if not (self.SMS_APP_ID and self.SMS_APP_KEY and self.SMS_SIGN_NAME):
                 problems.append("短信网关凭据缺失（SMS_APP_ID/SMS_APP_KEY/SMS_SIGN_NAME）")
+        problems.extend(self._payment_problems())
         if problems:
             raise RuntimeError(f"生产环境配置校验失败: {'; '.join(problems)}")
+
+    def _payment_problems(self) -> list[str]:
+        """微信支付四件套校验（2026-10-08 WM12-A；上线前审查 P2-5）。
+
+        判据：线上支付开着就必须是真通道且凭据齐备——mock 的验签永远放行，
+        在生产等于"任何订单都能被伪造回调置为已支付"。
+        平台证书**允许首刷补齐**（部署后手动触发一次轮换任务即可），故只校验路径已配置。
+        """
+        if not self.PAYMENT_ENABLED:
+            return []
+        provider = self.PAYMENT_PROVIDER.strip().lower()
+        if provider == "mock":
+            return [
+                "生产环境 PAYMENT_PROVIDER 不能是 mock（验签永远放行；纯人工收款版本请置 "
+                "PAYMENT_ENABLED=false）"
+            ]
+        if provider != "wechat":
+            return [f"未知的 PAYMENT_PROVIDER: {provider}（可选 mock/wechat）"]
+        out: list[str] = []
+        required = (
+            "WECHAT_MCH_ID",
+            "WECHAT_API_KEY_V3",
+            "WECHAT_CERT_SERIAL_NO",
+            "WECHAT_PRIVATE_KEY_PATH",
+            "WECHAT_PLATFORM_CERT_PATH",
+            "WECHAT_PAY_NOTIFY_URL",
+            "WECHAT_REFUND_NOTIFY_URL",  # WM12-B：退款结果通知（原路退款靠它落终态）
+        )
+        missing = [k for k in required if not getattr(self, k).strip()]
+        if missing:
+            out.append(f"微信支付配置缺失：{'/'.join(missing)}")
+            return out
+        if not Path(self.WECHAT_PRIVATE_KEY_PATH).is_file():
+            out.append(f"商户私钥文件不存在：{self.WECHAT_PRIVATE_KEY_PATH}")
+        if not self.WECHAT_PAY_NOTIFY_URL.startswith("https://"):
+            out.append("WECHAT_PAY_NOTIFY_URL 必须是 https 正式域名（微信只回调 https）")
+        return out
 
 
 @lru_cache

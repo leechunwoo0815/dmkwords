@@ -72,7 +72,7 @@ def test_validate_production_passes_when_empty(monkeypatch):
 
     2026-10-08 扩了两条生产校验（上线前审查 P2-1/P0-1 整改），"合规"的定义随之变宽：
     ① CORS_ORIGINS 不得含 localhost；② 短信通道要么接真实网关、要么显式关掉。
-    本用例走"微信一键登录 + 不用短信"，所以显式 SMS_ENABLED=false。
+    同日 WM12-A 再加支付四件套校验：本用例走"不用短信、也不开线上支付"的最小合规组合。
     """
     from backend.config import get_settings
 
@@ -84,6 +84,7 @@ def test_validate_production_passes_when_empty(monkeypatch):
     monkeypatch.setenv("WECHAT_APP_SECRET", "sec")
     monkeypatch.setenv("CORS_ORIGINS", "https://admin.example.com")
     monkeypatch.setenv("SMS_ENABLED", "false")
+    monkeypatch.setenv("PAYMENT_ENABLED", "false")
     get_settings.cache_clear()
     s = get_settings()
     s.validate_production()  # 不抛即过

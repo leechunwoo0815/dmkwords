@@ -61,6 +61,7 @@ from backend.domain.growth.growth_handlers import register_growth_handlers  # no
 from backend.domain.growth.miniapp_router import router as growth_miniapp_router  # noqa: E402
 from backend.domain.growth.router import router as growth_router  # noqa: E402
 from backend.domain.identity.miniapp_router import router as identity_miniapp_router  # noqa: E402
+from backend.domain.identity.pay_notify_router import router as pay_notify_router  # noqa: E402
 from backend.domain.identity.router import router as identity_router  # noqa: E402
 from backend.domain.reading.miniapp_router import router as miniapp_router  # noqa: E402
 from backend.domain.reading.router import router as reading_router  # noqa: E402
@@ -89,3 +90,5 @@ app.include_router(growth_miniapp_router, prefix="/api/miniapp")
 app.include_router(reading_router, prefix="/api/admin")
 app.include_router(reading_circle_router, prefix="/api/admin")
 app.include_router(reading_circle_miniapp_router, prefix="/api/miniapp")
+# 微信支付回调（WM12-A）：无登录态、凭平台证书验签；微信要求 https 正式域名可达
+app.include_router(pay_notify_router, prefix="/api/pay")

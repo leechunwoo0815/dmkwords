@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import logging
 import random
@@ -22,6 +21,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
+from backend.common.async_utils import run_coro
 from backend.common.exceptions import ConflictError, ValidationError
 from backend.config import get_settings
 from backend.domain.identity.models import Parent, SmsCode
@@ -30,11 +30,6 @@ logger = logging.getLogger(__name__)
 
 #: 短信正文里的用途文案（日志/审计用，不发给用户）
 PURPOSE_LABELS = {SmsCode.PURPOSE_LOGIN: "登录", SmsCode.PURPOSE_BIND: "绑定"}
-
-
-def _run(coro):
-    """在同步端点（线程池）里调异步网关：每个调用独立事件循环。"""
-    return asyncio.run(coro)
 
 
 def hash_code(phone: str, code: str) -> str:
@@ -99,7 +94,7 @@ class SmsCodeService:
             raise ConflictError(f"今日验证码发送已达上限（{daily_limit} 条），请明天再试")
 
         # 网关生成并发送；它把 code 回传给我方（真实厂商路径同样回传——用于本地落哈希）
-        result = _run(get_sms_gateway().send_code(phone))
+        result = run_coro(get_sms_gateway().send_code(phone))
         if not result.success or not result.code:
             logger.error(
                 "短信发送失败 phone=%s reason=%s", phone[:3] + "****", result.error_message

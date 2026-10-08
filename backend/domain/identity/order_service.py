@@ -77,50 +77,15 @@ class OrderService:
         parent = ParentService(self.db).get(child.parent_id)
 
         # 金额计算（服务端唯一权威；二孩 9 折按下单时刻判定 V1.1 §3.1）
-        if req.order_type == Order.TYPE_FIRST_ACTIVITY:
-            # 99 元每账号一次（R-321）：存在未被全额退款的已付 99 单则拒绝
-            # （refund_status 口径：退款中/失败均占资格；仅 refunded 释放）
-            exists = (
-                self.db.query(func.count(Order.id))
-                .filter(
-                    Order.parent_id == parent.id,
-                    Order.order_type == Order.TYPE_FIRST_ACTIVITY,
-                    Order.status == Order.STATUS_PAID,
-                    Order.refund_status != Order.REFUND_STATUS_REFUNDED,
-                    Order.is_deleted == 0,
-                )
-                .scalar()
-            )
-            if exists:
-                raise ConflictError("该账号已购买过首场亲子活动（每账号仅一次）")
-            amount = self._config_decimal("first_activity_fee")
-        elif req.order_type == Order.TYPE_OBSERVATION:
-            amount = self._config_decimal("observation_fee")
-        elif req.order_type == Order.TYPE_FORMAL:
-            base = self._config_decimal("formal_fee")
-            discount = self._config_decimal("second_child_discount_percent")
-            # 下单时该账号下另有有效会员孩子 → 自动 9 折（有效=日期感知口径 D1：过期的 formal 不算）
-            siblings = (
-                self.db.query(Child)
-                .filter(
-                    Child.parent_id == parent.id,
-                    Child.id != child.id,
-                    Child.is_deleted == 0,
-                )
-                .all()
-            )
-            siblings_active = any(s.is_active_member for s in siblings)
-            amount = (
-                (base * discount / Decimal(100)).quantize(Decimal("0.01"))
-                if siblings_active
-                else base
-            )
-        elif req.order_type == Order.TYPE_DEPOSIT:
-            # R3/FEAT-080：押金单激活押金模块——金额读标准配置不可自输；
-            # 确认收款时联动建 Deposit+Ledger（create 仅建单，confirm 落押金账）
-            amount = self._config_decimal(
-                "deposit_amount"
-            )  # 押金标准配置（billing confirm 联动激活 Deposit+Ledger）
+        # 会员类四型的定价抽进 price_member_order：家长端在线下单（WM12-A）与管理端造单同源，
+        # 免得两处各写一份二孩折扣/99 元资格判定而悄悄漂移
+        if req.order_type in (
+            Order.TYPE_FIRST_ACTIVITY,
+            Order.TYPE_OBSERVATION,
+            Order.TYPE_FORMAL,
+            Order.TYPE_DEPOSIT,
+        ):
+            amount = self.price_member_order(parent, child, req.order_type)
         elif req.order_type == Order.TYPE_ACTIVITY:
             # 管理端活动单收线下到场家长的钱——不联动报名（边界默认值，简报声明）
             if not req.activity_id:
@@ -218,6 +183,53 @@ class OrderService:
         )
         self.db.commit()
         return order
+
+    def price_member_order(self, parent: Parent, child: Child, order_type: str) -> Decimal:
+        """会员类订单定价（**唯一来源**：管理端造单与管理小程序在线下单都走它）。
+
+        - 99 元首场（R-321）：每账号一次，存在未被全额退款的已付单则拒绝
+        - 观察期费：读配置
+        - 年费：下单时刻该账号另有有效会员孩子 → 二孩折扣（V1.1 §3.1，有效=日期感知口径 D1）
+        - 押金：读标准配置不可自输（R3/FEAT-080；确认收款时联动建 Deposit+Ledger）
+        """
+        if order_type == Order.TYPE_FIRST_ACTIVITY:
+            exists = (
+                self.db.query(func.count(Order.id))
+                .filter(
+                    Order.parent_id == parent.id,
+                    Order.order_type == Order.TYPE_FIRST_ACTIVITY,
+                    Order.status == Order.STATUS_PAID,
+                    Order.refund_status != Order.REFUND_STATUS_REFUNDED,
+                    Order.is_deleted == 0,
+                )
+                .scalar()
+            )
+            if exists:
+                raise ConflictError("该账号已购买过首场亲子活动（每账号仅一次）")
+            return self._config_decimal("first_activity_fee")
+        if order_type == Order.TYPE_OBSERVATION:
+            return self._config_decimal("observation_fee")
+        if order_type == Order.TYPE_FORMAL:
+            base = self._config_decimal("formal_fee")
+            discount = self._config_decimal("second_child_discount_percent")
+            siblings = (
+                self.db.query(Child)
+                .filter(
+                    Child.parent_id == parent.id,
+                    Child.id != child.id,
+                    Child.is_deleted == 0,
+                )
+                .all()
+            )
+            siblings_active = any(s.is_active_member for s in siblings)
+            return (
+                (base * discount / Decimal(100)).quantize(Decimal("0.01"))
+                if siblings_active
+                else base
+            )
+        if order_type == Order.TYPE_DEPOSIT:
+            return self._config_decimal("deposit_amount")
+        raise ValidationError("订单类型不正确")
 
     def _create_activity_order(self, child: Child, activity, fee) -> Order:
         """活动报名订单（家长小程序发起；占名额待收款确认；不 commit 由调用方统一提交）。"""
@@ -334,6 +346,11 @@ class OrderService:
         return order
 
     @staticmethod
+    def new_order_no() -> str:
+        """订单号唯一生成口（历史代码内联同款格式；新增调用方一律走这里）。"""
+        return f"DMK{datetime.now():%Y%m%d%H%M%S}{uuid.uuid4().hex[:6].upper()}"
+
+    @staticmethod
     def get_voucher_rel_path(db: Session, order_id: int) -> str:
         """凭证路径（voucher-image 下发用；NotFound 全在此抛，Router 零 ORM）。"""
         order = db.query(Order).filter(Order.id == order_id, Order.is_deleted == 0).first()
@@ -372,13 +389,45 @@ class OrderService:
             if paid_exists:
                 raise ConflictError("该账号已购买过首场亲子活动（每账号仅一次）")
 
+        self._settle_paid(
+            order,
+            actor=admin,
+            pay_method=req.pay_method,
+            remark=req.remark or "",
+            payer_id=admin.id,
+            action="order.confirm_payment",
+            reason=req.remark or "人工收款确认",
+        )
+        self.db.commit()
+        return order
+
+    def _settle_paid(
+        self,
+        order: Order,
+        *,
+        actor,
+        pay_method: str,
+        remark: str,
+        payer_id: int | None,
+        action: str,
+        reason: str,
+        transaction_id: str | None = None,
+    ) -> None:
+        """**收款结算单一链路**：人工确认收款与线上支付回调都调它（WM12-A）。
+
+        为什么必须合并：回调若另写一份"置 paid + 开会员"，会员到期日/押金记账/活动报名转正/
+        99 元资格这些口径早晚漂移——那是最贵的一类 bug。调用方负责 commit（本方法只 flush+发事件）。
+        """
         order.status = Order.STATUS_PAID
-        order.pay_method = req.pay_method
+        order.pay_method = pay_method
         # WM3-B2 审查返工 R1：假通道删除——凭证唯一通道为 /voucher 上传端点
         # （落库即校验 JPG 落盘；confirm 收裸 path 无校验属注入面，不做）
         order.paid_at = datetime.now()
-        order.paid_by = admin.id
-        order.remark = req.remark or order.remark
+        order.paid_by = payer_id
+        if remark:
+            order.remark = remark
+        if transaction_id:
+            order.transaction_id = transaction_id
         self.db.flush()
 
         # ---- 会员开通联动（同一事务）----
@@ -412,7 +461,7 @@ class OrderService:
             if order.order_type in (Order.TYPE_DEPOSIT, Order.TYPE_DEPOSIT_SUPPLEMENT):
                 from backend.domain.billing.service import DepositService
 
-                DepositService(self.db).on_deposit_order_paid(admin, order)
+                DepositService(self.db).on_deposit_order_paid(actor, order)
             # 活动费订单 → 按有无报名分流（R2 插修 11）：
             # 家长端报名链（报名→订单→收款→报名转正）联动转正；管理端直建活动单
             # （FEAT-080 §3.5.2 线下收钱语义，从不创建报名）→ 无联动纯资金入账
@@ -442,8 +491,8 @@ class OrderService:
                     AdminNotifyService(self.db).mark_handled(
                         ref_type="activity_enrollment",
                         ref_id=e.id,
-                        admin=admin,
-                        note="confirm_payment",
+                        admin=actor,
+                        note=action,
                     )
                     if e.status == ActivityEnrollment.STATUS_ENROLLED:
                         from backend.domain.activity.models import Activity
@@ -469,16 +518,17 @@ class OrderService:
 
         publish_audit(
             self.db,
-            admin=admin,
-            action="order.confirm_payment",
+            admin=actor,
+            action=action,
             target_type="order",
             target_id=order.order_no,
             detail={
                 "amount": str(order.amount),
-                "method": req.pay_method,
+                "method": pay_method,
                 "member_status": child.member_status if child else "-",
+                "transaction_id": transaction_id or "",
             },
-            reason=req.remark or "人工收款确认",
+            reason=reason,
         )
         event_bus.publish(
             OrderPaidEvent(
@@ -489,8 +539,6 @@ class OrderService:
             ),
             db=self.db,
         )
-        self.db.commit()
-        return order
 
     def _open_membership(self, child_id: int, status: str, days: int) -> Child:
         child = self.db.query(Child).filter(Child.id == child_id).first()

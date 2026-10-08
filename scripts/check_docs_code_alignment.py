@@ -274,7 +274,12 @@ def collect_table_names() -> set[str]:
 def collect_symbols() -> set[str]:
     out = set()
     for f in list((ROOT / "backend").rglob("*.py")) + list((ROOT / "scripts").glob("*.py")):
-        out |= set(re.findall(r"^\s*(?:def|class)\s+([A-Za-z_][A-Za-z0-9_]*)", _read(f), re.M))
+        # 2026-10-08 WM12-A：原正则只认 `def/class`，**async def 一律收不到**——
+        # 网关层（微信支付/短信）几乎全是 async，文档引用 `refresh_platform_cert()` 这类
+        # 现成方法会被判"函数/类不存在"（假红）。补 `async` 前缀，与上方 JS 分支同口径。
+        out |= set(
+            re.findall(r"^\s*(?:async\s+)?(?:def|class)\s+([A-Za-z_][A-Za-z0-9_]*)", _read(f), re.M)
+        )
     for pat, exts in (
         (r"(?:^|\s)(?:async\s+)?function\s+([A-Za-z_$][\w$]*)", (".js", ".ts", ".tsx")),
         (
