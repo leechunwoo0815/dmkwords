@@ -134,17 +134,31 @@ export default function PaymentReconcilePanel() {
                 expandable={{
                   expandedRowRender: (row) =>
                     row.detail?.length ? (
-                      <Table<PaymentReconcileDiff>
-                        size="small"
-                        rowKey={(d) => `${row.id}-${d.kind}-${d.ref}`}
-                        dataSource={row.detail}
-                        pagination={false}
-                        columns={[
-                          { title: "类型", dataIndex: "kind", width: 220 },
-                          { title: "定位", dataIndex: "ref", width: 200, render: (v) => <span style={NUM}>{v}</span> },
-                          { title: "说明", dataIndex: "message" },
-                        ]}
-                      />
+                      <>
+                        {row.truncated && (
+                          <Alert
+                            type="warning"
+                            showIcon
+                            style={{ marginBottom: 8 }}
+                            message={`共 ${row.diff_total} 条差异，此处只展示前 ${row.detail.length} 条样本（按类型：${Object.entries(
+                              row.diff_by_kind || {},
+                            )
+                              .map(([k, v]) => `${k}=${v}`)
+                              .join("，")}）`}
+                          />
+                        )}
+                        <Table<PaymentReconcileDiff>
+                          size="small"
+                          rowKey={(d) => `${row.id}-${d.kind}-${d.ref}`}
+                          dataSource={row.detail}
+                          pagination={false}
+                          columns={[
+                            { title: "类型", dataIndex: "kind", width: 220 },
+                            { title: "定位", dataIndex: "ref", width: 200, render: (v) => <span style={NUM}>{v}</span> },
+                            { title: "说明", dataIndex: "message" },
+                          ]}
+                        />
+                      </>
                     ) : (
                       <span style={MUTED}>{row.note || "无差异"}</span>
                     ),

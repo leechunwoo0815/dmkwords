@@ -3511,9 +3511,23 @@
             "title": "Detail",
             "type": "array"
           },
+          "diff_by_kind": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "按差异类型计数（全量统计，不受样本截断影响）",
+            "title": "Diff By Kind",
+            "type": "object"
+          },
           "diff_count": {
             "default": 0,
             "title": "Diff Count",
+            "type": "integer"
+          },
+          "diff_total": {
+            "default": 0,
+            "description": "差异真实总数（detail 只落样本，见 truncated）",
+            "title": "Diff Total",
             "type": "integer"
           },
           "finished_at": {
@@ -3546,6 +3560,12 @@
             "description": "scheduled/manual",
             "title": "Trigger",
             "type": "string"
+          },
+          "truncated": {
+            "default": false,
+            "description": "detail 是否为截断样本（大差异日按字节预算截断）",
+            "title": "Truncated",
+            "type": "boolean"
           }
         },
         "required": [

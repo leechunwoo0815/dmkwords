@@ -165,6 +165,11 @@ class PaymentReconcileReport(BaseSchema):
     checked_count: int = 0
     diff_count: int = 0
     detail: list[PaymentReconcileDiff] = Field(default_factory=list)
+    diff_total: int = Field(0, description="差异真实总数（detail 只落样本，见 truncated）")
+    diff_by_kind: dict[str, int] = Field(
+        default_factory=dict, description="按差异类型计数（全量统计，不受样本截断影响）"
+    )
+    truncated: bool = Field(False, description="detail 是否为截断样本（大差异日按字节预算截断）")
     note: str = Field("", description="跳过/失败原因（status=skipped|failed 时看这里）")
     trigger: str = Field("manual", description="scheduled/manual")
     finished_at: str = ""

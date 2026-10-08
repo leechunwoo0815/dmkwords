@@ -191,12 +191,17 @@ class SmsCodeService:
             )
             .update({SmsCode.attempts: SmsCode.attempts + 1}, synchronize_session=False)
         )
-        self.db.commit()
         if not bumped:
+            self.db.commit()
             raise ValidationError("验证码错误次数过多，请重新获取")
-        left = max_attempts - int(
+        # 剩余次数在**提交前**、同一事务内读自己刚写的值：被本连接的行锁保护，
+        # 并发他方改不动（CI 实测过"提交后再读"的版本：文案随并发漂移，
+        # 20 并发下会出现两条"还可尝试 3 次"、放行条数也不定——安全性质没破但断言不可复现）。
+        attempts_after = int(
             self.db.query(SmsCode.attempts).filter(SmsCode.id == row_id).scalar() or 0
         )
+        self.db.commit()
+        left = max_attempts - attempts_after
         if left <= 0:
             raise ValidationError("验证码错误次数过多，请重新获取")
         raise ValidationError(f"验证码错误（还可尝试 {left} 次）")

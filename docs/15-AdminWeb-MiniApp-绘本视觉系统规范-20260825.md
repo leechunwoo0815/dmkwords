@@ -1039,6 +1039,29 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 3. **登录态可切**：换家长不必点 UI——`automation_evaluate` 里直接 `wx.request` 打 `/api/miniapp/login`（{phone, code:'1234'}），再把 `token/parent/children/currentChildId` 写进 storage 即可（`utils/session.js` 的键名即口径）。
 4. **`simulator_refresh` 会回到首页**：刷新后要重新 `simulator_open_page`，别以为页面自己回来了（2026-09-21 踩过）。
 
+### 二十.1 平台分支（iOS）打桩 —— 2026-10-08 实测，**打桩打出了真缺陷**
+
+**为什么要做**：`isIOS()` 决定"iOS 不展示价格与在线开通、只给到店指引"（微信对 iOS 虚拟支付的规定）。
+这条分支此前只有"读代码看起来对"的验证，从未跑过。
+
+**结论一（缺陷，已修）**：原实现 `wx.getWindowInfo().platform === 'ios'` —— **`wx.getWindowInfo()` 不返回 `platform`**
+（同日实测 keys 只有 `pixelRatio/screenWidth/screenHeight/windowWidth/windowHeight/statusBarHeight/safeArea/screenTop`），
+所以 `isIOS()` 恒 false，**iOS 合规分支从来没生效过**。修法：读 `wx.getDeviceInfo().platform`，
+老基础库回退 `wx.getSystemInfoSync().platform`（`miniapp/utils/platform.js`）。
+
+**结论二（打桩通道的真实边界，别浪费时间）**：
+- `automation_wx_api --action mock --method getDeviceInfo` 返回 `success: true`，但**对已编译的页面代码不生效**——
+  `automation_evaluate` 上下文的 `wx` 与页面模块不是同一个引用（同一次 evaluate 里改 `wx` 也只影响 evaluate 自己）。
+- 因此平台分支的正确验证姿势是**两段**：
+  1. **逻辑**：node 直接加载真实模块 + 多组 `wx` 桩（`tests/unit/test_miniapp_platform_isios.py`，6 组含旧实现根因复现）；
+  2. **渲染**：把页面切到该分支的数据态再截图（`automation_evaluate` 里 `p.setData({showPay:false, payBlocked:'ios', headHint:HINT_STORE})`），
+     确认"没有支付入口 + 有到店指引"的视觉结果。
+- 截图证据（2026-10-08）：购买页 iOS 态无「立即开通」、底部为 pay-button 的 iOS 提示；订单页显示
+  "iOS 端不提供线上支付，可到店办理。"（该页当时无待支付订单，"待支付行无『去支付』"只到数据级）。
+- **真机 iPhone 验证仍缺**：需用户微信号被加为小程序成员后用真机过一遍（挂交接卡待办）。
+
+**授权边界（同日实测）**：只关项目窗口（`close_project_window`）不影响 CLI 授权；但 `wechatide quit`（完全退出）**会清掉授权**——之后任何调用都报 `wait WechatIDE authorization timeout`，需要用户点一次「允许」才能恢复。确需退出时提前说明，别在无人值守时段做。
+
 
 ## 二十一、成就类页面呈现规范（生词本 / 护照 / 勋章族，2026-09-21 立，用户裁定后）
 

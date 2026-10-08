@@ -5204,10 +5204,23 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["PaymentReconcileDiff"][];
             /**
+             * Diff By Kind
+             * @description 按差异类型计数（全量统计，不受样本截断影响）
+             */
+            diff_by_kind?: {
+                [key: string]: number;
+            };
+            /**
              * Diff Count
              * @default 0
              */
             diff_count: number;
+            /**
+             * Diff Total
+             * @description 差异真实总数（detail 只落样本，见 truncated）
+             * @default 0
+             */
+            diff_total: number;
             /**
              * Finished At
              * @default
@@ -5237,6 +5250,12 @@ export interface components {
              * @default manual
              */
             trigger: string;
+            /**
+             * Truncated
+             * @description detail 是否为截断样本（大差异日按字节预算截断）
+             * @default false
+             */
+            truncated: boolean;
         };
         /** PaymentReconcileRunResponse */
         PaymentReconcileRunResponse: {

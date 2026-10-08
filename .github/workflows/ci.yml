@@ -37,8 +37,9 @@ jobs:
       DB_USER: "root"
       DB_PASSWORD: "root"
       DB_NAME: "dmkwords_ci"
-      MOCK_PAYMENT: "true"
-      MOCK_SMS: "true"
+      # 2026-10-08 清理：MOCK_PAYMENT / MOCK_SMS 已无人读（WM12-A 起支付通道看 PAYMENT_PROVIDER、
+      # 短信看 SMS_PROVIDER）——死键留着会让人误以为"CI 靠这两个开关走 mock"。
+      # 现在 CI 与本地同款默认：PAYMENT_PROVIDER=mock、SMS_PROVIDER=mock。
     steps:
       - uses: actions/checkout@v5
 

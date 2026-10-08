@@ -42,6 +42,11 @@ STUCK_REFUND_HOURS = 24
 #: 本地审计单类差异的返回上限（有界查询：异常通常个位数，真到上限说明系统性问题，先看这些）
 AUDIT_ROW_LIMIT = 2000
 
+#: `detail` 列的落库预算（UTF-8 字节）。MySQL TEXT 上限 64KB——**2026-10-08 十万级压测实锤**：
+#: 1100 条差异的 JSON 有 176KB，`INSERT` 直接 `DataError 1406`，**整轮对账一笔都写不进去**
+#: （系统性事故时反而没有留痕）。故落库只存样本 + 分类计数 + 截断标记；真实总数在 `diff_count` 列。
+DETAIL_BYTE_BUDGET = 32_000
+
 #: 微信账单 CSV 的必需列（缺列说明格式变了，必须报警而不是静默少比几列）
 BILL_REQUIRED_COLUMNS = ("商户订单号", "交易状态", "订单金额")
 
@@ -630,8 +635,20 @@ class PaymentReconcileService:
         if status is None:
             status = PaymentReconciliation.STATUS_DIFF if diffs else PaymentReconciliation.STATUS_OK
         # detail 统一是 JSON 对象 {diffs, note}：既能放差异清单，也能放"为什么跳过"
-        # （早先靠"能否 parse 成 list"区分，结果把 skipped 的原因读丢了）
-        detail = json.dumps({"diffs": diffs, "note": note}, ensure_ascii=False)
+        # （早先靠"能否 parse 成 list"区分，结果把 skipped 的原因读丢了）。
+        # WM12 压测加固：diffs 只落**样本**（按字节预算）+ 分类计数 + 截断标记——
+        # 真实总数看 diff_count 列；不截断会让大差异日的 INSERT 超 TEXT 上限、整轮写不进去。
+        sample, by_kind = self._sample_diffs(diffs)
+        detail = json.dumps(
+            {
+                "diffs": sample,
+                "diff_total": len(diffs),
+                "diff_by_kind": by_kind,
+                "truncated": len(sample) < len(diffs),
+                "note": note,
+            },
+            ensure_ascii=False,
+        )
         row = PaymentReconciliation(
             bill_date=day,
             source=source,
@@ -646,6 +663,21 @@ class PaymentReconcileService:
         self.db.add(row)
         self.db.commit()
         return self._view(row)
+
+    @staticmethod
+    def _sample_diffs(diffs: list[dict]) -> tuple[list[dict], dict[str, int]]:
+        """按字节预算取差异样本 + 全量分类计数（截断在 `_record` 里显式标记）。"""
+        by_kind: dict[str, int] = {}
+        sample: list[dict] = []
+        used = 0
+        for item in diffs:
+            kind = item.get("kind") or "unknown"
+            by_kind[kind] = by_kind.get(kind, 0) + 1
+            size = len(json.dumps(item, ensure_ascii=False).encode())
+            if used + size <= DETAIL_BYTE_BUDGET:
+                sample.append(item)
+                used += size
+        return sample, by_kind
 
     @staticmethod
     def _view(row: PaymentReconciliation) -> dict:
@@ -664,6 +696,9 @@ class PaymentReconcileService:
             "checked_count": row.checked_count,
             "diff_count": row.diff_count,
             "detail": detail,
+            "diff_total": payload.get("diff_total", len(detail)),
+            "diff_by_kind": payload.get("diff_by_kind", {}),
+            "truncated": bool(payload.get("truncated", False)),
             "note": payload.get("note", ""),
             "trigger": row.trigger,
             "finished_at": str(row.finished_at or ""),
