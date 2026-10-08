@@ -1034,7 +1034,7 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 | 改完 wxml/wxss 后 | `wechatide -c zcode simulator_refresh --project <...>`（防编译缓存假象） |
 
 **四条实战纪律**：
-1. **授权要用户点**：首次连接 IDE 弹「MCP 客户端授权（zcode 申请使用 MCP）」——**模型点不了**（`osascript` 会被系统拒绝辅助访问 -25211）。让用户点「允许」即可，之后本机长期有效；别再花时间造 HTML 近似渲染装置（2026-09-21 试过，弯路）。
+1. **授权要用户点（仅首次）**：首次连接 IDE 弹「MCP 客户端授权（zcode 申请使用 MCP）」——**模型点不了**（`osascript` 会被系统拒绝辅助访问 -25211）。让用户点「允许」即可，之后本机长期有效；别再花时间造 HTML 近似渲染装置（2026-09-21 试过，弯路）。**2026-10-08 实测更正**：授权过一次之后，`check_wechatide_status` 里 `loginExpired=false` 就表示工具已登录，**模型可直接截图/开页/跑 JS，不需要用户任何操作**；`mcpTokenRequired=true` 这一项**不阻塞 CLI**（同日实测截图成功）——别再把它当成等用户的借口（交接卡旧话术已同步更正）。
 2. **量尺寸比目测准**：`automation_evaluate` 里用 `wx.createSelectorQuery().selectAll('.cls').boundingClientRect()` 拿真实 pt 值（例：整页报告图实测 402×563pt / 卡宽 402pt），把"字号够不够、有没有被裁"变成数字写进证据。
 3. **登录态可切**：换家长不必点 UI——`automation_evaluate` 里直接 `wx.request` 打 `/api/miniapp/login`（{phone, code:'1234'}），再把 `token/parent/children/currentChildId` 写进 storage 即可（`utils/session.js` 的键名即口径）。
 4. **`simulator_refresh` 会回到首页**：刷新后要重新 `simulator_open_page`，别以为页面自己回来了（2026-09-21 踩过）。
