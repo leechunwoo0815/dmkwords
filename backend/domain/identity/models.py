@@ -124,6 +124,10 @@ class Order(BaseModel):
         # WM12-A：微信支付单号（回调幂等键）——同一流水号不得关联两笔订单，
         # 靠 DB 唯一索引兜底（模式手册〇.1：服务层查重只是友好报错，DB 才是最后防线）
         Index("uq_order_transaction", "transaction_id", "is_deleted", unique=True),
+        # 管理端订单列表：WHERE is_deleted=0 ORDER BY create_time DESC LIMIT n
+        # （上线前审查 P1-6：无索引时 filesort；造量 6 万行 EXPLAIN 见 docs/09 第三十六轮——
+        #  单列 create_time 优于 (is_deleted, create_time)：估算行数 20 vs 29880）
+        Index("ix_orders_create_time", "create_time"),
     )
 
     TYPE_FIRST_ACTIVITY = "first_activity_fee"

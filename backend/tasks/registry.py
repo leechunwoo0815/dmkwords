@@ -355,11 +355,119 @@ def run_task(task_name: str, manual: bool = False, admin=None) -> dict:
         session.close()
 
 
-def start_scheduler() -> None:
-    """main.py lifespan 调用：进程内 BackgroundScheduler 注册全部任务。"""
+#: 调度器单实例命名锁（MySQL `GET_LOCK`，**会话级**：连接断开即自动释放）。
+#: 背景（上线前审查 P0-4）：APScheduler 跑在进程内，多副本部署时每个副本都会注册全部任务，
+#: 同一时刻重复执行——历史事故是 dev 的 8443 镜像进程与 8002 主进程同秒双跑（TaskRunLog 双条）。
+#: 护栏 = 「骑锁」：谁拿到锁谁调度；拿不到就不注册任务（该进程照常提供 API）。
+SCHEDULER_LOCK_NAME = "dmkwords:scheduler"
+
+#: 持有命名锁的连接（**保持打开 = 保持锁**；进程退出/被杀时由 MySQL 自动释放）
+_lock_conn = None
+
+
+def _acquire_scheduler_lock() -> bool:
+    """尝试取调度器单实例锁。True=本进程可调度；False=别的进程正在调度。
+
+    取锁链路本身失败（连库失败 / 数据库不支持 GET_LOCK）→ **放行**：
+    单机部署纪律下不该因为拿不到锁就让定时任务整体停摆；真出现"多副本 + 数据库同时异常"，
+    要处理的问题已经不是双跑这一件。
+    """
+    global _lock_conn
+    from sqlalchemy import text
+
+    from backend.database import engine
+
+    try:
+        conn = engine.connect()
+        got = conn.execute(text("SELECT GET_LOCK(:n, 0)"), {"n": SCHEDULER_LOCK_NAME}).scalar()
+        conn.commit()  # 结束隐式事务（命名锁是会话级，提交不影响持有）
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("调度器单实例锁不可用（%s），按单进程纪律放行", exc)
+        return True
+    if got != 1:
+        conn.close()
+        return False
+    _lock_conn = conn
+    return True
+
+
+def _holds_scheduler_lock() -> bool:
+    """当前连接是否仍持有该锁。
+
+    必须每次复核：`wait_timeout` 掐断空闲连接时锁会**静默消失**（本进程还以为自己在调度，
+    而另一个副本可能同时取到了锁）——守门人不能只信启动那一刻的结果。
+    """
+    if _lock_conn is None:
+        return False
+    from sqlalchemy import text
+
+    try:
+        holder = _lock_conn.execute(
+            text("SELECT IS_USED_LOCK(:n)"), {"n": SCHEDULER_LOCK_NAME}
+        ).scalar()
+        mine = _lock_conn.execute(text("SELECT CONNECTION_ID()")).scalar()
+        _lock_conn.commit()
+    except Exception:  # noqa: BLE001
+        return False
+    return holder is not None and int(holder) == int(mine)
+
+
+def release_scheduler_lock() -> None:
+    """释放命名锁。
+
+    **必须显式 `RELEASE_LOCK`**：`Connection.close()` 只是把连接还回池，
+    DBAPI 会话没断、会话级命名锁会跟着池里的连接留下来（实测踩到）——下一副本就永远起不来。
+    """
+    global _lock_conn
+    conn, _lock_conn = _lock_conn, None
+    if conn is None:
+        return
+    from sqlalchemy import text
+
+    try:
+        conn.execute(text("SELECT RELEASE_LOCK(:n)"), {"n": SCHEDULER_LOCK_NAME})
+        conn.commit()
+    except Exception:  # noqa: BLE001 — 释放失败不影响收尾（连接关闭后由 MySQL 自解）
+        logger.warning("调度器单实例锁释放失败（连接关闭后由 MySQL 自解）")
+    finally:
+        conn.close()
+
+
+def ensure_scheduler_lock() -> bool:
+    """调度执行前复核：仍持有 → True；已丢 → 尝试重取（重取不到则本次不跑）。"""
+    if _lock_conn is not None and _holds_scheduler_lock():
+        return True
+    if _lock_conn is not None:
+        logger.warning("调度器单实例锁已丢失（连接被掐断或已释放），尝试重新获取")
+        release_scheduler_lock()
+    return _acquire_scheduler_lock()
+
+
+def guarded_run(task_name: str) -> dict | None:
+    """调度器路径的统一入口：跑前复核单实例锁。
+
+    看板手动触发走 `run_task`（人按的按钮必须响应，不受锁限制），这里只拦"自动调度"。
+    """
+    if not ensure_scheduler_lock():
+        logger.warning("调度器单实例锁被其它进程持有，本次跳过: %s", task_name)
+        return None
+    return run_task(task_name)
+
+
+def start_scheduler() -> bool:
+    """main.py lifespan 调用：进程内 BackgroundScheduler 注册全部任务。
+
+    返回是否真的启动（False = 命名锁被其它副本持有 → 本进程只提供 API，不调度）。
+    """
     global _scheduler
     if _scheduler is not None:
-        return
+        return True
+    if not _acquire_scheduler_lock():
+        logger.warning(
+            "调度器单实例锁 %s 被其它进程持有——本进程不注册定时任务（API 照常服务）",
+            SCHEDULER_LOCK_NAME,
+        )
+        return False
     from apscheduler.schedulers.background import BackgroundScheduler
 
     scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
@@ -381,11 +489,12 @@ def start_scheduler() -> None:
         else:
             job_kwargs["trigger"] = "interval"
             job_kwargs["seconds"] = spec.interval_seconds
-        scheduler.add_job(run_task, **job_kwargs)
+        scheduler.add_job(guarded_run, **job_kwargs)
     scheduler.start()
     _scheduler = scheduler
     _schedule_cron_catchup(scheduler)
     logger.info("APScheduler started with %d tasks", len(TASKS))
+    return True
 
 
 def stop_scheduler() -> None:
@@ -393,6 +502,7 @@ def stop_scheduler() -> None:
     if _scheduler is not None:
         _scheduler.shutdown(wait=False)
         _scheduler = None
+    release_scheduler_lock()
 
 
 #: cron 任务的"迟到宽限"（秒）。机器休眠会把钟点任务记成 missed，
@@ -462,7 +572,7 @@ def _schedule_cron_catchup(scheduler) -> None:
         if done:
             continue
         scheduler.add_job(
-            run_task,
+            guarded_run,
             trigger="date",
             run_date=now + timedelta(seconds=CRON_CATCHUP_DELAY_SECONDS),
             args=[spec.name],

@@ -1,0 +1,55 @@
+# Docker Compose — DmkWords **生产**（docs/20 §二；与 dev 的 docker-compose.yml 分离）
+#
+# ⚠️ `name:` 不是装饰（2026-10-08 实测踩到）：两份文件的**服务名都叫 mysql**，Compose 按
+#    「项目名 + 服务名」认容器——项目名默认取目录名，于是同一目录里跑 `-f docker-compose.prod.yml up`
+#    会把 **dev 容器 `dmkwords-mysql` 直接替换掉**（卷没动，但容器没了、dev 连不上）。
+#    显式声明独立项目名 `dmkwords-prod` 后，两份 compose 各自管各自的容器与卷，可安全并存。
+#
+# 用法：docker compose -f docker-compose.prod.yml up -d
+#   · 密码来自 .env 的 DB_PASSWORD（compose 自动读；**禁写死在文件里**）
+#   · 端口只绑 127.0.0.1（运维走 ssh 隧道/本机 nginx；禁暴露公网）
+#   · binlog 必开——scripts/backup_binlog.sh 的 PITR 恢复能力依赖它（dev 不开、生产必开）
+#   · 容器名与卷名都带 -prod/__prod 后缀：生产机上出现 `dmkwords-mysql` 这个名字就是配错了
+#
+# 冒烟（起容器后）：
+#   docker exec dmkwords-mysql-prod mysql -uroot -p"$DB_PASSWORD" -e "SHOW VARIABLES LIKE 'log_bin';"
+name: dmkwords-prod
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: dmkwords-mysql-prod
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?生产库密码未设置：请在 .env 填 DB_PASSWORD（强随机）}
+      MYSQL_DATABASE: ${DB_NAME:-dmkwords}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+      # ── binlog（PITR 前置，docs/20 §二/§七）──
+      - --log-bin=mysql-bin
+      - --server-id=1
+      - --binlog-format=ROW
+      - --binlog-expire-logs-seconds=604800   # 7 天：binlog 归档由 backup_binlog.sh 每小时取走
+    ports:
+      # 仅本机回环（校验：docker ps 的 PORTS 列必须是 127.0.0.1:...→3306）
+      - "127.0.0.1:${MYSQL_PROD_PORT:-3306}:3306"
+    volumes:
+      - mysql_data_prod:/var/lib/mysql
+    healthcheck:
+      # 用容器内自带的 MYSQL_ROOT_PASSWORD 展开（healthcheck 命令串里不出现明文密码）
+      test: ["CMD-SHELL", "mysqladmin ping -h127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      # R6（磁盘打满）：容器日志封顶，别让慢查询日志/错误日志吃掉磁盘
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mysql_data_prod:

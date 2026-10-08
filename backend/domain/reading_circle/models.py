@@ -24,6 +24,9 @@ class CirclePost(BaseModel):
             "ref_id",
             unique=False,
         ),
+        # 信息流：WHERE is_deleted=0 ORDER BY created_at DESC, id DESC LIMIT n
+        # （上线前审查 P1-6：演示量级全绿，上量后 filesort 线性变慢；造量 EXPLAIN 见 docs/09 第三十六轮）
+        Index("ix_circle_posts_is_deleted_created_at", "is_deleted", "created_at"),
     )
 
     CARD_MILESTONE = "milestone"  # 里程碑卡（ref_id=MilestoneAward.id）

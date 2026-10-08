@@ -24,7 +24,12 @@ class WordsLedger(BaseModel):
     """有效词数入账（红线：学生×书目终身唯一，永不回收）。"""
 
     __tablename__ = "words_ledgers"
-    __table_args__ = (Index("uq_words_child_book", "child_id", "book_id", unique=True),)
+    __table_args__ = (
+        Index("uq_words_child_book", "child_id", "book_id", unique=True),
+        # 周期榜/周报聚合：WHERE created_at >= ? AND < ? GROUP BY child_id
+        # （上线前审查 P1-6：无此索引时按 child_id 全索引扫描）
+        Index("ix_words_ledgers_created_at", "created_at"),
+    )
 
     child_id = Column(Integer, nullable=False, index=True)
     book_id = Column(Integer, nullable=False)

@@ -1,7 +1,7 @@
 # backend/domain/circulation/models.py — 借阅记录
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import Column, DateTime, Index, Integer, String
 
 from backend.common.base_model import BaseModel
 
@@ -11,6 +11,11 @@ class BorrowRecord(BaseModel):
 
     __tablename__ = "borrow_records"
     # 并发防线：with_for_update 副本行锁（MySQL 无部分索引，唯一索引会挡住历史记录复用副本）
+    __table_args__ = (
+        # 逾期扫描（overdue_mark / overdue_list）：WHERE status=? AND due_at < NOW()
+        # （上线前审查 P1-6：原先只有 status 单列索引 → 取回全部在借行再过滤 + filesort）
+        Index("ix_borrow_records_status_due_at", "status", "due_at"),
+    )
 
     STATUS_ACTIVE = "active"  # 借出中
     STATUS_OVERDUE = "overdue"  # 逾期（由任务/查询时判定）

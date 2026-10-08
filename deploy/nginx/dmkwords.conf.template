@@ -1,0 +1,58 @@
+# DmkWords nginx 站点模板（docs/20 §四）——**模板**，部署时替换 __占位符__ 后生效
+#
+# 安装（部署机）：
+#   sed -e 's|__SERVER_NAME__|api.dmkwords.cn|g' \
+#       -e 's|__CERT_CRT__|/opt/dmkwords/certs/server.crt|g' \
+#       -e 's|__CERT_KEY__|/opt/dmkwords/certs/server.key|g' \
+#       -e 's|__ADMIN_DIST__|/opt/dmkwords/admin-web-dist|g' \
+#       -e 's|__BACKEND_ADDR__|127.0.0.1:8002|g' \
+#       deploy/nginx/dmkwords.conf.template > /etc/nginx/conf.d/dmkwords.conf
+#   nginx -t && nginx -s reload
+#
+# 两条**必须成对**的纪律（上线前审查 P1-5 / P2-8）：
+#   ① 本文件用 `X-Forwarded-For $remote_addr` **覆盖**客户端传来的 XFF——
+#      禁用 `$proxy_add_x_forwarded_for`（追加式：客户端自带假 XFF 会被保留，登录限流桶可被绕过）；
+#   ② 后端 .env 里 `TRUSTED_PROXY_COUNT=1`（声明"我前面恰好有一层可信代理"，取值=右起第 1 段）。
+#      只配一边 = 要么全站共用一个限流桶（把所有人一起限流），要么伪造 XFF 能换桶（等于没限流）。
+#
+# 媒体缓存（内容寻址长缓存）由后端中间件下发（backend/middleware/media_cache.py，docs/15 §22.5），
+# 本文件**不得**覆写 /api/ 的 Cache-Control，否则会把 immutable 长缓存打回协商缓存。
+
+server {
+    listen 443 ssl;
+    # nginx ≥1.25 用 `http2 on;`；旧版改写 `listen 443 ssl http2;`
+    http2 on;
+    server_name __SERVER_NAME__;
+
+    ssl_certificate     __CERT_CRT__;
+    ssl_certificate_key __CERT_KEY__;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    # 音频/大图上传统一上限（R6：音频资产上百 GB）；后端慢接口（报表/对账）留足时间
+    client_max_body_size 200m;
+    proxy_read_timeout   300s;
+    proxy_send_timeout   300s;
+
+    # 管理端 SPA（pnpm --dir admin-web build 的产物；与 /api 同源 = 免 CORS，
+    # media.fullUrl 拼 token 依赖同源）
+    root __ADMIN_DIST__;
+    index index.html;
+
+    location /api/ {
+        proxy_pass http://__BACKEND_ADDR__;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;   # 覆盖式（见文件头 ①）
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+    location / {
+        try_files $uri /index.html;
+    }
+
+    # 拒掉探测型路径，别把噪声写进后端日志（不改变任何业务行为）
+    location = /favicon.ico { access_log off; log_not_found off; }
+}
