@@ -2,7 +2,20 @@
 const req = require('./request')
 
 module.exports = {
-  // 登录（开发期：手机号 + 验证码 1234；上线前接微信 code2session）
+  // 登录（2026-10-08 接线）：微信一键登录为主，短信验证码为兜底
+  // ① 微信主通道：wx.login 拿 code → openid 已绑 → 直接登录态；未绑 → need_bind + bind_ticket
+  loginByWechat(wxCode) {
+    return req.post('/api/miniapp/login/wechat', { code: wxCode }, { auth: false })
+  },
+  // ② 首次绑定：绑定凭证 + 手机号 + 短信码（手机号必须已在馆建档）
+  bindByWechat(bindTicket, phone, code) {
+    return req.post('/api/miniapp/login/bind', { bind_ticket: bindTicket, phone, code }, { auth: false })
+  },
+  // ③ 短信兜底 / 绑定共用：发验证码（同号 60 秒一次、每日上限在服务端）
+  sendSms(phone, purpose) {
+    return req.post('/api/miniapp/sms/send', { phone, purpose: purpose || 'login' }, { auth: false })
+  },
+  // 短信验证码登录（开发期固定码 1234 仍可用；生产走真短信）
   login(phone, code) {
     return req.post('/api/miniapp/login', { phone, code }, { auth: false })
   },

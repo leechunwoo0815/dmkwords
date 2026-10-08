@@ -157,3 +157,61 @@
 
 .logo-emoji { width: 72rpx; height: 72rpx; }
 .input-icon { width: 34rpx; height: 34rpx; }
+
+/* 登录页三态（2026-10-08 接线：微信主通道 / 首次绑定 / 短信兜底） */
+.wechat-login-btn {
+  width: 100%;
+  padding: 28rpx;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: var(--surface);
+  font-size: 32rpx;
+  font-weight: 600;
+  border: none;
+  line-height: 1.4;
+  min-height: auto;
+}
+
+.wechat-login-btn::after {
+  border: none;
+}
+
+.mode-tip {
+  font-size: 26rpx;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.sms-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.code-btn {
+  flex: none;
+  padding: 0 24rpx;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  border: 2rpx solid var(--accent);
+  color: var(--accent);
+  font-size: 26rpx;
+}
+
+.code-btn.disabled {
+  opacity: 0.4;
+}
+
+.alt-row {
+  text-align: center;
+}
+
+.alt-link {
+  font-size: 26rpx;
+  color: var(--accent);
+  text-decoration: underline;
+}
