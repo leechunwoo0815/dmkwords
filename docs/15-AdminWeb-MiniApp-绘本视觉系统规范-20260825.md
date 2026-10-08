@@ -1138,3 +1138,12 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 
 若将来新增一张带路径列的表（例："活动相册"）而忘了登记进引用规范表，孤儿判定就会把**在用的图**当孤儿。
 故 `tests/unit/test_media_health.py` **机械枚举** `Base.metadata` 里全部路径类列（`*_path` / `*_url` / `image*` / `thumb*` / `voucher` / `audio` / `*_images`），凡未出现在 `REFERENCE_SPECS` 又不在一份**显式豁免名单**（附理由）→ **测试红**。新增媒体列时必须同时改这张规范表。
+
+### 22.5 路径与缓存的两个单一口径（2026-10-08 加固）
+
+| 口径 | 规定 | 落地 |
+|---|---|---|
+| **uploads 内路径判定** | 一律 `is_within(root, full)`（= `abspath` 后 `root + os.sep` 前缀），**禁止裸 `startswith(root)`**——同前缀兄弟目录（`uploads-evil/`）能骗过裸前缀；`full == root` 也算"不在内"（不是文件） | `backend/common/media_paths.py` 的 `is_within()`（单一口径）；6 个文件的 10 处媒体/删除端点统一改它 |
+| **媒体响应 Cache-Control** | 文件名含**内容指纹**（`_<hex>` 结尾）→ `public, max-age=31536000, immutable`（内容变才换名，长缓存安全）；其余媒体（人工上传、按 id 定名）→ `no-cache`（协商缓存，靠 ETag 复验）。**CDN 要生效必须先有这一层**（审查 P2-7） | `backend/middleware/media_cache.py`（按响应 content-type + URL 指纹统一加，不再逐端点写） |
+
+> 背景：上线前深度大审查（`docs/专家审查-上线前-2026-09-24.md`）P3-1 / P2-7；两条都属"改一处、收益全站"的加固。
