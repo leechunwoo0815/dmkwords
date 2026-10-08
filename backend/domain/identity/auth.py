@@ -105,17 +105,107 @@ def children_payload(db, parent_id: int) -> list[dict]:
     ]
 
 
-def authenticate_parent(db, phone: str, code: str) -> dict:
-    """家长登录（A-1/T6 下沉）：校验验证码 + 查家长 + 返回 token 与孩子列表。
-    P0-F2 fail-closed：LOGIN_DEV_CODE 置空时任何 code 全拒（生产禁用固定验证码）。"""
-    dev_code = get_settings().LOGIN_DEV_CODE
-    if not dev_code or code != dev_code:
-        raise ValidationError("验证码错误")
-    parent = db.query(Parent).filter(Parent.phone == phone, Parent.is_deleted == 0).first()
-    if not parent:
-        raise ValidationError("该手机号未注册（请到店建档）")
+def _login_payload(db, parent: Parent) -> dict:
+    """登录成功的统一载荷（三条通道共用：开发固定码 / 短信 / 微信）。"""
     return {
         "token": _parent_token(parent.id),
         "parent": {"id": parent.id, "name": parent.name, "phone": parent.phone},
         "children": children_payload(db, parent.id),
     }
+
+
+def authenticate_parent(db, phone: str, code: str) -> dict:
+    """短信验证码登录（2026-10-08 接线）：校验通过 + 查家长 + 返回 token 与孩子列表。
+
+    两条通道（互斥）：
+      ① 开发固定码：`LOGIN_DEV_CODE` 非空且 code 与之相等 → 直接放行（供测试/演示；生产置空）；
+      ② 短信验证码：表 `sms_codes` 的服务端校验（限流、一次性、失败次数上限）。
+    生产 `LOGIN_DEV_CODE` 为空 ⇒ ① 恒不成立 ⇒ 任何 code 都必须过短信校验（fail-closed）。
+
+    ⚠️ 微信 openid 是**主通道**（`login_by_wechat` / `bind_wechat`），本函数是兜底与"换手机号"用。
+    """
+    dev_code = get_settings().LOGIN_DEV_CODE
+    if not (dev_code and code == dev_code):
+        from backend.domain.identity.models import SmsCode
+        from backend.domain.identity.sms_service import SmsCodeService
+
+        SmsCodeService(db).verify(phone, code, SmsCode.PURPOSE_LOGIN)
+    parent = db.query(Parent).filter(Parent.phone == phone, Parent.is_deleted == 0).first()
+    if not parent:
+        raise ValidationError("该手机号未注册（请到店建档）")
+    return _login_payload(db, parent)
+
+
+# ---------------- 微信 openid 登录（主通道） ----------------
+
+
+def _wechat_openid(code: str) -> str:
+    """code2session（异步集成 → 同步端点内跑一次事件循环）。"""
+    import asyncio
+
+    from backend.integrations.wechat.auth import WeChatAuth
+
+    data = asyncio.run(WeChatAuth.code_to_session(code))
+    openid = data.get("openid")
+    if not openid:
+        raise ValidationError("微信登录失败：未取到 openid")
+    return openid
+
+
+def make_bind_ticket(openid: str, ttl_minutes: int = 10) -> str:
+    """首次登录的绑定凭证（JWT，type=bind）：只够用来绑一次手机号，不能当登录态使。"""
+    import jwt as pyjwt
+
+    payload = {
+        "sub": openid,
+        "type": "bind",
+        "exp": datetime.now(UTC) + timedelta(minutes=ttl_minutes),
+    }
+    return pyjwt.encode(payload, get_settings().SECRET_KEY, algorithm="HS256")
+
+
+def parse_bind_ticket(ticket: str) -> str:
+    import jwt as pyjwt
+
+    try:
+        payload = pyjwt.decode(ticket, get_settings().SECRET_KEY, algorithms=["HS256"])
+    except pyjwt.PyJWTError as e:
+        raise UnauthorizedError("绑定凭证无效或已过期，请重新登录") from e
+    if payload.get("type") != "bind" or not payload.get("sub"):
+        raise UnauthorizedError("绑定凭证无效")
+    return str(payload["sub"])
+
+
+def login_by_wechat(db, code: str) -> dict:
+    """微信一键登录：openid 已绑家长 → 直接发登录态；未绑 → 返回 need_bind + 绑定凭证。"""
+    from backend.domain.identity.sms_service import parent_by_openid
+
+    openid = _wechat_openid(code)
+    parent = parent_by_openid(db, openid)
+    if parent:
+        return _login_payload(db, parent)
+    return {"need_bind": True, "bind_ticket": make_bind_ticket(openid)}
+
+
+def bind_wechat(db, bind_ticket: str, phone: str, code: str) -> dict:
+    """首次绑定：校验绑定凭证 + 短信验证码 + 手机号已在馆建档 → 落 openid 并发登录态。
+
+    家长档案由馆员"到店建档"创建（phone 唯一）——家长端**不允许自助注册**，
+    所以这里只做"认领"：手机号必须已存在。同一 openid 已绑别的家长 → 拒绝（防顶号）。
+    """
+    from backend.domain.identity.models import SmsCode
+    from backend.domain.identity.sms_service import SmsCodeService, parent_by_openid
+
+    openid = parse_bind_ticket(bind_ticket)
+    SmsCodeService(db).verify(phone, code, SmsCode.PURPOSE_BIND)
+    parent = db.query(Parent).filter(Parent.phone == phone, Parent.is_deleted == 0).first()
+    if not parent:
+        raise ValidationError("该手机号未注册（请到店建档）")
+    if parent.wechat_openid and parent.wechat_openid != openid:
+        raise ValidationError("该手机号已绑定其他微信，请联系馆员处理")
+    occupied = parent_by_openid(db, openid)
+    if occupied and occupied.id != parent.id:
+        raise ValidationError("该微信已绑定其他手机号，请联系馆员处理")
+    parent.wechat_openid = openid
+    db.commit()
+    return _login_payload(db, parent)

@@ -393,7 +393,7 @@ class EventBus:
             from backend.database import get_session
 
             for handler in handlers:
-                session = get_session()()
+                session = get_session()
                 try:
                     handler(event, session)
                     session.commit()
@@ -401,7 +401,7 @@ class EventBus:
                     session.rollback()
                     # 重试一次
                     try:
-                        retry_session = get_session()()
+                        retry_session = get_session()
                     except Exception as create_err:
                         logger.error(
                             f"Failed to create retry session: {create_err}",

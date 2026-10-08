@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+import os
+
 #: 可再生目录（白名单）：内容可由程序重新生成，允许清理其中的孤儿。**白名单外一律不动**
 REGENERABLE_PREFIXES = ("cover/", "book_audio/", "circle/", "reports/")
 
@@ -52,3 +54,13 @@ def is_protected(rel: str) -> bool:
 def is_regenerable(rel: str) -> bool:
     """是否落在可再生白名单内（**唯一允许被清理的一类**）。"""
     return any(norm_rel(rel).startswith(p) for p in REGENERABLE_PREFIXES)
+
+
+def is_within(root: str, full: str) -> bool:
+    """`full` 是否**真在** root 目录内（`root + os.sep` 前缀判定，`full == root` 不算）。
+
+    为什么不能裸 `full.startswith(root)`：同前缀的兄弟目录能骗过它——
+    `uploads-evil/x.jpg` 以 `uploads` 开头，裸前缀会放行（upstreams 审查 P3-1）。
+    本函数是 uploads 路径判定的**单一口径**（docs/15 §22.5）：媒体下发/删除端点一律走它。
+    """
+    return os.path.abspath(full).startswith(os.path.abspath(root) + os.sep)

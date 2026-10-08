@@ -4135,6 +4135,23 @@
         "title": "SigninRequest",
         "type": "object"
       },
+      "SmsSendRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "phone": {
+            "default": "",
+            "title": "Phone",
+            "type": "string"
+          },
+          "purpose": {
+            "default": "login",
+            "title": "Purpose",
+            "type": "string"
+          }
+        },
+        "title": "SmsSendRequest",
+        "type": "object"
+      },
       "StaffCreateRequest": {
         "additionalProperties": false,
         "properties": {
@@ -4391,6 +4408,40 @@
           "voucher_path"
         ],
         "title": "VoucherUploadResponse",
+        "type": "object"
+      },
+      "WeChatBindRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "bind_ticket": {
+            "default": "",
+            "title": "Bind Ticket",
+            "type": "string"
+          },
+          "code": {
+            "default": "",
+            "title": "Code",
+            "type": "string"
+          },
+          "phone": {
+            "default": "",
+            "title": "Phone",
+            "type": "string"
+          }
+        },
+        "title": "WeChatBindRequest",
+        "type": "object"
+      },
+      "WeChatLoginRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "default": "",
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "title": "WeChatLoginRequest",
         "type": "object"
       },
       "WithdrawalApplyRequest": {
@@ -11673,6 +11724,8 @@
             "required": false,
             "schema": {
               "default": 20,
+              "maximum": 100,
+              "minimum": 1,
               "title": "Page Size",
               "type": "integer"
             }
@@ -13551,6 +13604,86 @@
         ]
       }
     },
+    "/api/miniapp/login/bind": {
+      "post": {
+        "description": "微信首次绑定手机号：绑定凭证 + 短信验证码 → 落 openid 并发登录态。",
+        "operationId": "login_bind_api_miniapp_login_bind_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeChatBindRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login Bind",
+        "tags": [
+          "identity-miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/login/wechat": {
+      "post": {
+        "description": "微信一键登录（**主通道**）。\n\nopenid 已绑家长 → 直接发登录态；未绑 → `{need_bind: true, bind_ticket}`，\n小程序接着走「手机号 + 短信码」的绑定（`/login/bind`）。家长档案仍由馆员到店建档创建。",
+        "operationId": "login_wechat_api_miniapp_login_wechat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeChatLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login Wechat",
+        "tags": [
+          "identity-miniapp"
+        ]
+      }
+    },
     "/api/miniapp/notifications": {
       "get": {
         "description": "家长端消息中心（A-1/T6 下沉：逻辑在 NotificationService.list_mine）。",
@@ -14712,6 +14845,46 @@
         "summary": "Cancel Reservation",
         "tags": [
           "miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/sms/send": {
+      "post": {
+        "description": "发短信验证码（登录兜底 / 微信绑定共用）。\n\n三道闸门在服务层：同号间隔、每日上限、校验失败次数；开发态 `SMS_PROVIDER=mock`\n验证码打在服务端日志（`[MockSms]`），不真发短信。",
+        "operationId": "sms_send_api_miniapp_sms_send_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsSendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sms Send",
+        "tags": [
+          "identity-miniapp"
         ]
       }
     },

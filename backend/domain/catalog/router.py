@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
+from backend.common.media_paths import is_within
 from backend.config import get_settings
 from backend.database import get_db
 
@@ -66,7 +67,7 @@ def _media_response(book, field: str, media_type: str):
         raise NotFoundError("资源不存在")
     root = os.path.abspath(get_settings().UPLOADS_DIR)
     full = os.path.abspath(os.path.join(root, rel))
-    if not full.startswith(root) or not os.path.isfile(full):
+    if not is_within(root, full) or not os.path.isfile(full):
         raise NotFoundError("资源不存在")
     return FileResponse(full, media_type=media_type)
 
@@ -303,7 +304,7 @@ def update_copy_status(
 
 
 @router.post("/books/{book_id}/cover", response_model=BookResponse)
-async def upload_cover(
+def upload_cover(
     book_id: int,
     file: UploadFile = File(...),
     admin: Any = Depends(require_perm("book.manage")),
@@ -313,7 +314,7 @@ async def upload_cover(
 
     policy = read_image_policy(db, "cover")
     ensure_upload_within_limit(file, policy)  # 解码前拦超限（不把巨图读进内存）
-    data = await file.read()
+    data = file.file.read()
     ext = os.path.splitext(file.filename or "")[1]
     book = BookService(db).upload_cover(admin, book_id, data, ext)
     # D1 收尾：上传响应重算 missing（前端「待完善」Tag 依据）
@@ -321,25 +322,25 @@ async def upload_cover(
 
 
 @router.post("/books/{book_id}/audio", response_model=BookResponse)
-async def upload_audio(
+def upload_audio(
     book_id: int,
     file: UploadFile = File(...),
     admin: Any = Depends(require_perm("audio.manage")),
     db: Session = Depends(get_db),
 ):
-    data = await file.read()
+    data = file.file.read()
     book = BookService(db).upload_audio(admin, book_id, data, file.filename or "")
     # D1 收尾：上传响应重算 missing（前端「待完善」Tag 依据）
     return _to_book_response(book, 0, missing=BookService(db).get_onboarding_missing(book_id))
 
 
 @router.post("/books/import", response_model=ImportResultResponse)
-async def import_books_excel(
+def import_books_excel(
     file: UploadFile = File(...),
     admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
-    data = await file.read()
+    data = file.file.read()
     result = import_books(db, admin, data)
     return ImportResultResponse(**result)
 
@@ -355,7 +356,7 @@ def serve_upload(path: str, admin: Any = Depends(require_perm("book.manage"))):
 
     root = os.path.abspath(get_settings().UPLOADS_DIR)
     full = os.path.abspath(os.path.join(root, path))
-    if not full.startswith(root) or is_trash_path(path):
+    if not is_within(root, full) or is_trash_path(path):
         from backend.common.exceptions import NotFoundError
 
         raise NotFoundError("文件不存在")

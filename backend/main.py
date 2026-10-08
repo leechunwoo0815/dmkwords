@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.common.exceptions import BusinessException, business_exception_handler
 from backend.config import get_settings
+from backend.middleware.media_cache import MediaCacheMiddleware
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -34,11 +35,12 @@ app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION, lifespan=li
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # admin-web 开发端口；上线前收紧为正式域名
+    allow_origins=settings.cors_origins,  # 来自 CORS_ORIGINS（.env）；空=同域部署不发跨域头
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.add_middleware(MediaCacheMiddleware)  # 媒体缓存头单一口径（docs/15 §22.5）
 app.add_exception_handler(BusinessException, business_exception_handler)
 
 

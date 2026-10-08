@@ -106,7 +106,7 @@ def update_activity(
 
 
 @router.post("/activities/{activity_id}/cover")
-async def upload_activity_cover(
+def upload_activity_cover(
     activity_id: int,
     admin: Any = Depends(require_perm("member.manage")),
     db: Session = Depends(get_db),
@@ -116,7 +116,7 @@ async def upload_activity_cover(
     from backend.common.file_storage import ensure_upload_within_limit, read_image_policy
 
     ensure_upload_within_limit(file, read_image_policy(db, "activity_cover"))
-    data = await file.read()
+    data = file.file.read()
     a = AdminActivityService(db).upload_cover(admin, activity_id, data, file.filename or "")
     return {"id": a.id, "cover_path": a.cover_path}
 
@@ -141,7 +141,7 @@ def update_activity_detail_blocks(
 
 
 @router.post("/activities/{activity_id}/detail-images")
-async def upload_activity_detail_image(
+def upload_activity_detail_image(
     activity_id: int,
     admin: Any = Depends(require_perm("member.manage")),
     db: Session = Depends(get_db),
@@ -151,7 +151,7 @@ async def upload_activity_detail_image(
     from backend.common.file_storage import ensure_upload_within_limit, read_image_policy
 
     ensure_upload_within_limit(file, read_image_policy(db, "activity_detail"))
-    data = await file.read()
+    data = file.file.read()
     return AdminActivityService(db).upload_detail_image(
         admin, activity_id, data, file.filename or ""
     )

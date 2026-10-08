@@ -16,6 +16,7 @@ from backend.common.notification_models import Notification
 from backend.common.notifications import SCENE_MEMBER_EXPIRE_REMIND, NotificationService
 from backend.common.sql_utils import escape_like
 from backend.domain.catalog.audit_events import publish_audit
+from backend.domain.identity import refund_rules
 from backend.domain.identity.models import Child, Order, Parent, RefundRequest
 
 
@@ -29,6 +30,11 @@ class OrderService:
         from backend.common.config_service import ConfigService
 
         return Decimal(ConfigService(self.db).get_value(key))
+
+    def _config_int(self, key: str, default: int) -> int:
+        from backend.common.config_service import ConfigService
+
+        return int(ConfigService(self.db).get_value(key, str(default)))
 
     def my_orders(self, child_id: int, parent_id: int) -> list[dict]:
         """家长视角订单列表（A-1/T6 下沉）：孩子名下单 ∪ 家长级单（child_id NULL）。"""
@@ -248,7 +254,6 @@ class OrderService:
     def refund_order(self, admin, order_id: int, remark: str) -> RefundRequest:
         """超管代家长发起退款申请（B-15 改造 20260903）：原直接翻 REFUNDED 的旁路已废，
         统一走 R-308 审核链——创建 pending 申请，后续 review→execute 与家长申请同链。"""
-        from backend.domain.identity.wm10_service import RefundService
 
         order = (
             self.db.query(Order)
@@ -262,7 +267,7 @@ class OrderService:
         if order.status != Order.STATUS_PAID:
             raise ValidationError(f"订单状态 {order.status} 不可退款")
         # 金额强制复用 _refundable_amount（X6 三形态同源计算，不得另写）
-        refundable = RefundService(self.db)._refundable_amount(order)
+        refundable = refund_rules.refundable_amount(self.db, order)
         if refundable <= 0:
             raise ValidationError("该订单当前无可退金额")
         req = RefundRequest(
@@ -378,7 +383,11 @@ class OrderService:
 
         # ---- 会员开通联动（同一事务）----
         if order.order_type == Order.TYPE_OBSERVATION:
-            child = self._open_membership(order.child_id, Child.MEMBER_OBSERVATION, 30)
+            child = self._open_membership(
+                order.child_id,
+                Child.MEMBER_OBSERVATION,
+                self._config_int("observation_period_days", 30),
+            )
         elif order.order_type == Order.TYPE_FORMAL:
             child = self.db.query(Child).filter(Child.id == order.child_id).first()
             # 提前续费顺延（V1.1 §3.4）：有效会员且未过期 → 原到期日 +365
@@ -393,7 +402,8 @@ class OrderService:
             )
             self._transition_member(child, Child.MEMBER_FORMAL)
             child.member_start = child.member_start or date.today()
-            child.member_expire = base + timedelta(days=365)
+            # 年费时长进配置（审查 P2-3）：改口径只改配置，不发版
+            child.member_expire = base + timedelta(days=self._config_int("formal_period_days", 365))
         elif order.order_type == Order.TYPE_FIRST_ACTIVITY:
             child = None  # 99 元不开会员（获客单）
         else:

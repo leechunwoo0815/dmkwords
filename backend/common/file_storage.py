@@ -14,6 +14,7 @@ import struct
 from dataclasses import dataclass
 from io import BytesIO
 
+from backend.common.media_paths import is_within
 from backend.config import get_settings
 
 ALLOWED_COVER_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -171,7 +172,7 @@ def remove_book_media(cover_path: str | None, audio_path: str | None) -> None:
         if not rel:
             continue
         full = os.path.abspath(os.path.join(root, rel))
-        if not full.startswith(root):
+        if not is_within(root, full):
             continue
         if os.path.isfile(full):
             try:

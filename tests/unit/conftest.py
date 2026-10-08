@@ -29,6 +29,9 @@ ADMIN_TABLES = [
     # 会跨测试串台（下个用例的盘点断言读到上个用例的行）
     "media_trash_entries",
     "media_censuses",
+    # 短信验证码（2026-10-08 登录接线）：同号 60 秒发送间隔是**按库里的最新一条**判的，
+    # 不清就会跨测试互相限流（实测：连跑两轮，第二轮全红）
+    "sms_codes",
     "observation_reports",
     "transfer_requests",
     "withdrawal_requests",

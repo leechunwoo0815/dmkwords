@@ -39,6 +39,15 @@ class Settings(BaseSettings):
     # 定时任务调度器（WM11/F5：验收期与排障可经 .env 置 false 关闭，进程内任务不自动跑）
     SCHEDULER_ENABLED: bool = True
 
+    # 短信网关（2026-10-08 接线：登录绑定的兜底通道 + 换手机号）
+    # mock = 只打日志不发真短信（开发/测试）；生产必须 aliyun / tencent（validate_production 把关）
+    SMS_ENABLED: bool = True
+    SMS_PROVIDER: str = "mock"
+    SMS_APP_ID: str = ""  # 阿里云 AccessKeyId / 腾讯云 SecretId
+    SMS_APP_KEY: str = ""  # 阿里云 AccessKeySecret / 腾讯云 SecretKey
+    SMS_SIGN_NAME: str = ""  # 已报备的短信签名
+    SMS_TEMPLATE_CODE: str = ""  # 已报备的验证码模板 ID
+
     # 微信支付 V3
     WECHAT_MCH_ID: str = ""
     WECHAT_API_KEY_V3: str = ""
@@ -51,6 +60,14 @@ class Settings(BaseSettings):
     # 服务器
     BACKEND_PORT: int = 8002
     UPLOADS_DIR: str = "uploads"
+
+    # 管理端跨域白名单（逗号分隔；空 = 不发跨域头，适合同域反代部署）
+    # 2026-10-08：原为 main.py 硬编码 localhost:5173（审查 P2-1）——生产必须改成正式域名
+    CORS_ORIGINS: str = "http://localhost:5173"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
 
     @property
     def database_url(self) -> str:
@@ -72,6 +89,15 @@ class Settings(BaseSettings):
             problems.append("微信配置缺失")
         if self.LOGIN_DEV_CODE:
             problems.append("生产环境 LOGIN_DEV_CODE 必须置空（禁用固定验证码）")
+        if any("localhost" in o for o in self.cors_origins):
+            problems.append("生产环境 CORS_ORIGINS 不得含 localhost（改成正式管理端域名）")
+        if self.SMS_ENABLED and self.SMS_PROVIDER.strip().lower() == "mock":
+            problems.append(
+                "生产环境 SMS_PROVIDER 不能是 mock（短信发不出去；不用短信则置 SMS_ENABLED=false）"
+            )
+        if self.SMS_ENABLED and self.SMS_PROVIDER.strip().lower() in ("aliyun", "tencent"):
+            if not (self.SMS_APP_ID and self.SMS_APP_KEY and self.SMS_SIGN_NAME):
+                problems.append("短信网关凭据缺失（SMS_APP_ID/SMS_APP_KEY/SMS_SIGN_NAME）")
         if problems:
             raise RuntimeError(f"生产环境配置校验失败: {'; '.join(problems)}")
 

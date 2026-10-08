@@ -307,3 +307,25 @@ class ObservationReport(BaseModel):
     remark = Column(String(500), nullable=True, comment="馆员备注")
     uploaded_by = Column(Integer, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.now)
+
+
+class SmsCode(BaseModel):
+    """短信验证码（登录/绑定的**服务端权威存储**，2026-10-08 接线）。
+
+    为什么要落库而不是放网关内存：网关（mock/阿里云/腾讯）只负责"把码发出去"，
+    而**校验**必须由我们自己掌握——① 多 worker/多副本下内存态各存一份，校验会随机失败；
+    ② 限流（同号 60 秒一次、每日上限）与审计需要可查询的历史；③ 换网关不影响校验口径。
+    """
+
+    __tablename__ = "sms_codes"
+
+    PURPOSE_LOGIN = "login"  # 家长登录（短信兜底通道）
+    PURPOSE_BIND = "bind"  # 微信 openid 首次绑定手机号
+
+    phone = Column(String(20), nullable=False, index=True, comment="手机号")
+    purpose = Column(String(16), nullable=False, default=PURPOSE_LOGIN, comment="login/bind")
+    code_hash = Column(String(64), nullable=False, comment="sha256(phone:code:SECRET_KEY)")
+    expires_at = Column(DateTime, nullable=False, comment="过期时间")
+    used_at = Column(DateTime, nullable=True, comment="使用时间（一次性）")
+    attempts = Column(Integer, nullable=False, default=0, comment="校验失败次数（防爆破）")
+    created_at = Column(DateTime, nullable=False, default=datetime.now, comment="发送时间")

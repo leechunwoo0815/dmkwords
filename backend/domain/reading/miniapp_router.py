@@ -6,13 +6,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import Field
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
 from backend.common.exceptions import NotFoundError
 from backend.common.file_utils import book_cover_url, image_media_type
+from backend.common.media_paths import is_within
 from backend.database import get_db
 from backend.domain.catalog.models import Book
 from backend.domain.identity import guards
@@ -56,7 +57,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
 def list_books(
     keyword: str | None = None,
     page: int = 1,
-    page_size: int = 20,
+    page_size: int = Query(20, ge=1, le=100),
     grade: str | None = None,
     topic: str | None = None,
     ar_min: float | None = None,
@@ -219,7 +220,7 @@ def book_audio(
         raise NotFoundError("音频不存在")
     root = os.path.abspath(get_settings().UPLOADS_DIR)
     full = os.path.abspath(os.path.join(root, book.audio_path))
-    if not full.startswith(root) or not os.path.isfile(full):
+    if not is_within(root, full) or not os.path.isfile(full):
         raise NotFoundError("音频不存在")
     return FileResponse(full, media_type="audio/mpeg")
 
@@ -274,7 +275,7 @@ def book_cover(
         raise NotFoundError("封面不存在")
     root = os.path.abspath(get_settings().UPLOADS_DIR)
     full = os.path.abspath(os.path.join(root, book.cover_path))
-    if not full.startswith(root) or not os.path.isfile(full):
+    if not is_within(root, full) or not os.path.isfile(full):
         from backend.common.exceptions import NotFoundError
 
         raise NotFoundError("封面不存在")

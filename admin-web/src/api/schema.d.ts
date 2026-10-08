@@ -2857,6 +2857,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/miniapp/login/bind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login Bind
+         * @description 微信首次绑定手机号：绑定凭证 + 短信验证码 → 落 openid 并发登录态。
+         */
+        post: operations["login_bind_api_miniapp_login_bind_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/login/wechat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login Wechat
+         * @description 微信一键登录（**主通道**）。
+         *
+         *     openid 已绑家长 → 直接发登录态；未绑 → `{need_bind: true, bind_ticket}`，
+         *     小程序接着走「手机号 + 短信码」的绑定（`/login/bind`）。家长档案仍由馆员到店建档创建。
+         */
+        post: operations["login_wechat_api_miniapp_login_wechat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/miniapp/notifications": {
         parameters: {
             query?: never;
@@ -3203,6 +3246,29 @@ export interface paths {
         put?: never;
         /** Cancel Reservation */
         post: operations["cancel_reservation_api_miniapp_reservations__reservation_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/sms/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sms Send
+         * @description 发短信验证码（登录兜底 / 微信绑定共用）。
+         *
+         *     三道闸门在服务层：同号间隔、每日上限、校验失败次数；开发态 `SMS_PROVIDER=mock`
+         *     验证码打在服务端日志（`[MockSms]`），不真发短信。
+         */
+        post: operations["sms_send_api_miniapp_sms_send_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5202,6 +5268,19 @@ export interface components {
             /** Ticket Code */
             ticket_code: string;
         };
+        /** SmsSendRequest */
+        SmsSendRequest: {
+            /**
+             * Phone
+             * @default
+             */
+            phone: string;
+            /**
+             * Purpose
+             * @default login
+             */
+            purpose: string;
+        };
         /** StaffCreateRequest */
         StaffCreateRequest: {
             /** Display Name */
@@ -5293,6 +5372,32 @@ export interface components {
             order_no: string;
             /** Voucher Path */
             voucher_path: string;
+        };
+        /** WeChatBindRequest */
+        WeChatBindRequest: {
+            /**
+             * Bind Ticket
+             * @default
+             */
+            bind_ticket: string;
+            /**
+             * Code
+             * @default
+             */
+            code: string;
+            /**
+             * Phone
+             * @default
+             */
+            phone: string;
+        };
+        /** WeChatLoginRequest */
+        WeChatLoginRequest: {
+            /**
+             * Code
+             * @default
+             */
+            code: string;
         };
         /** WithdrawalApplyRequest */
         WithdrawalApplyRequest: {
@@ -10679,6 +10784,72 @@ export interface operations {
             };
         };
     };
+    login_bind_api_miniapp_login_bind_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeChatBindRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_wechat_api_miniapp_login_wechat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeChatLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_notifications_api_miniapp_notifications_get: {
         parameters: {
             query?: {
@@ -11382,6 +11553,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ReservationCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sms_send_api_miniapp_sms_send_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsSendRequest"];
             };
         };
         responses: {

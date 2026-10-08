@@ -4,12 +4,15 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
+from backend.database import get_db
 from backend.domain.identity.auth import child_of_parent, get_current_parent
 from backend.domain.identity.observation_service import ObservationReportService
 from backend.domain.identity.transfer_service import TransferService
 from backend.domain.identity.wm10_service import RefundService, WithdrawalService
+from backend.middleware.rate_limit import rate_limit
 
 router = APIRouter(tags=["identity-miniapp"])
 
@@ -248,3 +251,53 @@ def observation_reports(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child_of_parent(db, parent.id, child_id)
     return ObservationReportService(db).list_for_child(child_id)
+
+
+# ---------- 登录（2026-10-08 接线，审查 P0-1）：微信主通道 + 短信兜底 ----------
+
+
+class WeChatLoginRequest(BaseSchema):
+    code: str = ""  # wx.login 拿到的临时 code
+
+
+class WeChatBindRequest(BaseSchema):
+    bind_ticket: str = ""
+    phone: str = ""
+    code: str = ""
+
+
+class SmsSendRequest(BaseSchema):
+    phone: str = ""
+    purpose: str = "login"  # login=登录兜底 / bind=微信首次绑手机号
+
+
+@router.post("/login/wechat", dependencies=[Depends(rate_limit(10, 60))])
+def login_wechat(body: WeChatLoginRequest, db: Session = Depends(get_db)):
+    """微信一键登录（**主通道**）。
+
+    openid 已绑家长 → 直接发登录态；未绑 → `{need_bind: true, bind_ticket}`，
+    小程序接着走「手机号 + 短信码」的绑定（`/login/bind`）。家长档案仍由馆员到店建档创建。
+    """
+    from backend.domain.identity.auth import login_by_wechat
+
+    return login_by_wechat(db, body.code)
+
+
+@router.post("/login/bind", dependencies=[Depends(rate_limit(5, 60))])
+def login_bind(body: WeChatBindRequest, db: Session = Depends(get_db)):
+    """微信首次绑定手机号：绑定凭证 + 短信验证码 → 落 openid 并发登录态。"""
+    from backend.domain.identity.auth import bind_wechat
+
+    return bind_wechat(db, body.bind_ticket, body.phone, body.code)
+
+
+@router.post("/sms/send", dependencies=[Depends(rate_limit(5, 60))])
+def sms_send(body: SmsSendRequest, db: Session = Depends(get_db)):
+    """发短信验证码（登录兜底 / 微信绑定共用）。
+
+    三道闸门在服务层：同号间隔、每日上限、校验失败次数；开发态 `SMS_PROVIDER=mock`
+    验证码打在服务端日志（`[MockSms]`），不真发短信。
+    """
+    from backend.domain.identity.sms_service import SmsCodeService
+
+    return SmsCodeService(db).send(body.phone, body.purpose)

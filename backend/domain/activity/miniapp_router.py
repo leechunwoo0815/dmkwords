@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
+from backend.common.media_paths import is_within
 from backend.database import get_db
 from backend.domain.activity.admin_service import AdminActivityService
 from backend.domain.activity.past_service import PastActivityService
@@ -103,7 +104,7 @@ def activity_cover(
         raise NotFoundError("封面不存在")
     root = os.path.abspath(get_settings().UPLOADS_DIR)
     full = os.path.abspath(os.path.join(root, rel))
-    if not full.startswith(root) or not os.path.isfile(full):
+    if not is_within(root, full) or not os.path.isfile(full):
         from backend.common.exceptions import NotFoundError
 
         raise NotFoundError("封面文件不存在")

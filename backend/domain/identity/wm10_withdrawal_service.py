@@ -16,6 +16,7 @@ from backend.common.admin_notifications import AdminNotifyService
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.circulation.models import BorrowRecord
+from backend.domain.identity import refund_rules
 from backend.domain.identity.models import (
     Child,
     Order,
@@ -340,9 +341,7 @@ class WithdrawalService:
         同时排除已有「在办/已退」退款单的订单与押金，避免与独立退款流程叠加重复退。
         """
         from backend.domain.billing.models import Deposit
-        from backend.domain.identity.wm10_service import RefundService
 
-        refund_svc = RefundService(self.db)
         items: list[dict] = []
         # 已存在「在办或已退」退款单的订单/押金 → 退会结算不再重复计入
         settled = (
@@ -389,7 +388,7 @@ class WithdrawalService:
         for order in orders:
             if order.id in settled_order_ids:
                 continue
-            amount = refund_svc._refundable_amount(order)
+            amount = refund_rules.refundable_amount(self.db, order)
             if amount <= 0:
                 continue
             items.append(
@@ -398,7 +397,7 @@ class WithdrawalService:
                     "order_id": order.id,
                     "order_no": order.order_no,
                     "amount": amount,
-                    "rule": refund_svc._rule_text(order),
+                    "rule": refund_rules.rule_text(self.db, order),
                 }
             )
         # 2) 押金（可用余额；已扣除部分不退）

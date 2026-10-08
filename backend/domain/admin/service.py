@@ -565,9 +565,22 @@ class TaskAdminService:
             for r in rows
         ]
 
-    def run(self, task_name: str, manual: bool = False, admin=None) -> dict:
-        from backend.tasks.registry import run_task
+    #: 手动触发**仅超管**的任务分组——资金（动钱：订单超时取消/转让超时）与
+    #: 系统（动磁盘：媒体体检含回收站到期清除）。其余分组（会员/借阅/活动/阅读圈）
+    #: 专员可触发（日常运维需要）。审查 P1-5：此前一律 dashboard.view，专员可间接触发删文件。
+    SUPERADMIN_ONLY_TASK_GROUPS = ("资金", "系统")
 
+    def run(self, task_name: str, manual: bool = False, admin=None) -> dict:
+        from backend.tasks.registry import TASKS, run_task
+
+        if manual and admin is not None:
+            spec = TASKS.get(task_name)
+            if (
+                spec
+                and spec.group in self.SUPERADMIN_ONLY_TASK_GROUPS
+                and admin.role != AdminUser.ROLE_SUPER_ADMIN
+            ):
+                raise ForbiddenError(f"「{spec.display_name}」仅超级管理员可手动触发")
         return run_task(task_name, manual=manual, admin=admin)
 
 

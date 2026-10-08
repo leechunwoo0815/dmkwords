@@ -274,7 +274,7 @@ class OrderRefundRequest(BaseSchema):
 
 
 @router.post("/orders/{order_id}/voucher", response_model=VoucherUploadResponse)
-async def upload_order_voucher(
+def upload_order_voucher(
     order_id: int,
     file: UploadFile = File(...),
     admin: Any = Depends(require_perm("member.manage")),
@@ -286,7 +286,7 @@ async def upload_order_voucher(
     from backend.common.file_storage import ensure_upload_within_limit, read_image_policy
 
     ensure_upload_within_limit(file, read_image_policy(db, "doc"))
-    data = await file.read()
+    data = file.file.read()
     order = OrderService(db).upload_voucher(admin, order_id, data, file.filename or "")
     return VoucherUploadResponse(
         id=order.id, order_no=order.order_no, voucher_path=order.voucher_path or ""
@@ -434,7 +434,7 @@ def admin_transfer_review(
 
 
 @router.post("/children/{child_id}/observation-reports")
-async def upload_observation_report(
+def upload_observation_report(
     child_id: int,
     remark: str = Form(""),
     files: list[UploadFile] = File(...),

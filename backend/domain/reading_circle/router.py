@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
 from backend.common.file_utils import image_media_type
+from backend.common.media_paths import is_within
 from backend.database import get_db
 from backend.domain.reading_circle.admin_service import AdminCircleService
 from backend.domain.reading_circle.card_engine import CARD_TYPE_LABELS, post_card_image
@@ -135,7 +136,7 @@ def circle_post_image(
     rel = post_card_image(db, post_id)
     root = os.path.abspath(get_settings().UPLOADS_DIR)
     full = os.path.abspath(os.path.join(root, rel))
-    if not full.startswith(root) or not os.path.isfile(full):
+    if not is_within(root, full) or not os.path.isfile(full):
         from backend.common.exceptions import NotFoundError
 
         raise NotFoundError("卡片图文件不存在")

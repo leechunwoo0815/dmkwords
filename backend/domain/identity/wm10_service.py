@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from decimal import Decimal
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -20,6 +19,7 @@ from backend.common.admin_notification_models import AdminNotification
 from backend.common.admin_notifications import AdminNotifyService
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
 from backend.domain.catalog.audit_events import publish_audit
+from backend.domain.identity import refund_rules
 from backend.domain.identity.models import (
     Child,
     Order,
@@ -45,7 +45,7 @@ class RefundService:
     # ---------- 可退金额（服务端唯一权威） ----------
     def preview(self, child: Child, order_id: int) -> dict:
         order = self._paid_order(child, order_id)
-        amount = self._refundable_amount(order)
+        amount = refund_rules.refundable_amount(self.db, order)
         paid = order.amount
         # X6 可退卡片三形态：proportional（比例退带折算过程）/ full（全额）/ zero（不可退）
         if amount <= 0:
@@ -56,13 +56,14 @@ class RefundService:
             mode = "full"
         calc: dict = {"mode": mode}
         if mode == "proportional":
-            days_used = self._days_used(order)
-            days_total = 30 if order.order_type == Order.TYPE_OBSERVATION else 365
+            # 折算过程与实退算法**同源**（同一对函数：refund_rules.period_days / days_used）
+            used = refund_rules.days_used(order)
+            total = refund_rules.period_days(self.db, order.order_type)
             calc.update(
                 {
-                    "days_used": days_used,
-                    "days_total": days_total,
-                    "days_remaining": max(0, days_total - days_used),
+                    "days_used": used,
+                    "days_total": total,
+                    "days_remaining": max(0, total - used),
                 }
             )
         return {
@@ -71,39 +72,9 @@ class RefundService:
             "order_type": order.order_type,
             "paid_amount": str(paid),
             "refundable_amount": str(amount),
-            "rule": self._rule_text(order),
+            "rule": refund_rules.rule_text(self.db, order),
             "calc": calc,
         }
-
-    def _refundable_amount(self, order: Order) -> Decimal:
-        if order.order_type == Order.TYPE_OBSERVATION:
-            # 按剩余天数比例（30 天观察期）；待评估后退会可退为 0
-            days_used = self._days_used(order)
-            remaining = max(0, 30 - days_used)
-            return (order.amount * Decimal(remaining) / Decimal(30)).quantize(Decimal("0.01"))
-        if order.order_type == Order.TYPE_FORMAL:
-            # 按剩余天数比例（365 天年费）
-            days_used = self._days_used(order)
-            remaining = max(0, 365 - days_used)
-            return (order.amount * Decimal(remaining) / Decimal(365)).quantize(Decimal("0.01"))
-        # 首场活动费 / 活动费：未签到未开始全额（是否可退由审核判断）
-        return order.amount
-
-    @staticmethod
-    def _days_used(order: Order) -> int:
-        if not order.paid_at:
-            return 0
-        return max(0, (datetime.now() - order.paid_at).days)
-
-    @staticmethod
-    def _rule_text(order: Order) -> str:
-        if order.order_type == Order.TYPE_OBSERVATION:
-            return "观察期费按剩余天数比例退（30 天期，无手续费）"
-        if order.order_type == Order.TYPE_FORMAL:
-            return "年费按剩余天数比例退（按实付金额）"
-        if order.order_type == Order.TYPE_FIRST_ACTIVITY:
-            return "未参加全额退（已参加过不退，审核时核对）"
-        return "活动费：未签到且未开始全额退"
 
     def _paid_order(self, child: Child, order_id: int) -> Order:
         order = (
@@ -177,7 +148,7 @@ class RefundService:
                     raise ValidationError("活动已开始，请线下与馆员协商处理")
         # R1（X6 返工）：0 元禁提交——0 元申请会联动创建退会单+锁孩子，
         # 审核员误批即 withdrawn（真业务陷阱，非纯 UX）
-        if self._refundable_amount(order) <= 0:
+        if refund_rules.refundable_amount(self.db, order) <= 0:
             raise ValidationError("该订单当前无可退金额")
         # dup 检查先于锁定检查（同订单重复申请给更具体的错误）
         dup = (
@@ -234,7 +205,7 @@ class RefundService:
             order_id=order_id,
             withdrawal_id=withdrawal.id if withdrawal else None,
             child_id=child.id,
-            amount=self._refundable_amount(order),
+            amount=refund_rules.refundable_amount(self.db, order),
             reason=reason.strip(),
         )
         self.db.add(req)
