@@ -62,7 +62,7 @@
 | ID | 名称 | 价值 | 优先级 | 依赖 | 验收标准 | Gherkin | 状态 |
 |--- |--- |--- |--- |--- |--- |--- |--- |
 | FEAT-015 | 订单模型与状态机 | 资金基石 | P0 | 004 | 6 类订单（first_activity/observation/formal/activity/deposit/deposit_supplement）× 5 态（pending_payment/pending_manual_confirm/paid/cancelled/refunded；域H L-3 对齐实测 2026-09-03）；非法流转拦截；状态变更留痕〔R-312, R-322〕 | order.feature | MANUAL_TEST |
-| FEAT-016 | 微信线上支付 | 线上收款 | P0 | 015 | V3 下单；回调验签+金额校验+幂等（重复通知不重复入账）；三段式事务〔模式手册 P2/P3〕 | payment.feature | REGISTERED |
+| FEAT-016 | 微信线上支付 | 线上收款 | P0 | 015 | V3 下单；回调验签+金额校验+幂等（重复通知不重复入账）；三段式事务〔模式手册 P2/P3〕。**2026-10-08 落地（WM12-A）**：家长端在线下单（观察期/年费/99 元首场/押金）+ `pay` 拉起支付 + `/api/pay/wechat/notify` 回调三件套 + `orders.transaction_id` 唯一索引 + 平台证书轮换任务 + 生产校验四件套。**同日 WM12-B**：**原路退款**（执行按原单渠道分流 → 三段式调微信退款 → 退款结果通知按 `out_refund_no` 幂等入账，乱序守卫）+ **每日对账**（本地三类差异审计 + 微信账单比对 + `payment_reconciliations` 报表）；真机真付/真退与真实账单核对等 T3 商户号（任务包见 `docs/09` WM12-A/WM12-B 两章） | payment.feature | MANUAL_TEST |
 | FEAT-017 | 人工收款确认 | 线下收款 | P0 | 015 | 待人工确认态；操作人+凭证留痕；确认后等同 paid；活动单确认时限 min(48h, 开始时间)〔R-320〕 | payment.feature | MANUAL_TEST |
 | FEAT-018 | 线下收款登记 | 支付宝/刷卡/转账 | P1 | 017 | 登记收款方式+金额+凭证图；进人工确认流 | payment.feature | MANUAL_TEST |
 | FEAT-019 | 僵尸单清理 | 资金对账 | P1 | 015 | 定时任务扫超时未支付；幂等；释放占用（活动名额等）〔模式手册 P5〕 | order.feature | IMPLEMENTED |

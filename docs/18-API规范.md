@@ -27,6 +27,27 @@
 - **Router 层禁 try/except、禁 raise HTTPException、禁直接操作 ORM**
   ——`scripts/verify_architecture.py` 机械执法（T6 后含 miniapp_router）。
 
+**唯一例外：外部回调端点**（2026-10-08 WM12-A 起，`/api/pay/wechat/notify`）。
+它的状态码不是给自家前端看的，而是给**微信的重试策略**看的——微信只认 `200`（停止重试），
+4xx/5xx 都会触发重试（最长 24 小时）。所以该端点：
+
+| 情况 | HTTP | 响应体 |
+|---|---|---|
+| 入账成功 / 幂等重复 / 乱序忽略 / 非成功状态 / 迟到支付（已留痕待人工） | 200 | `{"code":"SUCCESS","message":"..."}` |
+| 验签不通过 / 验签不可用（缺平台证书） | 401 | `{"code":"FAIL",...}` |
+| 报文无法解析 / 解密失败 / 金额不符 | 400 | `{"code":"FAIL",...}` |
+| 订单不存在 | 404 | `{"code":"FAIL",...}` |
+| 支付单号已被别的订单占用 | 409 | `{"code":"FAIL",...}` |
+| 线上支付未开启 | 503 | `{"code":"FAIL",...}` |
+
+判定逻辑全在 `backend/domain/identity/payment_service.py`（`handle_notify` 返回 `(状态码, 响应体)`），
+Router 只照搬——**回调必须永远有明确应答**，抛异常等于让微信无限重试（旧项目 L2-008 教训）。
+
+**同一入口也收退款结果通知**（WM12-B，2026-10-08）：按报文 `event_type` 分派 `REFUND.*`——
+`REFUND.SUCCESS` 落"已退款"、`REFUND.CLOSED/ABNORMAL` 记失败、`PROCESSING` 保持执行中；
+按 `out_refund_no` 反解退款单，**已退款的重复或迟到失败通知一律 200 忽略**（乱序守卫 F-031）。
+微信商户平台把支付与退款两个通知地址都配到 `/api/pay/wechat/notify` 即可。
+
 ## 二、错误响应形状（显式声明——F-M2 `[object Object]` 事故的根因规范）
 
 **形状 A：BusinessException（业务异常）**
