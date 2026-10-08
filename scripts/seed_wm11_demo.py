@@ -24,18 +24,33 @@ from backend.domain.identity.models import Child, Order, Parent
 DEMO_OPENID = "mock_openid_demo_parent"
 
 
+def _demo_mock_openid() -> str:
+    """演示家长的 mock openid——**只在没有真实微信凭据时**预置。
+
+    为什么加这个条件（2026-10-08）：一旦 `.env` 配了真实 `WECHAT_APP_ID`/`WECHAT_APP_SECRET`，
+    演示家长就该走**真微信一键登录**（真 openid）。此时若还预置 mock openid，真号来绑会撞
+    "该手机号已绑定其他微信，请联系馆员处理"——本地反而用不了真登录（实测踩到）。
+    """
+    from backend.config import get_settings
+
+    s = get_settings()
+    if (s.WECHAT_APP_ID or "").strip() and (s.WECHAT_APP_SECRET or "").strip():
+        return ""
+    return DEMO_OPENID
+
+
 def _ensure_demo_parent(db: Session) -> Parent:
     row = db.query(Parent).filter(Parent.phone == "13800008888").first()
+    mock_openid = _demo_mock_openid()
     if row:
-        # WM12-C（审查 P0-3 口径）：线上支付只允许**已绑微信**的家长——演示家长不预置 openid，
-        # 本地就完全没法演练"点立即开通"（本地也拿不到真 openid：code2session 要 AppID/Secret，
-        # 真通道还要商户号）。这个 mock openid 只服务开发/演示库；生产家长的 openid 一律来自
-        # 微信一键登录（本脚本不进生产：演示 seed 只在 dev/验收链路跑）。
-        if not (row.wechat_openid or "").strip():
-            row.wechat_openid = DEMO_OPENID
+        # WM12-C（审查 P0-3 口径）+ 2026-10-08：线上支付只允许**已绑微信**的家长。没有真实凭据时
+        # 预置 mock openid（否则本地 mock 通道没法演练"点立即开通"）；有真实凭据时留空，
+        # 让演示家长走真微信一键登录绑定。
+        if mock_openid and not (row.wechat_openid or "").strip():
+            row.wechat_openid = mock_openid
             db.commit()
         return row
-    p = Parent(name="演示家长", phone="13800008888", wechat_openid=DEMO_OPENID)
+    p = Parent(name="演示家长", phone="13800008888", wechat_openid=mock_openid or None)
     db.add(p)
     db.flush()
     return p
