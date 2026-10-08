@@ -31,7 +31,11 @@ function fmtTime(value: string): string {
 export default function PaymentReconcilePanel() {
   const { message } = AntdApp.useApp();
   const { permissions } = useAuth();
-  const isSuper = hasPermission(permissions, "audit.view"); // 与退款中心/媒体体检同一判定
+  // WM12-C（审查 P2-11，用户裁定"都可读"）：**读**与后端同码——后端 GET /payments/reconciliations
+  // 挂 dashboard.view（专员也有），前端原先用 audit.view 判超管 → 专员看不到卡片而后端放行。
+  // **跑一轮**仍是超管专属（后端 POST /payments/reconcile 是 require_super_admin）。
+  const canRead = hasPermission(permissions, "dashboard.view");
+  const canRun = hasPermission(permissions, "audit.view");
   const [items, setItems] = useState<PaymentReconcileReport[]>([]);
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
@@ -50,8 +54,8 @@ export default function PaymentReconcilePanel() {
   }, [message]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (canRead) void load(); // 无读权限（dashboard.view）就不发请求
+  }, [canRead, load]);
 
   const runOnce = async () => {
     setRunning(true);
@@ -67,6 +71,7 @@ export default function PaymentReconcilePanel() {
     }
   };
 
+  if (!canRead) return null; // 读权限都没有 → 卡片不渲染（与后端 GET 同码）
   const latest = items[0];
   const summary = latest
     ? `${SOURCE_LABEL[latest.source] || latest.source} · ${latest.bill_date} · ${
@@ -79,7 +84,7 @@ export default function PaymentReconcilePanel() {
       title="支付对账"
       extra={
         <Space>
-          {isSuper && (
+          {canRun && (
             <>
               <Input
                 size="small"

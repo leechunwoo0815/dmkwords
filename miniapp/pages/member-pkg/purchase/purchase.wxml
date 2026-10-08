@@ -1,5 +1,5 @@
 <view class="page-bg">
-  <view class="head-hint">{{showPay ? '线上支付即时开通会员；价格以本页展示为准（下单时服务端复核）。' : '会员方案与价格以到店公示为准；iOS 端不提供在线开通。'}}</view>
+  <view class="head-hint">{{headHint}}</view>
 
   <view class="plan-card" wx:for="{{plans}}" wx:key="order_type">
     <view class="plan-badge {{item.badgeCls}}">{{item.label}}</view>
@@ -9,7 +9,7 @@
     </view>
     <view wx:if="{{!item.available}}" class="plan-reason">{{item.reason}}</view>
     <view wx:if="{{showPay}}"
-      class="plan-cta {{item.available ? '' : 'plan-cta-off'}}"
+      class="plan-cta {{item.available ? '' : 'plan-cta-off'}} {{paying ? 'plan-cta-busy' : ''}}"
       data-type="{{item.order_type}}"
       bindtap="onBuy">{{item.available ? '立即开通' : '不可购买'}}</view>
   </view>
@@ -25,6 +25,7 @@
   <view class="orders-entry" bindtap="goOrders">查看我的订单 ›</view>
 
   <view class="pay-wrap" wx:if="{{!showPay}}">
-    <pay-button amount="{{0}}" buttonText="到店办理会员" bind:pay="onStoreGuide" />
+    <view wx:if="{{payBlocked === 'login'}}" class="login-hint">线上开通需微信一键登录：请退出后在登录页选择「微信一键登录」；也可到店办理。</view>
+    <pay-button wx:else amount="{{0}}" buttonText="到店办理会员" bind:pay="onStoreGuide" />
   </view>
 </view>

@@ -2,9 +2,16 @@
 // 口径：
 // ① 价格一律配置下发（GET /api/miniapp/payment/plans），本页零硬编码金额；
 // ② **iOS 不给支付入口**（微信虚拟商品合规）——iOS 只见价格 + 到店引导；
-// ③ 下单价以服务端下单时重算为准（本页展示价只是展示，二孩折扣按下单时刻判定）。
+// ③ 下单价以服务端下单时重算为准（本页展示价只是展示，二孩折扣按下单时刻判定）；
+// ④ WM12-C（审查 P0-3，用户裁定）：**线上支付只允许已绑微信的家长**——服务端
+//    `can_pay_online=false`（手机号登录且未绑微信）时本页不出现「立即开通」，
+//    只给"请用微信一键登录"的引导（点了必 422，入口就不该存在）。
 const api = require('../../../utils/api')
 const { isIOS } = require('../../../utils/platform')
+
+const HINT_ONLINE = '线上支付即时开通会员；价格以本页展示为准（下单时服务端复核）。'
+const HINT_LOGIN = '线上开通仅支持微信一键登录的家长；当前登录方式不支持，可重新用微信一键登录或到店办理。'
+const HINT_STORE = '会员方案与价格以到店公示为准；iOS 端不提供在线开通。'
 
 // 方案卖点（文案固定，价格与可用性都来自服务端）
 const PLAN_FEATURES = {
@@ -27,7 +34,11 @@ Page({
     childId: 0,
     childName: '',
     isIOS: false,
-    showPay: false,      // 非 iOS 且服务端开着线上支付 → 才出现「立即开通」
+    showPay: false,      // 非 iOS + 服务端开着线上支付 + 家长已绑微信 → 才出现「立即开通」
+    canPayOnline: false, // WM12-C：服务端判据（家长是否已绑微信）
+    payBlocked: '',      // '' | off（未开通道）| login（未绑微信）| ios
+    paying: false,       // WM12-C（审查 P2-10）：请求期间禁止重复点击
+    headHint: HINT_STORE,
     paymentEnabled: true,
     plans: [],
     loading: true,
@@ -64,10 +75,15 @@ Page({
         reason: p.reason || '',
         features: PLAN_FEATURES[p.order_type] || [],
       }))
+      const canPay = !!res.can_pay_online // WM12-C：家长是否已绑微信（服务端判据）
       this.setData({
         plans,
         paymentEnabled: enabled,
-        showPay: enabled && !this.data.isIOS,
+        canPayOnline: canPay,
+        showPay: enabled && canPay && !this.data.isIOS,
+        payBlocked: !enabled ? 'off' : (!canPay ? 'login' : (this.data.isIOS ? 'ios' : '')),
+        headHint: enabled && canPay && !this.data.isIOS ? HINT_ONLINE
+          : (!enabled || !canPay ? HINT_LOGIN : HINT_STORE),
         loading: false,
       })
     } catch (e) { this.setData({ loading: false }) /* toast 已弹 */ }
@@ -76,6 +92,7 @@ Page({
 
   // 下单 → 拉起支付（两步：先建单让服务端算价，再发起支付拿 pay_params）
   async onBuy(e) {
+    if (this.data.paying) return // WM12-C（审查 P2-10）：请求期间不接受重复点击
     const orderType = e.currentTarget.dataset.type
     const plan = (this.data.plans || []).filter((p) => p.order_type === orderType)[0]
     if (!plan || !plan.available) {
@@ -96,15 +113,19 @@ Page({
 
   // 发起支付：mock 通道服务端即时到账（无 pay_params）；真通道拉起 wx.requestPayment
   async _payOrder(orderId) {
+    if (this.data.paying) return // WM12-C（审查 P2-10）：双击不产生两个预支付单
+    this.setData({ paying: true })
     wx.showLoading({ title: '发起支付' })
     let res = null
     try {
       res = await api.payOrder(orderId)
     } catch (e) {
       wx.hideLoading()
+      this.setData({ paying: false })
       return // toast 已弹
     }
     wx.hideLoading()
+    this.setData({ paying: false })
     if (res.already_paid || res.instant_paid) {
       wx.showToast({ title: res.already_paid ? '订单已支付' : '支付成功', icon: 'success' })
       this.loadPlans()

@@ -45,14 +45,24 @@ Page({
     tabs: TABS,
     activeTab: 'all',
     filtered: [],
-    showPay: false,   // 非 iOS 且服务端开着线上支付 → 待支付行出现「去支付」
+    showPay: false,   // 非 iOS + 家长已绑微信（WM12-C：登录口径见下）→ 待支付行出现「去支付」
+    payHint: '',      // WM12-C（审查 P0-3）：不能支付时说明原因，不留"点了没反应"的死按钮
+    paying: false,    // WM12-C（审查 P2-10）：请求期间禁止重复点击
   },
 
   onLoad(options) {
     this._childId = Number(options.child_id || 0)
+    // WM12-C（审查 P0-3，用户裁定）：线上支付只允许**已绑微信**的家长
+    // （`parent.wechat_bound` 来自登录载荷；老缓存没有该字段 → 按未绑处理，安全侧倒）
+    const parent = wx.getStorageSync('parent') || {}
+    const canPay = !!parent.wechat_bound
+    const ios = isIOS()
     this.setData({
       childName: decodeURIComponent(options.child_name || ''),
-      showPay: !isIOS(),
+      showPay: canPay && !ios,
+      payHint: canPay
+        ? (ios ? 'iOS 端不提供线上支付，可到店办理。' : '')
+        : '线上支付仅支持微信一键登录的家长：可在登录页选择「微信一键登录」，或到店办理。',
     })
   },
 
@@ -92,16 +102,20 @@ Page({
 
   // WM12-A：待支付订单继续支付（幂等键=订单号，服务端已支付会直接告知）
   async onPay(e) {
+    if (this.data.paying) return // WM12-C（审查 P2-10）：双击不重复发起
     const orderId = e.currentTarget.dataset.id
+    this.setData({ paying: true })
     wx.showLoading({ title: '发起支付' })
     let res = null
     try {
       res = await api.payOrder(orderId)
     } catch (err) {
       wx.hideLoading()
+      this.setData({ paying: false })
       return // toast 已弹
     }
     wx.hideLoading()
+    this.setData({ paying: false })
     if (res.already_paid || res.instant_paid) {
       wx.showToast({ title: res.already_paid ? '订单已支付' : '支付成功', icon: 'success' })
       this.load()

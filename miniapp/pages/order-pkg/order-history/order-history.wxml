@@ -12,6 +12,9 @@
       data-tab="{{item.key}}" bindtap="onTab">{{item.label}}</view>
   </view>
 
+  <!-- WM12-C（审查 P0-3）：不能线上支付时说明原因 -->
+  <view class="pay-hint" wx:if="{{payHint}}">{{payHint}}</view>
+
   <!-- Order List -->
   <view class="order-list" wx:if="{{filtered.length}}">
     <view wx:for="{{filtered}}" wx:key="id" class="order-card">
@@ -31,7 +34,7 @@
         <view class="order-amount">￥{{item.amount}}</view>
       </view>
       <view class="order-pay-row" wx:if="{{showPay && item.payable}}">
-        <view class="order-pay-btn" data-id="{{item.id}}" bindtap="onPay">去支付</view>
+        <view class="order-pay-btn {{paying ? 'order-pay-btn-busy' : ''}}" data-id="{{item.id}}" bindtap="onPay">去支付</view>
       </view>
     </view>
   </view>

@@ -22,6 +22,7 @@ import {
 import {
   apiListRefunds, apiListTransfers, apiListWithdrawals,
   apiReviewRefund, apiReviewTransfer, apiReviewWithdrawal, apiExecuteRefund,
+  apiQueryRefundGateway,
   apiSettlePreview, type SettlePreview,
   type RefundRequestItem, type TransferItem, type WithdrawalItem,
 } from "../api/refunds";
@@ -109,7 +110,9 @@ export default function RefundCenter() {
     kind: string;
     retry: boolean;
     refundChannel?: string; // WM12-B：wechat=自动原路退回，执行弹窗据此提示
+    unknown?: boolean; // WM12-C：网关结果未知（禁止跳过查单直接重试）
   } | null>(null);
+  const [queryingId, setQueryingId] = useState<number | null>(null);
   const [execSuccess, setExecSuccess] = useState(true);
   const [execRemark, setExecRemark] = useState("");
   const refundPg = usePaintPagination();
@@ -185,7 +188,23 @@ export default function RefundCenter() {
       kind: r.kind,
       retry: r.status === "failed",
       refundChannel: r.refund_channel,
+      unknown: !!r.gateway_unknown_at,
     });
+  };
+
+  // WM12-C（审查 P0-1）：退款查单——未知态（网关超时）下唯一合法的下一步。
+  // 不查单就重试会被服务端拒绝（换新商户退款单号可能二次出款）。
+  const doQueryGateway = async (id: number) => {
+    setQueryingId(id);
+    try {
+      const res = await apiQueryRefundGateway(id);
+      message.success(res.note || "查单完成");
+      load();
+    } catch (e) {
+      message.error((e as Error).message);
+    } finally {
+      setQueryingId(null);
+    }
   };
 
   const doExecute = async () => {
@@ -271,7 +290,14 @@ export default function RefundCenter() {
                   },
                   { title: "金额", dataIndex: "amount", width: 100, render: (v) => <Typography.Text strong>￥{Number(v).toLocaleString()}</Typography.Text> },
                   { title: "家长原因", dataIndex: "reason" },
-                  { title: "状态", dataIndex: "status", width: 90, render: (s) => <Tag color={STATUS_COLOR[s]}>{STATUS_LABEL[s] ?? s}</Tag> },
+                  {
+                    title: "状态", dataIndex: "status", width: 140, render: (s, r) => (
+                      <>
+                        <Tag color={STATUS_COLOR[s]}>{STATUS_LABEL[s] ?? s}</Tag>
+                        {r.gateway_unknown_at ? <Tag color="warning">结果未知</Tag> : null}
+                      </>
+                    ),
+                  },
                   {
                     title: "退款渠道", dataIndex: "refund_channel", width: 110,
                     // WM12-B：线上微信支付的单 → 执行时自动原路退回；线下收款的 → 人工打款登记
@@ -297,6 +323,10 @@ export default function RefundCenter() {
                           onClick={() => askExecute(r)}>
                           {r.status === "failed" ? "重试执行" : "执行退款"}
                         </Button>
+                      ) : (r.status === "processing" && r.refund_channel === "wechat") ? (
+                        // WM12-C：执行中的线上退款 → 可查单确认微信侧结果（未知态必须查单才能重试）
+                        <Button size="small" loading={queryingId === r.id}
+                          onClick={() => void doQueryGateway(r.id)}>查单</Button>
                       ) : <span>—</span>
                     ),
                   },
@@ -507,6 +537,19 @@ export default function RefundCenter() {
         <Typography.Paragraph>
           {execTarget?.childName} · ￥{execTarget?.amount}（{execTarget ? KIND_LABEL[execTarget.kind] : ""}）
         </Typography.Paragraph>
+        {execTarget?.unknown && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 10 }}
+            message="上一笔网关结果未知（微信可能已受理）"
+            description="请先「查单」确认微信侧结果：查得未受理才会允许重试（重试会换新的商户退款单号）。直接重试会被服务端拒绝——那是防二次出款。"
+            action={
+              <Button size="small" loading={queryingId === execTarget.id}
+                onClick={() => void doQueryGateway(execTarget.id)}>查单</Button>
+            }
+          />
+        )}
         {execTarget?.refundChannel === "wechat" && (
           <Alert
             type="info"

@@ -18,6 +18,8 @@ export interface RefundRequestItem {
   refund_channel?: string;
   /** WM12-B：商户退款单号（线上原路退款的幂等键，仅在途/已退时有值） */
   out_refund_no?: string;
+  /** WM12-C：网关结果未知（超时）的标记时间——非空=禁止重提，先「查单」确认 */
+  gateway_unknown_at?: string;
   created_at: string;
 }
 
@@ -64,6 +66,13 @@ export function apiExecuteRefund(
   return request(`/api/admin/refund-requests/${id}/execute`, {
     method: "POST", body: JSON.stringify({ success, remark }),
   });
+}
+
+/** WM12-C（审查 P0-1）：退款查单——未知态（网关超时）确认微信侧结果后才允许重试。 */
+export function apiQueryRefundGateway(id: number): Promise<{
+  id: number; status: string; gateway_state: string; resolved: boolean; note: string;
+}> {
+  return request(`/api/admin/refund-requests/${id}/query-gateway`, { method: "POST" });
 }
 
 export function apiListWithdrawals(status?: string): Promise<WithdrawalItem[]> {

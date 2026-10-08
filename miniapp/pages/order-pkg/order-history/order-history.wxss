@@ -217,3 +217,20 @@
   border: 3rpx solid var(--fg);
   box-shadow: var(--shadow-hard-sm);
 }
+
+/* WM12-C（审查 P2-10）：请求期间按钮置灰 + 不响应（双击不再刷出两个预支付单） */
+.order-pay-btn-busy {
+  opacity: 0.6;
+}
+
+/* WM12-C（审查 P0-3）：未绑微信的登录态 → 不渲染「去支付」，给一键登录引导 */
+.pay-hint {
+  margin: 16rpx 24rpx 0;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: var(--muted-light);
+  color: var(--fg);
+  font-size: 24rpx;
+  line-height: 1.6;
+  border: 3rpx dashed var(--fg);
+}

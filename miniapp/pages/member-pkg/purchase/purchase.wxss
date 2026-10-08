@@ -97,6 +97,21 @@
   background: var(--muted-light);
   box-shadow: none;
 }
+/* WM12-C（审查 P2-10）：请求期间按钮置灰 + 不响应（双击不再刷出两个预支付单） */
+.plan-cta-busy {
+  opacity: 0.6;
+}
+/* WM12-C（审查 P0-3）：未绑微信的登录态 → 不出现支付入口，只给一键登录引导 */
+.login-hint {
+  margin-top: 16rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 16rpx;
+  background: var(--muted-light);
+  color: var(--fg);
+  font-size: 24rpx;
+  line-height: 1.6;
+  border: 3rpx dashed var(--fg);
+}
 .plan-reason {
   margin-top: 12rpx;
   font-size: 22rpx;
