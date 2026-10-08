@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     # 应用
     APP_NAME: str = "DmkWords API"
     APP_VERSION: str = "1.0.0"
+    # APP_ENV：**生产判定开关**（dev / production）。2026-10-08 WM12-C（审查 P1-6）：
+    # 原先 `DEBUG=true` 一个变量就能整体跳过 validate_production（含支付 mock 通道、
+    # 空凭证、LOGIN_DEV_CODE 全部红线）——现在生产校验只看 APP_ENV，DEBUG 只管日志/开发态行为。
+    APP_ENV: str = "dev"
     DEBUG: bool = False
     # P0-F2：开发期固定验证码（.env 可覆盖）；生产必须置空（validate_production 硬校验），
     # 置空后 login 对任何 code 全拒（fail-closed），倒逼 WM12 接微信 code2session/SMS
@@ -73,6 +77,12 @@ class Settings(BaseSettings):
     # 2026-10-08：原为 main.py 硬编码 localhost:5173（审查 P2-1）——生产必须改成正式域名
     CORS_ORIGINS: str = "http://localhost:5173"
 
+    # 反向代理层数（限流取真实客户端 IP 用）。2026-10-08 WM12-C（审查 P1-5）：
+    # 0（默认）= 不读 X-Forwarded-For，直接用 transport 层 IP——伪造 XFF 无法换限流桶；
+    # >0 = 明确声明"我前面有 N 层可信代理"，取 XFF 右起第 N 段（左侧段客户端可伪造，一律不信）。
+    # 生产反代部署：nginx 用 `proxy_set_header X-Forwarded-For $remote_addr;` 覆盖 + 这里设 1（成对）。
+    TRUSTED_PROXY_COUNT: int = 0
+
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
@@ -85,8 +95,13 @@ class Settings(BaseSettings):
         )
 
     def validate_production(self) -> None:
-        """生产环境硬校验（宪法红线）：违规直接启动失败。"""
-        if self.DEBUG:
+        """生产环境硬校验（宪法红线）：违规直接启动失败。
+
+        WM12-C（审查 P1-6）：判据是 **`APP_ENV=production`**，不再看 `DEBUG`——
+        `APP_ENV=production` 时即使 `DEBUG=true` 也全量校验（DEBUG 只该影响日志与开发态行为，
+        不该能一句话关掉支付 mock 拒启、空凭证、LOGIN_DEV_CODE 全部红线）。
+        """
+        if self.APP_ENV.strip().lower() != "production" and self.DEBUG:
             return
         problems: list[str] = []
         if self.SECRET_KEY == "change-in-production":

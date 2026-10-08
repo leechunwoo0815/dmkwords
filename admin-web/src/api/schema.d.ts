@@ -1793,9 +1793,9 @@ export interface paths {
         put?: never;
         /**
          * Admin Simulate Refund Callback
-         * @description 超管演练微信退款结果通知（**仅 mock 支付通道可用**）：重复通知 / 迟到的失败通知。
+         * @description 超管演练微信退款结果通知（**仅 mock 支付通道可用**）：重复通知 / 迟到的失败通知 / 金额不符。
          *
-         *     判据见 docs/09 WM12-B §三 / docs/04 WM12 步骤 8-10。
+         *     判据见 docs/09 WM12-B §三 / docs/04 WM12 步骤 8-10、15、17。
          */
         post: operations["admin_simulate_refund_callback_api_admin_payments_simulate_refund_callback_post"];
         delete?: never;
@@ -1893,6 +1893,28 @@ export interface paths {
          * @description 执行退款（R-308：approved → processing → refunded/failed；线下打款登记凭证）。
          */
         post: operations["admin_refund_execute_api_admin_refund_requests__request_id__execute_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/refund-requests/{request_id}/query-gateway": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Admin Refund Query Gateway
+         * @description 退款查单（WM12-C 审查 P0-1）：未知态（网关超时）退款单调微信确认结果后收口。
+         *
+         *     为什么必须是独立动作：未知态下换新商户退款单号重提 = 可能二次出款；查得"未受理"才允许重试。
+         */
+        post: operations["admin_refund_query_gateway_api_admin_refund_requests__request_id__query_gateway_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5231,8 +5253,15 @@ export interface components {
         /**
          * PaymentRefundSimulateRequest
          * @description 退款回调演练参数（仅 mock 通道）：`out_refund_no` 形如 `RF{退款单id}-1-1`。
+         *
+         *     `amount` 留空 = 用退款单申请金额（正常路径）；传金额（元）可演练"退款金额不符被拒"。
          */
         PaymentRefundSimulateRequest: {
+            /**
+             * Amount
+             * @default
+             */
+            amount: string;
             /** Out Refund No */
             out_refund_no: string;
             /**
@@ -9291,6 +9320,37 @@ export interface operations {
                 "application/json": components["schemas"]["RefundExecuteRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_refund_query_gateway_api_admin_refund_requests__request_id__query_gateway_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

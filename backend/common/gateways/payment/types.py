@@ -69,4 +69,21 @@ class PaymentCallbackData:
     trade_state: str = ""
     refund_status: str = ""  # 退款通知状态（微信 v3: SUCCESS/CLOSED/ABNORMAL/PROCESSING）
     amount: Decimal | None = None
+    #: 退款通知的钱数（微信 `amount.refund`，单位元）。WM12-C（审查 P1-7）：必须与退款单
+    #: 申请金额比对——否则"微信退了 10 元、本地记整单已退"这种不一致无人发现。
+    refund_amount: Decimal | None = None
     raw_body: str = ""
+
+
+@dataclass
+class PaymentRefundQuery:
+    """退款查单结果（WM12-C 审查 P0-1）。
+
+    `found=False` 是**确定没受理**（微信 404 RESOURCE_NOT_EXISTS）——只有这种情况允许清掉
+    未知态并重试；`state` 走 SUCCESS/PROCESSING/CLOSED/ABNORMAL 语义（与 `refund()` 一致）。
+    """
+
+    found: bool
+    state: str = ""
+    refund_id: str = ""
+    error_message: str = ""

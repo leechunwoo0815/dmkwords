@@ -20,6 +20,7 @@ from backend.common.gateways.payment.types import (
     PaymentCallbackData,
     PaymentOrderRequest,
     PaymentOrderResponse,
+    PaymentRefundQuery,
     PaymentRefundRequest,
     PaymentRefundResponse,
 )
@@ -101,6 +102,16 @@ class MockPaymentGateway(PaymentGateway):
             state="SUCCESS",
         )
 
+    async def query_refund(self, out_refund_no: str) -> PaymentRefundQuery:
+        """mock 查单：即时退款语义 → 一律"已受理且成功"（与 refund() 的 state=SUCCESS 一致）。
+
+        未知态演练用 stub 网关（tests/unit/test_wm12_review_fixes.py），不靠 mock 造。
+        """
+        logger.info("[MockPay] 退款查单 out_refund_no=%s → SUCCESS（mock 即时退）", out_refund_no)
+        return PaymentRefundQuery(
+            found=True, state="SUCCESS", refund_id=f"mock_refund_{uuid.uuid4().hex[:16]}"
+        )
+
     async def verify_callback_signature(
         self, body: str, signature: str, timestamp: str, nonce: str
     ) -> bool:
@@ -114,6 +125,10 @@ class MockPaymentGateway(PaymentGateway):
             data = json.loads(ciphertext)
             amount_raw = data.get("amount")
             amount = Decimal(str(amount_raw)) / Decimal("100") if amount_raw is not None else None
+            refund_raw = data.get("refund_amount")
+            refund_amount = (
+                Decimal(str(refund_raw)) / Decimal("100") if refund_raw is not None else None
+            )
             return PaymentCallbackData(
                 out_trade_no=data.get("out_trade_no", ""),
                 out_refund_no=data.get("out_refund_no", ""),
@@ -123,6 +138,9 @@ class MockPaymentGateway(PaymentGateway):
                 trade_state=data.get("trade_state", "SUCCESS"),
                 refund_status=data.get("refund_status", ""),
                 amount=amount,
+                # WM12-C（审查 P1-7）：与微信 `amount.refund` 同语义（分 → 元）；缺省=None 表示
+                # 报文没带钱数（老报文/演练）——此时不做金额比对，但会记审计
+                refund_amount=refund_amount,
                 raw_body=ciphertext,
             )
         except json.JSONDecodeError as e:

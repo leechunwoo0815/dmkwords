@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import Depends, Header
+from sqlalchemy.exc import IntegrityError
 
 from backend.common.exceptions import UnauthorizedError, ValidationError
 from backend.config import get_settings
@@ -109,7 +110,14 @@ def _login_payload(db, parent: Parent) -> dict:
     """登录成功的统一载荷（三条通道共用：开发固定码 / 短信 / 微信）。"""
     return {
         "token": _parent_token(parent.id),
-        "parent": {"id": parent.id, "name": parent.name, "phone": parent.phone},
+        "parent": {
+            "id": parent.id,
+            "name": parent.name,
+            "phone": parent.phone,
+            # WM12-C（审查 P0-3，用户裁定"线上支付只允许微信一键登录"）：
+            # 前端据此隐藏支付入口——短信/固定码登录拿不到 openid，点了必然 422。
+            "wechat_bound": bool((parent.wechat_openid or "").strip()),
+        },
         "children": children_payload(db, parent.id),
     }
 
@@ -207,5 +215,11 @@ def bind_wechat(db, bind_ticket: str, phone: str, code: str) -> dict:
     if occupied and occupied.id != parent.id:
         raise ValidationError("该微信已绑定其他手机号，请联系馆员处理")
     parent.wechat_openid = openid
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        # WM12-C（审查 P2-13）：`parents.wechat_openid` 是唯一索引，两个请求同时绑同一微信时
+        # 后到者原先会以 500 收场（堆栈暴露）；这里是业务冲突，回滚并转 422。
+        db.rollback()
+        raise ValidationError("该微信刚刚已被绑定，请重新登录或联系馆员处理") from exc
     return _login_payload(db, parent)

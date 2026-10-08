@@ -120,8 +120,32 @@ class SmsCodeService:
 
     # ---------- 校验 ----------
 
+    def _consumed_failure_message(self, row_id: int, max_attempts: int) -> str:
+        """条件更新没吃下这一行时按**库里的事实**给准确文案（并发下失败原因不止一种）。
+
+        用列查询而不是 ORM 实体：刚 commit 过，实体可能过期，而列查询直接取库内当前值。
+        """
+        fresh = (
+            self.db.query(SmsCode.used_at, SmsCode.attempts).filter(SmsCode.id == row_id).first()
+        )
+        if fresh and fresh.used_at is not None:
+            return "验证码已失效（已被使用），请重新获取"
+        if fresh and int(fresh.attempts or 0) >= max_attempts:
+            return "验证码错误次数过多，请重新获取"
+        return "验证码已失效，请重新获取"
+
     def verify(self, phone: str, code: str, purpose: str = SmsCode.PURPOSE_LOGIN) -> None:
-        """校验通过则写 used_at；失败抛 ValidationError（附剩余机会）。"""
+        """校验通过则写 used_at；失败抛 ValidationError（附剩余机会）。
+
+        WM12-C（审查 P0-4）：**原子条件更新**——原先是"读 attempts → 判断上限 → 加一 → 提交"，
+        并发下丢失更新（实测 20 个并发错误码只持久化 4 次，上限 5 形同虚设，码可被暴力试穿）。
+        现在两条写入都带条件、看 `rowcount`：
+        - 消费（正确码）：`SET used_at=? WHERE id=? AND used_at IS NULL` —— rowcount=1 才算这次赢了
+          （同一正确码并发提交只有一个能消费，其余按"已失效"拒绝，防并发重放）；
+        - 计数（错误码）：`SET attempts=attempts+1 WHERE id=? AND used_at IS NULL AND attempts<上限`
+          —— rowcount=0 即"已被试爆/已被消费"，一律按超限拒绝。
+        InnoDB 的 UPDATE 在行锁上按**最新已提交版本**重新判定条件，所以计数不会超过上限。
+        """
         phone = (phone or "").strip()
         code = (code or "").strip()
         if not code:
@@ -142,15 +166,40 @@ class SmsCodeService:
         if row.expires_at and row.expires_at < datetime.now():
             raise ValidationError("验证码已过期，请重新获取")
         max_attempts = self._cfg_int("sms_max_attempts", 5)
-        if row.attempts >= max_attempts:
-            raise ValidationError("验证码错误次数过多，请重新获取")
-        if row.code_hash != hash_code(phone, code):
-            row.attempts += 1
+        row_id = row.id
+        if row.code_hash == hash_code(phone, code):
+            consumed = (
+                self.db.query(SmsCode)
+                .filter(
+                    SmsCode.id == row_id,
+                    SmsCode.used_at.is_(None),
+                    # 超限即作废：即使码是对的也不放行（否则"试爆上限"只挡住错码，形同虚设）
+                    SmsCode.attempts < max_attempts,
+                )
+                .update({SmsCode.used_at: datetime.now()}, synchronize_session=False)
+            )
             self.db.commit()
-            left = max(0, max_attempts - row.attempts)
-            raise ValidationError(f"验证码错误（还可尝试 {left} 次）")
-        row.used_at = datetime.now()
+            if consumed:
+                return
+            raise ValidationError(self._consumed_failure_message(row_id, max_attempts))
+        bumped = (
+            self.db.query(SmsCode)
+            .filter(
+                SmsCode.id == row_id,
+                SmsCode.used_at.is_(None),
+                SmsCode.attempts < max_attempts,
+            )
+            .update({SmsCode.attempts: SmsCode.attempts + 1}, synchronize_session=False)
+        )
         self.db.commit()
+        if not bumped:
+            raise ValidationError("验证码错误次数过多，请重新获取")
+        left = max_attempts - int(
+            self.db.query(SmsCode.attempts).filter(SmsCode.id == row_id).scalar() or 0
+        )
+        if left <= 0:
+            raise ValidationError("验证码错误次数过多，请重新获取")
+        raise ValidationError(f"验证码错误（还可尝试 {left} 次）")
 
 
 def random_code() -> str:

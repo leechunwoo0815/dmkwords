@@ -3,10 +3,12 @@
 
 from abc import ABC, abstractmethod
 
+from backend.common.exceptions import PaymentError
 from backend.common.gateways.payment.types import (
     PaymentCallbackData,
     PaymentOrderRequest,
     PaymentOrderResponse,
+    PaymentRefundQuery,
     PaymentRefundRequest,
     PaymentRefundResponse,
 )
@@ -33,6 +35,14 @@ class PaymentGateway(ABC):
     async def refund(self, request: PaymentRefundRequest) -> PaymentRefundResponse:
         """申请退款"""
         ...
+
+    async def query_refund(self, out_refund_no: str) -> PaymentRefundQuery:
+        """退款查单（WM12-C 审查 P0-1：网关异常后确认上一笔到底受理没有）。
+
+        默认**不支持**——抛错而不是返回"查无此单"：回一个假的"未受理"会让调用方误以为
+        可以安全重试，那正是二次出款的入口。
+        """
+        raise PaymentError(f"当前支付网关未实现退款查单（query_refund）：{out_refund_no}")
 
     @abstractmethod
     async def verify_callback_signature(

@@ -1,25 +1,33 @@
-# backend/domain/identity/payment_reconcile_service.py — 每日资金对账（WM12-B）
+# backend/domain/identity/payment_reconcile_service.py — 每日资金对账（WM12-B，WM12-C 加固）
 """对账只**报**不改（口径 docs/09 WM12-B §二.5）——自动改账是下一个事故的来源。
 
 两条腿：
-1. **本地一致性审计**（不依赖微信，永远能跑）——四类差异：
+1. **本地一致性审计**（不依赖微信，永远能跑）——六类差异：
    L1 订单主状态与退款终态冲突（已支付却有已退款单 / 已退款却查无退款单）；
-   L2 悬挂退款（`processing` 超过 24h：网关受理了但结果没回来）；
-   L3 线上退款链路不完整（有商户退款单号，原订单却没有微信支付单号）；
-   L4 僵尸单残余（超时未支付单仍在：清理任务可能没跑）。
+   L2 悬挂退款（`processing` 超过 24h：网关受理了但结果没回来；含"未知态"未收口）；
+   L3 线上退款链路不完整（有商户退款单号，原订单却缺微信支付单号）；
+   L4 僵尸单残余（超时未支付单仍在：清理任务可能没跑）；
+   L5 订单退款合计超付（同一订单活跃退款单合计 > 订单金额，审查 P0-1 兜底）；
+   L6 押金退款合计超付（同一孩子活跃押金退款合计 > 已缴押金，审查 P0-1 兜底）。
 2. **微信账单比对**（真通道）——下载当日对账单（SHA256 校验）后逐行比：
-   账单有我库无 / 我库有账单无 / 金额不符 / 退款状态不符。
-   缺凭据、当日无账单 → 记 `skipped`（**不把任务跑红**：每天一条假失败没人会再看这条告警）。
+   账单有我库无 / 我库有账单无 / 金额不符 / 退款金额或状态不符。
+   `skipped` 是**白名单**（审查 P0-2）：只有"未开通道"与"当日无账单（NO_BILL_EXIST）"两种；
+   哈希校验失败、缺哈希、缺列、解析失败一律 `failed`（文件不可信必须有人看见）。
+
+性能纪律（审查 P2-9）：本地审计全部走 JOIN / GROUP BY 聚合 + 有界 limit，
+不做"全表取回 Python 里循环"（订单量大时那是 O(n) 内存 + N+1 查询）。
 """
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from backend.common.async_utils import run_coro
@@ -31,8 +39,14 @@ logger = logging.getLogger(__name__)
 #: 悬挂退款阈值（小时）：超过它就该有人去看一眼——网关受理了但结果一直没回来
 STUCK_REFUND_HOURS = 24
 
+#: 本地审计单类差异的返回上限（有界查询：异常通常个位数，真到上限说明系统性问题，先看这些）
+AUDIT_ROW_LIMIT = 2000
+
 #: 微信账单 CSV 的必需列（缺列说明格式变了，必须报警而不是静默少比几列）
 BILL_REQUIRED_COLUMNS = ("商户订单号", "交易状态", "订单金额")
+
+#: 账单里参与"已支付"比对的交易状态（其余状态不参与）
+BILL_COUNTED_STATES = ("SUCCESS", "REFUND")
 
 
 class PaymentReconcileService:
@@ -90,6 +104,7 @@ class PaymentReconcileService:
         diffs += self._audit_stuck_refunds()
         diffs += self._audit_online_chain_gap()
         diffs += self._audit_zombie_orders()
+        diffs += self._audit_refund_overpaid()
         checked = (
             self.db.query(func.count(Order.id)).filter(Order.is_deleted == 0).scalar() or 0
         ) + (
@@ -101,56 +116,65 @@ class PaymentReconcileService:
         return int(checked), diffs
 
     def _audit_status_conflict(self) -> list[dict]:
-        """L1：订单主状态与退款单终态互相矛盾（两个方向都查，都是钱的去向说不清）。"""
+        """L1：订单主状态与退款单终态互相矛盾（两个方向都查，都是钱的去向说不清）。
+
+        JOIN 查询（审查 P2-9）：原先把"所有已退款退款单的 order_id"拉回 Python 再按它查订单，
+        订单量一大就是无界 IN + O(n·m) 的 set 重建——现在两条 SQL 各自只回差异行。
+        """
         out: list[dict] = []
-        refunded_ids = [
-            r[0]
-            for r in self.db.query(RefundRequest.order_id)
+        paid_but_refunded = (
+            self.db.query(Order)
+            .join(RefundRequest, RefundRequest.order_id == Order.id)
             .filter(
                 RefundRequest.is_deleted == 0,
                 RefundRequest.kind == RefundRequest.KIND_ORDER,
                 RefundRequest.status == RefundRequest.STATUS_REFUNDED,
-                RefundRequest.order_id.isnot(None),
+                Order.is_deleted == 0,
+                Order.status == Order.STATUS_PAID,
             )
-            .all()
-        ]
-        if refunded_ids:
-            paid_but_refunded = (
-                self.db.query(Order)
-                .filter(
-                    Order.id.in_(refunded_ids),
-                    Order.is_deleted == 0,
-                    Order.status == Order.STATUS_PAID,
-                )
-                .all()
-            )
-            out += [
-                {
-                    "kind": "paid_order_with_refunded_request",
-                    "ref": o.order_no,
-                    "message": f"订单仍为已支付，但已有退款单终态=已退款（订单 id={o.id}）",
-                }
-                for o in paid_but_refunded
-            ]
-        refunded_orders = (
-            self.db.query(Order)
-            .filter(Order.is_deleted == 0, Order.status == Order.STATUS_REFUNDED)
+            .distinct()
+            .limit(AUDIT_ROW_LIMIT)
             .all()
         )
-        for o in refunded_orders:
-            if o.id in set(refunded_ids):
-                continue
-            out.append(
-                {
-                    "kind": "refunded_order_without_request",
-                    "ref": o.order_no,
-                    "message": "订单已退款，但查不到对应的已退款单（历史旁路或手工改库？）",
-                }
+        out += [
+            {
+                "kind": "paid_order_with_refunded_request",
+                "ref": o.order_no,
+                "message": f"订单仍为已支付，但已有退款单终态=已退款（订单 id={o.id}）",
+            }
+            for o in paid_but_refunded
+        ]
+        refunded_orders = (
+            self.db.query(Order)
+            .outerjoin(
+                RefundRequest,
+                and_(
+                    RefundRequest.order_id == Order.id,
+                    RefundRequest.is_deleted == 0,
+                    RefundRequest.kind == RefundRequest.KIND_ORDER,
+                    RefundRequest.status == RefundRequest.STATUS_REFUNDED,
+                ),
             )
+            .filter(
+                Order.is_deleted == 0,
+                Order.status == Order.STATUS_REFUNDED,
+                RefundRequest.id.is_(None),
+            )
+            .limit(AUDIT_ROW_LIMIT)
+            .all()
+        )
+        out += [
+            {
+                "kind": "refunded_order_without_request",
+                "ref": o.order_no,
+                "message": "订单已退款，但查不到对应的已退款单（历史旁路或手工改库？）",
+            }
+            for o in refunded_orders
+        ]
         return out
 
     def _audit_stuck_refunds(self) -> list[dict]:
-        """L2：退款单卡在"执行中"超阈值——线上原路退款受理了但结果没回来。"""
+        """L2：退款单卡在"执行中"超阈值——线上原路退款受理了但结果没回来（含未知态）。"""
         cutoff = datetime.now() - timedelta(hours=STUCK_REFUND_HOURS)
         rows = (
             self.db.query(RefundRequest)
@@ -162,6 +186,8 @@ class PaymentReconcileService:
                     RefundRequest.reviewed_at < cutoff,
                 ),
             )
+            .order_by(RefundRequest.id.desc())
+            .limit(AUDIT_ROW_LIMIT)
             .all()
         )
         return [
@@ -170,28 +196,40 @@ class PaymentReconcileService:
                 "ref": f"refund#{r.id}",
                 "message": (
                     f"退款单卡在执行中超过 {STUCK_REFUND_HOURS}h（金额 {r.amount}，"
-                    f"单号 {r.out_refund_no or '-'}）——请到微信商户平台查该笔退款结果"
+                    f"单号 {r.out_refund_no or '-'}"
+                    + ("，**网关结果未知**" if r.gateway_unknown_at else "")
+                    + "）——用退款中心的「查单」（POST /api/admin/refund-requests/{id}/query-gateway）"
+                    "确认微信侧结果"
                 ),
             }
             for r in rows
         ]
 
     def _audit_online_chain_gap(self) -> list[dict]:
-        """L3：有商户退款单号（走过网关）却找不到原单的微信支付单号——链路不完整。"""
+        """L3：有商户退款单号（走过网关）却找不到原单的微信支付单号——链路不完整。
+
+        一条 LEFT JOIN 只回差异行（审查 P2-9：原先是"全量退款单 + 逐行查订单"）。
+        """
         rows = (
-            self.db.query(RefundRequest)
+            self.db.query(RefundRequest, Order)
+            .outerjoin(Order, Order.id == RefundRequest.order_id)
             .filter(
                 RefundRequest.is_deleted == 0,
                 RefundRequest.out_refund_no.isnot(None),
                 RefundRequest.out_refund_no != "",
                 RefundRequest.kind == RefundRequest.KIND_ORDER,
                 RefundRequest.order_id.isnot(None),
+                or_(
+                    Order.id.is_(None),
+                    Order.transaction_id.is_(None),
+                    Order.transaction_id == "",
+                ),
             )
+            .limit(AUDIT_ROW_LIMIT)
             .all()
         )
         out: list[dict] = []
-        for r in rows:
-            order = self.db.query(Order).filter(Order.id == r.order_id).first()
+        for r, order in rows:
             if order is None:
                 out.append(
                     {
@@ -201,17 +239,103 @@ class PaymentReconcileService:
                     }
                 )
                 continue
-            if not (order.transaction_id or "").strip():
-                out.append(
-                    {
-                        "kind": "online_refund_without_transaction",
-                        "ref": order.order_no,
-                        "message": (
-                            f"退款单 {r.out_refund_no} 已提交微信，但原订单缺微信支付单号"
-                            "（对账时无法与账单勾对）"
-                        ),
-                    }
+            out.append(
+                {
+                    "kind": "online_refund_without_transaction",
+                    "ref": order.order_no,
+                    "message": (
+                        f"退款单 {r.out_refund_no} 已提交微信，但原订单缺微信支付单号"
+                        "（对账时无法与账单勾对）"
+                    ),
+                }
+            )
+        return out
+
+    def _audit_refund_overpaid(self) -> list[dict]:
+        """L5/L6：**退款合计不得超付**（审查 P0-1 的对账兜底——重复出款的最后一道探测器）。
+
+        "活跃退款单" = `approved`/`processing`/`refunded`（钱要出去或已经出去）；`pending` 只是
+        申请、`rejected`/`cancelled` 不会出款，都不计入。
+        两条都是 SQL 聚合（`GROUP BY … HAVING SUM(...) > 上限`，审查 P2-9），不拉全表。
+        """
+        active = (
+            RefundRequest.STATUS_APPROVED,
+            RefundRequest.STATUS_PROCESSING,
+            RefundRequest.STATUS_REFUNDED,
+        )
+        out: list[dict] = []
+        order_rows = (
+            self.db.query(
+                Order.order_no,
+                Order.amount,
+                func.sum(RefundRequest.amount).label("refund_total"),
+                func.count(RefundRequest.id).label("refund_count"),
+            )
+            .join(RefundRequest, RefundRequest.order_id == Order.id)
+            .filter(
+                RefundRequest.is_deleted == 0,
+                RefundRequest.kind == RefundRequest.KIND_ORDER,
+                RefundRequest.status.in_(active),
+                Order.is_deleted == 0,
+            )
+            .group_by(Order.id, Order.order_no, Order.amount)
+            .having(func.sum(RefundRequest.amount) > Order.amount)
+            .limit(AUDIT_ROW_LIMIT)
+            .all()
+        )
+        for order_no, amount, total, count in order_rows:
+            out.append(
+                {
+                    "kind": "refund_overpaid",
+                    "ref": order_no,
+                    "message": (
+                        f"同一订单 {count} 笔活跃退款合计 {total} 超过订单金额 {amount}"
+                        "——重复出款风险，请人工核对退款单号与微信侧记录"
+                    ),
+                }
+            )
+        deposit_rows = (
+            self.db.query(
+                RefundRequest.child_id,
+                func.sum(RefundRequest.amount).label("refund_total"),
+                func.count(RefundRequest.id).label("refund_count"),
+            )
+            .filter(
+                RefundRequest.is_deleted == 0,
+                RefundRequest.kind == RefundRequest.KIND_DEPOSIT,
+                RefundRequest.status.in_(active),
+            )
+            .group_by(RefundRequest.child_id)
+            .all()
+        )
+        if deposit_rows:
+            child_ids = [row[0] for row in deposit_rows]
+            paid_rows = (
+                self.db.query(Order.child_id, func.sum(Order.amount).label("paid_total"))
+                .filter(
+                    Order.is_deleted == 0,
+                    # 已退款的押金单也算"已缴"（否则退完一笔后上限归零，反手报一个假超付）
+                    Order.status.in_([Order.STATUS_PAID, Order.STATUS_REFUNDED]),
+                    Order.order_type.in_([Order.TYPE_DEPOSIT, Order.TYPE_DEPOSIT_SUPPLEMENT]),
+                    Order.child_id.in_(child_ids),
                 )
+                .group_by(Order.child_id)
+                .all()
+            )
+            paid = {cid: total for cid, total in paid_rows}
+            for child_id, refund_total, count in deposit_rows:
+                cap = paid.get(child_id, Decimal("0"))
+                if refund_total > cap:
+                    out.append(
+                        {
+                            "kind": "deposit_refund_overpaid",
+                            "ref": f"child#{child_id}",
+                            "message": (
+                                f"该孩子 {count} 笔活跃押金退款合计 {refund_total} 超过已缴押金 "
+                                f"{cap}——重复出款风险，请人工核对"
+                            ),
+                        }
+                    )
         return out
 
     def _audit_zombie_orders(self) -> list[dict]:
@@ -227,6 +351,8 @@ class PaymentReconcileService:
                 Order.status.in_([Order.STATUS_PENDING_PAYMENT, Order.STATUS_PENDING_MANUAL]),
                 Order.create_time < cutoff,
             )
+            .order_by(Order.id.desc())
+            .limit(AUDIT_ROW_LIMIT)
             .all()
         )
         return [
@@ -275,9 +401,12 @@ class PaymentReconcileService:
             csv_text = run_coro(get_payment_gateway().download_bill(day.isoformat(), "ALL"))
         except PaymentError as exc:
             message = str(exc)
+            # WM12-C（审查 P0-2c）：`skipped` 是白名单——"未开通道"在上面两个早退分支，
+            # 这里只剩"当日无账单"（微信 NO_BILL_EXIST）。**哈希校验失败/缺哈希/缺列/格式变化
+            # 一律 failed**：把"文件不可信"记成"跳过"，运营会读成"没问题"（修复前正是如此）。
             status = (
                 PaymentReconciliation.STATUS_SKIPPED
-                if "NO_BILL_EXIST" in message or "账单" in message
+                if "NO_BILL_EXIST" in message
                 else PaymentReconciliation.STATUS_FAILED
             )
             return self._record(
@@ -288,7 +417,11 @@ class PaymentReconcileService:
                 trigger=trigger,
                 actor=actor,
                 status=status,
-                note=f"账单下载失败：{message[:180]}",
+                note=(
+                    f"当日无对账单（{message[:180]}）"
+                    if status == PaymentReconciliation.STATUS_SKIPPED
+                    else f"账单不可用/不可信，需人工看：{message[:180]}"
+                ),
             )
         except Exception as exc:  # 网关/网络/解密任何异常都不该让整轮对账崩掉
             logger.error("微信账单下载异常: %s", exc, exc_info=True)
@@ -313,7 +446,12 @@ class PaymentReconcileService:
         )
 
     def _diff_bill(self, day: date, csv_text: str) -> tuple[int, list[dict]]:
-        """逐行比对微信账单与本地订单/退款。返回 (核对笔数, 差异列表)。"""
+        """逐行比对微信账单与本地订单/退款。返回 (核对笔数, 差异列表)。
+
+        WM12-C（审查 P0-2a）：**退款行按 `out_refund_no` 独立核对**，不依赖"当日已支付订单"集合——
+        退款的账单日往往晚于支付日，原先跨日退款会走 `bill_only` 分支并 `continue`，
+        既产生假差异、又让跨日退款的金额/状态**永远不被校验**。
+        """
         rows = self._parse_bill(csv_text)
         start = datetime.combine(day, time.min)
         end = start + timedelta(days=1)
@@ -337,12 +475,18 @@ class PaymentReconcileService:
             state = (row.get("交易状态") or "").strip().upper()
             if not out_trade_no:
                 continue
-            if state not in ("SUCCESS", "REFUND"):
+            if state not in BILL_COUNTED_STATES:
                 continue  # 未支付/已关闭等状态不参与"我们的已支付"比对
-            checked += 1
-            bill_seen.add(out_trade_no)
+            refund_no = (row.get("商户退款单号") or "").strip()
             order = ours.get(out_trade_no)
+            if order is None and refund_no:
+                # 跨日退款：这行描述的是**往日那笔交易**的退款 → 只按商户退款单号核对退款侧
+                checked += 1
+                diffs += self._diff_refund_row(row, refund_no)
+                continue
             if order is None:
+                checked += 1
+                bill_seen.add(out_trade_no)
                 diffs.append(
                     {
                         "kind": "bill_only",
@@ -354,6 +498,8 @@ class PaymentReconcileService:
                     }
                 )
                 continue
+            checked += 1
+            bill_seen.add(out_trade_no)
             if not self._amount_eq(row.get("订单金额"), order.amount):
                 diffs.append(
                     {
@@ -362,7 +508,6 @@ class PaymentReconcileService:
                         "message": f"金额不符：账单 {row.get('订单金额')} vs 本地 {order.amount}",
                     }
                 )
-            refund_no = (row.get("商户退款单号") or "").strip()
             if refund_no:
                 diffs += self._diff_refund_row(row, refund_no)
         for order_no in ours:
@@ -389,12 +534,22 @@ class PaymentReconcileService:
                 }
             ]
         out: list[dict] = []
-        if not self._amount_eq(row.get("退款金额"), req.amount):
+        bill_amount = (row.get("退款金额") or "").strip()
+        if not bill_amount:
+            # 有退款单号却没有退款金额 → 列名/格式变了：显式报出来，别伪装成"金额不符"
+            out.append(
+                {
+                    "kind": "refund_field_missing",
+                    "ref": out_refund_no,
+                    "message": "账单退款行缺少「退款金额」列值（列名或格式可能已变，需核对样本）",
+                }
+            )
+        elif not self._amount_eq(bill_amount, req.amount):
             out.append(
                 {
                     "kind": "refund_amount_mismatch",
                     "ref": out_refund_no,
-                    "message": f"退款金额不符：账单 {row.get('退款金额')} vs 本地 {req.amount}",
+                    "message": f"退款金额不符：账单 {bill_amount} vs 本地 {req.amount}",
                 }
             )
         bill_state = (row.get("退款状态") or "").strip().upper()
@@ -410,29 +565,41 @@ class PaymentReconcileService:
 
     @staticmethod
     def _parse_bill(csv_text: str) -> list[dict]:
-        """解析对账单 CSV：找表头行 → 按列名取值 → 遇汇总行即止。
+        """解析对账单 CSV：`csv` 模块逐行读 → 按列名取值 → 遇汇总行即止。
+
+        WM12-C（审查 P0-2b）：早先 `ln.split(",")` 是朴素切分——商品名含逗号（如
+        "绘本套装,上册,下册"）会让后面所有列**整体错位**（金额列读到费率列），
+        既产生假差异、也可能"错位后碰巧相等"从而漏检。`csv` 模块按引号规则切，不会错列。
+        顺带处理 BOM（微信账单可能带 utf-8 BOM）与单元格前缀反引号（Excel 文本标记）。
 
         格式变了一律抛错（宁可整轮 failed 也不要静默少比几列——那才是真的假绿）。
         """
-        lines = [ln for ln in (csv_text or "").splitlines() if ln.strip()]
-        header_idx = next(
-            (i for i, ln in enumerate(lines) if "商户订单号" in ln and "交易状态" in ln),
-            None,
-        )
+        text = (csv_text or "").lstrip("\ufeff")
+        rows = list(csv.reader(io.StringIO(text)))
+        header_idx = None
+        for i, cells in enumerate(rows):
+            norm = [c.strip().lstrip("`") for c in cells]
+            if "商户订单号" in norm and "交易状态" in norm:
+                header_idx = i
+                break
         if header_idx is None:
             raise ValueError("对账单缺少表头（商户订单号/交易状态）")
-        header = [c.strip() for c in lines[header_idx].split(",")]
+        header = [c.strip().lstrip("`") for c in rows[header_idx]]
         missing = [c for c in BILL_REQUIRED_COLUMNS if c not in header]
         if missing:
             raise ValueError(f"对账单缺少必需列：{'/'.join(missing)}")
         out: list[dict] = []
-        for ln in lines[header_idx + 1 :]:
-            if ln.startswith("总交易单数") or ln.startswith("总笔数"):
+        for cells in rows[header_idx + 1 :]:
+            if not cells:
+                continue
+            first = (cells[0] or "").strip().lstrip("`")
+            if first.startswith("总交易单数") or first.startswith("总笔数"):
                 break
-            cells = ln.split(",")
             if len(cells) < len(header):
-                raise ValueError(f"对账单行字段数不足：{ln[:60]}")
-            out.append({header[i]: cells[i].strip().lstrip("`") for i in range(len(header))})
+                raise ValueError(f"对账单行字段数不足：{','.join(cells)[:60]}")
+            out.append(
+                {header[i]: (cells[i] or "").strip().lstrip("`") for i in range(len(header))}
+            )
         return out
 
     @staticmethod

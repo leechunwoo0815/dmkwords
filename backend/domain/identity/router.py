@@ -389,6 +389,19 @@ def admin_refund_execute(
     return RefundService(db).execute(admin, request_id, body.success, body.remark)
 
 
+@router.post("/refund-requests/{request_id}/query-gateway")
+def admin_refund_query_gateway(
+    request_id: int,
+    admin: Any = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    """退款查单（WM12-C 审查 P0-1）：未知态（网关超时）退款单调微信确认结果后收口。
+
+    为什么必须是独立动作：未知态下换新商户退款单号重提 = 可能二次出款；查得"未受理"才允许重试。
+    """
+    return RefundService(db).query_gateway(admin, request_id)
+
+
 @router.get("/withdrawals")
 def admin_withdrawal_list(
     status: str | None = None,
@@ -469,10 +482,14 @@ def admin_simulate_payment_callback(
 
 
 class PaymentRefundSimulateRequest(BaseSchema):
-    """退款回调演练参数（仅 mock 通道）：`out_refund_no` 形如 `RF{退款单id}-1-1`。"""
+    """退款回调演练参数（仅 mock 通道）：`out_refund_no` 形如 `RF{退款单id}-1-1`。
+
+    `amount` 留空 = 用退款单申请金额（正常路径）；传金额（元）可演练"退款金额不符被拒"。
+    """
 
     out_refund_no: str
     refund_status: str = "SUCCESS"
+    amount: str = ""
 
 
 @router.post("/payments/simulate-refund-callback", response_model=PaymentSimulateRefundResponse)
@@ -481,14 +498,14 @@ def admin_simulate_refund_callback(
     admin: Any = Depends(require_super_admin()),
     db: Session = Depends(get_db),
 ):
-    """超管演练微信退款结果通知（**仅 mock 支付通道可用**）：重复通知 / 迟到的失败通知。
+    """超管演练微信退款结果通知（**仅 mock 支付通道可用**）：重复通知 / 迟到的失败通知 / 金额不符。
 
-    判据见 docs/09 WM12-B §三 / docs/04 WM12 步骤 8-10。
+    判据见 docs/09 WM12-B §三 / docs/04 WM12 步骤 8-10、15、17。
     """
     from backend.domain.identity.payment_service import PaymentService
 
     return PaymentService(db).simulate_refund_callback(
-        admin, body.out_refund_no, refund_status=body.refund_status
+        admin, body.out_refund_no, refund_status=body.refund_status, amount=body.amount
     )
 
 

@@ -384,7 +384,15 @@ class RefundService:
             .populate_existing()  # P1-F1：锁定读，双超管并发执行串行化（防双台账/双押金退款单）
             .first()
         )
-        if not req or req.status not in (
+        if not req:
+            raise ValidationError("退款申请不存在")
+        if req.gateway_unknown_at is not None:
+            # WM12-C（审查 P0-1）：上一笔网关结果未知（超时窗口内微信可能已受理）——
+            # 换新 out_refund_no 重提就是二次出款。先查单确认：
+            # POST /api/admin/refund-requests/{id}/query-gateway（走 query_gateway）
+            # 放在状态判断之前：未知态下先说清"该干什么"，而不是笼统的"状态不可执行"
+            raise ValidationError("上一笔网关结果未知（可能已受理），请先「查单」确认后再重试")
+        if req.status not in (
             RefundRequest.STATUS_APPROVED,
             RefundRequest.STATUS_FAILED,
         ):
@@ -437,6 +445,16 @@ class RefundService:
             channel_note=channel_note,
         )
         return {"id": req.id, "status": req.status, "channel": "offline"}
+
+    def query_gateway(self, admin, request_id: int) -> dict:
+        """退款查单（WM12-C 审查 P0-1）：未知态/执行中的线上退款单调微信确认结果后收口。
+
+        未知态（网关超时）唯一的合法出路——查得"未受理"才允许重试（换新商户退款单号），
+        查得"已退款"直接落终态，查得"处理中"就等回调；查单失败则未知态保持（不猜）。
+        """
+        return refund_online.resolve_unknown(
+            self.db, admin, request_id, finalize=self._finalize_refund
+        )
 
     def _finalize_refund(
         self,

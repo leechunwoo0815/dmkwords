@@ -48,16 +48,23 @@ _limiter = RateLimiter()
 
 
 def _client_ip(request: Request) -> str:
-    """优先取 X-Forwarded-For 首个 IP（反代后 client.host 退化为代理 IP 导致全站共享限流桶）
+    """限流客户端 IP：**默认只信传输层**（`request.client.host`）。
 
-    注：信任 XFF 假设网关剥离了不可信头（Nginx proxy_set_header 追加时客户端可伪造首段），
-    生产部署需网关覆盖，否则攻击者可自填 XFF 伪造独立 IP 绕过单 IP 桶。
+    WM12-C（审查 P1-5）：原实现无条件取 `X-Forwarded-For` 首段——客户端自填
+    `X-Forwarded-For: 10.9.1.x` 就能每个请求换一个限流桶（实测 20 个并发伪造 XFF 全部
+    通过 `3/60` 的登录限流）。现在只有 `TRUSTED_PROXY_COUNT>0`（显式声明"我前面有几层
+    可信代理"）才读 XFF，且取**右起第 N 段**：每层可信代理会在右侧追加它亲眼看到的上游
+    地址，最右段来自最近的代理，客户端伪造的左侧段一律不采信（docs/20 §五/§八）。
     """
-    xff = request.headers.get("x-forwarded-for", "")
-    if xff:
-        first = xff.split(",")[0].strip()
-        if first:
-            return first
+    from backend.config import get_settings
+
+    trusted = int(getattr(get_settings(), "TRUSTED_PROXY_COUNT", 0) or 0)
+    if trusted > 0:
+        parts = [
+            p.strip() for p in request.headers.get("x-forwarded-for", "").split(",") if p.strip()
+        ]
+        if len(parts) >= trusted:
+            return parts[-trusted]
     return request.client.host if request.client else "unknown"
 
 

@@ -41,26 +41,45 @@ def my_list(db: Session, child: Child) -> list[dict]:
 
 
 def admin_list(db: Session, status: str | None = None) -> list[dict]:
-    """管理端退款台账（最多 200 条）：补齐孩子名/订单信息 + 退款渠道（WM12-B）。"""
+    """管理端退款台账（最多 200 条）：补齐孩子名/订单信息 + 退款渠道（WM12-B）。
+
+    WM12-C（审查 P2-8）：孩子 / 订单 / 押金候选三条 `IN` 批量预载，每请求 SQL **与行数无关**
+    （原先逐行查询是 `1+2N`，200 行上限约 401 条 SQL/请求）。
+    """
     q = db.query(RefundRequest).filter(RefundRequest.is_deleted == 0)
     if status:
         q = q.filter(RefundRequest.status == status)
     rows = q.order_by(RefundRequest.id.desc()).limit(200).all()
+    if not rows:
+        return []
+    child_ids = {r.child_id for r in rows}
+    order_ids = {r.order_id for r in rows if r.order_id}
+    deposit_child_ids = {
+        r.child_id for r in rows if r.kind == RefundRequest.KIND_DEPOSIT and r.deposit_id
+    }
+    children = {c.id: c for c in db.query(Child).filter(Child.id.in_(child_ids)).all()}
+    orders = (
+        {o.id: o for o in db.query(Order).filter(Order.id.in_(order_ids)).all()}
+        if order_ids
+        else {}
+    )
+    deposits = refund_online.deposit_paid_orders(db, list(deposit_child_ids))
     out: list[dict] = []
     for r in rows:
         v = view(r)
-        child = db.query(Child).filter(Child.id == r.child_id).first()
+        child = children.get(r.child_id)
         v["child_name"] = child.name if child else f"#{r.child_id}"
-        order = None
-        if r.order_id:
-            order = db.query(Order).filter(Order.id == r.order_id).first()
-            if order:
-                v["order_no"] = order.order_no
-                v["order_type"] = order.order_type
-                v["pay_method"] = order.pay_method
-        # 执行时会不会走微信原路退回（与 execute 同判据；上面已取的订单传进去复用，不做 N+1）
-        online_order, _note = refund_online.resolve_online_source(db, r, order=order)
+        order = orders.get(r.order_id) if r.order_id else None
+        if order:
+            v["order_no"] = order.order_no
+            v["order_type"] = order.order_type
+            v["pay_method"] = order.pay_method
+        # 执行时会不会走微信原路退回（与 execute 同判据；预载对象传进去复用，不做 N+1）
+        online_order, _note = refund_online.resolve_online_source(
+            db, r, order=order, deposit_orders=deposits.get(r.child_id, [])
+        )
         v["refund_channel"] = "wechat" if online_order is not None else "offline"
         v["out_refund_no"] = r.out_refund_no or ""
+        v["gateway_unknown_at"] = str(r.gateway_unknown_at or "")
         out.append(v)
     return out

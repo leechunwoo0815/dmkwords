@@ -238,6 +238,10 @@ class RefundRequest(BaseModel):
         server_default="0",
         comment="网关提交次数（重试换新单号）",
     )
+    # WM12-C（审查 P0-1）：网关调用异常/超时 = **未知态**（对方可能已受理）——非空即禁止重提，
+    # 必须先走退款查单确认微信侧结果（refund.query_gateway）。曾把异常落 failed：管理员重新
+    # 执行会换新 out_refund_no，若上一笔其实已被微信受理，就是二次出款且对账看不见。
+    gateway_unknown_at = Column(DateTime, nullable=True, comment="网关结果未知的标记时间")
 
 
 class WithdrawalRequest(BaseModel):

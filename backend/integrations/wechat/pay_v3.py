@@ -52,6 +52,7 @@ from backend.common.gateways.payment.types import (
     PaymentCallbackData,
     PaymentOrderRequest,
     PaymentOrderResponse,
+    PaymentRefundQuery,
     PaymentRefundRequest,
     PaymentRefundResponse,
 )
@@ -248,6 +249,12 @@ class WeChatPayV3(PaymentGateway):
         data = json.loads(plaintext)
         amount_raw = data.get("amount", {}).get("total")
         amount = Decimal(str(amount_raw)) / Decimal("100") if amount_raw is not None else None
+        # WM12-C（审查 P1-7）：退款通知里"退了多少钱"在 amount.refund（total 是原交易金额）——
+        # 只有拿 refund 才能和退款单申请金额比对，光看 total 会把"部分退款"当全额。
+        refund_raw = data.get("amount", {}).get("refund")
+        refund_amount = (
+            Decimal(str(refund_raw)) / Decimal("100") if refund_raw is not None else None
+        )
         return PaymentCallbackData(
             out_trade_no=data.get("out_trade_no", ""),
             out_refund_no=data.get("out_refund_no", ""),
@@ -255,6 +262,7 @@ class WeChatPayV3(PaymentGateway):
             trade_state=data.get("trade_state", ""),
             refund_status=data.get("refund_status", ""),
             amount=amount,
+            refund_amount=refund_amount,
             raw_body=plaintext.decode(),
         )
 
@@ -323,6 +331,36 @@ class WeChatPayV3(PaymentGateway):
             state=str(data.get("status", "") or ""),
         )
 
+    async def query_refund(self, out_refund_no: str) -> PaymentRefundQuery:
+        """退款查单（WM12-C 审查 P0-1）：GET /v3/refund/domestic/refunds/{out_refund_no}。
+
+        404 = 微信侧**查无此单**（未受理，可安全重试）；其余非 200 抛错（结果仍未知，
+        调用方不得据此重试）。真通道语义未验证（docs/09 WM12-C §四）。
+        """
+        url = f"/v3/refund/domestic/refunds/{out_refund_no}"
+        async with httpx.AsyncClient(base_url=self.BASE_URL, timeout=10) as client:
+            resp = await client.get(
+                url,
+                headers={
+                    "Authorization": self._build_auth_header("GET", url),
+                    "Accept": "application/json",
+                },
+            )
+        if resp.status_code == 404:
+            return PaymentRefundQuery(found=False, error_message="微信侧查无此退款单（未受理）")
+        if resp.status_code != 200:
+            try:
+                error_msg = resp.json().get("message", "未知错误")
+            except Exception:
+                error_msg = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            raise PaymentError(f"微信退款查单失败: {error_msg}")
+        data = resp.json()
+        return PaymentRefundQuery(
+            found=True,
+            state=str(data.get("status", "") or ""),
+            refund_id=str(data.get("refund_id", "") or ""),
+        )
+
     async def download_bill(self, bill_date: str, bill_type: str = "ALL") -> str:
         """下载微信对账单（WM12-B 对账用）→ 返回 CSV 文本。
 
@@ -360,12 +398,19 @@ class WeChatPayV3(PaymentGateway):
 
         raw = file_resp.content
         expected_hash = (meta.get("hash_value") or "").strip().upper()
-        if expected_hash and meta.get("hash_type", "SHA256").upper() == "SHA256":
-            import hashlib
+        hash_type = str(meta.get("hash_type") or "SHA256").upper()
+        # WM12-C（审查 P0-2c）：fail-closed——原先 `expected_hash and hash_type=="SHA256"` 才校验，
+        # hash_value 为空或 hash_type 变了就整段跳过且不留痕（文件被篡改/下载不完整没人知道）。
+        # 对账是"钱对不对"的最后一道防线：没有可用哈希就拒收这份账单，宁可 failed 让人来看。
+        if not expected_hash or hash_type != "SHA256":
+            raise PaymentError(
+                f"微信对账单缺少可用哈希（hash_type={hash_type or '空'}），拒绝未校验的账单"
+            )
+        import hashlib
 
-            got = hashlib.sha256(raw).hexdigest().upper()
-            if got != expected_hash:
-                raise PaymentError("微信对账单哈希校验失败（文件可能被篡改或下载不完整）")
+        got = hashlib.sha256(raw).hexdigest().upper()
+        if got != expected_hash:
+            raise PaymentError("微信对账单哈希校验失败（文件可能被篡改或下载不完整）")
 
         # 账单是 gzip 流；若不是（部分环境直接给明文 CSV）则原样解码
         try:

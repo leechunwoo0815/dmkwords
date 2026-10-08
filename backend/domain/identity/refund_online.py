@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -47,13 +48,43 @@ def find_by_out_refund_no(db: Session, out_refund_no: str) -> RefundRequest | No
     )
 
 
+def deposit_paid_orders(db: Session, child_ids: list[int]) -> dict[int, list[Order]]:
+    """孩子的**线上押金支付候选**（按孩子分组）——原路退款判据与列表页共用同一查询。
+
+    单开出来是为了批量预载（审查 P2-8：列表页逐行查会 N+1）。
+    """
+    if not child_ids:
+        return {}
+    rows = (
+        db.query(Order)
+        .filter(
+            Order.child_id.in_(child_ids),
+            Order.is_deleted == 0,
+            Order.status == Order.STATUS_PAID,
+            Order.order_type.in_([Order.TYPE_DEPOSIT, Order.TYPE_DEPOSIT_SUPPLEMENT]),
+            Order.pay_method == "wechat",
+            Order.transaction_id.isnot(None),
+            Order.transaction_id != "",
+        )
+        .all()
+    )
+    grouped: dict[int, list[Order]] = {}
+    for o in rows:
+        grouped.setdefault(o.child_id, []).append(o)
+    return grouped
+
+
 def resolve_online_source(
-    db: Session, req: RefundRequest, *, order: Order | None = None
+    db: Session,
+    req: RefundRequest,
+    *,
+    order: Order | None = None,
+    deposit_orders: list[Order] | None = None,
 ) -> tuple[Order | None, str]:
     """找出这笔退款对应的**线上支付原单**。返回 (原单, 说明)。
 
     找不到时返回 `(None, 说明)` → 走线下打款登记，说明会进审计（为什么没自动原路退）。
-    `order` 可由调用方预载（列表页逐行判定渠道时复用，避免 N+1）。
+    `order` / `deposit_orders` 可由调用方预载（列表页逐行判定渠道时复用，避免 N+1，审查 P2-8）。
     押金的特殊口径：一笔微信退款只能对应一笔原交易，所以**只有该孩子的押金由单笔线上支付
     构成**时才自动原路退；多笔（首缴+补缴）回落线下并留痕，绝不拼单——拼错了钱退到别人账上。
     """
@@ -63,23 +94,14 @@ def resolve_online_source(
             order = db.query(Order).filter(Order.id == req.order_id).first()
     elif req.kind == RefundRequest.KIND_DEPOSIT and req.deposit_id:
         order = None
-        rows = (
-            db.query(Order)
-            .filter(
-                Order.child_id == req.child_id,
-                Order.is_deleted == 0,
-                Order.status == Order.STATUS_PAID,
-                Order.order_type.in_([Order.TYPE_DEPOSIT, Order.TYPE_DEPOSIT_SUPPLEMENT]),
-                Order.pay_method == "wechat",
-                Order.transaction_id.isnot(None),
-                Order.transaction_id != "",
+        if deposit_orders is None:
+            deposit_orders = deposit_paid_orders(db, [req.child_id]).get(req.child_id, [])
+        if len(deposit_orders) == 1:
+            order = deposit_orders[0]
+        elif len(deposit_orders) > 1:
+            note = (
+                f"押金由 {len(deposit_orders)} 笔线上支付构成，未自动原路退（请线下打款或分笔退）"
             )
-            .all()
-        )
-        if len(rows) == 1:
-            order = rows[0]
-        elif len(rows) > 1:
-            note = f"押金由 {len(rows)} 笔线上支付构成，未自动原路退（请线下打款或分笔退）"
         else:
             note = "押金无线上支付记录，按线下打款登记"
     if order is None:
@@ -152,6 +174,7 @@ def submit_gateway_refund(
     gateway = get_payment_gateway()
     resp = None
     error_message = ""
+    gateway_error = False
     try:
         resp = run_coro(
             gateway.refund(
@@ -166,9 +189,10 @@ def submit_gateway_refund(
             )
         )
         error_message = resp.error_message
-    except Exception as exc:  # 网关炸了也要落痕：退款单留在"执行中"，由对账/人工收口
+    except Exception as exc:  # 网关炸了 = **结果未知**（不是失败）：见 Phase 3 的未知态处理
         logger.error("微信退款调用异常 req=%s: %s", req.id, exc, exc_info=True)
         error_message = f"网关异常：{exc}"
+        gateway_error = True
 
     # Phase 3
     fresh = (
@@ -180,6 +204,29 @@ def submit_gateway_refund(
     )
     if fresh is None or fresh.status == RefundRequest.STATUS_REFUNDED:
         return  # 回调赢了（或单被删）：认回调结果，不再改
+    if gateway_error:
+        # WM12-C（审查 P0-1）：超时/异常的窗口里微信**可能已受理**——留在"执行中" + 打未知态标记。
+        # 绝不落 failed：failed 可重提且会换新的 out_refund_no，上一笔若已受理就是二次出款，
+        # 对账也查不出来（本项修复前正是如此）。收口靠退款回调或人工查单（resolve_unknown）。
+        fresh.gateway_unknown_at = datetime.now()
+        publish_audit(
+            db,
+            admin=admin,
+            action="refund.gateway_unknown",
+            target_type="refund_request",
+            target_id=str(fresh.id),
+            detail={
+                "out_refund_no": out_refund_no,
+                "amount": str(fresh.amount),
+                "error": error_message[:200],
+            },
+            reason="网关调用异常，结果未知：先查单确认微信侧结果，再决定是否重试",
+        )
+        db.commit()
+        return
+    # 走到这里说明网关**明确应答**了（受理或拒绝）——结果不再未知，清掉未知态标记
+    # （无论后面落"已退款"、"执行中"还是"失败"，都不是"不知道对方收没收到"）
+    fresh.gateway_unknown_at = None
     if resp is not None and resp.success:
         fresh.gateway_refund_id = resp.refund_id or fresh.gateway_refund_id
         state = (resp.state or "SUCCESS").upper()
@@ -204,7 +251,6 @@ def submit_gateway_refund(
             )
             return
         # PROCESSING（或网关未返回状态）：微信已受理但钱还在路上 → 留在"执行中"等退款结果通知
-        db.commit()
         publish_audit(
             db,
             admin=admin,
@@ -219,6 +265,9 @@ def submit_gateway_refund(
             },
             reason="微信原路退款已受理，等待退款结果通知",
         )
+        # 先发布后提交（审计与状态同一事务）：早先 commit 在前、审计在后，请求结束 close()
+        # 把未提交的审计回滚掉——"留痕"其实没留（WM12-C 顺带修正）
+        db.commit()
         return
     finalize(
         admin,
@@ -228,6 +277,145 @@ def submit_gateway_refund(
         manual_override=manual_override,
         channel="wechat",
     )
+
+
+def resolve_unknown(
+    db: Session,
+    admin: Any,
+    request_id: int,
+    *,
+    finalize: Callable[..., None],
+) -> dict:
+    """退款**未知态**收口（WM12-C 审查 P0-1）：调微信查单确认上一笔到底受理没有。
+
+    这是未知态唯一的出路（回调之外）：`execute` 在 `processing` 上被状态机拦住，
+    而"换新单号重提"在未知态下是绝对禁止的（可能二次出款）。
+
+    分支（查单结论 → 动作）：
+    - 查无此单（未受理）→ 清未知态 + 落 `failed`（**现在**重试是安全的，会换新 `out_refund_no`）；
+    - `SUCCESS` → 直接落"已退款"（回调可能没到/迟到）；
+    - `PROCESSING` → 清未知态，留在"执行中"等退款回调；
+    - `CLOSED`/`ABNORMAL` → 钱没退出去 → 清未知态 + 落 `failed`（可重提）；
+    - 查单本身失败 → **未知态保持、状态不动**（宁可让人再查一次，也不拿猜测去重试）。
+    """
+    from backend.common.async_utils import run_coro
+    from backend.common.exceptions import ValidationError
+    from backend.integrations.payment import get_payment_gateway
+
+    req = (
+        db.query(RefundRequest)
+        .filter(RefundRequest.id == request_id, RefundRequest.is_deleted == 0)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    if not req:
+        raise NotFoundError("退款申请不存在")
+    if not (req.out_refund_no or "").strip():
+        raise ValidationError("该退款单没有商户退款单号（没走过网关），无需查单")
+    if req.gateway_unknown_at is None and req.status != RefundRequest.STATUS_PROCESSING:
+        raise ValidationError("该退款单不处于待查状态（只有执行中/未知态需要查单）")
+
+    out_refund_no = req.out_refund_no
+    try:
+        result = run_coro(get_payment_gateway().query_refund(out_refund_no))
+    except Exception as exc:
+        logger.error("退款查单失败 req=%s: %s", req.id, exc, exc_info=True)
+        publish_audit(
+            db,
+            admin=admin,
+            action="refund.gateway_query_failed",
+            target_type="refund_request",
+            target_id=str(req.id),
+            detail={"out_refund_no": out_refund_no, "error": str(exc)[:200]},
+            reason="退款查单失败：微信侧结果仍未确认，未知态保持",
+        )
+        db.commit()
+        return {
+            "id": req.id,
+            "status": req.status,
+            "gateway_state": "UNKNOWN",
+            "resolved": False,
+            "note": "查单失败，微信侧结果仍未确认（未知态保持，请稍后再查）",
+        }
+
+    state = (result.state or "").upper()
+    if not result.found:
+        # 未受理 = 可安全重试：清未知态 + 落 failed（这条路径上"重试"不再有二次出款的可能是查单换来的）
+        req.gateway_unknown_at = None
+        finalize(
+            admin,
+            req,
+            success=False,
+            remark=f"微信查单确认未受理（{out_refund_no}），可安全重试",
+            manual_override=False,
+            channel="wechat",
+            channel_note="退款查单：微信侧查无此单，已确认未受理",
+        )
+        return {
+            "id": req.id,
+            "status": req.status,
+            "gateway_state": "NOT_FOUND",
+            "resolved": True,
+            "note": "微信侧查无此单（未受理）→ 已置失败，可重新执行（会生成新的商户退款单号）",
+        }
+    if state == "SUCCESS":
+        req.gateway_unknown_at = None
+        if result.refund_id:
+            req.gateway_refund_id = result.refund_id
+        finalize(
+            admin,
+            req,
+            success=True,
+            remark=f"微信查单确认已退款（{out_refund_no}）",
+            manual_override=False,
+            channel="wechat",
+            channel_note="退款查单：微信侧已退款成功",
+        )
+        return {
+            "id": req.id,
+            "status": req.status,
+            "gateway_state": state,
+            "resolved": True,
+            "note": "微信侧已退款成功 → 已落已退款（回调可能迟到）",
+        }
+    if state in ("CLOSED", "ABNORMAL"):
+        req.gateway_unknown_at = None
+        finalize(
+            admin,
+            req,
+            success=False,
+            remark=f"微信查单结论：退款被关闭/异常（{state}，{out_refund_no}）",
+            manual_override=False,
+            channel="wechat",
+            channel_note=f"退款查单：{state}",
+        )
+        return {
+            "id": req.id,
+            "status": req.status,
+            "gateway_state": state,
+            "resolved": True,
+            "note": f"微信侧退款 {state}（未出款）→ 已置失败，可重新执行",
+        }
+    # PROCESSING / 其它中间态：受理了但钱在路上——未知态解除，继续等回调
+    req.gateway_unknown_at = None
+    publish_audit(
+        db,
+        admin=admin,
+        action="refund.gateway_queried",
+        target_type="refund_request",
+        target_id=str(req.id),
+        detail={"out_refund_no": out_refund_no, "state": state or "UNKNOWN"},
+        reason="退款查单：微信侧仍在处理中，未知态解除，等退款回调",
+    )
+    db.commit()
+    return {
+        "id": req.id,
+        "status": req.status,
+        "gateway_state": state or "UNKNOWN",
+        "resolved": True,
+        "note": "微信侧处理中（已受理）→ 未知态解除，留在执行中等回调",
+    }
 
 
 def finalize_gateway_result(
@@ -254,12 +442,29 @@ def finalize_gateway_result(
     )
     if not req:
         raise NotFoundError("退款申请不存在")
+    actor = types.SimpleNamespace(id=0, display_name="微信退款回调")
     if req.status == RefundRequest.STATUS_REFUNDED:
         return {"id": req.id, "status": req.status, "ignored": True}
     if req.status != RefundRequest.STATUS_PROCESSING:
-        req.assert_transition(RefundRequest.STATUS_PROCESSING)
-        req.status = RefundRequest.STATUS_PROCESSING
-        db.flush()
-    actor = types.SimpleNamespace(id=0, display_name="微信退款回调")
+        # WM12-C（审查 P2-14）：状态不可推进（如 pending/rejected/cancelled）→ **忽略并留痕**，
+        # 不再 `assert_transition` 抛错：抛错会让 Router 返回 500 → 微信按规则重发 24 小时，
+        # 而本地状态问题重试不会自愈（每次重发都失败，纯噪声+占资源）。
+        publish_audit(
+            db,
+            admin=actor,
+            action="refund.notify_state_skipped",
+            target_type="refund_request",
+            target_id=str(req.id),
+            detail={"status": req.status, "remark": remark[:120]},
+            reason="退款通知到达但退款单状态不可推进，已忽略（需人工核对）",
+        )
+        db.commit()
+        return {
+            "id": req.id,
+            "status": req.status,
+            "ignored": True,
+            "reason": "state_not_processable",
+        }
+    req.gateway_unknown_at = None  # 回调即明确结论：未知态解除
     finalize(actor, req, success=success, remark=remark, manual_override=False, channel="wechat")
     return {"id": req.id, "status": req.status}
