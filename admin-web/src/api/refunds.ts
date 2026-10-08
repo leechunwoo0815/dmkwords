@@ -14,6 +14,10 @@ export interface RefundRequestItem {
   order_no?: string;
   order_type?: string;
   pay_method?: string;
+  /** WM12-B：执行时会走微信原路退回（wechat）还是线下打款登记（offline） */
+  refund_channel?: string;
+  /** WM12-B：商户退款单号（线上原路退款的幂等键，仅在途/已退时有值） */
+  out_refund_no?: string;
   created_at: string;
 }
 

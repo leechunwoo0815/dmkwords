@@ -291,3 +291,22 @@ export function apiExportDashboard(): Promise<void> {
 export function apiExportNotifications(): Promise<void> {
   return downloadExcel("/api/admin/notifications/export", "notifications.xlsx");
 }
+
+// ---------- 支付对账（WM12-B，docs/09 WM12-B） ----------
+
+export type PaymentReconcileDiff = components["schemas"]["PaymentReconcileDiff"];
+export type PaymentReconcileReport = components["schemas"]["PaymentReconcileReport"];
+export type PaymentReconcileRun = components["schemas"]["PaymentReconcileRunResponse"];
+
+/** 最近几轮对账报告（专员可读：账对不对是公开看板）。 */
+export function apiPaymentReconciliations(limit = 10): Promise<{ items: PaymentReconcileReport[] }> {
+  return request(`/api/admin/payments/reconciliations?limit=${limit}`);
+}
+
+/** 手动跑一轮对账（**仅超管**）：本地一致性审计 + 微信账单比对（真通道时）。 */
+export function apiRunReconcile(billDate = "", withWechat = true): Promise<PaymentReconcileRun> {
+  return request("/api/admin/payments/reconcile", {
+    method: "POST",
+    body: JSON.stringify({ bill_date: billDate, with_wechat: withWechat }),
+  });
+}

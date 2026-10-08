@@ -93,6 +93,16 @@ module.exports = {
   myOrders(childId) {
     return req.get('/api/miniapp/orders', null, { params: { child_id: childId } })
   },
+  // 线上支付（WM12-A）：价格下发 → 下单 → 发起支付（返回 wx.requestPayment 参数）
+  getPaymentPlans(childId) {
+    return req.get('/api/miniapp/payment/plans', null, { params: { child_id: childId } })
+  },
+  createOnlineOrder(childId, orderType) {
+    return req.post('/api/miniapp/orders', { child_id: childId, order_type: orderType })
+  },
+  payOrder(orderId) {
+    return req.post(`/api/miniapp/orders/${orderId}/pay`, {})
+  },
   refundPreview(childId, orderId) {
     return req.get('/api/miniapp/refund-preview', null, { params: { child_id: childId, order_id: orderId } })
   },

@@ -200,3 +200,20 @@
 
 /* ===== 2026-09-13 内联样式迁移（机械生成，勿手改） ===== */
 .x-245e15 { padding: 80rpx 0; text-align: center; color: var(--muted); font-size: 26rpx; }
+
+/* ===== WM12-A：待支付订单「去支付」（iOS 不渲染该按钮，见 js 的 showPay） ===== */
+.order-pay-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 16rpx 24rpx 4rpx;
+}
+.order-pay-btn {
+  padding: 12rpx 40rpx;
+  border-radius: 999rpx;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 26rpx;
+  font-weight: 700;
+  border: 3rpx solid var(--fg);
+  box-shadow: var(--shadow-hard-sm);
+}

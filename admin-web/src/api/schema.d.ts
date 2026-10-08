@@ -1719,6 +1719,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/payments/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Admin Run Reconcile
+         * @description 手动跑一轮资金对账（超管）：本地一致性审计 + 微信账单比对（真通道时）。
+         */
+        post: operations["admin_run_reconcile_api_admin_payments_reconcile_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/payments/reconciliations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin List Reconciliations
+         * @description 最近的对账报告（专员可读：这是"账对不对"的公开看板，不是敏感资金数据）。
+         */
+        get: operations["admin_list_reconciliations_api_admin_payments_reconciliations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/payments/simulate-callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Admin Simulate Payment Callback
+         * @description 超管演练微信支付回调（**仅 mock 支付通道可用**）：重复回调 / 金额篡改 / 非成功状态。
+         *
+         *     为什么需要它：商户号未到位时无法真机验签，但"重复回调不重复入账""金额不符拒绝"
+         *     这类判据必须有人能现场演练（判据见 docs/09 WM12-A §三 / docs/04 WM12 步骤 4-6）。
+         */
+        post: operations["admin_simulate_payment_callback_api_admin_payments_simulate_callback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/payments/simulate-refund-callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Admin Simulate Refund Callback
+         * @description 超管演练微信退款结果通知（**仅 mock 支付通道可用**）：重复通知 / 迟到的失败通知。
+         *
+         *     判据见 docs/09 WM12-B §三 / docs/04 WM12 步骤 8-10。
+         */
+        post: operations["admin_simulate_refund_callback_api_admin_payments_simulate_refund_callback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/questions/{question_id}": {
         parameters: {
             query?: never;
@@ -2990,7 +3075,36 @@ export interface paths {
          */
         get: operations["my_orders_api_miniapp_orders_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Online Order
+         * @description 家长端在线下单（观察期费/年费/99 元首场/押金）→ 订单进待支付，随后调 `pay` 拉起微信支付。
+         *
+         *     只建单不收钱：金额一律服务端按配置重算（`OrderService.price_member_order` 单一来源）。
+         */
+        post: operations["create_online_order_api_miniapp_orders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/orders/{order_id}/pay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pay Order
+         * @description 发起线上支付（三段式：先落状态→调网关→锁内复核）。
+         *
+         *     返回 `pay_params` 供小程序 `wx.requestPayment` 拉起；mock 通道 `instant_paid=true`
+         *     （已即时到账，端上不用再拉起）。重复点按安全：幂等键=订单号（`already_paid=true`）。
+         */
+        post: operations["pay_order_api_miniapp_orders__order_id__pay_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3026,6 +3140,26 @@ export interface paths {
         };
         /** Passport */
         get: operations["passport_api_miniapp_passport_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/payment/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Payment Plans
+         * @description 购买页价格（配置下发，前端零硬编码金额）；`payment_enabled=false` 时前端不渲染支付入口。
+         */
+        get: operations["payment_plans_api_miniapp_payment_plans_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3439,6 +3573,28 @@ export interface paths {
         get: operations["withdrawal_settlement_api_miniapp_withdrawals__request_id__settlement_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pay/wechat/notify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Wechat Pay Notify
+         * @description 微信支付结果通知：验签 → 解密 → 金额比对 → 流水号查重 → 幂等入账。
+         *
+         *     处理细则（三层守卫，模式手册 P3）见 `backend/domain/identity/payment_service.py`。
+         */
+        post: operations["wechat_pay_notify_api_pay_wechat_notify_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4613,6 +4769,13 @@ export interface components {
              */
             reason: string;
         };
+        /** OnlineOrderRequest */
+        OnlineOrderRequest: {
+            /** Child Id */
+            child_id: number;
+            /** Order Type */
+            order_type: string;
+        };
         /** OrderConfirmRequest */
         OrderConfirmRequest: {
             /**
@@ -4976,6 +5139,147 @@ export interface components {
             /** Remark */
             remark: string;
         };
+        /**
+         * PaymentReconcileDiff
+         * @description 一条差异（对账只报不改：清单是给人看的证据）。
+         */
+        PaymentReconcileDiff: {
+            /**
+             * Kind
+             * @description 差异类型（bill_only/local_only/amount_mismatch/...）
+             */
+            kind: string;
+            /**
+             * Message
+             * @description 人话说明
+             * @default
+             */
+            message: string;
+            /**
+             * Ref
+             * @description 定位锚点（订单号/退款单号）
+             * @default
+             */
+            ref: string;
+        };
+        /** PaymentReconcileListResponse */
+        PaymentReconcileListResponse: {
+            /** Items */
+            items?: components["schemas"]["PaymentReconcileReport"][];
+        };
+        /**
+         * PaymentReconcileReport
+         * @description 一轮对账的结果（local=本地一致性审计 / wechat=微信账单比对）。
+         */
+        PaymentReconcileReport: {
+            /** Bill Date */
+            bill_date: string;
+            /**
+             * Checked Count
+             * @default 0
+             */
+            checked_count: number;
+            /** Detail */
+            detail?: components["schemas"]["PaymentReconcileDiff"][];
+            /**
+             * Diff Count
+             * @default 0
+             */
+            diff_count: number;
+            /**
+             * Finished At
+             * @default
+             */
+            finished_at: string;
+            /** Id */
+            id: number;
+            /**
+             * Note
+             * @description 跳过/失败原因（status=skipped|failed 时看这里）
+             * @default
+             */
+            note: string;
+            /**
+             * Source
+             * @description local/wechat
+             */
+            source: string;
+            /**
+             * Status
+             * @description ok/diff/skipped/failed
+             */
+            status: string;
+            /**
+             * Trigger
+             * @description scheduled/manual
+             * @default manual
+             */
+            trigger: string;
+        };
+        /** PaymentReconcileRunResponse */
+        PaymentReconcileRunResponse: {
+            /** Bill Date */
+            bill_date: string;
+            /**
+             * Diff Total
+             * @default 0
+             */
+            diff_total: number;
+            /** Reports */
+            reports?: components["schemas"]["PaymentReconcileReport"][];
+        };
+        /**
+         * PaymentRefundSimulateRequest
+         * @description 退款回调演练参数（仅 mock 通道）：`out_refund_no` 形如 `RF{退款单id}-1-1`。
+         */
+        PaymentRefundSimulateRequest: {
+            /** Out Refund No */
+            out_refund_no: string;
+            /**
+             * Refund Status
+             * @default SUCCESS
+             */
+            refund_status: string;
+        };
+        /**
+         * PaymentSimulateRefundResponse
+         * @description 退款回调演练结果（仅 mock 通道）。
+         */
+        PaymentSimulateRefundResponse: {
+            /** Http Status */
+            http_status: number;
+            /** Out Refund No */
+            out_refund_no: string;
+            /** Refund Request Id */
+            refund_request_id: number;
+            /** Response */
+            response: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * PaymentSimulateRequest
+         * @description 演练回调参数（仅 mock 通道）：留空 amount=用订单金额，transaction_id=每次随机。
+         */
+        PaymentSimulateRequest: {
+            /**
+             * Amount
+             * @default
+             */
+            amount: string;
+            /** Order No */
+            order_no: string;
+            /**
+             * Trade State
+             * @default SUCCESS
+             */
+            trade_state: string;
+            /**
+             * Transaction Id
+             * @default
+             */
+            transaction_id: string;
+        };
         /** ProgressReportRequest */
         ProgressReportRequest: {
             /** Book Id */
@@ -5053,6 +5357,22 @@ export interface components {
              * @default []
              */
             ids: number[];
+        };
+        /**
+         * ReconcileRunRequest
+         * @description 跑一轮对账：留空 bill_date=今天；with_wechat=false 只跑本地一致性审计。
+         */
+        ReconcileRunRequest: {
+            /**
+             * Bill Date
+             * @default
+             */
+            bill_date: string;
+            /**
+             * With Wechat
+             * @default true
+             */
+            with_wechat: boolean;
         };
         /**
          * RecordItemResponse
@@ -8666,6 +8986,136 @@ export interface operations {
             };
         };
     };
+    admin_run_reconcile_api_admin_payments_reconcile_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconcileRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentReconcileRunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_list_reconciliations_api_admin_payments_reconciliations_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentReconcileListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_simulate_payment_callback_api_admin_payments_simulate_callback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentSimulateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_simulate_refund_callback_api_admin_payments_simulate_refund_callback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentRefundSimulateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentSimulateRefundResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_question_api_admin_questions__question_id__put: {
         parameters: {
             query?: never;
@@ -11021,6 +11471,74 @@ export interface operations {
             };
         };
     };
+    create_online_order_api_miniapp_orders_post: {
+        parameters: {
+            query?: never;
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnlineOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pay_order_api_miniapp_orders__order_id__pay_post: {
+        parameters: {
+            query?: never;
+            header: {
+                authorization: string;
+            };
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_parent_profile_api_miniapp_parent_profile_put: {
         parameters: {
             query?: never;
@@ -11057,6 +11575,39 @@ export interface operations {
         };
     };
     passport_api_miniapp_passport_get: {
+        parameters: {
+            query: {
+                child_id: number;
+            };
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    payment_plans_api_miniapp_payment_plans_get: {
         parameters: {
             query: {
                 child_id: number;
@@ -11961,6 +12512,39 @@ export interface operations {
             path: {
                 request_id: number;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wechat_pay_notify_api_pay_wechat_notify_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Wechatpay-Signature"?: string;
+                "Wechatpay-Timestamp"?: string;
+                "Wechatpay-Nonce"?: string;
+            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;

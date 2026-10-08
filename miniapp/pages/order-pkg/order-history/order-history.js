@@ -1,6 +1,7 @@
 // pages/order-pkg/order-history/order-history.js — 我的订单（插修4-X7 补齐幽灵页）
 const api = require('../../../utils/api')
 const labels = require('../../../utils/labels')
+const { isIOS } = require('../../../utils/platform')
 
 
 // 状态中文映射对齐管理端 RefundCenter STATUS_LABEL 口径
@@ -44,11 +45,15 @@ Page({
     tabs: TABS,
     activeTab: 'all',
     filtered: [],
+    showPay: false,   // 非 iOS 且服务端开着线上支付 → 待支付行出现「去支付」
   },
 
   onLoad(options) {
     this._childId = Number(options.child_id || 0)
-    this.setData({ childName: decodeURIComponent(options.child_name || '') })
+    this.setData({
+      childName: decodeURIComponent(options.child_name || ''),
+      showPay: !isIOS(),
+    })
   },
 
   onShow() { this.load() },
@@ -65,6 +70,8 @@ Page({
         iconUrl: (TYPE_STYLE[o.order_type] || DEFAULT_TYPE_STYLE).icon,
         refundText: o.refund_status ? (REFUND_STATUS_TEXT[o.refund_status] || o.refund_status) : '',
         timeText: (o.paid_at || o.created_at || '').replace('T', ' ').slice(0, 16),
+        // WM12-A：待支付（线上/待人工确认）都可继续发起线上支付
+        payable: o.status === 'pending_payment' || o.status === 'pending_manual_confirm',
       }))
       this.setData({ orders, filtered: this._filter(orders, this.data.activeTab) })
     } catch (e) { /* toast 已弹 */ }
@@ -81,6 +88,41 @@ Page({
   onTab(e) {
     const key = e.currentTarget.dataset.tab
     this.setData({ activeTab: key, filtered: this._filter(this.data.orders, key) })
+  },
+
+  // WM12-A：待支付订单继续支付（幂等键=订单号，服务端已支付会直接告知）
+  async onPay(e) {
+    const orderId = e.currentTarget.dataset.id
+    wx.showLoading({ title: '发起支付' })
+    let res = null
+    try {
+      res = await api.payOrder(orderId)
+    } catch (err) {
+      wx.hideLoading()
+      return // toast 已弹
+    }
+    wx.hideLoading()
+    if (res.already_paid || res.instant_paid) {
+      wx.showToast({ title: res.already_paid ? '订单已支付' : '支付成功', icon: 'success' })
+      this.load()
+      return
+    }
+    const p = res.pay_params || {}
+    wx.requestPayment({
+      timeStamp: p.timeStamp,
+      nonceStr: p.nonceStr,
+      package: p.package,
+      signType: p.signType,
+      paySign: p.paySign,
+      success: () => {
+        wx.showToast({ title: '支付成功', icon: 'success' })
+        this.load()
+      },
+      fail: (err) => {
+        if (err && err.errMsg && err.errMsg.indexOf('cancel') >= 0) return
+        wx.showToast({ title: '支付未完成，可再次点按重试', icon: 'none' })
+      },
+    })
   },
 
   onBack() { wx.navigateBack({ delta: 1 }) },

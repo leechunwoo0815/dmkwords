@@ -4,7 +4,19 @@ import PaintPagination from "../components/PaintPagination";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  App as AntdApp, Button, Card, Input, Modal, Radio, Space, Table, Tabs, Tag, Tooltip, Typography,
+  App as AntdApp,
+  Button,
+  Card,
+  Input,
+  Modal,
+  Radio,
+  Space,
+  Table,
+  Tabs,
+  Tag,
+  Tooltip,
+  Typography,
+  Alert,
 } from "antd";
 
 import {
@@ -96,6 +108,7 @@ export default function RefundCenter() {
     amount: string;
     kind: string;
     retry: boolean;
+    refundChannel?: string; // WM12-B：wechat=自动原路退回，执行弹窗据此提示
   } | null>(null);
   const [execSuccess, setExecSuccess] = useState(true);
   const [execRemark, setExecRemark] = useState("");
@@ -171,6 +184,7 @@ export default function RefundCenter() {
       amount: r.amount,
       kind: r.kind,
       retry: r.status === "failed",
+      refundChannel: r.refund_channel,
     });
   };
 
@@ -258,6 +272,13 @@ export default function RefundCenter() {
                   { title: "金额", dataIndex: "amount", width: 100, render: (v) => <Typography.Text strong>￥{Number(v).toLocaleString()}</Typography.Text> },
                   { title: "家长原因", dataIndex: "reason" },
                   { title: "状态", dataIndex: "status", width: 90, render: (s) => <Tag color={STATUS_COLOR[s]}>{STATUS_LABEL[s] ?? s}</Tag> },
+                  {
+                    title: "退款渠道", dataIndex: "refund_channel", width: 110,
+                    // WM12-B：线上微信支付的单 → 执行时自动原路退回；线下收款的 → 人工打款登记
+                    render: (v: string) => (v === "wechat"
+                      ? <Tag color="processing">微信原路</Tag>
+                      : <Tag>线下打款</Tag>),
+                  },
                   { title: "审核备注", dataIndex: "review_remark", width: 150, render: (v) => v ?? "—" },
                   { title: "申请时间", dataIndex: "created_at", width: 165, render: (v) => v.replace("T", " ").slice(0, 19) },
                   {
@@ -486,6 +507,15 @@ export default function RefundCenter() {
         <Typography.Paragraph>
           {execTarget?.childName} · ￥{execTarget?.amount}（{execTarget ? KIND_LABEL[execTarget.kind] : ""}）
         </Typography.Paragraph>
+        {execTarget?.refundChannel === "wechat" && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 10 }}
+            message="该单为微信线上支付 → 点「确认登记」后自动原路退回"
+            description="退款结果由微信返回（受理后可能先显示「退款执行中」，到账后自动转「已退款」）。下方成功/失败只用于无法原路退回时的兜底登记。"
+          />
+        )}
         <Radio.Group value={execSuccess ? "ok" : "fail"} onChange={(e) => setExecSuccess(e.target.value === "ok")}>
           <Radio value="ok">退款成功</Radio>
           <Radio value="fail">退款失败</Radio>
