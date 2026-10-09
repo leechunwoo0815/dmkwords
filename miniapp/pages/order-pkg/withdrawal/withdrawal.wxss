@@ -94,6 +94,23 @@
   color: var(--success);
 }
 
+/* 状态档补齐（A2-4，2026-10-09）：模板用 `wd-{{item.status}}`，但 applying/pending_settle/
+   refunding 三档**从未定义** → 一直只有基类配色，三种状态肉眼分不出来（静默失效）。 */
+.wd-status.wd-applying {
+  background: var(--warning-soft);
+  color: var(--warning-dark);
+}
+
+.wd-status.wd-pending_settle {
+  background: var(--warning-soft-strong);
+  color: var(--warning-dark);
+}
+
+.wd-status.wd-refunding {
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+}
+
 .wd-status.wd-rejected,
 .wd-status.wd-cancelled {
   background: var(--bg);

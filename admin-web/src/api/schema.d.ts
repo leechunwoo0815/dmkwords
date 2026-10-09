@@ -2165,6 +2165,11 @@ export interface paths {
          *
          *     回收站目录**不下发**（2026-09-23，docs/15 §22.2 第 4 道防线）——已判定孤儿的文件在回收站里
          *     等还原或到期清除，不该还能从 Web 访问到。路径口径单一来源：`backend/common/media_paths`。
+         *
+         *     P2-1（2026-10-09 审查）：受保护目录（`voucher/` 收款凭证、`observation/` 评估报告图等
+         *     **人工上传且不可再生**）也**不再从这里下发**——原先只挡 `.trash`，任意 `book.manage`
+         *     管理员拿到路径即可读；现在走**目录白名单**：受保护目录各自有带归属校验的专用端点
+         *     （凭证 `/api/admin/members/orders/{id}/voucher-image`、评估图 `/api/miniapp/observation-images/`）。
          */
         get: operations["serve_upload_api_admin_uploads__path__get"];
         put?: never;
@@ -3001,6 +3006,30 @@ export interface paths {
          *     小程序接着走「手机号 + 短信码」的绑定（`/login/bind`）。家长档案仍由馆员到店建档创建。
          */
         post: operations["login_wechat_api_miniapp_login_wechat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Parent Logout
+         * @description 退出登录 = **服务端撤销**（P1-11，2026-10-09）：token 代数 +1，旧 token 立即失效。
+         *
+         *     为什么需要它：家长 token 原先 30 天有效且**不可撤销**（唯一出路是删家长档案=废号），
+         *     而它还会出现在媒体 URL（`?token=`）里 → 访问日志/分享链接泄漏后 30 天内一直可用。
+         *     现在"退出登录"是真撤销：本端与其它设备上的旧 token 全部 401（含 URL 里的）。
+         */
+        post: operations["parent_logout_api_miniapp_logout_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11358,6 +11387,37 @@ export interface operations {
                 "application/json": components["schemas"]["WeChatLoginRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    parent_logout_api_miniapp_logout_post: {
+        parameters: {
+            query?: never;
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

@@ -97,6 +97,16 @@
   background: var(--accent-soft);
   color: var(--accent);
 }
+/* 分类档补齐（A2-4，2026-10-09）：模板用 `cat-{{item.catKey}}`（money/borrow/reading/member/
+   activity/reserve/report/other），变体从未定义 → 八类通知全是同一个橙色标签（静默失效）。
+   用令牌给可区分的四组；member 沿用基类橙色。 */
+.msg-cat-tag.cat-money { background: var(--warning-soft); color: var(--warning-dark); }
+.msg-cat-tag.cat-borrow { background: var(--accent-soft); color: var(--accent); }
+.msg-cat-tag.cat-reading,
+.msg-cat-tag.cat-activity { background: var(--secondary-soft); color: var(--success); }
+.msg-cat-tag.cat-report { background: var(--success-soft); color: var(--success); }
+.msg-cat-tag.cat-reserve,
+.msg-cat-tag.cat-other { background: var(--bg); color: var(--muted); }
 .msg-title {
   flex: 1;
   min-width: 0;

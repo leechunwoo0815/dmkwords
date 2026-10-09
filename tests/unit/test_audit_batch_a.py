@@ -176,12 +176,11 @@ def test_media_cache_control_headers(client: TestClient, admin_headers: dict):
     """机器生成名（内容指纹/随机 token）长缓存；就地覆盖的（posters）协商缓存。"""
     root = os.path.abspath(get_settings().UPLOADS_DIR)
     cases = {
-        # 生成图/凭证/音频 = `{stem}_{内容指纹或随机token}` → 写完不再变 → 长缓存
+        # 生成图/音频 = `{stem}_{内容指纹或随机token}` → 写完不再变 → 长缓存
         "cover/9999/9780439064873_abcdef123456.jpg": "public, max-age=31536000, immutable",
-        "voucher/ORD1_abcdef123456.jpg": "public, max-age=31536000, immutable",
-        # 就该回源复验的两类：就地覆盖的（posters）与无可判指纹的
-        "posters/poster_1.jpg": "no-cache",
-        "observation/child_1/abcdef1234567890.jpg": "no-cache",
+        "circle/post_1_abcdef123456.jpg": "public, max-age=31536000, immutable",
+        # 就该回源复验的：无可判机器指纹的（就地覆盖类已随受保护目录一起挪走）
+        "reports/weekly_1.jpg": "no-cache",
     }
     for rel, expected in cases.items():
         full = os.path.join(root, rel)
@@ -191,3 +190,11 @@ def test_media_cache_control_headers(client: TestClient, admin_headers: dict):
         resp = client.get(f"/api/admin/uploads/{rel}", headers=admin_headers)
         assert resp.status_code == 200, resp.text
         assert resp.headers.get("cache-control") == expected, f"{rel}: {dict(resp.headers)}"
+    # A2-2（2026-10-09）：受保护目录（人工上传、不可再生）不再从通用上传端点下发——
+    # 凭证/评估图各有带归属校验的专用端点；这里断言"通用口一律 404"。
+    for rel in ("voucher/ORD1_abcdef123456.jpg", "observation/child_1/abcdef1234567890.jpg"):
+        full = os.path.join(root, rel)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "wb") as fh:
+            fh.write(b"\xff\xd8\xff\xe0" + b"x" * 32)
+        assert client.get(f"/api/admin/uploads/{rel}", headers=admin_headers).status_code == 404

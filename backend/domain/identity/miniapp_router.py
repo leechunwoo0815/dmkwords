@@ -43,6 +43,21 @@ class ChildAvatarRequest(BaseSchema):
 
 
 # ---------- 孩子列表刷新（2026-09-16：修「点赞头像 vs 我的页头像不一致」） ----------
+@router.post("/logout")
+def parent_logout(auth: Any = Depends(get_current_parent)):
+    """退出登录 = **服务端撤销**（P1-11，2026-10-09）：token 代数 +1，旧 token 立即失效。
+
+    为什么需要它：家长 token 原先 30 天有效且**不可撤销**（唯一出路是删家长档案=废号），
+    而它还会出现在媒体 URL（`?token=`）里 → 访问日志/分享链接泄漏后 30 天内一直可用。
+    现在"退出登录"是真撤销：本端与其它设备上的旧 token 全部 401（含 URL 里的）。
+    """
+    from backend.domain.identity.service import revoke_parent_tokens
+
+    parent, db = auth
+    revoke_parent_tokens(db, parent)
+    return {"ok": True}
+
+
 @router.get("/children")
 def my_children(auth: Any = Depends(get_current_parent)):
     """家长名下孩子列表（**与登录载荷同源**：`identity.auth.children_payload`）。

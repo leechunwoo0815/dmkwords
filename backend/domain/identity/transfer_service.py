@@ -307,18 +307,42 @@ class TransferService:
         return sent
 
     def expire_overdue(self) -> int:
-        """超时未审 → expired + 双方解锁（列表访问时惰性触发；WM11 定时任务接管）。"""
+        """超时未审 → expired + 双方解锁（列表访问时惰性触发；WM11 定时任务接管）。
+
+        P1-9（2026-10-09 审查）：原实现"读后无条件置位"——审核（`review`，带行锁）刚把单推到
+        approved（12 步链已提交：源孩子退会、目标转正、押金退款发起），超时扫描若读到旧快照就会
+        把它改回 `expired`，**记录与现实相反**。现在逐单**条件 UPDATE**：只有仍处于 pending
+        且仍超时的行才被推进（影响行数=0 即已被审核抢先，跳过不动）。
+        """
+        now = datetime.now()
         rows = (
             self.db.query(TransferRequest)
             .filter(
                 TransferRequest.status == TransferRequest.STATUS_PENDING,
-                TransferRequest.expires_at < datetime.now(),
+                TransferRequest.expires_at < now,
                 TransferRequest.is_deleted == 0,
             )
             .all()
         )
+        expired = 0
         for r in rows:
-            r.status = TransferRequest.STATUS_EXPIRED
+            changed = (
+                self.db.query(TransferRequest)
+                .filter(
+                    TransferRequest.id == r.id,
+                    TransferRequest.status == TransferRequest.STATUS_PENDING,
+                    TransferRequest.expires_at < now,
+                    TransferRequest.is_deleted == 0,
+                )
+                .update(
+                    {TransferRequest.status: TransferRequest.STATUS_EXPIRED},
+                    synchronize_session=False,
+                )
+            )
+            if not changed:
+                continue  # 已被审核/取消抢先：不覆盖（这正是 P1-9 的坏交错）
+            expired += 1
+            self.db.expire(r)
             self._unlock_both(r)
             # WM13 L2 回写：超时自动失效 → 该单管理待办审计标注来源（幂等）
             from backend.common.admin_notification_models import AdminNotification
@@ -329,9 +353,9 @@ class TransferService:
                 ref_id=str(r.id),
                 note="已超时自动失效",
             )
-        if rows:
+        if expired:
             self.db.commit()
-        return len(rows)
+        return expired
 
     def _unlock_both(self, req: TransferRequest) -> None:
         for cid in (req.source_child_id, req.target_child_id):

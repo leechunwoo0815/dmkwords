@@ -20,6 +20,11 @@ class Parent(BaseModel):
     phone = Column(String(20), unique=True, nullable=False, index=True, comment="手机号（唯一）")
     wechat_openid = Column(String(64), unique=True, nullable=True, comment="微信 openid")
     remark = Column(String(200), nullable=False, default="")
+    # P1-11（2026-10-09 审查）：家长 token 原先 30 天不可撤销（只能删档案=废号）。
+    # 现在 token 带 `gen`，撤销（小程序退出登录 / 馆员踢下线）= 本列 +1 → 旧 token 一律 401。
+    token_generation = Column(
+        Integer, nullable=False, default=0, comment="撤销/改绑后 +1，旧 token 失效"
+    )
 
 
 class Child(BaseModel):

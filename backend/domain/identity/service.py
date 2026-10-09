@@ -580,3 +580,13 @@ class ChildService:
 from backend.domain.identity.order_service import (  # noqa: F401,E402
     OrderService,
 )
+
+
+def revoke_parent_tokens(db, parent) -> None:
+    """撤销该家长已签发的全部 token（P1-11，2026-10-09）。
+
+    做法：`parents.token_generation + 1` —— token 载荷带 `gen`，代数不符即 401。
+    放在 Service 层（Router 只调它）：架构关禁止 Router 出现 ORM 操作。
+    """
+    parent.token_generation = int(parent.token_generation or 0) + 1
+    db.commit()

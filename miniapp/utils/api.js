@@ -109,6 +109,10 @@ module.exports = {
   applyRefund(childId, orderId, reason) {
     return req.post('/api/miniapp/refund-requests', { child_id: childId, order_id: orderId, reason })
   },
+  // P1-11（2026-10-09）：退出登录 = 服务端撤销（token 代数 +1，旧 token 全部失效）
+  logout() {
+    return req.post('/api/miniapp/logout', {})
+  },
   myRefunds(childId) {
     return req.get('/api/miniapp/refund-requests', null, { params: { child_id: childId } })
   },

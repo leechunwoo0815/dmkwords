@@ -19,12 +19,14 @@ from backend.database import get_db
 from backend.domain.identity.models import Child, Parent
 
 
-def _parent_token(parent_id: int) -> str:
+def _parent_token(parent: Parent) -> str:
+    """签发家长 token（P1-11：带 `gen` 代数——撤销 = parents.token_generation +1）。"""
     import jwt as pyjwt
 
     payload = {
-        "sub": str(parent_id),
+        "sub": str(parent.id),
         "type": "parent",
+        "gen": int(parent.token_generation or 0),
         "exp": datetime.now(UTC) + timedelta(days=30),
     }
     return pyjwt.encode(payload, get_settings().SECRET_KEY, algorithm="HS256")
@@ -44,6 +46,10 @@ def _parent_from_token(token: str, db) -> Parent:
     )
     if not parent:
         raise UnauthorizedError("账号不存在")
+    # P1-11（2026-10-09）：代数不符 = 已被撤销（退出登录/馆员踢下线）。
+    # 老 token 无 `gen` 字段按 0 处理 → 未撤销的账号仍可用；撤销后（gen≥1）一律 401。
+    if int(payload.get("gen", 0) or 0) != int(parent.token_generation or 0):
+        raise UnauthorizedError("登录已失效，请重新登录")
     return parent
 
 
@@ -109,7 +115,7 @@ def children_payload(db, parent_id: int) -> list[dict]:
 def _login_payload(db, parent: Parent) -> dict:
     """登录成功的统一载荷（三条通道共用：开发固定码 / 短信 / 微信）。"""
     return {
-        "token": _parent_token(parent.id),
+        "token": _parent_token(parent),
         "parent": {
             "id": parent.id,
             "name": parent.name,

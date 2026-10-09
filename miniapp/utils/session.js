@@ -70,6 +70,12 @@ function ensureLogin() {
   return true
 }
 function logout() {
+  // P1-11（2026-10-09）：退出登录要**真的撤销**——通知服务端把 token 代数 +1，
+  // 旧 token（含媒体 URL 里带的）立即失效；失败也不阻断本地清理（离线也能退出）。
+  try {
+    const api = require('./api')
+    api.logout && api.logout()
+  } catch (e) { /* 忽略：本地清理照常 */ }
   ;['token', 'parent', 'children', 'currentChildId'].forEach((k) => wx.removeStorageSync(k))
   const app = getApp()
   app.globalData.token = ''

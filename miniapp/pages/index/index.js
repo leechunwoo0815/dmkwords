@@ -187,7 +187,9 @@ Page({
   // 今日推荐：从书库取 6 本真实书目（封面横滑卡）
   async loadRecommend() {
     try {
-      const res = await api.listBooks('', 1, 6)
+      // P2-12（2026-10-09 审查）：`listBooks` 收**对象参数**，原先按位置传（'', 1, 6）→
+      // 形状不符，实际按默认 20 条拉取（首页"推荐"多拉了两倍多）。
+      const res = await api.listBooks({ keyword: '', page: 1, page_size: 6 })
       this.setData({ recommend: media.formatBooks(res.items || []) })
     } catch (e) { /* 静默 */ }
   },

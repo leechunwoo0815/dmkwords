@@ -11612,7 +11612,7 @@
     },
     "/api/admin/uploads/{path}": {
       "get": {
-        "description": "上传文件访问（鉴权下发；封面后续小程序端另行开放只读路由）。\n\n回收站目录**不下发**（2026-09-23，docs/15 §22.2 第 4 道防线）——已判定孤儿的文件在回收站里\n等还原或到期清除，不该还能从 Web 访问到。路径口径单一来源：`backend/common/media_paths`。",
+        "description": "上传文件访问（鉴权下发；封面后续小程序端另行开放只读路由）。\n\n回收站目录**不下发**（2026-09-23，docs/15 §22.2 第 4 道防线）——已判定孤儿的文件在回收站里\n等还原或到期清除，不该还能从 Web 访问到。路径口径单一来源：`backend/common/media_paths`。\n\nP2-1（2026-10-09 审查）：受保护目录（`voucher/` 收款凭证、`observation/` 评估报告图等\n**人工上传且不可再生**）也**不再从这里下发**——原先只挡 `.trash`，任意 `book.manage`\n管理员拿到路径即可读；现在走**目录白名单**：受保护目录各自有带归属校验的专用端点\n（凭证 `/api/admin/members/orders/{id}/voucher-image`、评估图 `/api/miniapp/observation-images/`）。",
         "operationId": "serve_upload_api_admin_uploads__path__get",
         "parameters": [
           {
@@ -14192,6 +14192,47 @@
           }
         },
         "summary": "Login Wechat",
+        "tags": [
+          "identity-miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/logout": {
+      "post": {
+        "description": "退出登录 = **服务端撤销**（P1-11，2026-10-09）：token 代数 +1，旧 token 立即失效。\n\n为什么需要它：家长 token 原先 30 天有效且**不可撤销**（唯一出路是删家长档案=废号），\n而它还会出现在媒体 URL（`?token=`）里 → 访问日志/分享链接泄漏后 30 天内一直可用。\n现在\"退出登录\"是真撤销：本端与其它设备上的旧 token 全部 401（含 URL 里的）。",
+        "operationId": "parent_logout_api_miniapp_logout_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Parent Logout",
         "tags": [
           "identity-miniapp"
         ]
