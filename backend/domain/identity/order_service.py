@@ -278,6 +278,31 @@ class OrderService:
             raise NotFoundError("订单不存在")
         if order.status != Order.STATUS_PAID:
             raise ValidationError(f"订单状态 {order.status} 不可退款")
+        # P0-B（2026-10-09 外部专家复核 + 本地亲验）：押金是担保账户，不得经订单退款通道出款——
+        # 走这条通道钱出了、Deposit 账户纹丝不动（可用余额仍能被退会/转让链再退一次），
+        # 且对账看不见（L5/L6 跨通道盲，实测当轮 diff_count=0）。口径与家长端
+        # `wm10_service._paid_order` 一致：押金退款随退会/权益转让流程自动发起。
+        if order.order_type in (Order.TYPE_DEPOSIT, Order.TYPE_DEPOSIT_SUPPLEMENT):
+            raise ValidationError("押金退款不能单独发起（随退会/权益转让流程自动发起）")
+        # 在途退款单闸（与家长端 apply 同口径）：同一订单同时只允许一笔进行中的申请——
+        # 否则两笔全额申请都能批、都能执行，L5 虽会报 refund_overpaid，但钱已经出了。
+        active = (
+            self.db.query(func.count(RefundRequest.id))
+            .filter(
+                RefundRequest.order_id == order.id,
+                RefundRequest.status.in_(
+                    [
+                        RefundRequest.STATUS_PENDING,
+                        RefundRequest.STATUS_APPROVED,
+                        RefundRequest.STATUS_PROCESSING,
+                    ]
+                ),
+                RefundRequest.is_deleted == 0,
+            )
+            .scalar()
+        )
+        if active:
+            raise ConflictError("该订单已有进行中的退款申请（同一时刻仅一个）")
         # 金额强制复用 _refundable_amount（X6 三形态同源计算，不得另写）
         refundable = refund_rules.refundable_amount(self.db, order)
         if refundable <= 0:
@@ -372,22 +397,8 @@ class OrderService:
         if not order.can_transition(Order.STATUS_PAID):
             raise ValidationError(f"订单状态 {order.status} 不可确认收款")
 
-        # P1-F6：99 元首单资格锁内复查（R-321 每账号一次）——apply 查重只查已 PAID，
-        # 双端并发可造两笔 pending 后先后确认穿透；order 已行锁（P1-F2），此处锁内复查
         if order.order_type == Order.TYPE_FIRST_ACTIVITY:
-            paid_exists = (
-                self.db.query(func.count(Order.id))
-                .filter(
-                    Order.parent_id == order.parent_id,
-                    Order.order_type == Order.TYPE_FIRST_ACTIVITY,
-                    Order.status == Order.STATUS_PAID,
-                    Order.id != order.id,
-                    Order.is_deleted == 0,
-                )
-                .scalar()
-            )
-            if paid_exists:
-                raise ConflictError("该账号已购买过首场亲子活动（每账号仅一次）")
+            self.assert_first_activity_eligible(order)
 
         self._settle_paid(
             order,
@@ -418,6 +429,12 @@ class OrderService:
         为什么必须合并：回调若另写一份"置 paid + 开会员"，会员到期日/押金记账/活动报名转正/
         99 元资格这些口径早晚漂移——那是最贵的一类 bug。调用方负责 commit（本方法只 flush+发事件）。
         """
+        if order.order_type == Order.TYPE_FIRST_ACTIVITY:
+            # P0-A（2026-10-09 外部专家复核 + 本地亲验）：资格复查必须在**结算链路内**。
+            # 原先只有"发起支付前"（_assert_first_activity_payable）与"管理端确认收款"两处各查一次，
+            # 线上回调链（_settle_online）完全不查——同一账号两笔 pending 单各自回调即双收
+            # （管理端造单 × 线上回调同样穿透）。放在这里 = 覆盖全部收款入口，第四个入口也不会漏。
+            self.assert_first_activity_eligible(order)
         order.status = Order.STATUS_PAID
         order.pay_method = pay_method
         # WM3-B2 审查返工 R1：假通道删除——凭证唯一通道为 /voucher 上传端点
@@ -539,6 +556,35 @@ class OrderService:
             ),
             db=self.db,
         )
+
+    def assert_first_activity_eligible(self, order: Order) -> None:
+        """99 元首场资格复查（R-321 每账号一次）——**全系统唯一判据**。
+
+        三入口共用本实现：家长端发起支付前的预检（`PaymentService._assert_first_activity_payable`）、
+        线上支付回调结算、管理端确认收款 / 管理端造单 × 线上回调（都经 `_settle_paid`）。
+
+        为什么先锁 `parents` 行：只锁"本单"护不住同一账号的**兄弟单**——两笔 pending 单
+        在两个事务里各自行锁、各自计数，都看到"没有已支付的"就都结算。按账号串行后，
+        后到的事务在锁内才能看见先到者刚提交的那笔（隔离级别 READ COMMITTED）。
+
+        口径：**已退款的首场单不占名额**（与发起支付前预检同源——家长退过款就该能重买），
+        改口径只改这一处。
+        """
+        self.db.query(Parent.id).filter(Parent.id == order.parent_id).with_for_update().first()
+        paid_exists = (
+            self.db.query(func.count(Order.id))
+            .filter(
+                Order.parent_id == order.parent_id,
+                Order.order_type == Order.TYPE_FIRST_ACTIVITY,
+                Order.status == Order.STATUS_PAID,
+                Order.refund_status != Order.REFUND_STATUS_REFUNDED,
+                Order.id != order.id,
+                Order.is_deleted == 0,
+            )
+            .scalar()
+        )
+        if paid_exists:
+            raise ConflictError("该账号已购买过首场亲子活动（每账号仅一次）")
 
     def _open_membership(self, child_id: int, status: str, days: int) -> Child:
         child = self.db.query(Child).filter(Child.id == child_id).first()

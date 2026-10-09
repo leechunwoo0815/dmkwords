@@ -31,7 +31,24 @@ async def lifespan(_: FastAPI):
     stop_scheduler()
 
 
-app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION, lifespan=lifespan)
+def docs_endpoint_urls(app_env: str) -> dict[str, str | None]:
+    """API 文档端点开关（用户拍板 a，2026-10-09）。
+
+    生产恒关闭：/docs、/redoc、/openapi.json 是 FastAPI 内建端点，**不经过任何权限校验**
+    （实测无 token 直打 200），等于把全部接口清单（含管理端）公开。契约的唯一来源是仓库快照
+    `docs/api/openapi.json`（门禁 `export_openapi.py --check` 维护），开发/测试保持开启。
+    """
+    if (app_env or "").strip().lower() == "production":
+        return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    return {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
+
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    lifespan=lifespan,
+    **docs_endpoint_urls(settings.APP_ENV),
+)
 
 app.add_middleware(
     CORSMiddleware,

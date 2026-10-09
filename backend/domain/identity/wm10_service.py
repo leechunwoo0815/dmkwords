@@ -413,6 +413,13 @@ class RefundService:
         manual_override = bool(
             needs_check and "人工放行:" in (remark or "") and admin.role == "superadmin"
         )
+        # P0-D（2026-10-09）：押金退款**执行前**余额复核（细则与理由见 deposit_refund_guards）
+        if req.kind == RefundRequest.KIND_DEPOSIT and req.deposit_id:
+            from backend.domain.identity.deposit_refund_guards import (
+                assert_deposit_refund_executable,
+            )
+
+            assert_deposit_refund_executable(self.db, req)
         if needs_check and not manual_override:
             from backend.domain.identity.wm10_withdrawal_service import outstanding_obligations
 
@@ -487,6 +494,13 @@ class RefundService:
 
                 dep = self.db.query(Deposit).filter(Deposit.id == req.deposit_id).first()
                 if dep:
+                    if dep.available_amount < req.amount:
+                        # P0-D 纵深：不掩盖——台账照实记负 + 异常审计（细则见 deposit_refund_guards）
+                        from backend.domain.identity.deposit_refund_guards import (
+                            publish_deposit_overdraft,
+                        )
+
+                        publish_deposit_overdraft(self.db, admin=admin, req=req, dep=dep)
                     dep.status = Deposit.STATUS_REFUNDED
                     # B-4/T24：先扣减再记账——balance_after 取实扣后余额
                     # （当前全额退结果同为 0；未来部分退款台账不再断链）

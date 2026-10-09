@@ -321,6 +321,16 @@ class WeChatPayV3(PaymentGateway):
                 error_msg = resp.json().get("message", "未知错误")
             except Exception:
                 error_msg = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            # P0-C（2026-10-09 外部专家复核 + 本地亲验）：**5xx/429 = 结果未知**，不是"确定失败"。
+            # 原先一律 success=False → 上层落 failed → 允许重试并换新 out_refund_no；若微信侧
+            # 其实已受理，就是两笔出款，而账单逐号对号双双通过（实测零退款差异）。
+            # 抛异常 → refund_online 的未知态分支（留 processing + gateway_unknown_at + 审计），
+            # 出路只有查单确认。4xx 才是微信明确拒绝（参数错/证书错/余额不足）——确定未受理。
+            if resp.status_code >= 500 or resp.status_code == 429:
+                raise PaymentError(
+                    f"微信退款请求结果未知（HTTP {resp.status_code}）：{error_msg}"
+                    "——禁止换单号重试，先查单确认微信侧结果"
+                )
             return PaymentRefundResponse(success=False, error_message=error_msg)
         data = resp.json()
         # WM12-B：受理 ≠ 成功——微信返回 status（SUCCESS/PROCESSING/CLOSED/ABNORMAL），

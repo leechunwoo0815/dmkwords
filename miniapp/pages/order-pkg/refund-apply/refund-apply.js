@@ -63,6 +63,35 @@ Page({
 
   onReason(e) { this.setData({ reason: e.detail.value }) },
 
+  // P0-2（2026-10-09 用户拍板 A「恢复家长自助申请」）：本页此前只有 wxml 的 bindtap="onSubmit"，
+  // js 里从未实现该方法——选好订单、填完原因、点提交**毫无反应**（后端
+  // POST /api/miniapp/refund-requests 与 api.applyRefund 早已就绪，缺的就是这一跳）。
+  async onSubmit() {
+    const order = this.data.selected
+    if (!order) {
+      wx.showToast({ title: '请先选择要退款的订单', icon: 'none' })
+      return
+    }
+    if (!this._ensureRefundable()) return
+    const reason = (this.data.reason || '').trim()
+    if (!reason) {
+      wx.showToast({ title: '请填写退款原因', icon: 'none' })
+      return
+    }
+    if (this._submitting) return // 防连点：两下不会建出两笔申请
+    this._submitting = true
+    try {
+      await api.applyRefund(this._childId, order.id, reason)
+      wx.showToast({ title: '已提交，等待审核', icon: 'success' })
+      this.setData({ selected: null, preview: null, reason: '' })
+      this.load()
+    } catch (e) {
+      /* toast 已弹（无可退金额/已有进行中申请会带具体原因） */
+    } finally {
+      this._submitting = false
+    }
+  },
+
   // R1（X6 返工）：zero 模式禁提交（按钮置灰+前置校验双保险，防绕过）
   _ensureRefundable() {
     const pv = this.data.preview

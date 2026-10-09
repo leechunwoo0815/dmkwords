@@ -50,11 +50,21 @@ class TransferService:
         checks: list[tuple[str, bool]] = []
 
         def _has_pending(child_id: int) -> bool:
+            # P0-D（2026-10-09 外部专家复核 + 本地亲验）：原先只数 PENDING——**已批准未执行**
+            # 的押金退款单（APPROVED）与在途执行（PROCESSING）不算"进行中"，
+            # 于是"押金退款已批、孩子已解锁"时转让照发 → 同一押金第二笔全额退款单
+            # → 两笔都执行 → available=-1200（实测）。三种在途态一律算进行中。
             pending_refund = (
                 self.db.query(func.count(RefundRequest.id))
                 .filter(
                     RefundRequest.child_id == child_id,
-                    RefundRequest.status == RefundRequest.STATUS_PENDING,
+                    RefundRequest.status.in_(
+                        [
+                            RefundRequest.STATUS_PENDING,
+                            RefundRequest.STATUS_APPROVED,
+                            RefundRequest.STATUS_PROCESSING,
+                        ]
+                    ),
                     RefundRequest.is_deleted == 0,
                 )
                 .scalar()
@@ -413,6 +423,26 @@ class TransferService:
             )
             deposit_refund_id = None
             if dep and dep.available_amount > 0:
+                # P0-D 纵深（2026-10-09）：同一押金只允许一笔在途退款单。上方 `_has_pending`
+                # 已按"孩子"拦过一道，这里按**押金账户**再拦一道——旁路创建/历史脏数据也挡得住。
+                in_flight = (
+                    self.db.query(func.count(RefundRequest.id))
+                    .filter(
+                        RefundRequest.deposit_id == dep.id,
+                        RefundRequest.kind == RefundRequest.KIND_DEPOSIT,
+                        RefundRequest.status.in_(
+                            [
+                                RefundRequest.STATUS_PENDING,
+                                RefundRequest.STATUS_APPROVED,
+                                RefundRequest.STATUS_PROCESSING,
+                            ]
+                        ),
+                        RefundRequest.is_deleted == 0,
+                    )
+                    .scalar()
+                )
+                if in_flight:
+                    raise ValidationError("该押金已有在途退款单，不能重复发起（先执行或撤销那笔）")
                 rr = RefundRequest(
                     kind=RefundRequest.KIND_DEPOSIT,
                     deposit_id=dep.id,

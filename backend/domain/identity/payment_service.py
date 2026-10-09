@@ -691,21 +691,15 @@ class PaymentService:
         return order
 
     def _assert_first_activity_payable(self, order: Order) -> None:
-        """99 元首场发起支付前的锁内复查（R-321 每账号一次；真正入账时还会再查一次）。"""
-        paid_exists = (
-            self.db.query(func.count(Order.id))
-            .filter(
-                Order.parent_id == order.parent_id,
-                Order.order_type == Order.TYPE_FIRST_ACTIVITY,
-                Order.status == Order.STATUS_PAID,
-                Order.refund_status != Order.REFUND_STATUS_REFUNDED,
-                Order.id != order.id,
-                Order.is_deleted == 0,
-            )
-            .scalar()
-        )
-        if paid_exists:
-            raise ConflictError("该账号已购买过首场亲子活动（每账号仅一次）")
+        """99 元首场**发起支付前**的锁内复查（R-321 每账号一次）。
+
+        判据委托 `OrderService.assert_first_activity_eligible`——与结算链路（`_settle_paid`）
+        用同一份实现：原先这里自带一份 SQL、注释还写着"真正入账时还会再查一次"，
+        而 `_settle_online` 实际没查（P0-A 双收的根因）。现在只有一处口径。
+        """
+        from backend.domain.identity.order_service import OrderService
+
+        OrderService(self.db).assert_first_activity_eligible(order)
 
     @staticmethod
     def _parse_envelope(body: str) -> dict | None:
