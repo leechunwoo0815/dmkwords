@@ -5,6 +5,25 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def sms_sdk_available(provider: str) -> bool:
+    """短信 SDK 是否可导入（P0-3，2026-10-09）。
+
+    与网关的 fail-closed 判据同一件事：凭据齐但 SDK 没装时，旧网关会静默"假成功"
+    （验证码只进日志、家长收不到、看板全绿）。生产启动校验据此拒启。
+    """
+    name = (provider or "").strip().lower()
+    try:
+        if name == "aliyun":
+            import alibabacloud_dysmsapi20170525  # noqa: F401
+        elif name == "tencent":
+            import tencentcloud.sms.v20210111  # noqa: F401
+        else:
+            return False
+    except ImportError:
+        return False
+    return True
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -121,6 +140,13 @@ class Settings(BaseSettings):
         if self.SMS_ENABLED and self.SMS_PROVIDER.strip().lower() in ("aliyun", "tencent"):
             if not (self.SMS_APP_ID and self.SMS_APP_KEY and self.SMS_SIGN_NAME):
                 problems.append("短信网关凭据缺失（SMS_APP_ID/SMS_APP_KEY/SMS_SIGN_NAME）")
+            elif not sms_sdk_available(self.SMS_PROVIDER):
+                # P0-3（2026-10-09）：**SDK 可导入性也是拒启条件**——原先只查凭据非空；
+                # 凭据齐但 SDK 没装时旧网关会静默"假成功"（码只进日志、家长收不到）。
+                problems.append(
+                    f"短信 SDK 未安装（{self.SMS_PROVIDER}）——缺 SDK 时网关 fail-closed 拒发，"
+                    "请安装可选依赖：uv sync --extra sms-aliyun（或 --extra sms-tencent）"
+                )
         problems.extend(self._payment_problems())
         if problems:
             raise RuntimeError(f"生产环境配置校验失败: {'; '.join(problems)}")

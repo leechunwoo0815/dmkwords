@@ -680,7 +680,23 @@ class OrderService:
             raise NotFoundError("订单不存在")
         if not order.can_transition(Order.STATUS_CANCELLED):
             raise ValidationError(f"订单状态 {order.status} 不可取消")
-        order.status = Order.STATUS_CANCELLED
+        # P1-3（2026-10-09 外部专家复核 + 本地亲验）：**条件 UPDATE 收口**——"钱已收"的单
+        # 不能被取消覆盖。实测（A-9 探针，30 轮并发确认收款 × 取消）：原实现"读后写"，
+        # **27 轮**出现终态 `cancelled` 却 `paid_at` 置位（钱与押金台账都在，退款链不触发）。
+        # 条件 UPDATE 让"先收款"的那一方赢：状态不在待支付/待确认、或已收款 → 影响行数=0 → 拒。
+        changed = (
+            self.db.query(Order)
+            .filter(
+                Order.id == order_id,
+                Order.is_deleted == 0,
+                Order.status.in_([Order.STATUS_PENDING_PAYMENT, Order.STATUS_PENDING_MANUAL]),
+                Order.paid_at.is_(None),
+            )
+            .update({Order.status: Order.STATUS_CANCELLED}, synchronize_session=False)
+        )
+        if not changed:
+            raise ValidationError("订单已收款或状态已变更，不能取消（请刷新后重试）")
+        self.db.expire(order)  # 条件 UPDATE 走的是 SQL：让 ORM 实体重新读库内新状态
         self.db.flush()
         # T2：活动单取消联动报名取消+名额回补（此前仅 timeout 清理链联动，手动 cancel 漏）
         if order.order_type == Order.TYPE_ACTIVITY:

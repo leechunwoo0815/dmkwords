@@ -64,6 +64,28 @@ Page({
         ? (ios ? 'iOS 端不提供线上支付，可到店办理。' : '')
         : '线上支付仅支持微信一键登录的家长：可在登录页选择「微信一键登录」，或到店办理。',
     })
+    this._refreshPayGate()
+  },
+
+  // P1-16（2026-10-09 审查）：支付入口以**服务端**为准——纯人工收款版本
+  // （PAYMENT_ENABLED=false）下订单页原先仍显示「去支付」，点了必失败（服务端抛"未开启"）；
+  // 购买页早已按 `payment_enabled / can_pay_online` 判，本页对齐同一口径
+  // （本地判据只作首屏兜底，服务端取不到时不阻断页面）。
+  async _refreshPayGate() {
+    try {
+      const res = await api.getPaymentPlans(this._childId)
+      const ios = isIOS()
+      const enabled = !!res.payment_enabled
+      const canPay = !!res.can_pay_online
+      this.setData({
+        showPay: enabled && canPay && !ios,
+        payHint: !enabled
+          ? '当前为到店支付模式：可在门店办理，或咨询馆员。'
+          : canPay
+            ? (ios ? 'iOS 端不提供线上支付，可到店办理。' : '')
+            : '线上支付仅支持微信一键登录的家长：可在登录页选择「微信一键登录」，或到店办理。',
+      })
+    } catch (e) { /* 取不到就保留首屏本地判据 */ }
   },
 
   onShow() { this.load() },

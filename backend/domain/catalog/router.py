@@ -328,6 +328,12 @@ def upload_audio(
     admin: Any = Depends(require_perm("audio.manage")),
     db: Session = Depends(get_db),
 ):
+    # P1-13（2026-10-09 审查）：音频原先无体积上限，全量读进内存
+    from backend.common.file_storage import ensure_upload_size_within_limit
+
+    ensure_upload_size_within_limit(
+        file, key="audio_upload_max_mb", default_mb=50, label="音频文件", db=db
+    )
     data = file.file.read()
     book = BookService(db).upload_audio(admin, book_id, data, file.filename or "")
     # D1 收尾：上传响应重算 missing（前端「待完善」Tag 依据）
@@ -340,6 +346,12 @@ def import_books_excel(
     admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
+    # P1-13（2026-10-09 审查）：Excel 导入原先无体积上限，全量读进内存
+    from backend.common.file_storage import ensure_upload_size_within_limit
+
+    ensure_upload_size_within_limit(
+        file, key="books_import_max_mb", default_mb=10, label="导入文件", db=db
+    )
     data = file.file.read()
     result = import_books(db, admin, data)
     return ImportResultResponse(**result)

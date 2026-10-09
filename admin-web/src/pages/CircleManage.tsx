@@ -19,6 +19,7 @@ import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
 import PreviewImage from "../components/PreviewImage";
 import { usePaintPagination } from "../hooks/usePaintPagination";
+import { useAuth } from "../auth";
 import { TODO_REFRESH_EVENT, useTodoCounts } from "../hooks/useTodoCounts";
 import {
   CirclePostItem,
@@ -66,6 +67,10 @@ function dualName(r: CirclePostItem): string {
 
 export default function CircleManage() {
   const { message } = AntdApp.useApp();
+  // P1-15（2026-10-09 审查）：删帖后端是 `require_super_admin()`，前端原先无门 → 专员点了必 403。
+  // 判据与 MemberManage 的退款按钮同款（超管专属）。
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "superadmin";
   const { page, setPage, pageSize, setPageSize } = usePaintPagination(10, 1);
   const { counts: todoCounts, failed } = useTodoCounts();
   const unlikedCount = failed || !todoCounts ? 0 : (todoCounts.circle_unliked ?? 0);
@@ -248,9 +253,11 @@ export default function CircleManage() {
             >
               {r.is_pinned ? "取消置顶" : "置顶"}
             </Button>
-            <Button size="small" danger onClick={() => setDeleteTarget(r)}>
-              删除
-            </Button>
+            {isSuperAdmin && (
+              <Button size="small" danger onClick={() => setDeleteTarget(r)}>
+                删除
+              </Button>
+            )}
           </span>
         ),
       },

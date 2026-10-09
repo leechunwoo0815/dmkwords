@@ -27,11 +27,14 @@ SEED_ACCOUNTS = [
 
 
 def seed() -> list[str]:
-    # C-1/2（外部审计 20260903）：生产模式拒绝默认弱口令——非 DEBUG 即生产，
-    # 防止误播种 admin/dmkwords123 被接管；生产口令经 .env 环境变量注入覆盖
+    # C-1/2（外部审计 20260903）：生产模式拒绝默认弱口令——防止误播种 admin/dmkwords123
+    # 被接管；生产口令经 .env 环境变量注入覆盖。
+    # P1-12（2026-10-09 审查）：判据从 `DEBUG` 改为 **`APP_ENV`**——与 `validate_production`
+    # 同一个开关。原先 `.env.example` 默认 `DEBUG=true`：操作员照抄模板 + 设 APP_ENV=production
+    # 就能把弱口令超管播种进生产（启动校验也不拦，它只看支付/短信/CORS/SECRET_KEY）。
     from backend.config import get_settings
 
-    if not get_settings().DEBUG:
+    if get_settings().APP_ENV.strip().lower() == "production":
         raise RuntimeError(
             "生产环境禁止播种默认口令（admin/dmkwords123）——请通过 .env 环境变量注入强口令"
         )

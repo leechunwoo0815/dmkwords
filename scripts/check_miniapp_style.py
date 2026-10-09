@@ -798,17 +798,41 @@ def scan_dead_classes(base: Path = MINIAPP):
             scope_wxml = sorted(css.parent.glob("*.wxml"))
             scope_js = sorted(css.parent.glob("*.js"))
         used: set[str] = set()
+        prefixes: set[str] = set()
         for wxml in scope_wxml:
             if not wxml.exists():
                 continue
             text = wxml.read_text(encoding="utf-8")
             for m in re.finditer(r'class\s*=\s*"([^"]*)"', text):
                 used |= _class_tokens_from_attr(m.group(1))
+                prefixes |= _interp_prefixes(m.group(1))
         js_text = "\n".join(js.read_text(encoding="utf-8") for js in scope_js if js.exists())
         for name in sorted(own - used):
+            if any(name.startswith(p) for p in prefixes):
+                # 插值前缀（`banner-{{index % 3}}` → `.banner-0/1/2`）：具体变体是否存在
+                # 归 check_miniapp_wiring 的 W2 管（2026-10-09，A1-11 配套，两条规则互补）
+                continue
             if name in js_text:
                 continue  # 保守：JS 里提过就当"可能在用"（动态拼类名）
             out.append((rel, name, "wxml+js 都未引用"))
+    return out
+
+
+def _interp_prefixes(attr: str) -> set[str]:
+    """class 属性里"字面量前缀 + 插值"的前缀集合（`banner-{{index % 3}}` → {`banner-`}）。
+
+    R16a 原先把这类定义整片判成死类名——插值的**具体变体**是否存在正是新检查器
+    `check_miniapp_wiring.py` W2 的职责（2026-10-09 实测：`banner-0/1/2` 从未定义 →
+    无封面卡片底色一直空白；两条规则互补而非重叠）。
+    """
+    out: set[str] = set()
+    parts = re.split(r"\{\{.*?\}\}", attr, flags=re.S)
+    if len(parts) < 2:
+        return out
+    for part in parts[:-1]:
+        frag = part.strip().split(" ")[-1] if part.strip() else ""
+        if re.fullmatch(r"[A-Za-z][\w-]*-", frag):
+            out.add(frag)
     return out
 
 

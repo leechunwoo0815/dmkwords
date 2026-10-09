@@ -56,6 +56,12 @@
   align-items: center;
   justify-content: center;
 }
+/* 轮播三色底（A1-11 接线检查 2026-10-09 补）：模板用 `banner-{{index % 3}}`，
+   但这三个变体**从未定义** → 无封面的卡片 banner 一直是空白（静默死样式，被门禁新规则 W2 抓到）。
+   用软色令牌三档循环，无封面时也有"刻意留白"的观感。 */
+.banner-0 { background: var(--accent-soft); }
+.banner-1 { background: var(--secondary-soft); }
+.banner-2 { background: var(--warning-soft); }
 .activity-banner-img {
   position: absolute;
   inset: 0;

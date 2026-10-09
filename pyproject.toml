@@ -29,6 +29,16 @@ dev = [
     "ruff>=0.8",
 ]
 
+# 短信 SDK（P0-3，2026-10-09）：**声明在此但不默认安装**——生产按所选通道装对应 extra：
+#   uv sync --extra sms-aliyun   /   uv sync --extra sms-tencent
+# 缺 SDK 时网关 fail-closed 拒发（不再假成功），validate_production 也会直接拒启。
+[project.optional-dependencies]
+sms-aliyun = [
+    "alibabacloud-dysmsapi20170525>=3.0",
+    "alibabacloud-tea-openapi>=0.3",
+]
+sms-tencent = ["tencentcloud-sdk-python>=3.0"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py313"

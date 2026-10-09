@@ -69,6 +69,11 @@ fi
 run python -m scripts.check_fake_assertions
 # E-20260912-01 防复发：小程序数据面断链（wxml 读的顶层变量必须真的进过 data）
 run python scripts/check_miniapp_bindings.py
+# A1-11（2026-10-09）：小程序**接线**两条——W1 `bind*/catch*` 指向的 handler 必须存在
+# （P0-2 退款死按钮的漏网形状：wxml 有 bindtap、js 无该方法 → 点了毫无反应）；
+# W2 插值类名必须能解析到样式（`banner-{{index % 3}}` 三变体从未定义 → 底色静默失效）。
+# 含 S1 注入自检（正反例）+ S2 空扫描自检。
+run python scripts/check_miniapp_wiring.py
 # E-20260912-05 防复发：文档引用悬空（文件路径/接口/配置键/表名/函数名必须真实存在）
 run python scripts/check_docs_code_alignment.py
 # E-20260912-09：RBAC 三方一致对账（宪法 §五.2 承诺项——声明/后端引用/前端引用）

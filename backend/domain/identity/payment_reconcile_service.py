@@ -468,6 +468,12 @@ class PaymentReconcileService:
                 Order.paid_at >= start,
                 Order.paid_at < end,
                 Order.status.in_([Order.STATUS_PAID, Order.STATUS_REFUNDED]),
+                # P1-6（2026-10-09 外部专家复核 + 本地亲验）：**只比线上支付单**——
+                # 线下现金/扫码收款单（`transaction_id` 为空）本就不该出现在微信账单里，
+                # 原先全被记成 `local_only` 差异（10 万级实测：1 万线下单全部被报），
+                # 报告天天"有差异"→ 真差异被淹没（正是告警脱敏）。
+                Order.transaction_id.isnot(None),
+                Order.transaction_id != "",
             )
             .all()
         )

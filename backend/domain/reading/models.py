@@ -14,8 +14,12 @@ class ReadingProgress(BaseModel):
     """
 
     __tablename__ = "reading_progress"
-    __table_args__ = (  # 学生×书目唯一（进程行）
+    __table_args__ = (  # 学生×书目唯一（进程行）——P1-8（2026-10-09）：**升级为唯一索引**
         Column("child_id", Integer, nullable=False, index=True),
+        # 为什么必须唯一：心跳重试/双开并发下原实现是 check-then-insert → 同一 (child, book)
+        # 落两行，进度被 `first()` 随机劈开 → 覆盖率永远到不了 95%、测验永久解不开（实测）。
+        # 带 is_deleted 与 `uq_order_transaction` 同款（软删行不占用唯一键）。
+        Index("uq_reading_progress_child_book", "child_id", "book_id", "is_deleted", unique=True),
     )
 
     book_id = Column(Integer, nullable=False, index=True)
@@ -40,6 +44,9 @@ class CheckIn(BaseModel):
     __table_args__ = (
         Column("child_id", Integer, nullable=False, index=True),
         Column("checkin_date", Date, nullable=False),
+        # P1-8（2026-10-09）：同日打卡唯一——原 check-then-insert 在并发下必然漏
+        # （实测 6 线程并发完播 → 6 行同日打卡）。带 is_deleted 同 `uq_order_transaction`。
+        Index("uq_checkins_child_date", "child_id", "checkin_date", "is_deleted", unique=True),
     )
 
     book_id = Column(Integer, nullable=False, comment="触发打卡的书")

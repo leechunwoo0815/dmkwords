@@ -70,16 +70,17 @@ class TencentSmsGateway(SmsGateway):
             return False, str(e)
 
     async def send_code(self, phone: str) -> SmsSendResponse:
-        code = f"{random.randint(100000, 999999)}"
-
         if not _HAS_SDK or not self.app_id or not self.app_key:
-            self._codes[phone] = (code, time.time())
-            logger.info(
-                "[TencentSms(dev)] 验证码 %s 已生成（SDK/凭据未配置，未实际发送）phone=%s",
-                code[:4],
+            # P0-3（2026-10-09）：**fail-closed**——缺 SDK/凭据绝不"假成功"
+            # （原实现返回 success=True 并把码写进库、日志打 code 前 4 位；详见 aliyun.py 同款注释）。
+            logger.error(
+                "腾讯云短信不可用：SDK 未安装或凭据缺失（拒绝发送，绝不假成功）phone=%s",
                 _mask_phone(phone),
             )
-            return SmsSendResponse(success=True, code=code)
+            return SmsSendResponse(
+                success=False, error_message="短信通道不可用（SDK 未安装或凭据缺失）"
+            )
+        code = f"{random.randint(100000, 999999)}"
 
         req = models.SendSmsRequest()
         req.SmsSdkAppId = self.app_id

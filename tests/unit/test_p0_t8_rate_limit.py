@@ -28,11 +28,16 @@ def test_miniapp_login_rate_limited(client: TestClient):
 
 
 def test_seed_admin_production_rejects_default_password(monkeypatch):
-    """修复前：生产模式也播种弱口令（RED）。"""
+    """生产拒播种弱口令——判据是 **APP_ENV**（P1-12，2026-10-09 由 DEBUG 改口径）。
+
+    旧语义"非 DEBUG 即生产"有个洞：`.env.example` 默认 `DEBUG=true`，操作员照抄模板
+    就能把 `admin/dmkwords123` 播种进生产（启动校验只看支付/短信/CORS/SECRET_KEY，不拦）。
+    现在与 `validate_production` 同一开关（APP_ENV），断言不变：生产必须拒。
+    """
     from backend.config import get_settings
     from backend.seeds import seed_admin
 
     s = get_settings()
-    monkeypatch.setattr(s, "DEBUG", False)
+    monkeypatch.setattr(s, "APP_ENV", "production")
     with pytest.raises(RuntimeError):
         seed_admin.seed()

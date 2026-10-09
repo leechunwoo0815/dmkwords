@@ -14,6 +14,7 @@ import {
 } from "../api/growth";
 import { getToken } from "../api/client";
 import { apiListChildren, type Child } from "../api/members";
+import { useAuth } from "../auth";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
 
@@ -25,6 +26,11 @@ const REASON_LABEL: Record<string, string> = {
 
 export default function GrowthManage() {
   const { message, modal } = AntdApp.useApp();
+  // P1-15（2026-10-09 审查）：本页三个按钮（等级阈值重算 / 里程碑核对补发 / 重置测验次数）
+  // 后端都是 `require_super_admin()`，前端原先无门 → 专员点了必 403（体验与"职责分离"冲突）。
+  // 判据与 MemberManage 的退款按钮同款：超管专属。
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "superadmin";
   const [children, setChildren] = useState<Child[]>([]);
   const [childrenTotal, setChildrenTotal] = useState(0);
   const [keyword, setKeyword] = useState("");
@@ -164,7 +170,7 @@ export default function GrowthManage() {
           placeholder="孩子姓名 / 家长手机号" allowClear style={{ width: 260 }}
           onSearch={(v) => { setKeyword(v); setPage(1); }}
         />
-        <Button onClick={onRecalc}>等级阈值重算</Button>
+        {isSuperAdmin && <Button onClick={onRecalc}>等级阈值重算</Button>}
         <Typography.Text type="secondary">
           测验次数重置仅超管可用；所有调整必填原因留痕。
         </Typography.Text>
@@ -213,7 +219,9 @@ export default function GrowthManage() {
             </Descriptions>
             <Space style={{ marginBottom: 16 }} wrap>
               <Button size="small" onClick={() => setAdjustOpen(true)}>积分人工调整</Button>
-              <Button size="small" onClick={onCheckMilestones}>里程碑核对补发</Button>
+              {isSuperAdmin && (
+                <Button size="small" onClick={onCheckMilestones}>里程碑核对补发</Button>
+              )}
               <Button size="small" onClick={() => onGenerateReport("weekly")}>生成周报图片</Button>
               <Button size="small" onClick={() => onGenerateReport("monthly")}>生成月报图片</Button>
             </Space>
@@ -269,10 +277,12 @@ export default function GrowthManage() {
                         { title: "状态", key: "s", width: 90, render: (_, r) => r.passed ? <Tag color="green">已通过</Tag> : r.attempts_used >= r.max_attempts ? <Tag color="red">已用完</Tag> : <Tag>进行中</Tag> },
                         {
                           title: "操作", key: "op", width: 110, render: (_, r) => (
-                            <Button type="link" size="small" onClick={() => {
-                              setResetTarget({ book_id: r.book_id, title: r.title });
-                              resetForm.resetFields();
-                            }}>重置次数</Button>
+                            isSuperAdmin ? (
+                              <Button type="link" size="small" onClick={() => {
+                                setResetTarget({ book_id: r.book_id, title: r.title });
+                                resetForm.resetFields();
+                              }}>重置次数</Button>
+                            ) : <Typography.Text type="secondary">—</Typography.Text>
                           ),
                         },
                       ]}

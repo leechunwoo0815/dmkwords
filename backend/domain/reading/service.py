@@ -109,9 +109,26 @@ class ReadingService:
             .first()
         )
         if not progress:
-            progress = ReadingProgress(child_id=child.id, book_id=book_id, total_seconds=total)
-            self.db.add(progress)
-            self.db.flush()
+            # P1-8（2026-10-09 审查）：**原子插入**——原 check-then-insert 在并发心跳重试/双开下
+            # 会落两行同一 (child, book)，进度被 `first()` 随机劈开 → 覆盖率永远到不了 95%、
+            # 测验永久解不开（实测）。唯一索引（uq_reading_progress_child_book）是最终防线，
+            # ON DUPLICATE KEY 让并发只有一个赢家，随后重读拿到那一行（可能是别人刚插的）。
+            from sqlalchemy.dialects.mysql import insert as mysql_insert
+
+            self.db.execute(
+                mysql_insert(ReadingProgress)
+                .values(child_id=child.id, book_id=book_id, total_seconds=total, is_deleted=0)
+                .on_duplicate_key_update(id=ReadingProgress.id)  # 空更新：保留既有行
+            )
+            progress = (
+                self.db.query(ReadingProgress)
+                .filter(
+                    ReadingProgress.child_id == child.id,
+                    ReadingProgress.book_id == book_id,
+                    ReadingProgress.is_deleted == 0,
+                )
+                .first()
+            )
 
         # 构造本次区间
         start = (
@@ -187,7 +204,24 @@ class ReadingService:
             .first()
         )
         streak = (yesterday.streak + 1) if yesterday else 1
-        self.db.add(CheckIn(child_id=child.id, checkin_date=today, book_id=book_id, streak=streak))
+        # P1-8（2026-10-09 审查）：**原子插入**——原 check-then-insert 在并发完播下
+        # 6 线程落 6 行同日打卡（实测）。唯一索引 + ON DUPLICATE KEY 让并发只有一个赢家，
+        # 其余按"今日已打卡"返回（不重复发积分事件）。
+        from sqlalchemy.dialects.mysql import insert as mysql_insert
+
+        result = self.db.execute(
+            mysql_insert(CheckIn)
+            .values(
+                child_id=child.id,
+                checkin_date=today,
+                book_id=book_id,
+                streak=streak,
+                is_deleted=0,
+            )
+            .on_duplicate_key_update(id=CheckIn.id)  # 空更新：不覆盖既有 streak
+        )
+        if result.rowcount != 1:  # MySQL：1=插入成功，2=命中唯一键走了空更新
+            return {"checked_in": False, "reason": "今日已打卡"}
         self.db.flush()
         # 打卡事件 → growth 域发周期积分（同事务；无订阅者时为 no-op）
         from backend.common.events import CheckInEvent, event_bus

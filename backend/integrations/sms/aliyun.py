@@ -70,16 +70,21 @@ class AliyunSmsGateway(SmsGateway):
             return False, str(e)
 
     async def send_code(self, phone: str) -> SmsSendResponse:
-        code = f"{random.randint(100000, 999999)}"
-
         if not _HAS_SDK or not self.app_id or not self.app_key:
-            self._codes[phone] = (code, time.time())
-            logger.info(
-                "[AliyunSms(dev)] 验证码 %s 已生成（SDK/凭据未配置，未实际发送）phone=%s",
-                code[:4],
+            # P0-3（2026-10-09，外部专家复核 + 本地亲验）：**fail-closed**——缺 SDK/凭据
+            # 绝不"假成功"。原先这里返回 success=True 并把码写进库，调用方与看板全是"成功"，
+            # 生产上家长永远收不到码（登录主通道之一直接断），且日志打印 code 前 4 位
+            # （秘密泄漏，配合服务端 5 次尝试上限 ≈ 5%/枚被猜中）。
+            # 现在：不生成码、不落库、返回失败；生产由 `validate_production` 启动时拒启
+            # （含 SDK 可导入性校验）。
+            logger.error(
+                "阿里云短信不可用：SDK 未安装或凭据缺失（拒绝发送，绝不假成功）phone=%s",
                 _mask_phone(phone),
             )
-            return SmsSendResponse(success=True, code=code)
+            return SmsSendResponse(
+                success=False, error_message="短信通道不可用（SDK 未安装或凭据缺失）"
+            )
+        code = f"{random.randint(100000, 999999)}"
 
         req = dysmsapi_models.SendSmsRequest(
             phone_numbers=phone,

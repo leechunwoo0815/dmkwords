@@ -285,14 +285,41 @@ class PaymentService:
     def handle_notify(
         self, *, body: str, signature: str, timestamp: str, nonce: str
     ) -> tuple[int, dict]:
-        """处理微信支付回调：返回 `(HTTP 状态码, 响应体)`。
+        """微信支付回调入口：**任何未预期异常都不抛给 Router**（P1-5 整改，2026-10-09）。
 
-        幂等/守卫顺序见模块 docstring；任何异常路径都不抛给 Router——
-        回调必须**有明确应答**（200 停止重试 / 4xx-5xx 让微信重试），
-        否则微信会一直重发到 24 小时结束。
+        为什么必须兜底：微信只认 200 才停止重试。真实教训——第二笔押金支付回调在
+        `_settle_paid` 内抛 `ValidationError`（`billing/service.py` 重复缴押金），
+        原实现的 `except` 只覆盖 `ConflictError`/`IntegrityError` → 异常出栈成 422 →
+        微信重发 24 小时全失败、订单停在待支付、**零 anomaly 审计**（钱收了、单没入账、没人知道）。
+
+        现在的语义：**兜底捕获一切 → 回滚 → 留 anomaly → 200「已记录待人工处理」**。
+        有意为之的 4xx（验签失败 / 金额不符 / 缺金额）在实现里照常返回，不受影响。
         """
         if not self.enabled():
             return 503, {"code": "FAIL", "message": "线上支付未开启"}
+        try:
+            return self._notify_impl(
+                body=body, signature=signature, timestamp=timestamp, nonce=nonce
+            )
+        except Exception as exc:  # noqa: BLE001 —— 回调路径必须"有应答"，异常一律兜底
+            logger.exception("支付回调处理异常，兜底为 200 + anomaly")
+            try:
+                self.db.rollback()
+                self._audit_anomaly(
+                    "支付回调处理异常（已兜底为 200，需人工核对）",
+                    reason=f"{type(exc).__name__}: {str(exc)[:180]}",
+                )
+            except Exception:  # noqa: BLE001 —— 留痕失败也不能变成无应答
+                logger.exception("回调异常留痕失败（仍返回 200）")
+            return 200, {"code": "SUCCESS", "message": "已记录待人工处理"}
+
+    def _notify_impl(
+        self, *, body: str, signature: str, timestamp: str, nonce: str
+    ) -> tuple[int, dict]:
+        """回调实现（验签 → 解密 → 金额比对 → 流水号查重 → 幂等入账）。
+
+        幂等/守卫顺序见模块 docstring；返回值由 `handle_notify` 兜底后交给 Router。
+        """
         gateway = self._gateway()
 
         # ① 入口层：验签（生产走平台证书；未配证书 fail-closed 拒绝，绝不静默放行）
@@ -458,11 +485,15 @@ class PaymentService:
             # 本地把整单记成已退款"这类不一致，原先完全没人发现（直接照抄回调的结果）。
             # 不符 → 不落终态 + 审计 + 400（让人工核对；照抄微信金额的代价是本地账实不符）。
             if data.refund_amount is None:
+                # P1-14（2026-10-09）：**缺金额即拒**——与支付侧同口径（支付回调缺金额直接拒）。
+                # 原实现只留一条 anomaly 后继续按 `req.amount` 落"已退款"：微信字段改名或
+                # 部分退款场景下，本地会把整笔记成已退、订单转 refunded，账实不符。
                 self._audit_anomaly(
-                    "退款回调未携带退款金额，无法核对（如实处置）",
+                    "退款回调未携带退款金额，拒绝落终态（如实处置）",
                     target_id=str(req.id),
                     reason=f"out_refund_no={out_refund_no}",
                 )
+                return 400, {"code": "FAIL", "message": "退款回调缺退款金额"}
             elif Decimal(data.refund_amount).quantize(Decimal("0.01")) != Decimal(
                 req.amount
             ).quantize(Decimal("0.01")):

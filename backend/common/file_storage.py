@@ -96,6 +96,25 @@ def ensure_upload_within_limit(file, policy: ImagePolicy) -> None:
         )
 
 
+def ensure_upload_size_within_limit(
+    file, *, key: str, default_mb: int, label: str, db=None
+) -> None:
+    """非图片上传（音频 / Excel 导入）的体积硬上限（P1-13，2026-10-09）。
+
+    与图片同一条纪律：Starlette 已填 `file.size`，**读进内存前**拦；上限配置化
+    （`key` 为 SystemConfig 键，改上限只改配置，不发版）。
+    """
+    from backend.common.config_service import ConfigService
+    from backend.common.exceptions import ValidationError
+
+    limit_mb = ConfigService(db).get_int(key, default_mb) if db is not None else default_mb
+    size = getattr(file, "size", None)
+    if size is not None and size > limit_mb * 1024 * 1024:
+        raise ValidationError(
+            f"{label}体积超限（{size / 1024 / 1024:.1f}MB > {limit_mb}MB），请压缩或拆分后再传"
+        )
+
+
 def normalize_image(
     data: bytes,
     *,
