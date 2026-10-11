@@ -29,21 +29,31 @@ from backend.domain.identity.models import Order, RefundRequest
 logger = logging.getLogger(__name__)
 
 
+def refund_id_of(out_refund_no: str) -> int | None:
+    """`RF{id}-{attempts}-1` → id（纯解析，不查库）。
+
+    单开出来给**批量**路径用（对账按退款单号预载，A3 第五批）：解析规则只此一处，
+    `find_by_out_refund_no` 与批量预载不可能漂移。
+    """
+    token = (out_refund_no or "").strip()
+    if not token.startswith("RF"):
+        return None
+    head = token[2:].split("-", 1)[0]
+    return int(head) if head.isdigit() else None
+
+
 def find_by_out_refund_no(db: Session, out_refund_no: str) -> RefundRequest | None:
     """按商户退款单号反解退款单（`RF{id}-...` → id）。
 
     为什么靠反解而不是新表：回调只带回这个字符串，而它本身就含 id——多一张映射表
     就多一处可能与事实不一致的地方。
     """
-    token = (out_refund_no or "").strip()
-    if not token.startswith("RF"):
-        return None
-    head = token[2:].split("-", 1)[0]
-    if not head.isdigit():
+    refund_id = refund_id_of(out_refund_no)
+    if refund_id is None:
         return None
     return (
         db.query(RefundRequest)
-        .filter(RefundRequest.id == int(head), RefundRequest.is_deleted == 0)
+        .filter(RefundRequest.id == refund_id, RefundRequest.is_deleted == 0)
         .first()
     )
 

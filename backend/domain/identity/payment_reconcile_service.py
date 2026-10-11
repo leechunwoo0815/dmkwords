@@ -25,12 +25,13 @@ import io
 import json
 import logging
 from datetime import date, datetime, time, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from backend.common.async_utils import run_coro
+from backend.domain.identity import reconcile_bill
 from backend.domain.identity.models import Order, RefundRequest
 from backend.domain.identity.payment_models import PaymentReconciliation
 
@@ -478,6 +479,10 @@ class PaymentReconcileService:
             .all()
         )
         ours = {o.order_no: o for o in our_orders}
+        # A3 第五批（2026-10-11 核对 K1 实测）：退款行原先**逐行 3 条 SQL**（反解 / 累计出款 /
+        # 累计超限各查一次）——8 万行账单（含 1 万退款行）实测 30,001 条 SQL / 26.8s。
+        # 行循环前一次性反解账单里出现的全部退款单号，行内只读内存表。
+        refunds = reconcile_bill.preload_refunds(self.db, rows)
         bill_seen: set[str] = set()
         diffs: list[dict] = []
         #: P0-C 纵深：按退款单累计账单出款（同一退款单换号重提 → 累计值超退款单金额才算得出）
@@ -495,8 +500,10 @@ class PaymentReconcileService:
             if order is None and refund_no:
                 # 跨日退款：这行描述的是**往日那笔交易**的退款 → 只按商户退款单号核对退款侧
                 checked += 1
-                diffs += self._diff_refund_row(row, refund_no)
-                self._accumulate_refund_outflow(refund_outflow, refund_no, row)
+                diffs += reconcile_bill.diff_refund_row(self.db, row, refund_no, refunds)
+                reconcile_bill.accumulate_refund_outflow(
+                    self.db, refund_outflow, refund_no, row, refunds
+                )
                 continue
             if order is None:
                 checked += 1
@@ -514,7 +521,7 @@ class PaymentReconcileService:
                 continue
             checked += 1
             bill_seen.add(out_trade_no)
-            if not self._amount_eq(row.get("订单金额"), order.amount):
+            if not reconcile_bill.amount_eq(row.get("订单金额"), order.amount):
                 diffs.append(
                     {
                         "kind": "amount_mismatch",
@@ -523,8 +530,10 @@ class PaymentReconcileService:
                     }
                 )
             if refund_no:
-                diffs += self._diff_refund_row(row, refund_no)
-                self._accumulate_refund_outflow(refund_outflow, refund_no, row)
+                diffs += reconcile_bill.diff_refund_row(self.db, row, refund_no, refunds)
+                reconcile_bill.accumulate_refund_outflow(
+                    self.db, refund_outflow, refund_no, row, refunds
+                )
         for order_no in ours:
             if order_no not in bill_seen:
                 diffs.append(
@@ -534,7 +543,7 @@ class PaymentReconcileService:
                         "message": "本地当日已支付，但微信账单里没有（可能账期延迟或单号不符）",
                     }
                 )
-        diffs += self._refund_outflow_diffs(refund_outflow)
+        diffs += reconcile_bill.refund_outflow_diffs(self.db, refund_outflow, refunds)
         return checked, diffs
 
     def export_local_diffs_csv(self, bill_date: date | None = None) -> str:
@@ -555,48 +564,6 @@ class PaymentReconcileService:
         for d in diffs:
             writer.writerow([str(day), d.get("kind", ""), d.get("ref", ""), d.get("message", "")])
         return buf.getvalue()
-
-    def _diff_refund_row(self, row: dict, out_refund_no: str) -> list[dict]:
-        from backend.domain.identity import refund_online
-
-        req = refund_online.find_by_out_refund_no(self.db, out_refund_no)
-        if req is None:
-            return [
-                {
-                    "kind": "bill_refund_only",
-                    "ref": out_refund_no,
-                    "message": "微信账单有这笔退款，本地查不到对应退款单",
-                }
-            ]
-        out: list[dict] = []
-        bill_amount = (row.get("退款金额") or "").strip()
-        if not bill_amount:
-            # 有退款单号却没有退款金额 → 列名/格式变了：显式报出来，别伪装成"金额不符"
-            out.append(
-                {
-                    "kind": "refund_field_missing",
-                    "ref": out_refund_no,
-                    "message": "账单退款行缺少「退款金额」列值（列名或格式可能已变，需核对样本）",
-                }
-            )
-        elif not self._amount_eq(bill_amount, req.amount):
-            out.append(
-                {
-                    "kind": "refund_amount_mismatch",
-                    "ref": out_refund_no,
-                    "message": f"退款金额不符：账单 {bill_amount} vs 本地 {req.amount}",
-                }
-            )
-        bill_state = (row.get("退款状态") or "").strip().upper()
-        if bill_state == "SUCCESS" and req.status != RefundRequest.STATUS_REFUNDED:
-            out.append(
-                {
-                    "kind": "refund_state_mismatch",
-                    "ref": out_refund_no,
-                    "message": f"微信已退款成功，本地退款单状态仍是 {req.status}（回调可能没到）",
-                }
-            )
-        return out
 
     @staticmethod
     def _parse_bill(csv_text: str) -> list[dict]:
@@ -635,68 +602,6 @@ class PaymentReconcileService:
             out.append(
                 {header[i]: (cells[i] or "").strip().lstrip("`") for i in range(len(header))}
             )
-        return out
-
-    @staticmethod
-    def _amount_eq(bill_amount: str | None, local: Decimal) -> bool:
-        if bill_amount is None or str(bill_amount).strip() == "":
-            return False
-        try:
-            return Decimal(str(bill_amount).replace(",", "").strip()) == Decimal(local).quantize(
-                Decimal("0.01")
-            )
-        except (InvalidOperation, ValueError):
-            return False
-
-    @staticmethod
-    def _parse_amount(bill_amount: str | None) -> Decimal | None:
-        """账单金额列 → Decimal（不可解析返回 None，由调用方决定报警还是跳过）。"""
-        if bill_amount is None or str(bill_amount).strip() == "":
-            return None
-        try:
-            return Decimal(str(bill_amount).replace(",", "").strip()).quantize(Decimal("0.01"))
-        except (InvalidOperation, ValueError):
-            return None
-
-    def _accumulate_refund_outflow(
-        self, acc: dict[int, Decimal], out_refund_no: str, row: dict
-    ) -> None:
-        """按**退款单**（不是退款单号）累计账单里的出款金额。
-
-        P0-C 纵深（2026-10-09 专家复核 + 亲验）：逐号对号时，同一退款单换号重提的两笔
-        各自都能通过校验（两号反解同一个 req，金额与状态都对得上）——只有按退款单累计
-        才看得出"一笔退款出了两次钱"。
-        """
-        from backend.domain.identity import refund_online
-
-        req = refund_online.find_by_out_refund_no(self.db, out_refund_no)
-        if req is None:
-            return  # 反解不到的单已由 _diff_refund_row 报 bill_refund_only
-        amount = self._parse_amount(row.get("退款金额"))
-        if amount is None:
-            return
-        acc[req.id] = acc.get(req.id, Decimal("0")) + amount
-
-    def _refund_outflow_diffs(self, acc: dict[int, Decimal]) -> list[dict]:
-        """同一退款单的账单累计出款 > 退款单金额 → 报差异（人工核对是否二次出款）。"""
-        from backend.domain.identity.models import RefundRequest
-
-        out: list[dict] = []
-        for req_id, total in sorted(acc.items()):
-            req = self.db.query(RefundRequest).filter(RefundRequest.id == req_id).first()
-            if req is None:
-                continue
-            if total > req.amount:
-                out.append(
-                    {
-                        "kind": "refund_overpaid_channel",
-                        "ref": f"refund_request#{req_id}",
-                        "message": (
-                            f"同一退款单在微信账单累计出款 {total} 超过退款单金额 {req.amount}"
-                            "——疑似换商户退款单号重提造成二次出款，请人工核对"
-                        ),
-                    }
-                )
         return out
 
     # ---------- 报表 ----------
