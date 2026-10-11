@@ -532,8 +532,11 @@ class CirculationService:
             raise ValidationError("该记录不可续借")
         if record.due_at < datetime.now():
             raise ValidationError("已逾期的书不能续借（V1.1 §5.4）")
-        if record.renew_used >= 1:
-            raise ValidationError("续借机会已用完（每本书限 1 次）")
+        # P2-6（2026-10-09 审查）：原先写死 `>= 1`，配置项 renew_limit 是**死配置**
+        # （运营改了没反应）。现在读配置（默认 1，与文案同源）。
+        renew_limit = int(ConfigService(self.db).get_value("renew_limit", "1"))
+        if record.renew_used >= renew_limit:
+            raise ValidationError(f"续借机会已用完（每本书限 {renew_limit} 次）")
         renew_days = int(ConfigService(self.db).get_value("renew_days"))
         record.due_at = record.due_at + timedelta(days=renew_days)  # 从原到期日起算
         record.renew_used += 1
@@ -563,6 +566,10 @@ class CirculationService:
             return 0
         today = datetime.now().date()
         sent = 0
+        # P2-5（2026-10-09 审查）：**补发窗口**——原按"节点日"精确匹配（due_at ∈ [target, target+1)），
+        # 停机一整天该节点就永久漏发（无补发）。现在每个节点向前放宽 1 天，文案按**实际剩余天数**
+        # 算（不会把昨天到期的说成"今天到期"）；幂等键仍是节点值 `str(days)` → 补发不重复。
+        catchup = timedelta(days=1)
         for days in sorted(set(remind_days)):
             target = today + timedelta(days=days)
             records = (
@@ -570,7 +577,7 @@ class CirculationService:
                 .filter(
                     BorrowRecord.is_deleted == 0,
                     BorrowRecord.status == BorrowRecord.STATUS_ACTIVE,
-                    BorrowRecord.due_at >= target,
+                    BorrowRecord.due_at >= target - catchup,
                     BorrowRecord.due_at < target + timedelta(days=1),
                 )
                 .all()
@@ -582,7 +589,16 @@ class CirculationService:
                 book = self.db.query(Book).filter(Book.id == rec.book_id).first()
                 title = book.title if book else f"书目#{rec.book_id}"
                 parent = self.db.query(Parent).filter(Parent.id == child.parent_id).first()
-                label = "今天" if days == 0 else f"{days} 天后"
+                actual_days = (rec.due_at.date() - today).days
+                label = (
+                    "今天"
+                    if actual_days == 0
+                    else (
+                        f"{actual_days} 天后"
+                        if actual_days > 0
+                        else f"已逾期 {abs(actual_days)} 天"
+                    )
+                )
                 if NotificationService(self.db).send(
                     parent_id=child.parent_id,
                     scene=SCENE_BORROW_DUE_REMIND,

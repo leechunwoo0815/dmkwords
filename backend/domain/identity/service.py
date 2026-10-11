@@ -539,6 +539,10 @@ class ChildService:
             return 0
         today = date.today()
         sent = 0
+        # P2-5（2026-10-09 审查）：补发窗口——原按"节点日"精确匹配（member_expire == target），
+        # 停机一整天该节点永久漏发。现在向前放宽 1 天，文案按实际剩余天数算；
+        # 幂等键仍是节点值 `str(days)` → 补发不重复。
+        catchup = timedelta(days=1)
         for days in sorted(set(notify_days)):
             target = today + timedelta(days=days)
             children = (
@@ -547,13 +551,19 @@ class ChildService:
                     Child.is_deleted == 0,
                     Child.member_status == Child.MEMBER_FORMAL,
                     Child.member_expire.isnot(None),
-                    Child.member_expire == target,
+                    Child.member_expire >= target - catchup,
+                    Child.member_expire <= target,
                 )
                 .all()
             )
             for child in children:
                 parent = self.db.query(Parent).filter(Parent.id == child.parent_id).first()
-                label = "今天" if days == 0 else f"{days} 天后"
+                actual_days = (child.member_expire - today).days
+                label = (
+                    "今天"
+                    if actual_days == 0
+                    else (f"{actual_days} 天后" if actual_days > 0 else "已过期")
+                )
                 if NotificationService(self.db).send(
                     parent_id=child.parent_id,
                     scene=SCENE_MEMBER_EXPIRE_REMIND,

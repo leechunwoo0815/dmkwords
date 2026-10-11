@@ -6,10 +6,15 @@ const PROD_BASE_URL = 'https://api.dmkwords.cn'
 // - 真机（ios/android）：媒体栈拦 http，必须走本地 https :8443
 //   （证书 certs/server.crt，手机需安装并完全信任 ca.crt；本机 IP 变更需改 SAN 重新生成）
 const _envVersion = (wx.getAccountInfoSync().miniProgram.envVersion || 'develop')
+// P2-9（2026-10-09 审查）：本机 IP 变了不必改代码——控制台执行
+//   wx.setStorageSync('dev_base_url', 'https://<新IP>:8443')
+// 即可覆盖（模拟器与真机各一套默认值；改网络环境不再需要发版/改源码）。
+const _devOverride = wx.getStorageSync('dev_base_url') || ''
 const DEV_BASE_URL =
-  wx.getSystemInfoSync().platform === 'devtools'
+  _devOverride ||
+  (wx.getSystemInfoSync().platform === 'devtools'
     ? 'http://127.0.0.1:8002'
-    : 'https://192.168.18.162:8443'
+    : 'https://192.168.18.162:8443')
 const BASE_URL = _envVersion === 'develop' ? DEV_BASE_URL : PROD_BASE_URL
 
 App({

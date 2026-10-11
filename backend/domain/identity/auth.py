@@ -53,9 +53,15 @@ def _parent_from_token(token: str, db) -> Parent:
     return parent
 
 
-def get_current_parent(authorization: str = Header(...), db=Depends(get_db)) -> tuple[Parent, Any]:
-    """FastAPI 依赖：解析家长 token，返回 (Parent, Session)。"""
-    token = authorization.replace("Bearer ", "")
+def get_current_parent(authorization: str = Header(""), db=Depends(get_db)) -> tuple[Parent, Any]:
+    """FastAPI 依赖：解析家长 token，返回 (Parent, Session)。
+
+    P2-11（2026-10-09 审查）：缺头/空 token 一律 **401**——原先 `Header(...)` 缺头会被
+    FastAPI 参数校验拦成 422，与"未登录"语义不一致（前端按 401 触发重新登录）。
+    """
+    token = (authorization or "").replace("Bearer ", "").strip()
+    if not token:
+        raise UnauthorizedError("请先登录")
     return _parent_from_token(token, db), db
 
 

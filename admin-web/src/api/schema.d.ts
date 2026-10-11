@@ -9979,8 +9979,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -10033,8 +10033,8 @@ export interface operations {
                 limit?: number;
                 offset?: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -10066,8 +10066,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 activity_id: number;
@@ -10170,8 +10170,8 @@ export interface operations {
     enroll_api_miniapp_activities__activity_id__enroll_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 activity_id: number;
@@ -10217,8 +10217,8 @@ export interface operations {
                 has_audio?: boolean;
                 sort?: string;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -10248,8 +10248,8 @@ export interface operations {
     book_detail_api_miniapp_books__book_id__get: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 book_id: number;
@@ -10317,8 +10317,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 book_id: number;
@@ -10352,8 +10352,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 book_id: number;
@@ -10387,8 +10387,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -10421,8 +10421,8 @@ export interface operations {
                 child_id: number;
                 days?: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -10452,8 +10452,8 @@ export interface operations {
     my_children_api_miniapp_children_get: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -10483,8 +10483,8 @@ export interface operations {
     update_child_avatar_api_miniapp_children__child_id__avatar_put: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 child_id: number;
@@ -10553,8 +10553,8 @@ export interface operations {
     circle_child_profile_api_miniapp_circle_children__child_id__profile_get: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 child_id: number;
@@ -10588,8 +10588,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -10624,8 +10624,8 @@ export interface operations {
                 /** @description 观看方当前选中的孩子（liked_by_me 口径） */
                 child_id?: number | null;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -10655,8 +10655,8 @@ export interface operations {
     circle_share_api_miniapp_circle_posts_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -10690,8 +10690,8 @@ export interface operations {
     circle_delete_my_post_api_miniapp_circle_posts__post_id__delete: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 post_id: number;
@@ -10756,8 +10756,8 @@ export interface operations {
     circle_like_api_miniapp_circle_posts__post_id__like_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 post_id: number;
@@ -10796,8 +10796,8 @@ export interface operations {
                 /** @description 点赞主体孩子（定位取消的赞） */
                 child_id?: number | null;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 post_id: number;
@@ -10864,8 +10864,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -10932,8 +10932,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -10963,8 +10963,8 @@ export interface operations {
     create_supplement_order_api_miniapp_deposits_supplement_orders_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11002,8 +11002,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11033,8 +11033,8 @@ export interface operations {
     cancel_enrollment_api_miniapp_enrollments__enrollment_id__cancel_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 enrollment_id: number;
@@ -11070,8 +11070,8 @@ export interface operations {
     apply_refund_api_miniapp_enrollments__enrollment_id__refund_apply_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 enrollment_id: number;
@@ -11109,8 +11109,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11140,8 +11140,8 @@ export interface operations {
     favorites_add_api_miniapp_favorites_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11179,8 +11179,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 book_id: number;
@@ -11214,8 +11214,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11247,8 +11247,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11281,8 +11281,8 @@ export interface operations {
                 period?: string;
                 child_id?: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11411,8 +11411,8 @@ export interface operations {
     parent_logout_api_miniapp_logout_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11448,8 +11448,8 @@ export interface operations {
                 /** @description 按场景过滤（fix34 R0：如 circle.liked） */
                 scene?: string | null;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11479,8 +11479,8 @@ export interface operations {
     mark_notifications_read_api_miniapp_notifications_read_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11549,8 +11549,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11582,8 +11582,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11613,8 +11613,8 @@ export interface operations {
     create_online_order_api_miniapp_orders_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11648,8 +11648,8 @@ export interface operations {
     pay_order_api_miniapp_orders__order_id__pay_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 order_id: number;
@@ -11681,8 +11681,8 @@ export interface operations {
     update_parent_profile_api_miniapp_parent_profile_put: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11718,8 +11718,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11751,8 +11751,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11784,8 +11784,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11818,8 +11818,8 @@ export interface operations {
                 child_id: number;
                 book_ids: string;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11851,8 +11851,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 book_id: number;
@@ -11884,8 +11884,8 @@ export interface operations {
     submit_quiz_api_miniapp_quiz__book_id__submit_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 book_id: number;
@@ -11921,8 +11921,8 @@ export interface operations {
     report_progress_api_miniapp_reading_progress_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11959,8 +11959,8 @@ export interface operations {
                 child_id: number;
                 order_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -11992,8 +11992,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -12023,8 +12023,8 @@ export interface operations {
     refund_apply_api_miniapp_refund_requests_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -12058,8 +12058,8 @@ export interface operations {
     refund_cancel_api_miniapp_refund_requests__request_id__cancel_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 request_id: number;
@@ -12097,8 +12097,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 kind: string;
@@ -12166,8 +12166,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -12197,8 +12197,8 @@ export interface operations {
     create_reservation_api_miniapp_reservations_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -12232,8 +12232,8 @@ export interface operations {
     cancel_reservation_api_miniapp_reservations__reservation_id__cancel_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 reservation_id: number;
@@ -12302,8 +12302,8 @@ export interface operations {
     transfer_list_api_miniapp_transfers_get: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -12333,8 +12333,8 @@ export interface operations {
     transfer_apply_api_miniapp_transfers_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -12371,8 +12371,8 @@ export interface operations {
                 source_child_id: number;
                 target_child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -12402,8 +12402,8 @@ export interface operations {
     transfer_cancel_api_miniapp_transfers__transfer_id__cancel_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 transfer_id: number;
@@ -12437,8 +12437,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -12472,8 +12472,8 @@ export interface operations {
                 child_id: number;
                 book_id?: number | null;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -12505,8 +12505,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 vocabulary_id: number;
@@ -12540,8 +12540,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -12571,8 +12571,8 @@ export interface operations {
     withdrawal_apply_api_miniapp_withdrawals_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path?: never;
             cookie?: never;
@@ -12606,8 +12606,8 @@ export interface operations {
     withdrawal_cancel_api_miniapp_withdrawals__request_id__cancel_post: {
         parameters: {
             query?: never;
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 request_id: number;
@@ -12645,8 +12645,8 @@ export interface operations {
             query: {
                 child_id: number;
             };
-            header: {
-                authorization: string;
+            header?: {
+                authorization?: string;
             };
             path: {
                 request_id: number;

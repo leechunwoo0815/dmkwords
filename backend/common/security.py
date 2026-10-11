@@ -62,3 +62,18 @@ def decode_admin_token(token: str) -> dict:
     """校验并解码 admin token；无效/过期抛 jwt.PyJWTError（调用方转 UnauthorizedError）。"""
     settings = get_settings()
     return jwt.decode(token, settings.SECRET_KEY, algorithms=[_ALGO])
+
+
+_DUMMY_HASH: str | None = None
+
+
+def dummy_password_hash() -> str:
+    """惰性生成的假哈希（与真实哈希同格式同代价）。
+
+    用途：登录时"用户不存在"路径也要跑一次等价校验，否则响应时间暴露账号是否存在
+    （P2-11，2026-10-09 审查：原先未知用户名短路返回，实测可区分）。
+    """
+    global _DUMMY_HASH
+    if _DUMMY_HASH is None:
+        _DUMMY_HASH = hash_password("dummy-password-for-timing-only")
+    return _DUMMY_HASH

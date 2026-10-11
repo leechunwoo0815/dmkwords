@@ -23,7 +23,12 @@ from backend.common.exceptions import (
     UnauthorizedError,
     ValidationError,
 )
-from backend.common.security import create_admin_token, hash_password, verify_password
+from backend.common.security import (
+    create_admin_token,
+    dummy_password_hash,
+    hash_password,
+    verify_password,
+)
 from backend.common.sql_utils import escape_like
 from backend.domain.admin.models import AdminUser, AuditLog, SystemConfig
 from backend.domain.admin.repository import (
@@ -85,7 +90,12 @@ class AuthService:
 
     def login(self, username: str, password: str) -> tuple[str, AdminUser]:
         user = self.user_repo.get_by_username(username)
-        if not user or not verify_password(password, user.password_hash):
+        # P2-11（2026-10-09 审查）：用户不存在时也要跑一次 PBKDF2——否则响应时间暴露
+        # "用户名是否存在"（未知用户名短路返回 vs 已知用户算 200k 轮）。用惰性假哈希做等价计算。
+        if user is None:
+            verify_password(password, dummy_password_hash())
+            raise UnauthorizedError("用户名或密码错误")
+        if not verify_password(password, user.password_hash):
             raise UnauthorizedError("用户名或密码错误")
         if user.status != AdminUser.STATUS_ACTIVE:
             raise ForbiddenError("账号已禁用，请联系超级管理员")
