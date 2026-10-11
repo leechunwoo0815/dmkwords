@@ -179,7 +179,12 @@ class CircleService:
 
         likers = self._likers_map([r.id for r in rows])
         levels = self._levels_map([r.child_id for r in rows])
-        items = [self._post_view(r, viewer.id, likers, child_id, levels) for r in rows]
+        children, parents = self._name_maps(rows)
+        liked_ids = self._liked_map([r.id for r in rows], child_id)
+        items = [
+            self._post_view(r, viewer.id, likers, child_id, levels, children, parents, liked_ids)
+            for r in rows
+        ]
         return {
             "items": items,
             "total": total,
@@ -203,6 +208,53 @@ class CircleService:
             datetime.combine(monday, datetime.min.time())
         )
         return {"words": sum(e["words"] for e in entries), "kids": len(entries)}
+
+    def _name_maps(self, rows: list[CirclePost]) -> tuple[dict[int, Child], dict[int, Parent]]:
+        """发帖孩子/家长**批查**（P2-3，2026-10-11 审查）。
+
+        原先 `_post_view` 每帖 2 条 SELECT（孩子 + 家长），10 帖页 = 22 条；与
+        `_likers_map` / `_levels_map` 同款"一次查映射"（本模块既有纪律）。
+        """
+        child_ids = {r.child_id for r in rows if r.child_id}
+        parent_ids = {r.parent_id for r in rows if r.parent_id}
+        children = (
+            {
+                c.id: c
+                for c in self.db.query(Child)
+                .filter(Child.id.in_(child_ids), Child.is_deleted == 0)
+                .all()
+            }
+            if child_ids
+            else {}
+        )
+        parents = (
+            {
+                p.id: p
+                for p in self.db.query(Parent)
+                .filter(Parent.id.in_(parent_ids), Parent.is_deleted == 0)
+                .all()
+            }
+            if parent_ids
+            else {}
+        )
+        return children, parents
+
+    def _liked_map(self, post_ids: list[int], viewer_child_id: int | None) -> set[int]:
+        """观看方当前孩子点过赞的帖子集合（批查；原先每帖一条 COUNT，10 帖 10 条）。"""
+        from backend.domain.reading_circle.models import CircleLike
+
+        if not post_ids or not viewer_child_id:
+            return set()
+        rows = (
+            self.db.query(CircleLike.post_id)
+            .filter(
+                CircleLike.post_id.in_(post_ids),
+                CircleLike.child_id == viewer_child_id,
+                CircleLike.is_deleted == 0,
+            )
+            .all()
+        )
+        return {pid for (pid,) in rows}
 
     def _levels_map(self, child_ids: list[int]) -> dict[int, str]:
         """发帖孩子等级（fix34 R4 头像框数据面）——**批查，不在 _post_view 里逐条查**（禁 N+1）。"""
@@ -274,27 +326,41 @@ class CircleService:
         likers: dict[int, list] | None = None,
         viewer_child_id: int | None = None,
         levels: dict[int, str] | None = None,
+        children: dict[int, Child] | None = None,
+        parents: dict[int, Parent] | None = None,
+        liked_ids: set[int] | None = None,
     ) -> dict:
-        child = (
-            self.db.query(Child).filter(Child.id == post.child_id, Child.is_deleted == 0).first()
-        )
-        parent = (
-            self.db.query(Parent)
-            .filter(Parent.id == post.parent_id, Parent.is_deleted == 0)
-            .first()
-        )
+        # P2-3（2026-10-11）：列表路径传入批查结果（`children`/`parents`/`liked_ids`），
+        # 单帖路径（详情）不传则回退单条查询——语义不变，只是不再 10 帖 22 条。
+        if children is None or parents is None:
+            child = (
+                self.db.query(Child)
+                .filter(Child.id == post.child_id, Child.is_deleted == 0)
+                .first()
+            )
+            parent = (
+                self.db.query(Parent)
+                .filter(Parent.id == post.parent_id, Parent.is_deleted == 0)
+                .first()
+            )
+        else:
+            child = children.get(post.child_id)
+            parent = parents.get(post.parent_id)
         # liked_by_me 按**观看方当前孩子**判定（fix33 R2）；未选孩子 → false
         liked = False
         if viewer_child_id:
-            liked = bool(
-                self.db.query(func.count(CircleLike.id))
-                .filter(
-                    CircleLike.post_id == post.id,
-                    CircleLike.child_id == viewer_child_id,
-                    CircleLike.is_deleted == 0,
+            if liked_ids is not None:
+                liked = post.id in liked_ids
+            else:
+                liked = bool(
+                    self.db.query(func.count(CircleLike.id))
+                    .filter(
+                        CircleLike.post_id == post.id,
+                        CircleLike.child_id == viewer_child_id,
+                        CircleLike.is_deleted == 0,
+                    )
+                    .scalar()
                 )
-                .scalar()
-            )
         title, subtitle = self._card_fields(post)
         return {
             "id": post.id,

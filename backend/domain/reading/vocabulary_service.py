@@ -58,7 +58,16 @@ class VocabularyService:
             if book_id and not existing.book_id:
                 existing.book_id = book_id
             # 重复查同一个词累加次数（生词本的成就感来源；新词由 default=1 起算）
-            existing.lookup_count = (existing.lookup_count or 0) + 1
+            # P2-7（2026-10-11 审查）：**原子 UPDATE**——原先读改写，并发查同一词会丢计数；
+            # 与阅读圈 like_count 同款纪律（`col = col + 1` 交给数据库）。
+            from sqlalchemy import func as _func
+
+            from backend.domain.reading.models import Vocabulary as _Vocab
+
+            self.db.query(_Vocab).filter(_Vocab.id == existing.id).update(
+                {_Vocab.lookup_count: _func.coalesce(_Vocab.lookup_count, 0) + 1},
+                synchronize_session=False,
+            )
         self.db.commit()
         return {
             "word": entry.word,

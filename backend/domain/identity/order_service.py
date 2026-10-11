@@ -278,14 +278,12 @@ class OrderService:
             raise NotFoundError("订单不存在")
         if order.status != Order.STATUS_PAID:
             raise ValidationError(f"订单状态 {order.status} 不可退款")
-        # P0-B（2026-10-09 外部专家复核 + 本地亲验）：押金是担保账户，不得经订单退款通道出款——
-        # 走这条通道钱出了、Deposit 账户纹丝不动（可用余额仍能被退会/转让链再退一次），
-        # 且对账看不见（L5/L6 跨通道盲，实测当轮 diff_count=0）。口径与家长端
-        # `wm10_service._paid_order` 一致：押金退款随退会/权益转让流程自动发起。
+        # P0-B（2026-10-09）：押金是担保账户，不得经订单退款通道出款——钱出了而 Deposit
+        # 纹丝不动（余额还能再退一次）、对账跨通道看不见。与家长端 `wm10_service._paid_order` 同口径。
         if order.order_type in (Order.TYPE_DEPOSIT, Order.TYPE_DEPOSIT_SUPPLEMENT):
             raise ValidationError("押金退款不能单独发起（随退会/权益转让流程自动发起）")
-        # 在途退款单闸（与家长端 apply 同口径）：同一订单同时只允许一笔进行中的申请——
-        # 否则两笔全额申请都能批、都能执行，L5 虽会报 refund_overpaid，但钱已经出了。
+        # 在途退款单闸（与家长端 apply 同口径）：同订单只允许一笔进行中的申请（L5 事后能报，
+        # 但钱已经出了）。
         active = (
             self.db.query(func.count(RefundRequest.id))
             .filter(
@@ -560,15 +558,9 @@ class OrderService:
     def assert_first_activity_eligible(self, order: Order) -> None:
         """99 元首场资格复查（R-321 每账号一次）——**全系统唯一判据**。
 
-        三入口共用本实现：家长端发起支付前的预检（`PaymentService._assert_first_activity_payable`）、
-        线上支付回调结算、管理端确认收款 / 管理端造单 × 线上回调（都经 `_settle_paid`）。
-
-        为什么先锁 `parents` 行：只锁"本单"护不住同一账号的**兄弟单**——两笔 pending 单
-        在两个事务里各自行锁、各自计数，都看到"没有已支付的"就都结算。按账号串行后，
-        后到的事务在锁内才能看见先到者刚提交的那笔（隔离级别 READ COMMITTED）。
-
-        口径：**已退款的首场单不占名额**（与发起支付前预检同源——家长退过款就该能重买），
-        改口径只改这一处。
+        三入口共用：家长 prepay 预检、线上回调结算、管理端确认/造单（都经 `_settle_paid`）。
+        先锁 `parents` 行：只锁本单护不住同一账号的兄弟单（两事务各自计数都见"无已付"→都结算）。
+        口径：**已退款的首场单不占名额**（与 prepay 预检同源），改口径只改这一处。
         """
         self.db.query(Parent.id).filter(Parent.id == order.parent_id).with_for_update().first()
         paid_exists = (
@@ -633,14 +625,9 @@ class OrderService:
         total = q.count()
         q = q.order_by(order_clause if order_clause is not None else Order.id.desc())
         orders = q.offset((page - 1) * page_size).limit(page_size).all()
-        # 关联孩子/家长名
-        out = []
-        for o in orders:
-            child = (
-                self.db.query(Child).filter(Child.id == o.child_id).first() if o.child_id else None
-            )
-            parent = self.db.query(Parent).filter(Parent.id == o.parent_id).first()
-            out.append((o, child.name if child else None, parent.name if parent else None))
+        # 关联孩子/家长名（P2-4，2026-10-11：**批查**——原先每行 2 条 SELECT，20 行 40 条）
+        cmap, pmap = _name_maps(self.db, orders)
+        out = [(o, cmap.get(o.child_id), pmap.get(o.parent_id)) for o in orders]
         # R10b：活动报名高亮锚点（批量一次查映射，零 N+1）
         order_ids = [o.id for o in orders]
         enrollment_map: dict[int, int] = {}
@@ -798,3 +785,15 @@ class OrderService:
         if sent:
             self.db.commit()
         return sent
+
+
+def _name_maps(db: Session, orders: list[Order]) -> tuple[dict[int, str], dict[int, str]]:
+    """订单行的孩子/家长名**批查**（P2-4，2026-10-11）——每行 2 条 SELECT → 总计 2 条。
+
+    放模块级而非方法内：`order_service.py` 触顶 800 行 god-file 关（同批实测 807 行）。
+    """
+    cids = {o.child_id for o in orders if o.child_id}
+    pids = {o.parent_id for o in orders if o.parent_id}
+    cmap = dict(db.query(Child.id, Child.name).filter(Child.id.in_(cids)).all()) if cids else {}
+    pmap = dict(db.query(Parent.id, Parent.name).filter(Parent.id.in_(pids)).all()) if pids else {}
+    return cmap, pmap

@@ -493,10 +493,11 @@ class AdminTodoService:
                 )
                 .all()
             )
+            # P2-2（2026-10-11 审查）：**整批 resolve 一次**——原先逐行 `resolve_many([n])`
+            # 每次发 3~4 条 IN 查询（行数越多越慢），与列表路径同款"一次算全表"。
+            resolved_enroll = self.resolve_many(enroll_rows)
             counts["activity_enroll_pending"] = sum(
-                1
-                for n in enroll_rows
-                if self.resolve_many([n])[n.id]["effective_status"] == ST_PENDING
+                1 for n in enroll_rows if resolved_enroll[n.id]["effective_status"] == ST_PENDING
             )
             # R10（计数同源第 7 案，20260907 用户裁定）：活动报名待确认统一进
             # admin_total——运营视角一个数=全部要干的活（"审核五类"历史口径
@@ -513,10 +514,11 @@ class AdminTodoService:
                 )
                 .all()
             )
+            resolved_followup = self.resolve_many(followup_rows)
             counts["member_follow_up"] = sum(
                 1
                 for n in followup_rows
-                if self.resolve_many([n])[n.id]["effective_status"] == ST_PENDING
+                if resolved_followup[n.id]["effective_status"] == ST_PENDING
             )
             counts["admin_total"] += counts["member_follow_up"]
             # WM14-A：阅读圈未赞数（member.manage 角色可赞——徽标语义是"你能处理的"）
