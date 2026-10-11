@@ -537,6 +537,25 @@ class PaymentReconcileService:
         diffs += self._refund_outflow_diffs(refund_outflow)
         return checked, diffs
 
+    def export_local_diffs_csv(self, bill_date: date | None = None) -> str:
+        """导出**全量**本地审计差异 CSV（专家裁决④配套工单，2026-10-11）。
+
+        为什么重算而不是读库：`detail` 只存 32KB 样本 + 分类计数（TEXT 列 64KB 上限，
+        10 万级实测 176KB 会写不进去）——**全量明细没有落库**。本地审计是纯本地 SQL
+        （10 万级 0.74s），重算最稳、且口径与当轮完全同源（同一个 `_local_audit`）。
+        """
+        import csv
+        import io
+
+        day = bill_date or date.today()
+        _checked, diffs = self._local_audit()
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["bill_date", "kind", "ref", "message"])
+        for d in diffs:
+            writer.writerow([str(day), d.get("kind", ""), d.get("ref", ""), d.get("message", "")])
+        return buf.getvalue()
+
     def _diff_refund_row(self, row: dict, out_refund_no: str) -> list[dict]:
         from backend.domain.identity import refund_online
 

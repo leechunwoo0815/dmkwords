@@ -1759,6 +1759,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/payments/reconciliations/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin Export Reconcile Diffs
+         * @description 对账差异**全量明细 CSV**（专家裁决④配套，2026-10-11）。
+         *
+         *     `detail` 落库只留样本（TEXT 64KB 上限）→ 审计全貌靠这个二次导出：**重算本地审计**
+         *     并全量导出（口径与当轮同源）。读语义（不写库）→ 与列表同权限码。
+         */
+        get: operations["admin_export_reconcile_diffs_api_admin_payments_reconciliations_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/payments/simulate-callback": {
         parameters: {
             query?: never;
@@ -9114,6 +9137,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaymentReconcileListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_export_reconcile_diffs_api_admin_payments_reconciliations_export_csv_get: {
+        parameters: {
+            query?: {
+                bill_date?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

@@ -12,6 +12,7 @@ import {
   type PaymentReconcileReport,
 } from "../api/admin";
 import { hasPermission, useAuth } from "../auth";
+import { getToken } from "../api/client";
 
 const NUM: CSSProperties = { fontFamily: "var(--font-mono)" };
 const MUTED: CSSProperties = { color: "rgba(0,0,0,0.45)" };
@@ -104,6 +105,33 @@ export default function PaymentReconcilePanel() {
               </Button>
             </>
           )}
+          <Button
+            size="small"
+            onClick={() => {
+              // 专家裁决④配套（2026-10-11）：detail 落库只留样本，全量明细靠这个二次导出
+              // （服务端**重算**本地审计并全量导出 CSV，口径与当轮同源）。
+              // 走 Authorization 头 + Blob 下载——**不把 token 放进 URL**（A2 口径）。
+              const token = getToken();
+              const q = new URLSearchParams();
+              const day = billDate.trim();
+              if (day) q.set("bill_date", day);
+              void fetch(`/api/admin/payments/reconciliations/export.csv?${q}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+              })
+                .then(async (r) => {
+                  if (!r.ok) throw new Error(`导出失败（HTTP ${r.status}）`);
+                  const url = URL.createObjectURL(await r.blob());
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `reconcile-diffs-${day || "today"}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                })
+                .catch((e: Error) => message.error(e.message));
+            }}
+          >
+            导出全量明细
+          </Button>
           <Button size="small" icon={<ReloadOutlined />} onClick={() => void load()}>
             刷新
           </Button>

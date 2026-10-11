@@ -10497,6 +10497,53 @@
         ]
       }
     },
+    "/api/admin/payments/reconciliations/export.csv": {
+      "get": {
+        "description": "对账差异**全量明细 CSV**（专家裁决④配套，2026-10-11）。\n\n`detail` 落库只留样本（TEXT 64KB 上限）→ 审计全貌靠这个二次导出：**重算本地审计**\n并全量导出（口径与当轮同源）。读语义（不写库）→ 与列表同权限码。",
+        "operationId": "admin_export_reconcile_diffs_api_admin_payments_reconciliations_export_csv_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "bill_date",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Bill Date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Admin Export Reconcile Diffs",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
     "/api/admin/payments/simulate-callback": {
       "post": {
         "description": "超管演练微信支付回调（**仅 mock 支付通道可用**）：重复回调 / 金额篡改 / 非成功状态。\n\n为什么需要它：商户号未到位时无法真机验签，但\"重复回调不重复入账\"\"金额不符拒绝\"\n这类判据必须有人能现场演练（判据见 docs/09 WM12-A §三 / docs/04 WM12 步骤 4-6）。",

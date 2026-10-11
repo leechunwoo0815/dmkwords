@@ -537,6 +537,34 @@ def admin_run_reconcile(
     )
 
 
+@router.get("/payments/reconciliations/export.csv")
+def admin_export_reconcile_diffs(
+    bill_date: str = "",
+    admin: Any = Depends(require_perm("dashboard.view")),
+    db: Session = Depends(get_db),
+):
+    """对账差异**全量明细 CSV**（专家裁决④配套，2026-10-11）。
+
+    `detail` 落库只留样本（TEXT 64KB 上限）→ 审计全貌靠这个二次导出：**重算本地审计**
+    并全量导出（口径与当轮同源）。读语义（不写库）→ 与列表同权限码。
+    """
+    from datetime import date as _date
+
+    from fastapi.responses import Response
+
+    from backend.domain.identity.payment_reconcile_service import PaymentReconcileService
+
+    day = _date.fromisoformat(bill_date) if bill_date else None
+    csv_text = PaymentReconcileService(db).export_local_diffs_csv(day)
+    return Response(
+        content=csv_text,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="reconcile-diffs-{day or _date.today()}.csv"'
+        },
+    )
+
+
 @router.get("/payments/reconciliations", response_model=PaymentReconcileListResponse)
 def admin_list_reconciliations(
     limit: int = Query(10, ge=1, le=50),
