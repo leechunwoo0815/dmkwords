@@ -236,6 +236,14 @@ class PaymentService:
         finally:
             lock.release()
 
+    def _assert_collectable(self, child: Child) -> None:
+        """P9（2026-10-12 拍板）：冻结期禁止发起支付（与确认收款同一口径）。"""
+        if child is not None and child.operation_locked:
+            raise ValidationError(
+                "该孩子正在退会/权益转让审核流程中，冻结期间不能发起支付——"
+                "如确需先收欠款，请先撤销退会申请"
+            )
+
     def _prepay_once(self, parent: Parent, order: Order) -> dict:
         """单次预支付（三段式）——调用方已持有该订单的进程内锁。"""
         if order.status == Order.STATUS_PAID:
@@ -243,6 +251,14 @@ class PaymentService:
             return self._pay_result(order, already_paid=True)
         if order.status not in (Order.STATUS_PENDING_PAYMENT, Order.STATUS_PENDING_MANUAL):
             raise ValidationError(f"订单状态 {order.status} 不可发起支付")
+        # P9：冻结期禁收款（退会/转让审核中，账先别动）
+        from backend.domain.identity.models import Child
+
+        self._assert_collectable(
+            self.db.query(Child).filter(Child.id == order.child_id).first()
+            if order.child_id
+            else None
+        )
         openid = (parent.wechat_openid or "").strip()
         if not openid:
             # 口径 docs/09 WM12-C §二.4（用户裁定）：线上支付只允许微信一键登录的家长。
@@ -253,10 +269,20 @@ class PaymentService:
         if order.order_type == Order.TYPE_FIRST_ACTIVITY:
             self._assert_first_activity_payable(order)
 
-        # Phase 1：先落库（状态置线上待支付 + 提交），把锁放掉再谈网络
-        if order.status != Order.STATUS_PENDING_PAYMENT:
-            order.status = Order.STATUS_PENDING_PAYMENT
+        # Phase 1：先落库（状态置线上待支付 + 提交），把锁放掉再谈网络。
+        # 2026-10-12 审查 P2（T3）：原先是无条件 ORM 赋值——家长点"去支付"与管理员取消/超时
+        # 清理并发时，会把已取消的单**复活**成待支付（取消意图丢失、钱照收）。
+        # 改为条件 UPDATE：只允许"待人工确认 → 线上待支付"这一条合法跃迁。
+        if order.status == Order.STATUS_PENDING_MANUAL:
+            moved = (
+                self.db.query(Order)
+                .filter(Order.id == order.id, Order.status == Order.STATUS_PENDING_MANUAL)
+                .update({Order.status: Order.STATUS_PENDING_PAYMENT}, synchronize_session=False)
+            )
             self.db.commit()
+            self.db.expire(order)
+            if not moved:
+                raise ValidationError("订单状态已变更（可能已被取消），请刷新后重试")
 
         # Phase 2：事务外调网关（无任何 DB 锁；失败不回滚 Phase 1——模式手册 P2/F-030）
         gateway = self._gateway()
@@ -321,13 +347,49 @@ class PaymentService:
             logger.exception("支付回调处理异常，兜底为 200 + anomaly")
             try:
                 self.db.rollback()
+                # 2026-10-12 审查 P2：兜底留痕必须**能定位到哪一笔**——原先 target_id 缺省 "-"、
+                # reason 里没有订单号，人工只能反查微信账单（而对账的账单比对此前长期 skipped）。
+                # 微信通知体里订单号在密文内（解密失败正是抛错原因之一），故做**尽力提取**：
+                # 明文字段（event_type / 通知 id）+ 正则捞 out_trade_no，再拼 body 摘要。
+                note = self._notify_hint(body)
                 self._audit_anomaly(
                     "支付回调处理异常（已兜底为 200，需人工核对）",
-                    reason=f"{type(exc).__name__}: {str(exc)[:180]}",
+                    target_id=note.get("out_trade_no", ""),
+                    reason=(
+                        f"{type(exc).__name__}: {str(exc)[:180]} | "
+                        f"event={note.get('event_type', '?')} notif={note.get('notify_id', '?')} "
+                        f"body_sha1={note.get('digest', '?')}"
+                    ),
                 )
             except Exception:  # noqa: BLE001 —— 留痕失败也不能变成无应答
                 logger.exception("回调异常留痕失败（仍返回 200）")
             return 200, {"code": "SUCCESS", "message": "已记录待人工处理"}
+
+    @staticmethod
+    def _notify_hint(body: str) -> dict:
+        """从回调报文里**尽力**提取可定位字段（解不开密文时也能人工核对）。"""
+        import hashlib
+        import json
+        import re
+
+        out: dict[str, str] = {}
+        raw = body or ""
+        out["digest"] = hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+        try:
+            data = json.loads(raw or "{}")
+            if isinstance(data, dict):
+                out["event_type"] = str(data.get("event_type", "") or "")
+                out["notify_id"] = str(data.get("id", "") or "")
+        except (ValueError, TypeError):
+            pass
+        m = re.search(r'"out_trade_no"\s*:\s*"([A-Za-z0-9_\-]{4,64})"', raw)
+        if m:
+            out["out_trade_no"] = m.group(1)
+        m2 = re.search(r'"out_refund_no"\s*:\s*"([A-Za-z0-9_\-]{4,64})"', raw)
+        if m2:
+            out["out_refund_no"] = m2.group(1)
+            out.setdefault("out_trade_no", m2.group(1))
+        return out
 
     def _notify_impl(
         self, *, body: str, signature: str, timestamp: str, nonce: str
@@ -490,6 +552,19 @@ class PaymentService:
             self._audit_anomaly("退款回调缺商户退款单号", reason=event_type)
             return 400, {"code": "FAIL", "message": "缺少退款单号"}
         req = refund_online.find_by_out_refund_no(self.db, out_refund_no)
+        # 2026-10-12 审查 P2（T2）：**反解到单 ≠ 这笔通知属于当前提交**。换号重试后
+        # （RF{id}-2-1），旧号（RF{id}-1-1）的迟到通知会落到"正在进行中的那一笔"上：
+        # 旧笔 CLOSED 会把在途单判成失败（管理员据此换号重提 = 二次出款），旧笔 SUCCESS
+        # 会把在途单直接置为已退款（真在途那笔的成功回调被幂等忽略 → 账实不符）。
+        # 只在"这一笔确实提交过"（有单号）时才比对：未提交的单没有"当前提交"可比，
+        # 交给原有状态机与字段校验处理（A1 的"缺金额→400"用例即此路径）。
+        if (req.out_refund_no or "").strip() and req.out_refund_no.strip() != out_refund_no.strip():
+            self._audit_anomaly(
+                "退款结果通知的单号与当前提交不一致（已忽略，防旧通知落错笔）",
+                target_id=f"refund_request#{req.id}",
+                reason=f"通知={out_refund_no} 当前={req.out_refund_no}",
+            )
+            return 200, {"code": "SUCCESS", "message": "已忽略（单号非当前提交）"}
         if req is None:
             self._audit_anomaly("退款回调找不到退款单", reason=f"out_refund_no={out_refund_no}")
             return 404, {"code": "FAIL", "message": "退款单不存在"}
@@ -787,6 +862,22 @@ class PaymentService:
         资金相关异常必须留痕，否则出问题时只能看到"钱少了"而查不到经过。
         """
         logger.warning("支付异常留痕: %s | %s", message, reason)
+        # 2026-10-12 拍板（P10）：**资金异常要进管理端待办**。原先只写审计行，而审计页仅超管可见
+        # ——"钱收了没入账"这类事故只能靠人主动翻页面。这里同事务补一条待办（失败不影响留痕）。
+        try:
+            from backend.common.admin_notification_models import AdminNotification
+            from backend.common.admin_notifications import AdminNotifyService
+
+            AdminNotifyService(self.db).send(
+                scene=AdminNotification.SCENE_PAYMENT_ANOMALY,
+                title="【资金异常】",
+                content=f"【资金异常】{message}｜{reason[:160]}",
+                ref_type=AdminNotification.REF_CHILD,
+                ref_id=target_id or "-",
+                applicant_name="系统",
+            )
+        except Exception:  # noqa: BLE001 —— 待办失败不能反过来影响资金留痕
+            logger.exception("资金异常待办写入失败（审计已留痕）")
         publish_audit(
             self.db,
             admin=admin or self._system_actor(),

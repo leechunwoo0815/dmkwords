@@ -200,6 +200,8 @@ export interface TaskSpecItem {
   schedule_text?: string | null;
   cron_expr?: string | null;
   last_run?: { status: string; processed: number; error: string | null; started_at: string } | null;
+  // 2026-10-12 拍板（P10）：连续失败次数（看板标红用；一次成功会把 last_run 洗白）
+  consecutive_failures?: number;
 }
 
 export interface TaskRunItem {

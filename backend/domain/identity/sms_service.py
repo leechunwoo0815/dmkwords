@@ -19,6 +19,7 @@ import logging
 import random
 from datetime import datetime, timedelta
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.common.async_utils import run_coro
@@ -53,7 +54,7 @@ class SmsCodeService:
 
     # ---------- 发送 ----------
 
-    def send(self, phone: str, purpose: str = SmsCode.PURPOSE_LOGIN) -> dict:
+    def send(self, phone: str, purpose: str = SmsCode.PURPOSE_LOGIN, client_ip: str = "") -> dict:
         """发一条验证码。返回 {sent: True, ttl_seconds, provider}（**不回传验证码**）。"""
         from backend.integrations.sms import get_sms_gateway
 
@@ -64,8 +65,9 @@ class SmsCodeService:
             raise ValidationError("验证码用途不合法")
 
         now = datetime.now()
-        interval = self._cfg_int("sms_send_interval_seconds", 60)
+        interval = self._cfg_int("sms_send_interval_seconds", 90)
         daily_limit = self._cfg_int("sms_daily_limit", 10)
+        ip_daily_limit = self._cfg_int("sms_ip_daily_limit", 30)
         ttl = self._cfg_int("sms_code_ttl_seconds", 300)
 
         recent = (
@@ -92,6 +94,25 @@ class SmsCodeService:
         )
         if today_count >= daily_limit:
             raise ConflictError(f"今日验证码发送已达上限（{daily_limit} 条），请明天再试")
+        # 2026-10-12 拍板（P2）：**单 IP 日上限**。原口径只按手机号计额度，任何人拿一个号
+        # 反复调用就能把**受害者**当天的额度烧光（没绑微信的家长当天彻底登不进来，短信费还我们出）。
+        # 这里再加一层"按来源 IP"的总量闸；被刷爆时微信登录链路完全不受影响（独立通道）。
+        if client_ip:
+            ip_today = (
+                self.db.query(func.count(SmsCode.id))
+                .filter(
+                    SmsCode.request_ip == client_ip,
+                    SmsCode.is_deleted == 0,
+                    SmsCode.created_at >= now.replace(hour=0, minute=0, second=0, microsecond=0),
+                )
+                .scalar()
+                or 0
+            )
+            if ip_today >= ip_daily_limit:
+                raise ConflictError(
+                    f"当前网络今日发送验证码已达上限（{ip_daily_limit} 条）——"
+                    "请改用微信一键登录，或明天再试"
+                )
 
         # 网关生成并发送；它把 code 回传给我方（真实厂商路径同样回传——用于本地落哈希）
         result = run_coro(get_sms_gateway().send_code(phone))
@@ -105,6 +126,7 @@ class SmsCodeService:
             SmsCode(
                 phone=phone,
                 purpose=purpose,
+                request_ip=(client_ip or None),
                 code_hash=hash_code(phone, result.code),
                 expires_at=now + timedelta(seconds=ttl),
                 created_at=now,

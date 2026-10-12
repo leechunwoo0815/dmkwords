@@ -4,6 +4,10 @@ const req = require('./request')
 module.exports = {
   // 登录（2026-10-08 接线）：微信一键登录为主，短信验证码为兜底
   // ① 微信主通道：wx.login 拿 code → openid 已绑 → 直接登录态；未绑 → need_bind + bind_ticket
+  // 登录选项（2026-10-12 拍板 P1）：服务端下发短信通道开关 → 关闭时隐藏手机号入口
+  getLoginOptions() {
+    return req.get('/api/miniapp/login/options', { auth: false })
+  },
   loginByWechat(wxCode) {
     return req.post('/api/miniapp/login/wechat', { code: wxCode }, { auth: false })
   },

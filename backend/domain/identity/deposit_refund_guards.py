@@ -56,13 +56,11 @@ def assert_order_refund_executable(db: Session, req) -> None:
 
     from backend.domain.identity.models import Order, RefundRequest
 
-    order = (
-        db.query(Order)
-        .filter(Order.id == req.order_id)
-        .with_for_update()
-        .populate_existing()
-        .first()
-    )
+    # 注意：这里**不锁订单行**（2026-10-12 实测）：本闸在"已持有退款单锁"的事务里执行，
+    # 再锁订单行会与"先锁订单再建退款单"的路径（结算/确认收款）形成锁序反转 → 死锁（1213）。
+    # 因此只做聚合读。残留竞态：两笔退款单**同时**执行时可能各自读到对方未提交的累计值，
+    # 但两条路径各有退款单状态机把关，且对账 L5/L6 事后必报超额（口径见 docs/09 第四十九轮 §二）。
+    order = db.query(Order).filter(Order.id == req.order_id).first()
     if order is None:
         return
     in_flight_or_paid = (

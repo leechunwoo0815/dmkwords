@@ -290,8 +290,10 @@ def test_production_rejects_mock_sms_gateway():
     with pytest.raises(RuntimeError) as exc:
         Settings(SMS_ENABLED=True, SMS_PROVIDER="mock", **base).validate_production()
     assert "SMS_PROVIDER" in str(exc.value)
-    # 关掉短信（纯微信登录）→ 放行
-    Settings(SMS_ENABLED=False, SMS_PROVIDER="mock", **base).validate_production()
+    # 2026-10-12 拍板（P1）：**关掉短信不再放行**（关闭=拒绝启动）——原口径"纯微信登录也算合规"已废
+    with pytest.raises(RuntimeError) as exc2:
+        Settings(SMS_ENABLED=False, SMS_PROVIDER="mock", **base).validate_production()
+    assert "短信通道已关闭" in str(exc2.value)
     # 接真实网关但缺凭据 → 拒
     with pytest.raises(RuntimeError) as exc2:
         Settings(SMS_ENABLED=True, SMS_PROVIDER="aliyun", **base).validate_production()

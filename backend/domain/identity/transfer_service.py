@@ -20,6 +20,7 @@ from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.circulation.models import BorrowRecord
 from backend.domain.identity.models import (
     Child,
+    Order,
     Parent,
     RefundRequest,
     TransferRequest,
@@ -437,6 +438,21 @@ class TransferService:
             # 1) 转出方退会（年费不退；历史阅读成果保留）
             source.member_status = Child.MEMBER_WITHDRAWN
             source.withdraw_reason = "membership_transfer"
+            # 2026-10-12 拍板（P7）：转出方的年费订单标记「已随转让处置」——否则家长端还能对
+            # 这笔单发起退款并执行（同一笔年费既转给受让方又在退）。年费类型见 Order.TYPE_FORMAL。
+            (
+                self.db.query(Order)
+                .filter(
+                    Order.child_id == source.id,
+                    Order.order_type == Order.TYPE_FORMAL,
+                    Order.status == Order.STATUS_PAID,
+                    Order.is_deleted == 0,
+                )
+                .update(
+                    {Order.refund_status: Order.REFUND_STATUS_TRANSFERRED},
+                    synchronize_session=False,
+                )
+            )
             # 2) 自动发起转出方押金退款申请
             from backend.domain.billing.models import Deposit
 

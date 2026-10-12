@@ -357,6 +357,14 @@ class ReservationService:
             raise ValidationError("孩子正在转让/退会审核流程中，预约已冻结")
         if not child.is_active_member:
             raise ValidationError("仅有效会员可预约")
+        # 2026-10-12 拍板（P6）：**下架/已删除的书禁预约**（PRD §4.4 既有口径，代码此前没做）
+        from backend.domain.catalog.models import Book
+
+        book = self.db.query(Book).filter(Book.id == book_id, Book.is_deleted == 0).first()
+        if book is None:
+            raise NotFoundError("书目不存在")
+        if book.status != Book.STATUS_ON:
+            raise ValidationError(f"《{book.title}》已下架，不能预约")
         from backend.domain.billing.models import Deposit
 
         dep = (

@@ -148,6 +148,10 @@ class RefundService:
                     raise ValidationError("活动已开始，请线下与馆员协商处理")
         # R1（X6 返工）：0 元禁提交——0 元申请会联动创建退会单+锁孩子，
         # 审核员误批即 withdrawn（真业务陷阱，非纯 UX）
+        # 2026-10-12 拍板（P7）：已随权益转让处置的订单不再受理退款
+        # （同一笔年费既转给受让方又在退 = 重复得利；退费诉求在转让定价环节解决）
+        if order.refund_status == Order.REFUND_STATUS_TRANSFERRED:
+            raise ValidationError("该订单已随权益转让处置，不再受理退款申请")
         if refund_rules.refundable_amount(self.db, order) <= 0:
             raise ValidationError("该订单当前无可退金额")
         # dup 检查先于锁定检查（同订单重复申请给更具体的错误）

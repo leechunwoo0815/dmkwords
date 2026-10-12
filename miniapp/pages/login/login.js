@@ -14,6 +14,17 @@ Page({
     agreed: true,
     sending: false,
     countdown: 0,
+    // 2026-10-12 拍板（P1）：短信通道开关由服务端下发——关闭时**隐藏手机号入口**
+    // （不允许出现"页面能点、验证码永远收不到"的假入口）
+    smsEnabled: true,
+  },
+
+  onLoad() {
+    api.getLoginOptions().then((res) => {
+      if (res && typeof res.sms_enabled === 'boolean') {
+        this.setData({ smsEnabled: res.sms_enabled })
+      }
+    }).catch(() => {})
   },
 
   onPhoneInput(e) { this.setData({ phone: e.detail.value }) },

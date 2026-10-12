@@ -35,6 +35,12 @@ skip() {
   echo "（跳过：$1）"
 }
 
+# 2026-10-12 审查 P2：缺件类问题必须判红（原先是静默 skip，删个目录就能让红线无声消失）
+fail() {
+  echo "✗ 门禁失败: $1"
+  FAILED=1
+}
+
 step 1 "lint (ruff)"
 run ruff check backend/ tests/ features/ scripts/
 run ruff format --check .
@@ -80,7 +86,7 @@ run python scripts/check_docs_code_alignment.py
 run python scripts/check_rbac_consistency.py
 # E-20260913：小程序风格基准（**R1–R14** 规则 + S1–S3 自证；含 R12 悬空类名 / R13 图标槽位 emoji/资产 /
 # R14 WXML 注释与标签结构——2026-09-20 补：注释写成 */ 会吞掉半页模板且报错行指向别处，IDE 才看得见。
-# 2026-09-20 修正：旧注释写"R1–R7"是陈旧的，规则实际已到 R13（见 docs/08 TD-11/TD-12）。不能替代目视截图）
+# 2026-09-20 修正：旧注释写"R1–R7"是陈旧的，规则实际已到 R16（见 docs/08 TD-11/TD-12）。不能替代目视截图）
 run python scripts/check_miniapp_style.py
 # fix44 R4（Q8 机化）：媒体纪律三条——M1 落盘单出口（只有 file_storage / Canvas.finish / save_jpeg
 # 可写媒体文件）/ M2 破缓存单出口（`?v=` 只许出现在 file_utils.media_version）/ M3 清理脚本默认 dry-run。
@@ -103,8 +109,17 @@ fi
 step 7 "前端类型检查（tsc）"
 if [ -f "admin-web/node_modules/.bin/tsc" ]; then
   run bash -c "cd admin-web && pnpm exec tsc --noEmit"
+elif [ -n "${CI:-}" ]; then
+  fail "CI 环境缺 admin-web 依赖（node_modules/.bin/tsc 不存在）——pnpm install 后重跑"
 else
-  skip "admin-web 未安装依赖（pnpm install 后启用）"
+  # 2026-10-12 审查 P2：**本地缺件也判红**。原先是静默 skip——删掉 node_modules 或契约快照
+  # 就能让"tsc 0 错误 / API 类型禁手写"两条红线无声消失（而 CI 装着依赖照样绿，正好掩盖本地这次跳过）。
+  # 逃生口是显式的：`SKIP_FRONTEND_CHECKS=1`（须在门禁日志里留痕）。
+  if [ "${SKIP_FRONTEND_CHECKS:-0}" = "1" ]; then
+    skip "显式 SKIP_FRONTEND_CHECKS=1（本地临时跳过 tsc，不得用于交付）"
+  else
+    fail "admin-web 未安装依赖（node_modules/.bin/tsc 不存在）——请 pnpm install；如确需临时跳过：SKIP_FRONTEND_CHECKS=1"
+  fi
 fi
 
 step 8 "契约快照检查（T27：破坏性变更必须改代码+更新快照两步显形）"
@@ -115,11 +130,13 @@ if [ -f "docs/api/openapi.json" ]; then
   # 契约源统一为快照（不再直连 8002），逐字节比对，无服务也能进 CI。
   if [ -f "admin-web/node_modules/.bin/openapi-typescript" ]; then
     run bash -c "cd admin-web && pnpm gen:api --check"
+  elif [ "${SKIP_FRONTEND_CHECKS:-0}" = "1" ]; then
+    skip "显式 SKIP_FRONTEND_CHECKS=1（本地临时跳过前端类型产物比对）"
   else
-    skip "admin-web 未安装依赖（pnpm install 后本步启用）"
+    fail "admin-web 未安装依赖（node_modules/.bin/openapi-typescript 不存在）——请 pnpm install"
   fi
 else
-  skip "契约快照未导出（docs/api/openapi.json 不存在）"
+  fail "契约快照未导出（docs/api/openapi.json 不存在）——请 python -m scripts.export_openapi"
 fi
 
 step 9 "交付完整性检查（E-20260903-03 起源；G1 起扩为全仓 untracked 判红）"

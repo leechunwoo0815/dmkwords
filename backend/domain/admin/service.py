@@ -548,9 +548,21 @@ class TaskAdminService:
                     else "",
                 },
             )
+        # 2026-10-12 拍板（P10）：**连续失败要在看板标红**——原先只有"最后一次状态"，
+        # 一次成功就把连续失败盖掉了（失败三次最后一次碰巧成功 = 看板全绿）。
+        history: dict[str, list[str]] = {}
+        for r in rows:  # rows 已按 id desc（最新在前）
+            history.setdefault(r.task_name, []).append(r.status)
         for s in specs:
             last = by_task.get(s["name"])
             s["last_run"] = last or None
+            streak = 0
+            for st in history.get(s["name"], []):
+                if st == TaskRunLog.STATUS_FAILED:
+                    streak += 1
+                else:
+                    break
+            s["consecutive_failures"] = streak
         return specs
 
     def recent_runs(self, limit: int = 20) -> list[dict]:

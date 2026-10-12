@@ -132,9 +132,15 @@ class DepositService:
         child = self.db.query(Child).filter(Child.id == child_id, Child.is_deleted == 0).first()
         if not child:
             raise NotFoundError("孩子不存在")
+        self._assert_collectable(child)  # P9：冻结期禁收款
         dep = self._get_or_create(child.id)
-        if dep.status == Deposit.STATUS_PAID:
-            raise ValidationError("押金已缴纳")
+        # 2026-10-12 审查 P2（T4）：原先只拦"已缴清"——押金处于"部分扣除/退款中"时再造一张
+        # 全额押金单，结算会把可用余额**覆盖**成标准额（已扣除的记录仍在，台账自相矛盾，
+        # 家庭多付一笔且退会只退标准额）。与家长端建单闸门同款：非"未缴"一律拒。
+        if dep.status != Deposit.STATUS_UNPAID:
+            raise ValidationError(
+                f"押金当前状态为 {dep.status}，无需重复缴纳（补缴请走押金补缴入口）"
+            )
         amount = Decimal(ConfigService(self.db).get_value("deposit_amount"))
         import uuid
         from datetime import datetime
@@ -152,6 +158,14 @@ class DepositService:
         self.db.commit()
         return order
 
+    def _assert_collectable(self, child) -> None:
+        """P9（2026-10-12 拍板）：冻结期禁止押金补缴（与确认收款/发起支付同一口径）。"""
+        if child is not None and child.operation_locked:
+            raise ValidationError(
+                "该孩子正在退会/权益转让审核流程中，冻结期间不能缴押金——"
+                "如确需先收欠款，请先撤销退会申请"
+            )
+
     def create_supplement_order(self, admin, child_id: int) -> Order:
         """补缴订单：金额 = 恢复全额（标准额−可用余额）+ 待结清。
 
@@ -161,6 +175,7 @@ class DepositService:
         child = self.db.query(Child).filter(Child.id == child_id, Child.is_deleted == 0).first()
         if not child:
             raise NotFoundError("孩子不存在")
+        self._assert_collectable(child)  # P9：冻结期禁收款（补缴同样属于收款）
         dep = self._get_or_create(child.id)
         standard = Decimal(ConfigService(self.db).get_value("deposit_amount"))
         # E-20260909-03（扣多少补多少）：恢复全额 + 待结清（干净场景恰好 = 赔偿总额）

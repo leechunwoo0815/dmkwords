@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
@@ -356,13 +356,23 @@ def login_bind(body: WeChatBindRequest, db: Session = Depends(get_db)):
     return bind_wechat(db, body.bind_ticket, body.phone, body.code)
 
 
+@router.get("/login/options")
+def login_options():
+    """登录方式开关（公开端点，2026-10-12 拍板 P1）：小程序据此隐藏手机号入口。"""
+    from backend.config import get_settings
+
+    return {"sms_enabled": bool(get_settings().SMS_ENABLED), "wechat_enabled": True}
+
+
 @router.post("/sms/send", dependencies=[Depends(rate_limit(5, 60))])
-def sms_send(body: SmsSendRequest, db: Session = Depends(get_db)):
+def sms_send(body: SmsSendRequest, request: Request, db: Session = Depends(get_db)):
     """发短信验证码（登录兜底 / 微信绑定共用）。
 
     三道闸门在服务层：同号间隔、每日上限、校验失败次数；开发态 `SMS_PROVIDER=mock`
     验证码打在服务端日志（`[MockSms]`），不真发短信。
     """
     from backend.domain.identity.sms_service import SmsCodeService
+    from backend.middleware.rate_limit import _client_ip
 
-    return SmsCodeService(db).send(body.phone, body.purpose)
+    # 2026-10-12 拍板（P2）：把来源 IP 交给服务层做"单 IP 日上限"（与限流同一 IP 口径）
+    return SmsCodeService(db).send(body.phone, body.purpose, client_ip=_client_ip(request))

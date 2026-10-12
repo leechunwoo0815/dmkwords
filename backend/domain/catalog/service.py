@@ -303,6 +303,21 @@ class BookService:
         )
         if borrowed:
             raise ConflictError(f"该书目存在 {borrowed} 本借出中副本，请先归还再删除")
+        # 2026-10-12 审查 P2（T8）：**有活跃预约的书不许删**。原先只拦"借出中"，
+        # 删掉之后预约成孤儿：孩子端看不到书、到店核销报"ISBN 未入库"、额度还被占最多 72h。
+        from backend.domain.reading.models import Reservation
+
+        reserved = (
+            self.db.query(Reservation)
+            .filter(
+                Reservation.book_id == book_id,
+                Reservation.status == Reservation.STATUS_ACTIVE,
+                Reservation.is_deleted == 0,
+            )
+            .count()
+        )
+        if reserved:
+            raise ConflictError(f"该书目有 {reserved} 个进行中的预约，请先处理预约再删除")
         book.is_deleted = 1
         self.book_repo.update(book)
         self._audit(
@@ -421,11 +436,34 @@ class BookService:
         self.db.commit()
         return book
 
+    def _active_borrow_of(self, copy_id: int):
+        """该副本当前的活跃借阅记录（ACTIVE/OVERDUE）。"""
+        from backend.domain.circulation.models import BorrowRecord
+
+        return (
+            self.db.query(BorrowRecord)
+            .filter(
+                BorrowRecord.copy_id == copy_id,
+                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
+                BorrowRecord.is_deleted == 0,
+            )
+            .first()
+        )
+
     def update_copy_status(self, admin, copy_id: int, new_status: str, reason: str) -> BookCopy:
         copy = self.copy_repo.get_by_id_or_raise(copy_id)
         if not copy.can_transition(new_status):
             raise ValidationError(
                 f"副本状态不允许从 {copy.status} 变更为 {new_status}（转移矩阵拦截）"
+            )
+        # 2026-10-12 拍板（P5）：**正在被借出的副本不许直接改状态**——它拿在某个孩子手里，
+        # 随手改成"在馆"会让系统以为书是空的、被再借一次（同一副本两条在借记录，之后还书还错人）。
+        # 要改先还书；书在家长手上损坏/丢失走「报损·遗失」（下方 report_copy_damage）。
+        active = self._active_borrow_of(copy_id)
+        if active is not None and new_status != BookCopy.STATUS_BORROWED:
+            raise ConflictError(
+                f"该副本正被借出（借阅记录 #{active.id}），不能直接改状态："
+                "请先办理还书；若书在家长手上损坏或丢失，请用「报损·遗失」登记"
             )
         old = copy.status
         copy.status = new_status
@@ -435,6 +473,55 @@ class BookService:
             "copy.status",
             str(copy.id),
             {"old": old, "new": new_status, "copy_code": copy.copy_code},
+            reason,
+        )
+        self.db.commit()
+        return copy
+
+    def report_copy_damage(self, admin, copy_id: int, *, kind: str, reason: str) -> BookCopy:
+        """报损·遗失（2026-10-12 拍板 P5）：书在家长手上出事时登记。
+
+        与"改状态"的区别：**不动在借记录**（孩子照常还书/结案），只把副本标成维护中/遗失
+        并生成一条**赔偿待办**给运营（赔偿按 PRD §3.6 从押金扣或记待结清）。
+        """
+        from backend.common.admin_notification_models import AdminNotification
+        from backend.common.admin_notifications import AdminNotifyService
+
+        if kind not in ("damage", "lost"):
+            raise ValidationError("报损类型不合法（damage=损坏 / lost=遗失）")
+        copy = self.copy_repo.get_by_id_or_raise(copy_id)
+        target = BookCopy.STATUS_LOST if kind == "lost" else BookCopy.STATUS_MAINTENANCE
+        if copy.status == target:
+            raise ValidationError("该副本已是此状态，无需重复登记")
+        active = self._active_borrow_of(copy_id)
+        old = copy.status
+        copy.status = target
+        self.copy_repo.update(copy)
+        book = self.db.query(Book).filter(Book.id == copy.book_id).first()
+        title = book.title if book else f"副本{copy.copy_code}"
+        child_name = "（未在借）"
+        if active is not None:
+            from backend.domain.identity.models import Child
+
+            c = self.db.query(Child).filter(Child.id == active.child_id).first()
+            child_name = c.name if c else child_name
+        AdminNotifyService(self.db).send(
+            scene=AdminNotification.SCENE_COPY_DAMAGE_COMPENSATION,
+            title="【图书报损·待赔偿】",
+            content=(
+                f"【图书报损·待赔偿】《{title}》（副本 {copy.copy_code}，借阅人 {child_name}）"
+                f"登记为{'遗失' if kind == 'lost' else '损坏'}：{reason}"
+                "——请按赔偿规则处理（押金扣除或记待结清）"
+            ),
+            ref_type=AdminNotification.REF_CHILD,
+            ref_id=str(active.child_id) if active is not None else str(copy.id),
+            applicant_name=child_name,
+        )
+        self._audit(
+            admin,
+            "copy.report_damage",
+            str(copy.id),
+            {"old": old, "new": target, "kind": kind, "copy_code": copy.copy_code},
             reason,
         )
         self.db.commit()

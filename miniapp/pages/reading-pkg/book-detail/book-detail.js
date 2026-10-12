@@ -252,8 +252,9 @@ Page({
           confirmText: guide.btn,
           showCancel: false,
           success: () => {
-            // TODO（FEAT 会员购买动线）：购买/续费界面上线后替换为跳购买页
-            wx.navigateTo({ url: '/pages/member/member' })
+            // 2026-10-12 拍板（P12）：原跳 `/pages/member/member` 是 **tabBar 页**，
+            // `wx.navigateTo` 对 tabBar 页必然失败（点了什么都不发生）；购买页早已存在。
+            wx.navigateTo({ url: `/pages/member-pkg/purchase/purchase?child_id=${this.data.childId}` })
           },
         })
         return

@@ -24,6 +24,7 @@ from backend.domain.catalog.schemas import (
     BookListResponse,
     BookResponse,
     BookUpdateRequest,
+    CopyDamageRequest,
     CopyResponse,
     CopyStatusUpdateRequest,
     ImportResultResponse,
@@ -393,6 +394,19 @@ def serve_upload(path: str, admin: Any = Depends(require_perm("book.manage"))):
 
         raise NotFoundError("文件不存在")
     return FileResponse(full)
+
+
+@router.post("/copies/{copy_id}/report-damage")
+def report_copy_damage(
+    copy_id: int,
+    body: CopyDamageRequest,
+    admin: Any = Depends(require_perm("book.manage")),
+    db: Session = Depends(get_db),
+):
+    """报损·遗失（2026-10-12 拍板 P5）：不动在借记录，标状态 + 生成赔偿待办。"""
+    from backend.domain.catalog.service import BookService
+
+    return BookService(db).report_copy_damage(admin, copy_id, kind=body.kind, reason=body.reason)
 
 
 # ---------- 测验题目 ----------

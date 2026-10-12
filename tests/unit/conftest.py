@@ -71,6 +71,42 @@ ADMIN_TABLES = [
 ]
 
 
+def _force_books_on_shelf() -> None:
+    """把当前库里所有书目置为上架态（仅测试环境；见 clean_db 注释）。"""
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE books SET status = 1 WHERE is_deleted = 0"))
+
+
+#: 这些模块考的就是"新建书目默认下架 + 上架完整性五检"——不能被"建书即上架"基建覆盖
+_OFF_SHELF_CONTRACT_MODULES = ("test_wm2_catalog", "test_wm2_d1d3", "test_wm2_p2")
+
+
+@pytest.fixture(autouse=True)
+def books_on_shelf_by_default(monkeypatch, request):
+    """测试里**新建的书默认上架**（2026-10-12，P6 下架禁借落地后的测试基建口径）。
+
+    为什么不在建后统一 UPDATE：书是在用例执行**过程中**建的，建完立刻就要借。
+    这里包住 BookService.create——建完把 status 置为上架（需要测下架行为的用例自行 toggle）。
+    """
+    from backend.domain.catalog.models import Book
+    from backend.domain.catalog.service import BookService
+
+    orig = BookService.create_book
+
+    def _create_book(self, admin, payload):  # noqa: ANN001
+        book = orig(self, admin, payload)
+        book.status = Book.STATUS_ON
+        self.db.commit()
+        return book
+
+    module = getattr(request.node, "module", None)
+    if module is not None and module.__name__.split(".")[-1] in _OFF_SHELF_CONTRACT_MODULES:
+        yield  # D1 契约用例：保持"新建默认下架"，不改行为
+        return
+    monkeypatch.setattr(BookService, "create_book", _create_book)
+    yield
+
+
 @pytest.fixture(autouse=True)
 def clean_db():
     """每个测试独立数据：截断 admin 三表 → 重播种子 → 清配置缓存。"""
@@ -93,6 +129,9 @@ def clean_db():
     seed_configs()
     seed_dictionary()
     invalidate_config_cache()
+    # 2026-10-12（P6 下架禁借落地后）：测试里**新建的书默认上架**——否则所有"建书即借"的
+    # 历史用例都会撞上"已下架，不能借出"。需要测下架行为的用例自行 toggle 即可。
+    _force_books_on_shelf()
     yield
 
 

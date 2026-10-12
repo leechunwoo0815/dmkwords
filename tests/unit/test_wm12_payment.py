@@ -471,11 +471,20 @@ def _prod_settings(**overrides):
         WECHAT_APP_SECRET="sec",
         LOGIN_DEV_CODE="",
         CORS_ORIGINS="https://admin.example.com",
-        SMS_ENABLED=False,
+        # 2026-10-12 拍板（P1）：生产必须启用短信通道；本文件不考短信，给一组合规基座
+        SMS_ENABLED=True,
+        SMS_PROVIDER="aliyun",
+        SMS_APP_ID="app",
+        SMS_APP_KEY="key",
+        SMS_SIGN_NAME="sign",
         PAYMENT_ENABLED=True,
         PAYMENT_PROVIDER="mock",
     )
     base.update(overrides)
+    # 本机（dev）未装短信 SDK：校验里"SDK 可导入"一项用桩放行（另有专门用例考它）
+    from backend import config as _cfg
+
+    _cfg.sms_sdk_available = lambda provider: True  # type: ignore[assignment]
     return Settings(**base)
 
 

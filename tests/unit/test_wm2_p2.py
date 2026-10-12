@@ -235,6 +235,9 @@ def test_c2_borrow_reserved_copy_chinese_error(client: TestClient):
     """reserved 副本按副本ID借书 → 409 detail 含「预约锁定」，不含英文 "reserved"。"""
     h = _h(client)
     c, book = _member_with_book(client, h)
+    from tests.unit.helpers import ensure_book_on
+
+    ensure_book_on(client, h, book["id"])  # 本模块锁定"新建默认下架"契约 → 借阅用例自行上架
     copies = client.get(f"/api/admin/books/{book['id']}/copies", headers=h).json()
     r = client.put(
         f"/api/admin/copies/{copies[0]['id']}/status",

@@ -457,6 +457,10 @@ class AdminTodoService:
                 AdminNotification.SCENE_TRANSFER_APPLY: "transfer_pending",
                 AdminNotification.SCENE_TRANSFER_EXPIRING: "transfer_expiring",
                 AdminNotification.SCENE_ACTIVITY_BATCH_REFUND: "activity_batch_refund",
+                # 2026-10-12：三类新待办（活动订单作废 / 副本报损赔偿 / 资金异常）
+                AdminNotification.SCENE_ACTIVITY_ORDER_VOIDED: "activity_orders_voided",
+                AdminNotification.SCENE_COPY_DAMAGE_COMPENSATION: "copy_damage_pending",
+                AdminNotification.SCENE_PAYMENT_ANOMALY: "payment_anomaly",
             }
             for n in all_rows:
                 if resolved[n.id]["effective_status"] != ST_PENDING:

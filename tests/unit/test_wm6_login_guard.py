@@ -71,8 +71,9 @@ def test_validate_production_passes_when_empty(monkeypatch):
     """置空 + 其余生产项合规 → 不因验证码通道报错（fail-closed 不误伤合规部署）。
 
     2026-10-08 扩了两条生产校验（上线前审查 P2-1/P0-1 整改），"合规"的定义随之变宽：
-    ① CORS_ORIGINS 不得含 localhost；② 短信通道要么接真实网关、要么显式关掉。
-    同日 WM12-A 再加支付四件套校验：本用例走"不用短信、也不开线上支付"的最小合规组合。
+    ① CORS_ORIGINS 不得含 localhost；② 短信通道必须接真实网关**且启用**
+    （2026-10-12 拍板 P1：关闭短信=拒绝启动——原口径"显式关掉也算合规"已废）。
+    同日 WM12-A 再加支付四件套校验：本用例走"短信合规、不开线上支付"的最小组合。
     """
     from backend.config import get_settings
 
@@ -83,7 +84,13 @@ def test_validate_production_passes_when_empty(monkeypatch):
     monkeypatch.setenv("WECHAT_APP_ID", "wx")
     monkeypatch.setenv("WECHAT_APP_SECRET", "sec")
     monkeypatch.setenv("CORS_ORIGINS", "https://admin.example.com")
-    monkeypatch.setenv("SMS_ENABLED", "false")
+    # 2026-10-12 拍板（P1）：生产**必须启用短信通道**（关闭=拒启），且 SDK 可导入才算合规
+    monkeypatch.setenv("SMS_ENABLED", "true")
+    monkeypatch.setenv("SMS_PROVIDER", "aliyun")
+    monkeypatch.setenv("SMS_APP_ID", "app")
+    monkeypatch.setenv("SMS_APP_KEY", "key")
+    monkeypatch.setenv("SMS_SIGN_NAME", "sign")
+    monkeypatch.setattr("backend.config.sms_sdk_available", lambda provider: True)
     monkeypatch.setenv("PAYMENT_ENABLED", "false")
     get_settings.cache_clear()
     s = get_settings()

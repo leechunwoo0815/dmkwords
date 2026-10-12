@@ -171,6 +171,9 @@ class CirculationService:
         book = self.db.query(Book).filter(Book.isbn == isbn, Book.is_deleted == 0).first()
         if not book:
             raise NotFoundError(f"ISBN {isbn} 未入库")
+        # 2026-10-12 拍板（P6）：下架 = 禁借（PRD §4.4 既有口径，代码此前只做了隐藏与停音频）
+        if book.status != Book.STATUS_ON:
+            raise ValidationError(f"《{book.title}》已下架，不能借出")
         copy = (
             self.db.query(BookCopy)
             .filter(
@@ -241,6 +244,9 @@ class CirculationService:
             if not copy:
                 raise NotFoundError("副本不存在")
             book = self.db.query(Book).filter(Book.id == copy.book_id).first()
+            # 2026-10-12 拍板（P6）：按副本借也要判书目状态（软删/下架都禁借）
+            if book is None or book.is_deleted or book.status != Book.STATUS_ON:
+                raise ValidationError("该书目已下架或已删除，不能借出")
         elif isbn:
             book, copy = self.find_copy_by_isbn(isbn)
             if not copy:

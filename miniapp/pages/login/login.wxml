@@ -11,7 +11,7 @@
       <button class="wechat-login-btn" bindtap="onWechatLogin" disabled="{{submitting}}">
         {{submitting ? '登录中…' : '微信一键登录'}}
       </button>
-      <view class="alt-row">
+      <view class="alt-row" wx:if="{{smsEnabled}}">
         <text class="alt-link" bindtap="switchToSms">用手机号验证码登录</text>
       </view>
     </block>

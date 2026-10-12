@@ -243,7 +243,8 @@ class ActivityService:
             )
             .all()
         )
-        refund_cnt = cancel_cnt = 0
+        refund_cnt = cancel_cnt = voided_orders = 0
+        from backend.domain.identity.models import Order  # P4：函数级 import（避免局部名未绑定）
         refund_amounts: list[Decimal] = []
         from backend.domain.identity.wm10_service import RefundService
 
@@ -253,6 +254,27 @@ class ActivityService:
                 e.status = ActivityEnrollment.STATUS_CANCELLED
                 e.cancel_reason = "活动取消"
                 cancel_cnt += 1
+                # 2026-10-12 拍板（P4）：**关联订单一并作废**。原先只翻报名状态，订单还挂在
+                # "待确认收款/待支付"里——收银台 48 小时内点确认照样能把钱收进来（活动没了、
+                # 名额没了、无退款单、无提醒）。条件 UPDATE：只作废"未收款"的单，已收款的不动。
+                if e.order_id:
+                    voided = (
+                        self.db.query(Order)
+                        .filter(
+                            Order.id == e.order_id,
+                            Order.status.in_(
+                                [Order.STATUS_PENDING_PAYMENT, Order.STATUS_PENDING_MANUAL]
+                            ),
+                            Order.paid_at.is_(None),
+                        )
+                        .update(
+                            {Order.status: Order.STATUS_CANCELLED},
+                            synchronize_session=False,
+                        )
+                    )
+                    if voided:
+                        voided_orders += 1
+                        self.db.expire_all()
             elif e.status == ActivityEnrollment.STATUS_ENROLLED:
                 if e.order_id:
                     # T16/B-9：付费报名 → 退款待审 + 统一台账 RefundRequest
@@ -316,17 +338,42 @@ class ActivityService:
                 applicant_name=a.title,
                 amount=sum(refund_amounts) if refund_amounts else None,
             )
+        # P4：作废订单要给馆员一条待办（"活动没了，这些单别再收钱"）
+        if voided_orders:
+            from backend.common.admin_notification_models import AdminNotification
+            from backend.common.admin_notifications import AdminNotifyService
+
+            AdminNotifyService(self.db).send(
+                scene=AdminNotification.SCENE_ACTIVITY_ORDER_VOIDED,
+                title="【活动订单作废】",
+                content=(
+                    f"【活动订单作废】《{a.title}》已取消，{voided_orders} 笔未收款订单已同步作废"
+                    "（收银台不要再收这几笔）"
+                ),
+                ref_type=AdminNotification.REF_ACTIVITY,
+                ref_id=str(activity_id),
+                applicant_name=a.title,
+            )
         publish_audit(
             self.db,
             admin=admin,
             action="activity.cancel",
             target_type="activity",
             target_id=str(activity_id),
-            detail={"refund_pending": refund_cnt, "cancelled": cancel_cnt},
+            detail={
+                "refund_pending": refund_cnt,
+                "cancelled": cancel_cnt,
+                "orders_voided": voided_orders,
+            },
             reason="门店取消活动",
         )
         self.db.commit()
-        return {"activity_id": activity_id, "refund_pending": refund_cnt, "cancelled": cancel_cnt}
+        return {
+            "activity_id": activity_id,
+            "refund_pending": refund_cnt,
+            "cancelled": cancel_cnt,
+            "orders_voided": voided_orders,
+        }
 
     def list_enrollments(self, activity_id: int) -> list[dict]:
         self._get(activity_id)

@@ -23,7 +23,8 @@ class ResetAttemptsRequest(BaseSchema):
 
 
 class AdjustPointsRequest(BaseSchema):
-    points: int = Field(..., description="调整积分（正数加）")
+    # 2026-10-12 审查 P2（T11）：积分列是 INT，入参原先无边界 → 溢出 500
+    points: int = Field(..., ge=-1_000_000, le=1_000_000, description="调整积分（正数加）")
     reason: str = Field(..., min_length=2, max_length=200, description="调整原因（必填留痕）")
 
 

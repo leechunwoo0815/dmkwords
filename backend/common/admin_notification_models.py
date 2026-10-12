@@ -45,6 +45,10 @@ class AdminNotification(BaseModel):
     # R-313：未入会临时借书（馆员放行）→ 生成「入会跟进任务」。
     # 2026-09-12 全维度审查发现该规则此前**未实现**（全仓无任何落点，BDD 场景又挂在 @draft 永不跑）。
     SCENE_MEMBER_FOLLOW_UP = "admin.member_follow_up"
+    # 2026-10-12 拍板（P4/P5/P10）：活动取消后的订单作废、副本报损赔偿、资金异常
+    SCENE_ACTIVITY_ORDER_VOIDED = "admin.activity_order_voided"
+    SCENE_COPY_DAMAGE_COMPENSATION = "admin.copy_damage_compensation"
+    SCENE_PAYMENT_ANOMALY = "admin.payment_anomaly"
 
     # ref_type 取值
     REF_REFUND_REQUEST = "refund_request"

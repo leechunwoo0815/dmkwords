@@ -156,6 +156,8 @@ class Order(BaseModel):
     REFUND_STATUS_PROCESSING = "processing"
     REFUND_STATUS_REFUNDED = "refunded"
     REFUND_STATUS_FAILED = "failed"
+    # 2026-10-12 拍板（P7）：权益转让完成后，转出方那笔年费**已随转让处置**——不再受理单独退款
+    REFUND_STATUS_TRANSFERRED = "transferred"
 
     ALLOWED_TRANSITIONS = {
         STATUS_PENDING_PAYMENT: {STATUS_PAID, STATUS_CANCELLED},
@@ -360,4 +362,7 @@ class SmsCode(BaseModel):
     expires_at = Column(DateTime, nullable=False, comment="过期时间")
     used_at = Column(DateTime, nullable=True, comment="使用时间（一次性）")
     attempts = Column(Integer, nullable=False, default=0, comment="校验失败次数（防爆破）")
+    request_ip = Column(
+        String(45), nullable=True, index=True, comment="请求来源 IP（2026-10-12：单 IP 日上限防刷）"
+    )
     created_at = Column(DateTime, nullable=False, default=datetime.now, comment="发送时间")

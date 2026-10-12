@@ -381,6 +381,24 @@ class OrderService:
             raise NotFoundError("凭证不存在")
         return order.voucher_path
 
+    def _assert_child_collectable(self, order: Order) -> None:
+        """2026-10-12 拍板（P9）：**冻结期（退会/转让审核中）禁止一切收款**。
+
+        冻结前已存在的订单（待确认收款/待支付/押金补缴）此前仍能被收钱——最后钱会走退会结算
+        退掉，但中间出现"会员被重新开通、押金被缴进来、退会单还挂着"的自相矛盾账。
+        确有欠款要先收的，先撤销退会申请。
+        """
+        if not order.child_id:
+            return
+        from backend.domain.identity.models import Child
+
+        child = self.db.query(Child).filter(Child.id == order.child_id).first()
+        if child is not None and child.operation_locked:
+            raise ValidationError(
+                "该孩子正在退会/权益转让审核流程中，冻结期间不能收款——"
+                "如确需先收欠款，请先撤销退会申请"
+            )
+
     def confirm_payment(self, admin, order_id: int, req) -> Order:
         """人工收款确认 → paid → 联动会员开通。"""
         order = (
@@ -394,6 +412,7 @@ class OrderService:
             raise NotFoundError("订单不存在")
         if not order.can_transition(Order.STATUS_PAID):
             raise ValidationError(f"订单状态 {order.status} 不可确认收款")
+        self._assert_child_collectable(order)  # P9：冻结期禁收款
 
         if order.order_type == Order.TYPE_FIRST_ACTIVITY:
             self.assert_first_activity_eligible(order)

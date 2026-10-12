@@ -108,6 +108,14 @@ def resolve_online_source(
             deposit_orders = deposit_paid_orders(db, [req.child_id]).get(req.child_id, [])
         if len(deposit_orders) == 1:
             order = deposit_orders[0]
+            # 2026-10-12 拍板（P8）：**该笔线上交易金额必须覆盖本次退款**，否则微信必然拒绝
+            # （混合押金：现金 1200 + 线上补缴 200，却要退 1200）。原先只看"是不是一笔"，
+            # 结果反复提交必然失败的越界退款；现在第一次就说清"需人工线下退款"。
+            if Decimal(str(order.amount)) < Decimal(str(req.amount)):
+                return None, (
+                    f"该笔线上交易金额 ￥{order.amount} 小于应退 ￥{req.amount}"
+                    "（押金为线下+线上混合构成）——不能自动原路退，请人工线下退款"
+                )
         elif len(deposit_orders) > 1:
             note = (
                 f"押金由 {len(deposit_orders)} 笔线上支付构成，未自动原路退（请线下打款或分笔退）"

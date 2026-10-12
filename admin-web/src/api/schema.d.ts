@@ -1053,6 +1053,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/copies/{copy_id}/report-damage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report Copy Damage
+         * @description 报损·遗失（2026-10-12 拍板 P5）：不动在借记录，标状态 + 生成赔偿待办。
+         */
+        post: operations["report_copy_damage_api_admin_copies__copy_id__report_damage_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/copies/{copy_id}/status": {
         parameters: {
             query?: never;
@@ -3012,6 +3032,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/miniapp/login/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Login Options
+         * @description 登录方式开关（公开端点，2026-10-12 拍板 P1）。
+         *
+         *     小程序按 `sms_enabled` 决定是否显示"手机号验证码登录"入口——**不允许出现
+         *     "页面能点、验证码永远收不到"的假入口**。只暴露布尔开关，不含任何凭据。
+         */
+        get: operations["login_options_api_miniapp_login_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/miniapp/login/wechat": {
         parameters: {
             query?: never;
@@ -4363,6 +4406,19 @@ export interface components {
             child_id: number;
             /** Ref Id */
             ref_id: number;
+        };
+        /**
+         * CopyDamageRequest
+         * @description 报损·遗失请求（2026-10-12 拍板 P5）。
+         */
+        CopyDamageRequest: {
+            /**
+             * Kind
+             * @description damage=损坏 / lost=遗失
+             */
+            kind: string;
+            /** Reason */
+            reason: string;
         };
         /** CopyResponse */
         CopyResponse: {
@@ -7835,6 +7891,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SystemConfigResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_copy_damage_api_admin_copies__copy_id__report_damage_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                copy_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CopyDamageRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -11425,6 +11516,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_options_api_miniapp_login_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

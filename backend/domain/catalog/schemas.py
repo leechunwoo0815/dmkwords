@@ -30,7 +30,8 @@ class BookCreateRequest(BaseSchema):
     title: str = Field(..., min_length=1, max_length=200)
     author: str = Field("", max_length=100)
     # P2-12：word_count 是 WM7 词数入账依据，0 词书目无业务意义（用户 2026-08-28 裁定 min 1）
-    word_count: int = Field(..., ge=1)
+    # 2026-10-12 审查 P2（T11）：books.word_count 是 INT，原先只有下界 → 溢出 500（应为 422）
+    word_count: int = Field(..., ge=1, le=100_000_000)
     ar_level: str | None = Field(None, max_length=10)
     topic: str = Field("", max_length=50)
     grade: str = Field("", max_length=50)
@@ -47,7 +48,8 @@ class BookUpdateRequest(BaseSchema):
     isbn: str | None = Field(None, max_length=20, description="ISBN；可后补或修改")
     title: str = Field(..., min_length=1, max_length=200)
     author: str = Field("", max_length=100)
-    word_count: int = Field(..., ge=1)
+    # 2026-10-12 审查 P2（T11）：books.word_count 是 INT，原先只有下界 → 溢出 500（应为 422）
+    word_count: int = Field(..., ge=1, le=100_000_000)
     ar_level: str | None = Field(None, max_length=10)
     topic: str = Field("", max_length=50)
     grade: str = Field("", max_length=50)
@@ -139,6 +141,13 @@ class QuizQuestionResponse(BaseSchema):
 
             return _json.loads(v)
         return v
+
+
+class CopyDamageRequest(BaseSchema):
+    """报损·遗失请求（2026-10-12 拍板 P5）。"""
+
+    kind: str = Field(..., description="damage=损坏 / lost=遗失")
+    reason: str = Field(..., min_length=2, max_length=200)
 
 
 class BatchDeleteRequest(BaseSchema):

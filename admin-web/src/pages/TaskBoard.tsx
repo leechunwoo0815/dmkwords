@@ -43,9 +43,30 @@ function statusTag(status: string): React.ReactNode {
   }
 }
 
-function lastRunCell(last: TaskSpecItem["last_run"] | undefined): React.ReactNode {
+function lastRunCell(
+  last: TaskSpecItem["last_run"] | undefined,
+  consecutiveFailures?: number,
+): React.ReactNode {
   if (!last) {
     return <span style={{ color: "rgba(0,0,0,0.45)" }}>从未运行</span>;
+  }
+  // 2026-10-12 拍板（P10）：连续失败 ≥2 标红——"最后一次碰巧成功"不再把连续失败洗白
+  if ((consecutiveFailures ?? 0) >= 2) {
+    return (
+      <Popover
+        content={
+          <div style={{ maxWidth: 320, whiteSpace: "pre-wrap" }}>
+            {`连续失败 ${consecutiveFailures} 次（最近一次：${last.status}）
+${last.error ?? ""}`}
+          </div>
+        }
+        trigger="hover"
+      >
+        <span style={{ color: "#cf1322", fontWeight: 600, cursor: "help" }}>
+          <Tag color="red">连续失败 {consecutiveFailures} 次</Tag> {last.started_at}
+        </span>
+      </Popover>
+    );
   }
   const node = (
     <span>
@@ -156,7 +177,8 @@ export default function TaskBoard() {
               title: "上次运行",
               dataIndex: "last_run",
               width: 200,
-              render: (last: TaskSpecItem["last_run"] | undefined) => lastRunCell(last),
+              render: (last: TaskSpecItem["last_run"] | undefined, row: TaskSpecItem) =>
+                lastRunCell(last, row.consecutive_failures),
             },
             {
               title: "操作",

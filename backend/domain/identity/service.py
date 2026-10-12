@@ -179,6 +179,13 @@ class ParentService:
             parent.name = req.name
             changed.append("name")
         if req.phone is not None and req.phone != parent.phone:
+            # 2026-10-12 拍板（P3）：手机号是登录账号，**改号 = 档案换手** → 旧登录一律立刻失效。
+            # 不撤的话旧号持有人最长 30 天还能看这个家庭的孩子/会员码/订单/评估报告（实测路径）。
+            # 家长重新登录一次的成本远低于泄露代价。
+            from backend.domain.identity.service import revoke_parent_tokens
+
+            revoke_parent_tokens(self.db, parent)
+            parent.phone = req.phone
             dup = (
                 self.db.query(func.count(Parent.id))
                 .filter(Parent.phone == req.phone, Parent.is_deleted == 0, Parent.id != parent_id)

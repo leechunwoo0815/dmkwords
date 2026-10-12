@@ -48,7 +48,8 @@ class ActivityCreateRequest(BaseSchema):
     location: str = Field("", max_length=200)
     max_quota: int = Field(..., gt=0, le=1000)
     # B-8/T15：金额严禁 float（宪法红线），Decimal 落 Numeric(10,2)
-    fee: Decimal = Field(Decimal("0"), ge=0)
+    # 2026-10-12 审查 P2（T11）：列是 Numeric(10,2)，入参原先无上界 → 溢出 500（应为 422）
+    fee: Decimal = Field(Decimal("0"), ge=0, max_digits=10, decimal_places=2)
     description: str | None = Field(None, max_length=2000)
     member_only: bool = False
     enroll_deadline: datetime | None = None
