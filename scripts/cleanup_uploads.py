@@ -28,6 +28,13 @@
     python scripts/cleanup_uploads.py                # 只打印计划（默认）
     python scripts/cleanup_uploads.py --trash DIR    # 移到 DIR（保留相对结构，可回滚）★推荐
     python scripts/cleanup_uploads.py --apply        # 直接删除（不可恢复）
+
+⚠️ 回收站布局是**两段式**：`<uploads>/.trash/<批次>/<原相对路径>`（`media_service.trash_files_on_disk`
+   按"第一段=批次、其余=原路径"解析）。所以 `--trash` 指向回收站根（basename = `.trash`）时，
+   本脚本会**自动建一个批次目录**（`%Y%m%d-%H%M%S`）再往里放；指向别的目录则把它当批次目录直接用。
+   2026-10-11 实测踩到：按 `<uploads>/.trash` 直接铺开（少一层批次）会被解析成
+   批次=`cover` / 原路径=`9780/x.jpg`——面板"还原"就会把文件搬到 `uploads/9780/x.jpg`（错位）。
+   搬完可跑一次媒体体检的"回收站对账"（每日盘点任务也调）把无账文件补进账内，之后即可在面板还原/清空。
 """
 
 from __future__ import annotations
@@ -36,6 +43,7 @@ import argparse
 import os
 import shutil
 from collections import defaultdict
+from datetime import datetime
 
 from backend.common.media_paths import (
     PROTECTED_PREFIXES,  # noqa: F401 — 下面文档字符串与保护判定共用同一份名单
@@ -44,6 +52,7 @@ from backend.common.media_paths import (
     TRASH_DIRNAME,
     is_protected,
 )
+from backend.config import get_settings
 from backend.database import SessionLocal
 
 # 引用口径**单一来源**（2026-09-23，红线 51）：此前本脚本自己写了一份 `collect_referenced`，
@@ -70,11 +79,20 @@ def main() -> int:
     ap.add_argument("--trash", metavar="DIR", help="改为移动到 DIR（保留相对路径，可回滚）")
     args = ap.parse_args()
 
-    root = os.path.abspath("uploads")
+    # 与 media_service._root() 同源（原先写死 CWD/uploads，测试与多环境都不好使）
+    root = os.path.abspath(get_settings().UPLOADS_DIR)
     if not os.path.isdir(root):
         print(f"uploads 目录不存在: {root}")
         return 1
-    mode = "删除" if args.apply else (f"移到 {args.trash}" if args.trash else "仅打印计划")
+
+    trash = ""
+    if args.trash:
+        trash = os.path.abspath(args.trash)
+        if os.path.basename(trash.rstrip(os.sep)) == TRASH_DIRNAME:
+            # 指向回收站根 → 自动建批次目录（两段式布局：<批次>/<原相对路径>）
+            trash = os.path.join(trash, datetime.now().strftime("%Y%m%d-%H%M%S"))
+            print(f"回收站批次目录: {trash}")
+    mode = "删除" if args.apply else (f"移到 {trash}" if trash else "仅打印计划")
 
     referenced, missing = collect_referenced(root)
     print(f"uploads 根: {root}")
@@ -114,8 +132,8 @@ def main() -> int:
             stat[bucket][1] += size
             if args.apply:
                 os.remove(full)
-            elif args.trash:
-                dest = os.path.join(args.trash, rel)
+            elif trash:
+                dest = os.path.join(trash, rel)
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
                 shutil.move(full, dest)
 
@@ -129,7 +147,7 @@ def main() -> int:
     print(f"  {'合计':<12} {total_files:>5} 个   {total_bytes / 1048576:>8.1f} MB")
     print(f"保护名单跳过: {protected_hits} 个（证据/人工上传类，永不自动清理）")
 
-    if args.apply or args.trash:
+    if args.apply or trash:
         removed_dirs = 0
         for dirpath, dirnames, filenames in os.walk(root, topdown=False):
             if dirnames or filenames or dirpath == root:
@@ -140,7 +158,7 @@ def main() -> int:
                 removed_dirs += 1
         print(f"清理空目录: {removed_dirs} 个")
 
-    if not (args.apply or args.trash):
+    if not (args.apply or trash):
         print("\n（未做任何改动；加 --trash DIR 或 --apply 才执行）")
     return 0
 
