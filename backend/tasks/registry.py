@@ -189,10 +189,17 @@ def _payment_reconcile(db: Session) -> int:
     返回值 = **差异笔数**（任务看板上那个数：0 才该是绿色的）。
     本地一致性审计必跑；微信账单比对只在真通道下跑（mock/未开启 → 记 skipped，不算失败）。
     """
+    from datetime import date, timedelta
+
     from backend.domain.identity.payment_models import PaymentReconciliation
     from backend.domain.identity.payment_reconcile_service import PaymentReconcileService
 
+    # 2026-10-12 审查 P1：**必须取昨日账单**。微信对账单 T+1 生成，本任务 03:30 跑，
+    # 原先不传 bill_date（服务里 `day = bill_date or date.today()`）→ 永远 NO_BILL_EXIST →
+    # 微信侧比对长期 skipped（面板灰色"已跳过"≈"没问题"），**微信单边差异（微信收了钱、
+    # 本地无记录；本地记已退款、微信未出款）从来没人发现**。
     result = PaymentReconcileService(db).run(
+        bill_date=date.today() - timedelta(days=1),
         trigger=PaymentReconciliation.TRIGGER_SCHEDULED,
     )
     return int(result["diff_total"])

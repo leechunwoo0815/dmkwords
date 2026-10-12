@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -14,6 +15,7 @@ from backend.common.admin_notification_models import AdminNotification
 from backend.common.config_service import ConfigService
 from backend.common.events import BookBorrowedEvent, BookReturnedEvent, event_bus
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
+from backend.common.gateways.payment.types import yuan_to_cents
 from backend.common.notification_models import Notification
 from backend.common.notifications import (
     SCENE_BORROW_DUE_REMIND,
@@ -108,10 +110,15 @@ class CirculationService:
         )
         _gate_d = deposit_gate(
             deposit_status=dep.status if dep else None,
-            deposit_unpaid_balance=int(dep.unpaid_balance or 0) if dep else 0,
+            # 2026-10-12 审查 P2：原先 int(Decimal) 截断——0.50 元的未结清尾巴被当成 0（骗过闸门）；
+            # 统一按**分**比较（与支付网关同单位）
+            deposit_unpaid_balance=yuan_to_cents(dep.unpaid_balance or Decimal("0")) if dep else 0,
             override_reason=None,
             unpaid_status=Deposit.STATUS_UNPAID,
             fully_deducted_status=Deposit.STATUS_FULLY_DEDUCTED,
+            # 2026-10-12 审查 P1：白名单判据（refunded/refunding 不再放行；部分扣除仍有余额 → 放行）
+            paid_status=Deposit.STATUS_PAID,
+            partially_deducted_status=Deposit.STATUS_PARTIALLY_DEDUCTED,
         )
         _hit = first_block(_gate_m, _gate_d)
         _block = (_hit.reason, _hit.kind == HARD) if _hit else None
@@ -290,10 +297,15 @@ class CirculationService:
         # 押金段判定：同样走单一来源（B-12/T12 口径：未缴/扣光/未结清赔偿款同险，可人工放行）
         gate_d = deposit_gate(
             deposit_status=dep.status if dep else None,
-            deposit_unpaid_balance=int(dep.unpaid_balance or 0) if dep else 0,
+            # 2026-10-12 审查 P2：原先 int(Decimal) 截断——0.50 元的未结清尾巴被当成 0（骗过闸门）；
+            # 统一按**分**比较（与支付网关同单位）
+            deposit_unpaid_balance=yuan_to_cents(dep.unpaid_balance or Decimal("0")) if dep else 0,
             override_reason=override_reason,
             unpaid_status=Deposit.STATUS_UNPAID,
             fully_deducted_status=Deposit.STATUS_FULLY_DEDUCTED,
+            # 2026-10-12 审查 P1：白名单判据（refunded/refunding 不再放行；部分扣除仍有余额 → 放行）
+            paid_status=Deposit.STATUS_PAID,
+            partially_deducted_status=Deposit.STATUS_PARTIALLY_DEDUCTED,
         )
         if gate_d.code and not (gate_d.kind == OVERRIDABLE and override_reason):
             raise ValidationError(gate_d.reason)

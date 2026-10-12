@@ -60,6 +60,8 @@ Page({
 
   async onSupplement() {
     if (this.data.supplementDisabled) return
+    // 2026-10-12 审查 P1：补缴原先**完全没有** in-flight 锁 → 双击建出两笔同额补缴单。
+    this.setData({ supplementDisabled: true })
     try {
       const r = await api.createSupplementOrder(this._childId)
       wx.showModal({
@@ -68,6 +70,8 @@ Page({
         showCancel: false,
       })
       this.load()
-    } catch (e) { /* request.js 已 toast */ }
+    } catch (e) { /* request.js 已 toast */ } finally {
+      this.setData({ supplementDisabled: false })
+    }
   },
 })

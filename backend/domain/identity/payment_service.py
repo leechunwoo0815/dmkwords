@@ -168,6 +168,22 @@ class PaymentService:
             raise ValidationError("该订单类型不支持在线支付，请到店办理")
         if child.operation_locked:
             raise ValidationError("孩子正在转让/退会审核流程中，不能创建新订单")
+        if order_type in (Order.TYPE_DEPOSIT, Order.TYPE_DEPOSIT_SUPPLEMENT):
+            # 2026-10-12 审查 P1：**建单侧**必须拦"押金已有账"的重复缴款。原先只在收款结算时拦
+            # （`billing.on_deposit_order_paid` 见 paid 才抛），而那时钱已进微信——实测：已缴押金
+            # 孩子建单 1200 → 回调走兜底 200 回滚 → **钱收了、订单停待支付、押金未变、审计无订单号**，
+            # 只能人工退款。押金是担保账户：宁可少收，不许错收。
+            from backend.domain.billing.models import Deposit
+
+            existing = (
+                self.db.query(Deposit)
+                .filter(Deposit.child_id == child.id, Deposit.is_deleted == 0)
+                .first()
+            )
+            if existing is not None and existing.status != Deposit.STATUS_UNPAID:
+                raise ValidationError(
+                    f"押金当前状态为 {existing.status}，无需重复缴纳（补缴请走押金补缴入口）"
+                )
         from backend.domain.identity.order_service import OrderService
 
         amount = OrderService(self.db).price_member_order(parent, child, order_type)

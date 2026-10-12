@@ -42,6 +42,54 @@ def assert_deposit_refund_executable(db: Session, req) -> None:
         )
 
 
+def assert_order_refund_executable(db: Session, req) -> None:
+    """订单退款执行前**累计**复核（2026-10-12 审查 P1；调用点：`RefundService.execute`）。
+
+    为什么必须有：`failed` 既不计入"进行中"（家长申请 / 退会结算的 dup 检查只看
+    pending/approved/processing），又**可被重试执行**——实测（订单 500）：RR#3 执行判失败 →
+    再申请 RR#4 放行 → RR#4 成功 → RR#3 重试成功 → **同一订单出款 1000**。
+    押金侧早有同款闸（`assert_deposit_refund_executable`），订单侧一直缺。
+
+    口径：本次金额 + 该订单**已成功/在途**的其它退款单合计 ≤ 订单金额，超出即拒（422，状态不流转）。
+    """
+    from sqlalchemy import func
+
+    from backend.domain.identity.models import Order, RefundRequest
+
+    order = (
+        db.query(Order)
+        .filter(Order.id == req.order_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    if order is None:
+        return
+    in_flight_or_paid = (
+        db.query(func.coalesce(func.sum(RefundRequest.amount), 0))
+        .filter(
+            RefundRequest.order_id == req.order_id,
+            RefundRequest.id != req.id,
+            RefundRequest.is_deleted == 0,
+            RefundRequest.status.in_(
+                [
+                    RefundRequest.STATUS_PENDING,
+                    RefundRequest.STATUS_APPROVED,
+                    RefundRequest.STATUS_PROCESSING,
+                    RefundRequest.STATUS_REFUNDED,
+                ]
+            ),
+        )
+        .scalar()
+    )
+    total = (in_flight_or_paid or 0) + req.amount
+    if total > order.amount:
+        raise ValidationError(
+            f"该订单退款将超额（订单 {order.amount}，已退/在途 {in_flight_or_paid}，"
+            f"本次 {req.amount}）——疑似重复退款单，请人工核对后再执行"
+        )
+
+
 def publish_deposit_overdraft(db: Session, *, admin, req, dep) -> None:
     """超额执行留痕（台账照实记负 + 异常审计）——正常路径已被执行前复核拦住。"""
     from backend.domain.catalog.audit_events import publish_audit

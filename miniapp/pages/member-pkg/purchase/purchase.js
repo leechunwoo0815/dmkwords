@@ -92,22 +92,28 @@ Page({
 
   // 下单 → 拉起支付（两步：先建单让服务端算价，再发起支付拿 pay_params）
   async onBuy(e) {
-    if (this.data.paying) return // WM12-C（审查 P2-10）：请求期间不接受重复点击
+    // 2026-10-12 审查 P1：建单阶段也要挡重复点击（`_creating` 与 `_payOrder` 的 `paying` 分开，
+    // 否则置位 paying 会让 _payOrder 直接 return 跳过支付）
+    if (this.data.paying || this._creating) return
     const orderType = e.currentTarget.dataset.type
     const plan = (this.data.plans || []).filter((p) => p.order_type === orderType)[0]
     if (!plan || !plan.available) {
       wx.showToast({ title: (plan && plan.reason) || '暂不可购买', icon: 'none' })
       return
     }
-    wx.showLoading({ title: '创建订单' })
+    // 建单请求在途时快速连点会建出两笔待支付订单（服务端建单无查重）；`mask:true` 挡住点击穿透。
+    this._creating = true
+    wx.showLoading({ title: '创建订单', mask: true })
     let order = null
     try {
       order = await api.createOnlineOrder(this.data.childId, orderType)
     } catch (e) {
       wx.hideLoading()
+      this._creating = false
       return // toast 已弹
     }
     wx.hideLoading()
+    this._creating = false
     await this._payOrder(order.id)
   },
 

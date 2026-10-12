@@ -37,8 +37,8 @@
     <view class="x-718442" wx:for="{{refunds}}" wx:key="id">
       <view class="x-510ea6">
         <text>￥{{item.amount}}</text>
-        <text style="color:{{item.status === 'approved' ? 'var(--success)' : item.status === 'rejected' ? 'var(--error)' : item.status === 'cancelled' ? 'var(--muted)' : 'var(--warning)'}};">
-          {{item.status === 'pending' ? '审核中' : item.status === 'approved' ? '已退款' : item.status === 'cancelled' ? '已撤销' : '已拒绝'}}
+        <text style="color:{{item.status === 'refunded' ? 'var(--success)' : item.status === 'rejected' || item.status === 'failed' ? 'var(--error)' : item.status === 'cancelled' ? 'var(--muted)' : 'var(--warning)'}};">
+          {{item.status === 'pending' ? '审核中' : item.status === 'approved' ? '审核已通过' : item.status === 'processing' ? '退款中' : item.status === 'refunded' ? '已退款' : item.status === 'failed' ? '退款失败' : item.status === 'cancelled' ? '已撤销' : '已拒绝'}}
         </text>
       </view>
       <view class="x-be6535" wx:if="{{item.review_remark}}">

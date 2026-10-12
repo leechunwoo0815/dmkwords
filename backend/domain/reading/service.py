@@ -106,6 +106,13 @@ class ReadingService:
                 ReadingProgress.book_id == book_id,
                 ReadingProgress.is_deleted == 0,
             )
+            # 2026-10-12 审查 P1：**必须锁行读**——本方法是"读快照 → 合并区间 → 整列覆盖写"，
+            # 无锁时并发心跳（双开播放器/心跳重试）各自基于同一陈旧快照写回，后到者会把先到者的
+            # 区间整段覆盖掉（确定性两会话演示：终态 `[[30,60]]`/coverage 30，期望并集 60）
+            # → 家长侧表现为"读完的书又没读完"；反向还会因陈旧 `old_cov` 把合法上报判成"播放数据异常"。
+            # `populate_existing()` 是项目锁定读的统一纪律（防旧快照）。
+            .with_for_update()
+            .populate_existing()
             .first()
         )
         if not progress:
@@ -127,6 +134,8 @@ class ReadingService:
                     ReadingProgress.book_id == book_id,
                     ReadingProgress.is_deleted == 0,
                 )
+                .with_for_update()  # 同上：拿到锁再读，后续合并/覆盖写才安全
+                .populate_existing()
                 .first()
             )
 
@@ -205,8 +214,15 @@ class ReadingService:
         )
         streak = (yesterday.streak + 1) if yesterday else 1
         # P1-8（2026-10-09 审查）：**原子插入**——原 check-then-insert 在并发完播下
-        # 6 线程落 6 行同日打卡（实测）。唯一索引 + ON DUPLICATE KEY 让并发只有一个赢家，
-        # 其余按"今日已打卡"返回（不重复发积分事件）。
+        # 6 线程落 6 行同日打卡（实测）。唯一索引 + ON DUPLICATE KEY 让并发只有一个赢家。
+        #
+        # 2026-10-12 审查 P1：**判据必须换**——原先靠 `result.rowcount != 1`（注释假设
+        # "1=插入成功，2=命中唯一键"）判定重复，但 SQLAlchemy 的 MySQL 方言硬编码
+        # `CLIENT_FOUND_ROWS`，"命中唯一键 + 空更新"的 affected-rows 由 0 变 1 →
+        # **实测（真跑）首次插入 1、重复插入也是 1**，判据恒不成立 → 并发第二个请求会
+        # 返回"打卡成功"并**二次发布 CheckInEvent**（周期日双发积分 + 唯一索引冲突 500）。
+        # 现在改用 `inserted_primary_key`（真插入才有值；空更新路径不带 AUTO_INCREMENT 值）
+        # 作为唯一判据，并保留 rowcount 兜底。
         from sqlalchemy.dialects.mysql import insert as mysql_insert
 
         result = self.db.execute(
@@ -220,7 +236,10 @@ class ReadingService:
             )
             .on_duplicate_key_update(id=CheckIn.id)  # 空更新：不覆盖既有 streak
         )
-        if result.rowcount != 1:  # MySQL：1=插入成功，2=命中唯一键走了空更新
+        inserted = bool(
+            getattr(result, "inserted_primary_key", None) and result.inserted_primary_key[0]
+        )
+        if not inserted:
             return {"checked_in": False, "reason": "今日已打卡"}
         self.db.flush()
         # 打卡事件 → growth 域发周期积分（同事务；无订阅者时为 no-op）

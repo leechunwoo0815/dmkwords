@@ -13,7 +13,6 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from decimal import Decimal
 
 from sqlalchemy import text
 
@@ -38,7 +37,6 @@ def test_empty_bearer_returns_401(client):
 
 def test_admin_login_runs_password_hash_for_unknown_user(client, monkeypatch):
     """未知用户名也必须跑一次 PBKDF2（等价耗时），否则可枚举账号。"""
-    from backend.domain import admin
     from backend.domain.admin import service as admin_service
 
     calls: list[str] = []
@@ -52,7 +50,6 @@ def test_admin_login_runs_password_hash_for_unknown_user(client, monkeypatch):
     r = client.post("/api/admin/login", json={"username": "__no_such_user__", "password": "x"})
     assert r.status_code == 401
     assert len(calls) == 1, "未知用户名路径必须仍做一次等价校验（防时序侧信道）"
-    assert admin is not None  # 保持 import 使用（ruff）
 
 
 # ---------- ③ 到期提醒补发窗口 ----------
@@ -159,4 +156,3 @@ def test_renew_limit_reads_config(client):
             text("SELECT renew_used, due_at FROM borrow_records WHERE id=:i"), {"i": rec_id}
         ).fetchone()
     assert row[0] == 2, "两次续借都应记账"
-    assert Decimal("0") < Decimal("1")  # 保持 Decimal 导入使用

@@ -370,6 +370,11 @@ class MediaHealthService:
         abs_path = os.path.abspath(os.path.join(root, rel))
         if not rel or not abs_path.startswith(root + os.sep):
             return "路径非法（不在 uploads 内）"
+        # 2026-10-12 审查 P1：闸门必须判**解析后**的相对路径——原先判 `rel`（未解析）而对解析后的
+        # `abs_path` 做 move/delete，`cover/../voucher/x.jpg` 能骗过"保护目录"闸（首段是 cover）。
+        resolved_rel = os.path.relpath(abs_path, root).replace(os.sep, "/")
+        if norm_rel(resolved_rel) != resolved_rel or resolved_rel != rel:
+            return "路径非法（含 .. 或未归一，疑似绕过保护目录）"
         if is_trash_path(rel):
             return "已在回收站目录内"
         if rel in referenced:

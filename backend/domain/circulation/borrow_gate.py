@@ -81,20 +81,26 @@ def deposit_gate(
     override_reason: str | None,
     unpaid_status: str,
     fully_deducted_status: str,
+    paid_status: str = "paid",
+    partially_deducted_status: str = "partially_deducted",
 ) -> GateResult:
-    """押金段（B-12/T12）：未缴/扣光/未结清赔偿款同险，可人工放行留痕。"""
-    if (
-        deposit_status is None
-        or deposit_status == unpaid_status
-        or deposit_status == fully_deducted_status
-        or deposit_unpaid_balance > 0
-    ):
+    """押金段（B-12/T12）：未缴/扣光/未结清赔偿款同险，可人工放行留痕。
+
+    2026-10-12 审查 P1：判据由"黑名单"改**白名单**——押金必须在账（`paid` 或
+    `partially_deducted`，后者只是扣过赔偿但仍有余额）且无未结清赔偿款才放行。
+    原黑名单只拦 `unpaid`/`fully_deducted`/未结清，于是 `refunded`（退会结算后的终态）与
+    `refunding`（在途退款）**被当成合格**：孩子退会后重新入会（WITHDRAWN→OBSERVATION 在允许
+    矩阵内）即可**零押金借书**——全仓没有任何把押金写回 `unpaid` 的复位路径，这个洞一直是开的。
+    """
+    if deposit_status not in (paid_status, partially_deducted_status) or deposit_unpaid_balance > 0:
         if deposit_status is None or deposit_status == unpaid_status:
             block_reason = "押金未缴纳"
         elif deposit_status == fully_deducted_status:
             block_reason = "押金已扣光"
-        else:
+        elif deposit_unpaid_balance > 0:
             block_reason = "有未结清赔偿款"
+        else:
+            block_reason = f"押金状态为 {deposit_status}（非已缴，需重新缴纳）"
         if not override_reason:
             return GateResult(
                 f"deposit_{block_reason}", f"{block_reason}（可人工放行并填写原因）", OVERRIDABLE

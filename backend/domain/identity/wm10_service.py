@@ -420,6 +420,14 @@ class RefundService:
             )
 
             assert_deposit_refund_executable(self.db, req)
+        elif req.kind == RefundRequest.KIND_ORDER and req.order_id:
+            # 2026-10-12 审查 P1：订单退款**累计**复核——失败单可重试 + 新单可再申请，
+            # 实测同一订单出款两次（押金侧早有同款闸）。细则见 deposit_refund_guards。
+            from backend.domain.identity.deposit_refund_guards import (
+                assert_order_refund_executable,
+            )
+
+            assert_order_refund_executable(self.db, req)
         if needs_check and not manual_override:
             from backend.domain.identity.wm10_withdrawal_service import outstanding_obligations
 

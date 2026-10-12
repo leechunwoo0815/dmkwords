@@ -163,5 +163,18 @@ if [ "$FAILED" -eq 0 ]; then
   exit 0
 else
   echo "===== 全量门禁 FAIL ====="
+  # 2026-10-12 审查 P2：**失败分支同样恢复现场**。pytest 步骤已 TRUNCATE 全部业务表，
+  # 而"门禁红"恰是最容易忘记恢复的时刻（此前只有 PASS 分支自动 restart，
+  # docs/19 记录过三次"库里空了没人发现"的事故）。恢复失败不影响退出码语义。
+  if curl -sf -m 2 http://localhost:8002/health > /dev/null 2>&1 || [ -d ".dev-logs" ]; then
+    echo "----- 门禁失败但仍是本地 dev 环境：自动恢复现场（dev.sh restart） -----"
+    if bash scripts/dev.sh restart > /dev/null 2>&1; then
+      echo "----- 现场已自动恢复 ✓（业务表已回填演示数据） -----"
+    else
+      echo "⚠ 自动恢复失败——请手动执行: bash scripts/dev.sh restart"
+    fi
+  else
+    echo "⚠ 业务表已被门禁清空——如需演示/目视请执行: bash scripts/dev.sh restart"
+  fi
   exit 1
 fi

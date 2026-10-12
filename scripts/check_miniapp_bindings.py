@@ -77,10 +77,12 @@ def written_names(js: str) -> set[str]:
 
 def main() -> int:
     problems: list[str] = []
+    scanned = 0
     for base in (PAGES, COMPONENTS):
         if not base.is_dir():
             continue
         for wxml in base.rglob("*.wxml"):
+            scanned += 1
             js = wxml.with_suffix(".js")
             if not js.is_file():
                 continue
@@ -93,12 +95,17 @@ def main() -> int:
             missing = [m for m in missing if m not in {"item", "index", "true", "false"}]
             if missing:
                 problems.append(f"{wxml.relative_to(ROOT)} 读了但 js 从未写入 data: {missing}")
+    # S2 空扫自检（2026-10-12 审查 P2）：扫到 0 个 wxml 时"全绿"是盲区形状——
+    # 目录改名/移动会让本检查器静默失效（兄弟检查器 check_miniapp_wiring 早有此护栏）。
+    if scanned < 10:
+        print(f"✗ 扫描面塌缩：只扫到 {scanned} 个 wxml（应 ≥10）——检查器自身失效，判 FAIL")
+        return 1
     if problems:
         print("✗ 小程序数据面断链：")
         for p in problems:
             print("  " + p)
         return 1
-    print("✓ 小程序数据面一致（wxml 读到的顶层变量都有 data 来源）")
+    print(f"✓ 小程序数据面一致（扫 {scanned} 个 wxml：读到的顶层变量都有 data 来源）")
     return 0
 
 

@@ -369,11 +369,22 @@ def serve_upload(path: str, admin: Any = Depends(require_perm("book.manage"))):
     管理员拿到路径即可读；现在走**目录白名单**：受保护目录各自有带归属校验的专用端点
     （凭证 `/api/admin/members/orders/{id}/voucher-image`、评估图 `/api/miniapp/observation-images/`）。
     """
-    from backend.common.media_paths import is_protected, is_trash_path
+    from backend.common.media_paths import is_protected, is_trash_path, norm_rel
 
     root = os.path.abspath(get_settings().UPLOADS_DIR)
     full = os.path.abspath(os.path.join(root, path))
-    if not is_within(root, full) or is_trash_path(path) or is_protected(path):
+    # 2026-10-12 审查 P1：判据必须用**解析后**的相对路径。原先判 `path`（未解析）而下发 `full`
+    # （已解析）——`cover/../voucher/x.jpg` 的首段是 `cover`（既不属回收站也不属保护目录）于是放行，
+    # 实际打开的却是 `voucher/x.jpg`。实测（`curl --path-as-is` 打真实 uvicorn）：正门 404、
+    # 绕过后 **200 拿到凭证图**（`%2e%2e` 变体同样可绕）。
+    resolved_rel = os.path.relpath(full, root).replace(os.sep, "/") if is_within(root, full) else ""
+    if (
+        not resolved_rel
+        or not is_within(root, full)
+        or norm_rel(resolved_rel) != resolved_rel  # 归一化后与原串不一致 = 含 `..`/反斜杠/前导斜杠
+        or is_trash_path(resolved_rel)
+        or is_protected(resolved_rel)
+    ):
         from backend.common.exceptions import NotFoundError
 
         raise NotFoundError("文件不存在")

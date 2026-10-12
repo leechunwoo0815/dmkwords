@@ -45,7 +45,9 @@ export interface ChildReadingProfile {
 export function apiListReservations(status?: string, keyword?: string): Promise<ReservationItem[]> {
   const params = new URLSearchParams();
   if (status) params.set("status", status);
-  if (keyword) params.set("keyword", encodeURIComponent(keyword));
+  // 2026-10-12 审查 P1：**不要预编码**——URLSearchParams.toString() 会再编码一次，
+  // 中文关键词会变成 `%25E5%25BC%25A0` 字面量传给后端 → 模糊匹配必然为空（搜索框形同失效）。
+  if (keyword) params.set("keyword", keyword);
   const qs = params.toString();
   return request(`/api/admin/reservations${qs ? `?${qs}` : ""}`);
 }
