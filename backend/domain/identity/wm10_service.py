@@ -417,21 +417,14 @@ class RefundService:
         manual_override = bool(
             needs_check and "人工放行:" in (remark or "") and admin.role == "superadmin"
         )
-        # P0-D（2026-10-09）：押金退款**执行前**余额复核（细则与理由见 deposit_refund_guards）
+        # P0-D（2026-10-09）+ 2026-10-12 P1：退款**执行前**复核（押金看余额 / 订单看累计）
+        from backend.domain.identity import deposit_refund_guards as _guards
+
         if req.kind == RefundRequest.KIND_DEPOSIT and req.deposit_id:
-            from backend.domain.identity.deposit_refund_guards import (
-                assert_deposit_refund_executable,
-            )
-
-            assert_deposit_refund_executable(self.db, req)
+            _guards.assert_deposit_refund_executable(self.db, req)
         elif req.kind == RefundRequest.KIND_ORDER and req.order_id:
-            # 2026-10-12 审查 P1：订单退款**累计**复核——失败单可重试 + 新单可再申请，
-            # 实测同一订单出款两次（押金侧早有同款闸）。细则见 deposit_refund_guards。
-            from backend.domain.identity.deposit_refund_guards import (
-                assert_order_refund_executable,
-            )
-
-            assert_order_refund_executable(self.db, req)
+            # 2026-10-12 审查 P1：订单退款累计复核（失败单可重试 + 新单可再申请 → 实测同单出款两次）
+            _guards.assert_order_refund_executable(self.db, req)
         if needs_check and not manual_override:
             from backend.domain.identity.wm10_withdrawal_service import outstanding_obligations
 

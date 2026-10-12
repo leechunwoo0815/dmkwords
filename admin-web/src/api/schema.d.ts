@@ -3041,10 +3041,7 @@ export interface paths {
         };
         /**
          * Login Options
-         * @description 登录方式开关（公开端点，2026-10-12 拍板 P1）。
-         *
-         *     小程序按 `sms_enabled` 决定是否显示"手机号验证码登录"入口——**不允许出现
-         *     "页面能点、验证码永远收不到"的假入口**。只暴露布尔开关，不含任何凭据。
+         * @description 登录方式开关（公开端点，2026-10-12 拍板 P1）：小程序据此隐藏手机号入口。
          */
         get: operations["login_options_api_miniapp_login_options_get"];
         put?: never;
