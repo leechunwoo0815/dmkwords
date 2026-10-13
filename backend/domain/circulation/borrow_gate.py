@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import NamedTuple
 
 # 拦截类型：硬拦截（放行也没用，如退会/开关未开）与可放行（填原因即可，如押金、会员过期）
@@ -93,12 +94,18 @@ def deposit_gate(
     矩阵内）即可**零押金借书**——全仓没有任何把押金写回 `unpaid` 的复位路径，这个洞一直是开的。
     """
     if deposit_status not in (paid_status, partially_deducted_status) or deposit_unpaid_balance > 0:
-        if deposit_status is None or deposit_status == unpaid_status:
+        # 2026-10-13（第五十一轮·BDD 押金解封首轮实证）：**欠款优先**。原顺序把
+        # `fully_deducted` 判在前面，而"扣到超额"的实现必然把状态置为 fully_deducted
+        # （billing `deduct_for_compensation`：over>0 → STATUS_FULLY_DEDUCTED），于是
+        # "有未结清赔偿款"这一支**永远不可达**——馆员在借还台只看到"押金已扣光"，
+        # 看不到"还欠多少"，与 PRD §3.6"持续提醒馆员待结清"的意图背离。
+        # 欠款是更可执行的事实（补缴额 = 标准额 − 可用 + 待结清），故先判欠款并带上金额。
+        if deposit_unpaid_balance > 0:
+            block_reason = f"有未结清赔偿款 {(Decimal(deposit_unpaid_balance) / 100).quantize(Decimal('0.01'))} 元"
+        elif deposit_status is None or deposit_status == unpaid_status:
             block_reason = "押金未缴纳"
         elif deposit_status == fully_deducted_status:
             block_reason = "押金已扣光"
-        elif deposit_unpaid_balance > 0:
-            block_reason = "有未结清赔偿款"
         else:
             block_reason = f"押金状态为 {deposit_status}（非已缴，需重新缴纳）"
         if not override_reason:

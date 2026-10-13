@@ -345,6 +345,26 @@ class TransferService:
             expired += 1
             self.db.expire(r)
             self._unlock_both(r)
+            # 2026-10-13（第五十一轮·BDD 转让解封亲验）：PRD §3.5 第 4 条要求"3 天内不处理
+            # 自动取消（双方冻结解除、**家长收到通知**）"——原实现只回写了管理端待办，
+            # **家长侧零通知**（家长等到自己发现申请没了）。这里补齐家长站内信：
+            # 与审核结果共用 other.transfer_result 场景，dedup_key 区分以免撞审核结果通知。
+            source = self.db.query(Child).filter(Child.id == r.source_child_id).first()
+            target = self.db.query(Child).filter(Child.id == r.target_child_id).first()
+            if source is not None:
+                NotificationService(self.db).send(
+                    parent_id=source.parent_id,
+                    scene=SCENE_OTHER_TRANSFER_RESULT,
+                    title="权益转让已超时自动取消",
+                    content=(
+                        f"权益转让申请（{source.name} → {target.name if target else '受让方'}）"
+                        "超过 72 小时未审核，已自动取消，双方锁定已解除。"
+                    ),
+                    category=Notification.CATEGORY_OTHER,
+                    ref_type="transfer",
+                    ref_id=str(r.id),
+                    dedup_key="expired",
+                )
             # WM13 L2 回写：超时自动失效 → 该单管理待办审计标注来源（幂等）
             from backend.common.admin_notification_models import AdminNotification
             from backend.common.admin_notifications import AdminNotifyService

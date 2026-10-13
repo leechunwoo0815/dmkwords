@@ -76,10 +76,10 @@
 | FEAT-022 | 观察期购买与到期 | 入会主路径 | P0 | 021 | 500 元/月；到期自动 pending_evaluation（权益保留）；无时限；转正=评估+年费〔V1.1 §3.3〕 | membership.feature | MANUAL_TEST |
 | FEAT-023 | 年费与二孩 9 折 | 定价规则 | P0 | 021 | 6000/5400；下单时账号下另有在会孩子即自动 9 折（观察期/待评估/正式都算）；不打折项明确；不叠加不追回〔V1.1 §3.1〕 | membership.feature | MANUAL_TEST |
 | FEAT-024 | 续费与到期提醒 | 留存 | P1 | 021 | 提前续费原到期日+365；过期续费付款日+365；30/14/7/当天四档提醒〔V1.1 §3.4〕 | membership.feature | MANUAL_TEST |
-| FEAT-025 | 押金状态机 | 资金安全 | P0 | 015 | unpaid/paid/partially_deducted/fully_deducted/refunding/refunded；按孩子独立；转移矩阵〔R-312〕 | deposit.feature | MANUAL_TEST |
-| FEAT-026 | 押金扣除与赔偿 | 遗失损坏处理 | P0 | 025 | 原价赔偿优先扣本人押金；不够扣记待结清持续提醒；先协商后赔偿；找回恢复上架〔V1.1 §3.6〕 | deposit.feature | MANUAL_TEST |
-| FEAT-027 | 押金补缴 | 恢复全额+待结清 | P0 | 025 | 补缴=deposit_amount−available+待结清（扣多少补多少，20260909 用户裁决 E-20260909-03；原公式漏待结清且支付即清零=真金漏洞）；补后状态回 paid；支付拆分入账（先恢复余额再结清）；流水记录；退会退 available 不退 deducted〔R-312〕 | deposit.feature | MANUAL_TEST |
-| FEAT-028 | 退会申请 | 生命周期终点 | P0 | 021 | 6 态状态机；前置校验（无借阅/逾期/未结赔偿/进行中申请）；锁定范围；超管审核；结算三笔退款〔R-311〕；**2026-09-15 增补**：退会独立成页（只提交申请，不罗列费用）；**审核通过后**家长端展示可退明细（`GET /api/miniapp/withdrawals/{id}/settlement`，逐项=费用类型/订单号/金额/命中规则/状态+合计）；审核期间可撤销；**可退费用白名单（2026-09-20 登记，fix44 R6/N4）**：`_settle_items` 只扫 `first_activity`/`observation`/`formal`（按剩余天数比例）/`activity` 四类，**显式排除** `deposit`（双表示，扫进来会退两遍）与 `custom`（纯资金流水）——口径三处同源：代码常量 + `docs/billing-circulation模式手册` P9b 表 + 本行 | withdrawal.feature | ACCEPTED |
+| FEAT-025 | 押金状态机 | 资金安全 | P0 | 015 | unpaid/paid/partially_deducted/fully_deducted/refunding/refunded；按孩子独立；转移矩阵〔R-312〕；**2026-10-13 增补**：BDD 解封（`deposit.feature` 撤 `@draft`，8 场景真实执行） | deposit.feature | MANUAL_TEST |
+| FEAT-026 | 押金扣除与赔偿 | 遗失损坏处理 | P0 | 025 | 原价赔偿优先扣本人押金；不够扣记待结清持续提醒；先协商后赔偿；找回恢复上架〔V1.1 §3.6〕；**2026-10-13 增补**：BDD 解封（赔偿扣除/超扣记待结清/找回恢复上架真实执行）；**缺口 G1**——"持续提醒"的在位实现只有"管理端恒可见 + 借还台与预约被拦并回显欠款金额"，**主动提醒通道（待办/推送）未做**（docs/09 第五十一轮） | deposit.feature | MANUAL_TEST |
+| FEAT-027 | 押金补缴 | 恢复全额+待结清 | P0 | 025 | 补缴=deposit_amount−available+待结清（扣多少补多少，20260909 用户裁决 E-20260909-03；原公式漏待结清且支付即清零=真金漏洞）；补后状态回 paid；支付拆分入账（先恢复余额再结清）；流水记录；退会退 available 不退 deducted〔R-312〕；**2026-10-13 增补**：BDD 解封（家长小程序补缴/超扣补缴真实执行）；**PRD §3.6 正文同轮订正**（原"1200 − 当前可用余额"口径作废，改为含待结清公式） | deposit.feature | MANUAL_TEST |
+| FEAT-028 | 退会申请 | 生命周期终点 | P0 | 021 | 6 态状态机；前置校验（无借阅/逾期/未结赔偿/进行中申请）；锁定范围；超管审核；结算三笔退款〔R-311〕；**2026-09-15 增补**：退会独立成页（只提交申请，不罗列费用）；**审核通过后**家长端展示可退明细（`GET /api/miniapp/withdrawals/{id}/settlement`，逐项=费用类型/订单号/金额/命中规则/状态+合计）；审核期间可撤销；**可退费用白名单（2026-09-20 登记，fix44 R6/N4）**：`_settle_items` 只扫 `first_activity`/`observation`/`formal`（按剩余天数比例）/`activity` 四类，**显式排除** `deposit`（双表示，扫进来会退两遍）与 `custom`（纯资金流水）——口径三处同源：代码常量 + `docs/billing-circulation模式手册` P9b 表 + 本行；**2026-10-13 增补**：BDD 解封（8 场景真实执行）；**冻结期禁删档案补判据**（原先只靠订单守卫，受让方那类"无订单的冻结态"能钻过去，docs/09 第五十一轮） | withdrawal.feature | ACCEPTED |
 | FEAT-029 | 会员费退款联动退会 | 退款即退会 | P0 | 020,028 | observation/formal 退款=同时建退会申请+锁定；成功前再校验；成功后 withdrawn+自动发起押金退款；观察期用尽可退 0 禁提交〔R-309, R-310〕 | refund.feature | MANUAL_TEST |
 | FEAT-030 | 重新入会 | 回流客户 | P1 | 021 | withdrawn→observation（观察期单支付）/→formal（年费单支付或转让通过）；历史词数/积分/等级/打卡全保留〔R-301〕 | membership.feature | MANUAL_TEST |
 
@@ -150,9 +150,9 @@
 
 | ID | 名称 | 价值 | 优先级 | 依赖 | 验收标准 | Gherkin | 状态 |
 |--- |--- |--- |--- |--- |--- |--- |--- |
-| FEAT-063 | 转让申请（16 条件） | 二孩家庭 | P0 | 021 | 同账号；转出 formal+剩余>0+无借阅/逾期/遗失/损坏/待结清/进行中申请/锁定；受让 none/withdrawn+无进行中；前端显示具体失败原因〔R-302, R-303〕 | transfer.feature | MANUAL_TEST |
-| FEAT-064 | 转让锁定 | 状态一致性 | P0 | 063 | 双方锁定：禁借/约/续/退款/退会/档案删除/新订单/新转让/受让/改到期日；允许查看+（不应发生的）还书；拒绝/撤销/超时/通过即解锁〔R-304〕 | transfer.feature | MANUAL_TEST |
-| FEAT-065 | 转让审核事务 | 资金安全 | P0 | 063 | 仅超管；72h 超时自动 expired+解锁+通知；通过时二次校验 6 项；同一事务 12 步（申请 approved/转出 withdrawn+退会记录/押金退款申请自动发起/受让 formal+到期日继承/转让记录/解锁/通知）〔R-305〕 | transfer.feature | MANUAL_TEST |
+| FEAT-063 | 转让申请（12 项校验） | 二孩家庭 | P0 | 021 | 同账号；转出 formal+剩余>0+无借阅/逾期/遗失/损坏/待结清/进行中申请/锁定；受让 none/withdrawn+无进行中；前端显示具体失败原因〔R-302, R-303〕；**2026-10-13 增补**：BDD 解封（发起 + 条件校验大纲 9 行逐行点名失败项真实执行）；标题原写"16 条件"，按 R-303"14 语义项→**12 实现项**全对齐"订正；**缺口 G3**——只报损未登记赔偿不拦（遗失经未结清赔偿款收口） | transfer.feature | MANUAL_TEST |
+| FEAT-064 | 转让锁定 | 状态一致性 | P0 | 063 | 双方锁定：禁借/约/续/退款/退会/档案删除/新订单/新转让/受让/改到期日；允许查看+（不应发生的）还书；拒绝/撤销/超时/通过即解锁〔R-304〕；**2026-10-13 增补**：BDD 解封（冻结范围整行真实执行）；**缺口 G2**——"人工修改到期日"功能本身未做（无端点可改 `member_expire`），冻结无从拦截该动作，步骤按"传了也改不动"断言 | transfer.feature | MANUAL_TEST |
+| FEAT-065 | 转让审核事务 | 资金安全 | P0 | 063 | 仅超管；72h 超时自动 expired+解锁+通知；通过时二次校验 6 项；同一事务 12 步（申请 approved/转出 withdrawn+退会记录/押金退款申请自动发起/受让 formal+到期日继承/转让记录/解锁/通知）〔R-305〕；**2026-10-13 增补**：BDD 解封（12 步 + 二次校验失败 + 超时 + 撤销真实执行）；**超时家长通知补齐**（原先只有管理端待办回写，PRD §3.5 第 4 条要求"家长收到通知"） | transfer.feature | MANUAL_TEST |
 | FEAT-066 | 观察期评估报告 | 专业服务 | P1 | 022 | 馆员上传图片（≤9 张）；家长孩子可见（**竖版整页展示 + 点开可双指放大/翻页/长按保存**，2026-09-21 补）；上传留痕 | observation_report.feature | MANUAL_TEST |
 
 ## F11 通知任务看板（admin，对应 P12 横切）

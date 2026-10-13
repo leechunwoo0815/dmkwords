@@ -384,8 +384,14 @@ class ChildService:
         return child
 
     def delete(self, admin, child_id: int) -> None:
-        """软删孩子档案（WM3-B1；订单守卫 409）。"""
+        """软删孩子档案（WM3-B1；订单守卫 409 + 冻结守卫 422）。"""
         child = self._get_child(child_id)
+        # 2026-10-13（第五十一轮·BDD 转让解封亲验）：**冻结期禁删档案**。原实现只靠订单守卫，
+        # 而**受让方**（none/withdrawn 状态）没有订单 → 冻结期间可被删档，转让单随即指向已删孩子
+        # （PRD §3.5 第 3 条"两个孩子的相关操作暂时冻结"）。转出方本来就被订单守卫拦住，
+        # 这里补上冻结判据，把"双方"都收口。
+        if child.operation_locked:
+            raise ValidationError("孩子正在转让/退会审核流程中，不能删除档案")
         if self.has_orders(self.db, child_id):
             raise ConflictError("该孩子已创建订单，禁止删除")
         child.is_deleted = 1

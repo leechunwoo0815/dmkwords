@@ -380,12 +380,17 @@ class ReservationService:
         ):
             # B-12（第二批 T12）：押金扣光/有未结清赔偿款与未缴纳同险；预约为
             # 线上自助操作，硬拦截无人工放行（宪法三类硬拦截例外）
-            if not dep or dep.status == Deposit.STATUS_UNPAID:
+            # 2026-10-13（第五十一轮·BDD 押金解封首轮实证）：**欠款优先**——与
+            # `circulation/borrow_gate.deposit_gate` 同步改序：超扣实现必然把状态置为
+            # fully_deducted，原顺序让"有未结清赔偿款"不可达，家长端只看到"押金已扣光"。
+            if dep and (dep.unpaid_balance or 0) > 0:
+                block_reason = f"有未结清赔偿款 {dep.unpaid_balance} 元"
+            elif not dep or dep.status == Deposit.STATUS_UNPAID:
                 block_reason = "押金未缴纳"
             elif dep.status == Deposit.STATUS_FULLY_DEDUCTED:
                 block_reason = "押金已扣光"
             else:
-                block_reason = "有未结清赔偿款"
+                block_reason = f"押金状态为 {dep.status}（非已缴，需重新缴纳）"
             raise ValidationError(f"{block_reason}，不能预约")
         now = datetime.now()
         # 2026-09-21 甲方口径：逾期不拦截（全端统一）——原先此处对"有逾期未还"硬拦
