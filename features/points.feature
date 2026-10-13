@@ -1,5 +1,6 @@
 # language: zh-CN
-@draft
+# 2026-10-13（第五十三批·解封第三批 3b）：本域 9 个场景全部转真实执行
+# （步骤实现 features/steps/growth_quiz_steps.py）。积分只加不减、周期奖按 7/30 独立周期防重发。
 # FEAT-049 积分 | 锚点: V1.1 §7.2
 功能: 积分
   作为孩子
