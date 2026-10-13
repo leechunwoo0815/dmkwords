@@ -67,8 +67,9 @@ export function apiReturnBook(copy_id: number, condition: string): Promise<Borro
   return request("/api/admin/circulation/return", { method: "POST", body: JSON.stringify({ copy_id, condition }) });
 }
 
-export function apiRenew(record_id: number): Promise<BorrowRecord> {
-  return request("/api/admin/circulation/renew", { method: "POST", body: JSON.stringify({ record_id }) });
+// G7（2026-10-13）：逾期书人工续借必须带 reason（后端强制留痕）；未逾期续借可不传。
+export function apiRenew(record_id: number, reason?: string): Promise<BorrowRecord> {
+  return request("/api/admin/circulation/renew", { method: "POST", body: JSON.stringify({ record_id, reason }) });
 }
 
 export function apiOverdueList(): Promise<OverdueItem[]> {

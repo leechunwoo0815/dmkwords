@@ -972,7 +972,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Renew Book */
+        /**
+         * Renew Book
+         * @description 馆员代办续借（G7：逾期书须填 `reason`，写进审计留痕）。
+         */
         post: operations["renew_book_api_admin_circulation_renew_post"];
         delete?: never;
         options?: never;
@@ -5636,6 +5639,11 @@ export interface components {
         };
         /** RenewRequest */
         RenewRequest: {
+            /**
+             * Reason
+             * @description 人工续借原因（逾期书必填，PRD §5.4 留痕）
+             */
+            reason?: string | null;
             /** Record Id */
             record_id: number;
         };

@@ -1388,16 +1388,32 @@ def step_milestone_unlocked(context, node_words):
     )
 
 
-@then("家长收到解锁通知（馆员侧通道未实现，见 G9）")
-def step_milestone_notify_parent(context):
+@then("家长与馆员都收到解锁通知")
+def step_milestone_notify_both(context):
+    """PRD §7.4「同时通知家长和馆员」——**G9 于 2026-10-13（第五十五轮）落地**：
+
+    家长侧 = 小程序通知（`reading.milestone`，既有通道）；馆员侧 = 管理端待办墙
+    `admin.milestone_achieved`（一个节点一条、按孩子去重；显示态"已达成·可线下表扬"，
+    **不计入待办数**——它是知会而非待审事项）。
+    """
     items = context.client.get(
         "/api/miniapp/notifications",
         params={"scene": "reading.milestone"},
         headers=context.mini,
     ).json()["items"]
     assert items, "家长应收到里程碑通知"
-    # 如实标注：PRD §7.4 写"家长和馆员一起庆祝"，但**馆员侧没有通知通道**
-    # （SCENE 表里没有里程碑的管理端场景）——登记为 G9，本断言不覆盖。
+
+    inbox = context.client.get(
+        "/api/admin/admin-notifications",
+        params={"scene": "admin.milestone_achieved"},
+        headers=context.h,
+    )
+    assert inbox.status_code == 200, inbox.text
+    data = inbox.json()
+    assert data["total"] == 1, f"馆员侧应收到且只收到 1 条（一个节点一条）：{data}"
+    row = data["items"][0]
+    assert row["ref_id"] == str(context.child["id"]), row
+    assert row["effective_status"] == "done" and "线下表扬" in row["status_text"], row
 
 
 @when("小明词数继续增长再次越过 {node_words:d}")

@@ -652,37 +652,57 @@ def step_renew_rejected(context):
     assert "已逾期" in context.renew_attempt.json()["detail"], context.renew_attempt.text
 
 
-@then("馆员人工办理也不可突破一次续借上限")
-def step_admin_cannot_bypass(context):
-    """按**现状**断言两件事：① 逾期书的馆员续借同样被拒（无放行参数；PRD §5.4 允许人工办理的差异登记为 G7）；
-    ② 上限不是"自助才有"——馆员对新书续借一次后，第二次（代办或自助）一律拒绝。"""
-    staff = context.client.post(
+@then("馆员填原因可人工办理逾期续借 不填原因被拒")
+def step_admin_overdue_renew(context):
+    """PRD §5.4 第 5 条（**G7，2026-10-13 第五十五轮落地**）：逾期书家长自助硬拦，
+    **馆员可以人工办理**——但必须填原因（写进审计留痕），上限照旧（下一步骤断言）。
+
+    人工办理的新到期日从**办理时刻**起算 `renew_days`：原到期日已过，若仍从它加 7 天，
+    续借后往往还在逾期，宽限失去意义（口径见 PRD §5.4 实现注 + docs/09 第五十五轮）。
+    """
+    from backend.common.system_models import AuditLog
+
+    # ① 不填原因 → 拒（留痕是硬要求，不是可选项）
+    no_reason = context.client.post(
         "/api/admin/circulation/renew",
         json={"record_id": context.renew_record_id},
         headers=context.h,
     )
-    assert staff.status_code == 422, (
-        f"现状：逾期书馆员也办不了（PRD §5.4 允许人工办理，差异登记为 G7）：{staff.text[:120]}"
+    assert no_reason.status_code == 422, (
+        f"逾期书人工办理必须填原因：{no_reason.status_code} {no_reason.text[:160]}"
     )
-    _, copy_ids = _book_with_copies(context, "上限对照样例")
-    created = _borrow(context, context.child["id"], copy_id=copy_ids[0])
-    assert created.status_code == 200, created.text
-    record_id = created.json()["id"]
-    first = context.client.post(
-        "/api/admin/circulation/renew", json={"record_id": record_id}, headers=context.h
+    assert "必须填写原因" in no_reason.json()["detail"], no_reason.text
+
+    # ② 填原因 → 放行；新到期日 = 办理时刻 + 7 天（不是原到期日 +7）
+    before = datetime.now()
+    r = context.client.post(
+        "/api/admin/circulation/renew",
+        json={
+            "record_id": context.renew_record_id,
+            "reason": "家长电话说明孩子住院，同意宽限一周",
+        },
+        headers=context.h,
     )
-    assert first.status_code == 200, first.text
-    second_staff = context.client.post(
-        "/api/admin/circulation/renew", json={"record_id": record_id}, headers=context.h
+    assert r.status_code == 200, r.text
+    new_due = datetime.fromisoformat(r.json()["due_at"])
+    assert abs((new_due - (before + timedelta(days=7))).total_seconds()) < 60, (
+        f"人工办理应从**办理时刻**起算 7 天：now={before} due={new_due}"
     )
-    second_self = context.client.post(
-        f"/api/miniapp/borrows/{record_id}/renew",
-        json={"child_id": context.child["id"]},
-        headers=context.mini,
-    )
-    assert second_staff.status_code == 422 and second_self.status_code == 422, (
-        f"1 次上限谁也突破不了：代办={second_staff.status_code} 自助={second_self.status_code}"
-    )
+    assert new_due > datetime.now(), f"续借后不能还在逾期：due={new_due}"
+    assert r.json()["renew_used"] == 1, r.text
+
+    # ③ 留痕：原因进审计日志（谁、何时、对谁、为什么）
+    with _db() as db:
+        log = (
+            db.query(AuditLog)
+            .filter(
+                AuditLog.action == "circulation.renew",
+                AuditLog.target_id == str(context.renew_record_id),
+            )
+            .first()
+        )
+    assert log is not None, "人工办理必须写审计"
+    assert log.reason == "家长电话说明孩子住院，同意宽限一周", log.reason
 
 
 # ---------- 场景：馆员代办续借的上限（原「逾期图书不可续借」的人工办理部分，独立真跑） ----------
@@ -740,35 +760,3 @@ def step_renew_exhausted(context):
     )
     assert self_again.status_code == 422, self_again.text
     assert "续借机会已用完" in self_again.json()["detail"], self_again.text
-
-
-@then("逾期书的馆员人工办理现状为硬拦（与 PRD §5.4「特殊情况可人工办理」不一致，见 G7）")
-def step_overdue_renew_blocked(context):
-    """如实断言**现状**：`renew` 对逾期书一律拒绝，且没有放行参数——PRD §5.4 允许馆员
-    "特殊情况下人工办理逾期书的续借（留痕）"，该放行口径**未实现**（docs/09 第五十二轮 G7）。
-    """
-    from backend.domain.circulation.models import BorrowRecord
-
-    rows = _active_borrows_of(context, context.child["id"])
-    target = None
-    for row in rows:
-        if row.due_at < datetime.now():
-            target = row
-            break
-    if target is None:
-        _seed_borrowed_books(context, context.child["id"], len(rows) + 1, overdue=len(rows) + 1)
-        target = [
-            r for r in _active_borrows_of(context, context.child["id"]) if r.due_at < datetime.now()
-        ][0]
-    with _db() as db:
-        db.query(BorrowRecord).filter(BorrowRecord.id == target.id).update(
-            {"renew_used": 0, "due_at": datetime.now() - timedelta(days=1)}
-        )
-        db.commit()
-    r = context.client.post(
-        "/api/admin/circulation/renew", json={"record_id": target.id}, headers=context.h
-    )
-    assert r.status_code == 422, (
-        f"现状：逾期书人工续借被拒（无放行口）：{r.status_code} {r.text[:160]}"
-    )
-    assert "逾期" in r.json()["detail"], r.text

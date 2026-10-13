@@ -11,6 +11,7 @@ import {
   Card,
   Col,
   Input,
+  Modal,
   Row,
   Space,
   Table,
@@ -71,6 +72,10 @@ export default function CirculationDesk() {
   const [overdue, setOverdue] = useState<OverdueItem[]>([]);
   const [recent, setRecent] = useState<RecentRow[]>([]);
   const [tab, setTab] = useState("desk");
+  // G7（2026-10-13）：逾期书人工续借弹窗（原因必填 → 审计留痕）
+  const [renewTarget, setRenewTarget] = useState<BorrowRecordResponse | null>(null);
+  const [renewReason, setRenewReason] = useState("");
+  const [renewBusy, setRenewBusy] = useState(false);
   const cardRef = useRef<ChildCard | null>(null);
   const seqRef = useRef(0);
   const memberRef = useRef<ScanHandle>(null);
@@ -115,6 +120,29 @@ export default function CirculationDesk() {
     if (cur) setCurrentCard(await apiChildCard(cur.child_id));
     loadOverdue();
   };
+
+  // 续借（G7）：未逾期直接办；逾期走弹窗填原因（后端 `reason` 必填，留痕进审计）。
+  // 成功文案给**新到期日**而不是写死"+7 天"——`renew_days` 是活配置（S71）。
+  const doRenew = useCallback(async (record: BorrowRecordResponse, reason?: string) => {
+    try {
+      const updated = await apiRenew(record.id, reason);
+      message.success(`续借成功（新到期日 ${fmtShort(updated.due_at)}）`);
+      setRenewTarget(null);
+      setRenewReason("");
+      await refresh();
+    } catch (e) {
+      const text = e instanceof Error ? e.message : "续借失败";
+      // 状态列的 `status` 由 `overdue_mark` 任务翻转（最长滞后一个任务周期）：刚过期那一下
+      // 按钮还是「续借」，后端按**时间**判逾期并要求原因 —— 此时改走人工动线，别让馆员卡住。
+      if (!reason && text.includes("必须填写原因")) {
+        setRenewReason("");
+        setRenewTarget(record);
+        message.warning("该书已逾期，请填写人工续借原因");
+        return;
+      }
+      message.error(text);
+    }
+  }, [message, refresh]);
 
   // ---------- 扫会员码（第一个框）----------
   // 命中即出卡片并把焦点交棒给书码框——这就是"扫完孩子自动跳到扫书"的焦点链。
@@ -425,13 +453,18 @@ export default function CirculationDesk() {
               },
               { title: "到期日", dataIndex: "due_at", width: 130, render: (v: string) => fmtShort(v) },
               { title: "状态", dataIndex: "status", width: 90, render: (s: string) => s === "overdue" ? <Tag color="red">逾期</Tag> : <Tag color="blue">借出中</Tag> },
-              { title: "续借", dataIndex: "renew_used", width: 90, render: (v: number, r: BorrowRecordResponse) => v >= 1 ? <Tag>已用</Tag> : <Button type="link" size="small" onClick={async () => {
-                try {
-                  await apiRenew(r.id);  // WM5-F1：用被点击行的 r.id，原 find(...) 全局查找导致多本在借时永远续第 1 行
-                  message.success("续借成功（+7 天）");
-                  await refresh();
-                } catch (e) { message.error(e instanceof Error ? e.message : "续借失败"); }
-              }}>续借</Button> },
+              { title: "续借", dataIndex: "renew_used", width: 100, render: (v: number, r: BorrowRecordResponse) => v >= 1 ? <Tag>已用</Tag> : (
+                // G7（2026-10-13）：逾期书不能一键续借（家长端硬拦）——馆员走"人工续借"，
+                // 必须填原因留痕（PRD §5.4 特殊情况人工办理）；未逾期仍是原有一键路径。
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={() => {
+                    if (r.status === "overdue") { setRenewReason(""); setRenewTarget(r); return; }
+                    void doRenew(r);  // WM5-F1：用被点击行的 r.id，原 find(...) 全局查找导致多本在借时永远续第 1 行
+                  }}
+                >{r.status === "overdue" ? "人工续借" : "续借"}</Button>
+              ) },
               { title: "操作", key: "op", width: 100, render: (_, r) => (
                 <Button type="primary" size="small" onClick={() => doReturn(r)}>还书</Button>
               ) },
@@ -440,6 +473,36 @@ export default function CirculationDesk() {
           <PaintHScrollbar auto />
         </>
       )}
+
+      {/* G7（2026-10-13）：逾期书人工续借——PRD §5.4「特殊情况馆员可以人工办理（留痕）」。
+          新到期日从**今天**起算（后端口径），原因写进审计日志；每本 1 次的上限不受影响。 */}
+      <Modal
+        open={!!renewTarget}
+        title="逾期书人工续借（留痕）"
+        okText="确认续借"
+        cancelText="取消"
+        confirmLoading={renewBusy}
+        onCancel={() => setRenewTarget(null)}
+        onOk={async () => {
+          if (!renewTarget) return;
+          if (!renewReason.trim()) { message.warning("请填写人工续借原因（必须留痕）"); return; }
+          setRenewBusy(true);
+          try { await doRenew(renewTarget, renewReason.trim()); } finally { setRenewBusy(false); }
+        }}
+      >
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+          《{renewTarget?.book_title || "该书"}》已逾期（到期日 {fmtShort(renewTarget?.due_at)}）。
+          人工续借后新到期日从今天起算（不沿用原到期日顺延），并把原因写进审计日志；每本书的续借次数上限不受影响。
+        </Typography.Paragraph>
+        <Input.TextArea
+          rows={3}
+          maxLength={200}
+          showCount
+          value={renewReason}
+          onChange={(e) => setRenewReason(e.target.value)}
+          placeholder="例：家长电话说明孩子住院，同意宽限一周（馆员 张三）"
+        />
+      </Modal>
 
       {/* 逾期名单 */}
       <Typography.Title level={5} style={{ fontFamily: "var(--font-display)", marginTop: 24 }}>

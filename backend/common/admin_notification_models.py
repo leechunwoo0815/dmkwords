@@ -49,6 +49,11 @@ class AdminNotification(BaseModel):
     SCENE_ACTIVITY_ORDER_VOIDED = "admin.activity_order_voided"
     SCENE_COPY_DAMAGE_COMPENSATION = "admin.copy_damage_compensation"
     SCENE_PAYMENT_ANOMALY = "admin.payment_anomaly"
+    # G9（2026-10-13 第五十五轮）：PRD §7.4「每达成一个节点…**同时通知家长和馆员**」
+    # 的馆员侧通道。它是**知会**（线下表扬/朋友圈/颁奖候选），不是待审事项：
+    # 一个节点一条（dedup_key=节点词数）、按孩子去重；显示态固定"已达成·可线下表扬"，
+    # **不计入待办数**（待办数只统计需要人工审结的申请类事项）。
+    SCENE_MILESTONE_ACHIEVED = "admin.milestone_achieved"
 
     # ref_type 取值
     REF_REFUND_REQUEST = "refund_request"

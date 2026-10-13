@@ -4135,6 +4135,19 @@
       "RenewRequest": {
         "additionalProperties": false,
         "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "人工续借原因（逾期书必填，PRD §5.4 留痕）",
+            "title": "Reason"
+          },
           "record_id": {
             "title": "Record Id",
             "type": "integer"
@@ -8077,6 +8090,7 @@
     },
     "/api/admin/circulation/renew": {
       "post": {
+        "description": "馆员代办续借（G7：逾期书须填 `reason`，写进审计留痕）。",
         "operationId": "renew_book_api_admin_circulation_renew_post",
         "requestBody": {
           "content": {

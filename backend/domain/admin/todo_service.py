@@ -31,6 +31,12 @@ from backend.domain.admin.models import AdminUser
 from backend.domain.admin.service import role_has_permission
 from backend.domain.catalog.audit_events import publish_audit
 
+#: **知会类场景**（运营感知，不是待审事项）：不进待办墙默认名单，只有显式按 `scene` 筛选才出现。
+#: G9（2026-10-13 第五十五轮）：里程碑达成是"通知馆员去线下表扬/发朋友圈"的知会，
+#: 没有待审状态机、也没有可处理动作——混在待办列表里只是噪声（用户 2026-10-13 明确要求分开）。
+#: 后续新增同类（纯知会、无人工审结动作）的 scene 时加进本元组即可。
+NOTICE_SCENES: tuple[str, ...] = (AdminNotification.SCENE_MILESTONE_ACHIEVED,)
+
 
 class AdminTodoService:
     """WM13 管理待办查询/聚合/显示态解析（编排层）。
@@ -66,7 +72,11 @@ class AdminTodoService:
         child_states = self._child_states(by_type.get("child", []))
 
         for n in notifications:
-            if n.ref_type == "refund_request":
+            if n.scene == AdminNotification.SCENE_MILESTONE_ACHIEVED:
+                # G9（2026-10-13 第五十五轮）：里程碑达成是**知会**（线下表扬/朋友圈/颁奖候选），
+                # 没有"待审"状态机 → 固定显示态、不计入待办数（PRD §7.4 口径）。
+                result[n.id] = {"effective_status": ST_DONE, "status_text": "已达成·可线下表扬"}
+            elif n.ref_type == "refund_request":
                 status = refund_states.get(n.ref_id)
                 if n.scene == AdminNotification.SCENE_REFUND_EXECUTE_FAILED:
                     result[n.id] = self._decide_execute_failed(status)
@@ -305,6 +315,8 @@ class AdminTodoService:
         权限（S2/v2）：非超管返回空数据（不 403，空列表）。
         status_filter: pending=待处理 / finished=已审结+已失效 / None=全部。
         排序：待处理优先，组内 created_at 升序（等待最久的排前——运营处理优先级）。
+        G9（2026-10-13）：知会类场景（`NOTICE_SCENES`）**不进默认名单**——它们没有待审状态、
+        没有可处理动作，只有显式按 `scene` 筛选时才列出（前端"里程碑知会"视图走这条）。
         """
         # T20g（#8 产品决策）：staff 可见只读——返回全量数据 + read_only 标记
         # （看记录+超管处理结果；handle 端点权限矩阵不动仍仅超管；todo-counts 对
@@ -313,6 +325,10 @@ class AdminTodoService:
         q = self.db.query(AdminNotification).filter(AdminNotification.is_deleted == 0)
         if scene:
             q = q.filter(AdminNotification.scene == scene)
+        else:
+            # G9：待办墙默认名单 = **待审事项**。知会类（里程碑达成…）有独立视图，
+            # 不混进来（否则"已处理"里全是没人处理过的知会，看着乱且误导）。
+            q = q.filter(AdminNotification.scene.notin_(NOTICE_SCENES))
         if keyword:
             like = f"%{escape_like(keyword)}%"
             q = q.filter(

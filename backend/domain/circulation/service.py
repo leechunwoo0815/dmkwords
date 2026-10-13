@@ -529,12 +529,23 @@ class CirculationService:
         return record
 
     # ---------- 续借 ----------
-    def _load_renewable(self, record_id: int, *, owner_child_id: int | None = None) -> BorrowRecord:
+    def _load_renewable(
+        self,
+        record_id: int,
+        *,
+        owner_child_id: int | None = None,
+        allow_overdue: bool = False,
+        overdue_reason: str | None = None,
+    ) -> tuple[BorrowRecord, bool, int]:
         """续借公共链：锁定读 + 全量校验 + 改期（**馆员代办与家长自助单一来源**）。
 
         2026-10-13（第五十三轮 G6）：把校验链从 `renew` 抽出来，给家长自助
         `renew_self` 复用——两套判据各写一遍必然漂移（本仓"同一判定写两遍"的老教训）。
         `owner_child_id` 传入时按归属校验（越权与不存在**同回应**，不暴露他人记录）。
+
+        2026-10-13（第五十五轮 G7）：`allow_overdue` 给**馆员人工办理**开口（PRD §5.4
+        "特殊情况馆员可以人工办理逾期书的续借（留痕）"），此时 `overdue_reason` 必填；
+        家长自助不传该参数 → 逾期仍硬拦。返回 `(记录, 是否逾期, 逾期天数)`（天数供审计留痕）。
         """
         record = (
             self.db.query(BorrowRecord)
@@ -554,30 +565,49 @@ class CirculationService:
             raise ValidationError(f"孩子会员状态无效（{state}），不能续借（R-313）")
         if record.status not in (BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE):
             raise ValidationError("该记录不可续借")
-        if record.due_at < datetime.now():
+        now = datetime.now()
+        # 逾期判定用**布尔**（`due_at < now` 但不足 1 天时 `.days == 0`，不能拿天数当判据）
+        is_overdue = record.due_at < now
+        overdue_days = (now - record.due_at).days if is_overdue else 0
+        if is_overdue and not allow_overdue:
             raise ValidationError("已逾期的书不能续借（V1.1 §5.4）")
+        if is_overdue and not (overdue_reason or "").strip():
+            raise ValidationError("逾期书人工续借必须填写原因（留痕）")
         # P2-6（2026-10-09 审查）：原先写死 `>= 1`，配置项 renew_limit 是**死配置**
         # （运营改了没反应）。现在读配置（默认 1，与文案同源）。
         renew_limit = int(ConfigService(self.db).get_value("renew_limit", "1"))
         if record.renew_used >= renew_limit:
             raise ValidationError(f"续借机会已用完（每本书限 {renew_limit} 次）")
         renew_days = int(ConfigService(self.db).get_value("renew_days"))
-        record.due_at = record.due_at + timedelta(days=renew_days)  # 从原到期日起算
+        # 未逾期：从原到期日起算（既有口径，G6 自助同源）；逾期人工办理：从**办理时刻**起算
+        # （原到期日已过，再从它加天数往往续借后还在逾期——宽限没有意义，G7 口径见 PRD §5.4）。
+        base = now if is_overdue else record.due_at
+        record.due_at = base + timedelta(days=renew_days)
         record.renew_used += 1
         self.db.flush()
-        return record
+        return record, is_overdue, overdue_days
 
-    def renew(self, admin, record_id: int) -> BorrowRecord:
-        """馆员代办续借（留痕：操作人 = 管理员，action `circulation.renew`）。"""
-        record = self._load_renewable(record_id)
+    def renew(self, admin, record_id: int, reason: str | None = None) -> BorrowRecord:
+        """馆员代办续借（留痕：操作人 = 管理员，action `circulation.renew`）。
+
+        2026-10-13（第五十五轮 G7）：逾期书按 PRD §5.4 允许**人工办理**——必须填 `reason`
+        （写进审计，明细含逾期天数），`renew_limit` 上限与家长自助同一条校验、谁都不能突破。
+        """
+        record, is_overdue, overdue_days = self._load_renewable(
+            record_id, allow_overdue=True, overdue_reason=reason
+        )
         publish_audit(
             self.db,
             admin=admin,
             action="circulation.renew",
             target_type="borrow",
             target_id=str(record.id),
-            detail={"new_due": str(record.due_at)},
-            reason="续借",
+            detail={
+                "new_due": str(record.due_at),
+                "overdue": is_overdue,
+                "overdue_days": overdue_days,
+            },
+            reason=(reason or "").strip() or "续借",
         )
         self.db.commit()
         return record
@@ -590,8 +620,9 @@ class CirculationService:
         · **不写管理员审计**——`audit_logs.actor_id` 语义是管理员 id，家长 id 混入会污染
           操作人追溯；与家长侧其他自助动作（预约创建/取消、退款申请）口径一致，
           自助续借的事实由 `borrow_records.due_at / renew_used` 承载。
+        逾期书**硬拦**（不传 `allow_overdue`）：人工办理是馆员线下的口子（G7）。
         """
-        record = self._load_renewable(record_id, owner_child_id=child.id)
+        record, _, _ = self._load_renewable(record_id, owner_child_id=child.id)
         self.db.commit()
         return record
 

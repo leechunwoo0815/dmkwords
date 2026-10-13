@@ -55,6 +55,11 @@ const SCENE_OPTIONS: { value: string; label: string }[] = [
   { value: "other.transfer_result", label: "权益转让审核" },
 ];
 
+// G9（2026-10-13）：里程碑达成是**知会**（馆员线下表扬/朋友圈/颁奖候选），不是待审事项——
+// 后端 `NOTICE_SCENES` 已把它从待办墙默认名单里摘出去，这里给它一个**独立视图**（第三个下拉项），
+// 免得混在"待处理/已处理"里看着乱（用户 2026-10-13 明确要求分开）。
+const MILESTONE_SCENE = "admin.milestone_achieved";
+
 // WM13 管理待办事项类型（6 场景，Q5 裁定）
 const ADMIN_SCENE_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "全部事项" },
@@ -64,6 +69,7 @@ const ADMIN_SCENE_OPTIONS: { value: string; label: string }[] = [
   { value: "admin.activity_batch_refund", label: "活动批量退款" },
   { value: "admin.transfer_expiring", label: "转让临近超时" },
   { value: "admin.refund_execute_failed", label: "退款执行失败" },
+  { value: MILESTONE_SCENE, label: "里程碑达成" },
 ];
 
 // 关联对象中文标签 + 管理端跳转路由（N1：order/activity/report 等可跳；
@@ -140,7 +146,10 @@ export default function Notifications() {
   const [parentTab, setParentTab] = useState<string>(
     initialTab === "unread" || initialTab === "read" ? initialTab : "all"
   );
-  const [adminTab, setAdminTab] = useState<string>(initialTab === "done" ? "done" : "todo");
+  // 管理端三视图：todo（待处理）/ done（已处理）/ milestone（里程碑知会，G9 独立视图）
+  const [adminTab, setAdminTab] = useState<string>(
+    initialTab === "done" ? "done" : initialTab === "milestone" ? "milestone" : "todo"
+  );
   const [keyword, setKeyword] = useState<string>(searchParams.get("keyword") ?? "");
   const [scene, setScene] = useState<string | undefined>(searchParams.get("scene") ?? undefined);
   // 家长通知（现状平移）
@@ -208,12 +217,14 @@ export default function Notifications() {
 
   const loadInbox = useCallback(async () => {
     setInboxLoading(true);
+    // G9：里程碑知会视图 = 固定按该场景取数（知会类已在后端默认名单外）；其余视图走待办口径。
+    const milestoneView = adminTab === "milestone";
     try {
       const data = await apiListAdminInbox({
         page,
         page_size: pageSize,
-        status_filter: adminTab === "todo" ? "pending" : "finished",
-        scene,
+        status_filter: milestoneView ? undefined : adminTab === "todo" ? "pending" : "finished",
+        scene: milestoneView ? MILESTONE_SCENE : scene,
         keyword: keyword || undefined,
       });
       setInbox(data.items);
@@ -273,7 +284,10 @@ export default function Notifications() {
   const changeAdminTab = (next: string) => {
     setAdminTab(next);
     setPage(1);
-    mirrorUrl({ box, tab: next, page: 1, keyword, scene });
+    // 切到"里程碑知会"视图时清掉事项类型筛选（该视图固定按里程碑场景取数）
+    const nextScene = next === "milestone" ? undefined : scene;
+    if (next === "milestone") setScene(undefined);
+    mirrorUrl({ box, tab: next, page: 1, keyword, scene: nextScene });
   };
 
   const toggleRead = useCallback(
@@ -327,7 +341,14 @@ export default function Notifications() {
   // R3：管理待办行展开——完整内容+关联对象+超管处理结果（staff 只读视角的"查看"目标）
   const adminExpandContent = (r: AdminInboxItem) => {
     const meta = ADMIN_REF_ROUTE[r.ref_type];
-    const label = meta ? { refund_request: "退款申请", withdrawal_request: "退会申请", transfer: "权益转让", activity: "活动", activity_enrollment: "活动报名" }[r.ref_type] ?? r.ref_type : r.ref_type;
+    // G9（2026-10-13）：里程碑达成是**知会**（PRD §7.4 线下表扬/朋友圈/颁奖候选），
+    // 不是待审事项 → 显示态恒为"已达成·可线下表扬"，并给一条直达孩子成长档案的链。
+    const milestone = r.scene === "admin.milestone_achieved";
+    const label = milestone
+      ? "里程碑"
+      : meta
+        ? { refund_request: "退款申请", withdrawal_request: "退会申请", transfer: "权益转让", activity: "活动", activity_enrollment: "活动报名" }[r.ref_type] ?? r.ref_type
+        : r.ref_type;
     return (
       <div style={{ padding: "4px 8px 8px" }}>
         <div style={{ color: "rgba(0,0,0,0.75)" }}>
@@ -335,12 +356,21 @@ export default function Notifications() {
         </div>
         <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
           <Tag color="blue">{label}#{r.ref_id}</Tag>
+          {milestone && (
+            <Button size="small" icon={<LinkOutlined />} onClick={() => navigate(`/growth?child_id=${r.ref_id}`)}>
+              查看成长档案
+            </Button>
+          )}
           <span style={{ color: "rgba(0,0,0,0.45)" }}>
             {r.effective_status === "done" && r.handled_by_name
               ? `超管 ${r.handled_by_name} 已处理`
-              : r.effective_status === "invalid"
+              : r.effective_status === "done"
+                // 机器推导的终态（审核推进自动审结 / 里程碑知会）：如实显示状态文案；
+                // 原实现落在"待超管处理"——无人可处理却挂着待办提示，是误导。
                 ? r.status_text
-                : "待超管处理"}
+                : r.effective_status === "invalid"
+                  ? r.status_text
+                  : "待超管处理"}
           </span>
         </div>
       </div>
@@ -572,11 +602,13 @@ export default function Notifications() {
     <>
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         <Select
-          value={adminTab === "done" ? "done" : "todo"}
-          style={{ width: 170 }}
+          value={adminTab === "done" ? "done" : adminTab === "milestone" ? "milestone" : "todo"}
+          style={{ width: 190 }}
           options={[
             { value: "todo", label: todoTabCount === null ? "待处理" : `待处理（${todoTabCount}）` },
             { value: "done", label: "已处理" },
+            // G9：知会类单独一档（不进待办数、不进待处理/已处理名单）
+            { value: "milestone", label: "里程碑知会" },
           ]}
           onChange={changeAdminTab}
         />
@@ -584,7 +616,8 @@ export default function Notifications() {
           allowClear
           placeholder="事项类型"
           style={{ width: 180 }}
-          value={scene}
+          value={adminTab === "milestone" ? MILESTONE_SCENE : scene}
+          disabled={adminTab === "milestone"}  // 该视图固定按里程碑场景取数
           onChange={(v) => {
             const next = v || undefined;
             setScene(next);
@@ -628,7 +661,13 @@ export default function Notifications() {
         locale={{
           emptyText: (
             <PaintEmpty
-              message={adminTab === "todo" ? "没有待处理的申请，一切安好" : "暂无已处理记录"}
+              message={
+                adminTab === "todo"
+                  ? "没有待处理的申请，一切安好"
+                  : adminTab === "milestone"
+                    ? "暂无里程碑达成记录"
+                    : "暂无已处理记录"
+              }
             />
           ),
         }}

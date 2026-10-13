@@ -39,6 +39,10 @@ class ScanRequest(BaseSchema):
 
 class RenewRequest(BaseSchema):
     record_id: int
+    # G7（2026-10-13）：逾期书人工办理**必填**（写进审计留痕）；未逾期续借可不填。
+    reason: str | None = Field(
+        None, max_length=200, description="人工续借原因（逾期书必填，PRD §5.4 留痕）"
+    )
 
 
 class BorrowRecordResponse(BaseSchema):
@@ -287,7 +291,8 @@ def renew_book(
     admin: Any = Depends(require_perm("borrow.operate")),
     db: Session = Depends(get_db),
 ):
-    record = CirculationService(db).renew(admin, body.record_id)
+    """馆员代办续借（G7：逾期书须填 `reason`，写进审计留痕）。"""
+    record = CirculationService(db).renew(admin, body.record_id, body.reason)
     return BorrowRecordResponse.model_validate(record)
 
 

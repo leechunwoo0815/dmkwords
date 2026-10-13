@@ -251,7 +251,9 @@ def _on_reservation_released(event: ReservationExpiredEvent, db: Session) -> Non
 
 
 def _on_milestone_achieved(event: MilestoneAchievedEvent, db: Session) -> None:
-    from backend.domain.identity.models import Child
+    from backend.common.admin_notification_models import AdminNotification
+    from backend.common.admin_notifications import AdminNotifyService
+    from backend.domain.identity.models import Child, Parent
 
     child = db.get(Child, event.child_id)
     if not child:
@@ -269,6 +271,24 @@ def _on_milestone_achieved(event: MilestoneAchievedEvent, db: Session) -> None:
         ref_id=str(event.child_id),
         openid=_parent_openid(db, child.parent_id),
     )
+    # G9（2026-10-13 第五十五轮）：PRD §7.4"同时通知家长和馆员"的**馆员侧**——写管理端待办墙
+    # （运营主工作面）。一个节点一条（dedup_key=节点词数，撞唯一索引静默忽略）→ 重复达成不刷屏；
+    # 显示态由 todo_service 固定为"已达成·可线下表扬"，不计入待办数（知会而非待审，见 scene 常量注释）。
+    parent = db.get(Parent, child.parent_id) if child.parent_id else None
+    notify = AdminNotifyService(db)
+    for node in event.nodes:
+        notify.send(
+            scene=AdminNotification.SCENE_MILESTONE_ACHIEVED,
+            title=f"里程碑达成：{child.name} 累计 {node:,} 词",
+            content=(
+                f"{child.name} 达成阅读里程碑（累计 {node:,} 词），勋章已解锁"
+                "——可安排线下表扬、朋友圈或作为颁奖盛典候选。"
+            ),
+            ref_type=AdminNotification.REF_CHILD,
+            ref_id=child.id,
+            applicant_name=f"{parent.name if parent else ''}·{child.name}",
+            dedup_key=str(node),
+        )
 
 
 def register_notification_handlers() -> None:
