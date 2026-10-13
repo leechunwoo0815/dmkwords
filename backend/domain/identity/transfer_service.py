@@ -316,6 +316,9 @@ class TransferService:
         且仍超时的行才被推进（影响行数=0 即已被审核抢先，跳过不动）。
         """
         now = datetime.now()
+        # 文案里的"几小时"必须与**实际判定用的时限同源**（本仓老规矩：文案不许写死）。
+        # 2026-10-13 验收亲验：把配置临时改成 0 后，通知仍写"超过 72 小时"——文案与配置脱节。
+        timeout_hours = int(ConfigService(self.db).get_value("transfer_review_timeout_hours", "72"))
         rows = (
             self.db.query(TransferRequest)
             .filter(
@@ -358,7 +361,7 @@ class TransferService:
                     title="权益转让已超时自动取消",
                     content=(
                         f"权益转让申请（{source.name} → {target.name if target else '受让方'}）"
-                        "超过 72 小时未审核，已自动取消，双方锁定已解除。"
+                        f"超过 {timeout_hours} 小时未审核，已自动取消，双方锁定已解除。"
                     ),
                     category=Notification.CATEGORY_OTHER,
                     ref_type="transfer",
