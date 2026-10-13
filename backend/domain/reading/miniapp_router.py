@@ -353,6 +353,33 @@ def current_borrows(child_id: int, auth: Any = Depends(get_current_parent)):
     return ShelfService(db).current_borrows(child)
 
 
+class RenewSelfRequest(BaseSchema):
+    child_id: int
+
+
+@router.post("/borrows/{record_id}/renew")
+def renew_borrow_self(
+    record_id: int, body: RenewSelfRequest, auth: Any = Depends(get_current_parent)
+):
+    """家长自助续借（PRD §5.1「未逾期的书一键续借」；2026-10-13 第五十三轮 G6 落地）。
+
+    校验链与馆员代办同源（`CirculationService._load_renewable`）：越权/不存在同回应 404、
+    冻结期拒、会员状态无效拒、逾期拒、每本 1 次（配置）。延期从**原到期日**加 `renew_days`。
+    """
+    from backend.domain.circulation.service import CirculationService
+
+    parent, db = auth
+    child = child_of_parent(db, parent.id, body.child_id)
+    svc = CirculationService(db)
+    record = svc.renew_self(child, record_id)
+    return {
+        "record_id": record.id,
+        "due_at": str(record.due_at),
+        "renew_used": record.renew_used,
+        "renew_limit": svc.renew_meta()["renew_limit"],
+    }
+
+
 @router.get("/continue-listening")
 def continue_listening(child_id: int, auth: Any = Depends(get_current_parent)):
     """首页"继续听"卡：最近一次有进度但未读完（finished=0）的上一本。

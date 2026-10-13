@@ -529,7 +529,13 @@ class CirculationService:
         return record
 
     # ---------- 续借 ----------
-    def renew(self, admin, record_id: int) -> BorrowRecord:
+    def _load_renewable(self, record_id: int, *, owner_child_id: int | None = None) -> BorrowRecord:
+        """续借公共链：锁定读 + 全量校验 + 改期（**馆员代办与家长自助单一来源**）。
+
+        2026-10-13（第五十三轮 G6）：把校验链从 `renew` 抽出来，给家长自助
+        `renew_self` 复用——两套判据各写一遍必然漂移（本仓"同一判定写两遍"的老教训）。
+        `owner_child_id` 传入时按归属校验（越权与不存在**同回应**，不暴露他人记录）。
+        """
         record = (
             self.db.query(BorrowRecord)
             .filter(BorrowRecord.id == record_id, BorrowRecord.is_deleted == 0)
@@ -537,7 +543,7 @@ class CirculationService:
             .populate_existing()  # E-1/T21：锁定读，并发双续借防双延期双计数
             .first()
         )
-        if not record:
+        if not record or (owner_child_id is not None and record.child_id != owner_child_id):
             raise NotFoundError("借阅记录不存在")
         child = self.db.query(Child).filter(Child.id == record.child_id).first()
         if child and child.operation_locked:
@@ -559,6 +565,11 @@ class CirculationService:
         record.due_at = record.due_at + timedelta(days=renew_days)  # 从原到期日起算
         record.renew_used += 1
         self.db.flush()
+        return record
+
+    def renew(self, admin, record_id: int) -> BorrowRecord:
+        """馆员代办续借（留痕：操作人 = 管理员，action `circulation.renew`）。"""
+        record = self._load_renewable(record_id)
         publish_audit(
             self.db,
             admin=admin,
@@ -570,6 +581,26 @@ class CirculationService:
         )
         self.db.commit()
         return record
+
+    def renew_self(self, child: Child, record_id: int) -> BorrowRecord:
+        """家长自助续借（PRD §5.1「家长在小程序对**未逾期**的书一键续借」）。
+
+        与馆员代办**共用** `_load_renewable`（含锁定读与全部校验），差别只有两条：
+        · 归属校验（只能续自己孩子的记录，越权按"记录不存在"回应）；
+        · **不写管理员审计**——`audit_logs.actor_id` 语义是管理员 id，家长 id 混入会污染
+          操作人追溯；与家长侧其他自助动作（预约创建/取消、退款申请）口径一致，
+          自助续借的事实由 `borrow_records.due_at / renew_used` 承载。
+        """
+        record = self._load_renewable(record_id, owner_child_id=child.id)
+        self.db.commit()
+        return record
+
+    def renew_meta(self) -> dict:
+        """续借元数据（书架在借列表用：前端不猜"还能不能续"）。"""
+        return {
+            "renew_limit": int(ConfigService(self.db).get_value("renew_limit", "1")),
+            "renew_days": int(ConfigService(self.db).get_value("renew_days")),
+        }
 
     def book_due_remind(self) -> int:
         """借阅即将到期提醒（due_remind_days 节点；每节点一次）。"""

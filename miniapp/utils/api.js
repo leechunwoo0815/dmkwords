@@ -229,6 +229,10 @@ module.exports = {
   currentBorrows(childId) {
     return req.get('/api/miniapp/borrows', null, { params: { child_id: childId } })
   },
+  // 自助续借（PRD §5.1，2026-10-13 G6）：未逾期的书一键续借，从原到期日延长 renew_days 天
+  renewBorrow(recordId, childId) {
+    return req.post(`/api/miniapp/borrows/${recordId}/renew`, { child_id: childId })
+  },
 
   continueListening(childId) {
     return req.get('/api/miniapp/continue-listening', null, { params: { child_id: childId } })

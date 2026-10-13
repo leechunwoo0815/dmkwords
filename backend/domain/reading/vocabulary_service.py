@@ -216,7 +216,16 @@ class ShelfService:
         self.db = db
 
     def current_borrows(self, child: Child) -> list[dict]:
+        """当前在借（含续借元数据：家长自助续借的按钮依据，服务端算、前端不猜）。
+
+        2026-10-13（第五十三轮 G6）：补 `renew_used/renew_limit/renew_days/can_renew`。
+        `can_renew` 只判"未逾期 + 次数未用尽"（列表态）；冻结期/会员状态由提交时的
+        `CirculationService.renew_self` 兜底把关——**不把提交时的判定复制到列表**（避免两套）。
+        """
+        from backend.domain.circulation.service import CirculationService
+
         now = datetime.now()
+        meta = CirculationService(self.db).renew_meta()
         rows = (
             self.db.query(BorrowRecord, Book)
             .join(Book, BorrowRecord.book_id == Book.id)
@@ -240,6 +249,10 @@ class ShelfService:
                 "borrowed_at": str(r.borrowed_at),
                 "due_at": str(r.due_at),
                 "overdue": r.due_at < now,
+                "renew_used": r.renew_used,
+                "renew_limit": meta["renew_limit"],
+                "renew_days": meta["renew_days"],
+                "can_renew": r.due_at >= now and r.renew_used < meta["renew_limit"],
             }
             for r, b in rows
         ]

@@ -12,9 +12,9 @@
   开启 = 可放行、**每次限 1 本**、due = +72h、并生成 `admin.member_follow_up` 待办。
 - 「借出时自动创建阅读记录」按口实况：借出写的是**借阅记录**（书架在借列表的源头），
   阅读进度行在首次播放上报时创建（PRD §5.2 字面要求未实现，已登记 G8）。
-- 「小程序自助续借」**未实现**（无端点、无入口），故两个续借场景保留 `@draft`（G6）；
-  其中"馆员人工办理的上限"另立场景真跑，并把"逾期人工办理被硬拦 vs PRD §5.4 允许人工办理"
-  的差异如实标注（G7）。
+- **小程序自助续借已于 2026-10-13（第五十三轮 G6）落地**：`POST /api/miniapp/borrows/{id}/renew`
+  （与馆员代办**共用** `CirculationService._load_renewable` 校验链），本域两个续借场景全部真跑。
+- "逾期人工办理被硬拦 vs PRD §5.4 允许人工办理"的差异仍按**现状**断言并登记为 **G7**（待产品口径）。
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -598,6 +598,93 @@ def step_copy_maintenance(context):
     assert "维护中" in r.json()["detail"], r.text
 
 
+# ---------- 场景：续借一次七天（自助）/ 逾期图书不可续借（自助被拒） ----------
+
+
+@when("张女士在小程序续借")
+def step_renew_self(context):
+    r = context.client.post(
+        f"/api/miniapp/borrows/{context.renew_record_id}/renew",
+        json={"child_id": context.child["id"]},
+        headers=context.mini,
+    )
+    assert r.status_code == 200, r.text
+    context.renew_response = r.json()
+
+
+@then("新到期日比原到期日晚 {days:d} 天")
+def step_renew_gap(context, days):
+    due_after = datetime.fromisoformat(context.renew_response["due_at"])
+    expected = context.due_before + timedelta(days=days)
+    assert abs((due_after - expected).total_seconds()) < 2, (
+        f"自助续借同样从**原到期日**加 {days} 天：before={context.due_before} after={due_after}"
+    )
+
+
+@given("小明某书已逾期")
+def step_overdue_borrow(context):
+    from backend.domain.circulation.models import BorrowRecord
+
+    _, copy_ids = _book_with_copies(context, "逾期续借样例")
+    r = _borrow(context, context.child["id"], copy_id=copy_ids[0])
+    assert r.status_code == 200, r.text
+    context.renew_record_id = r.json()["id"]
+    with _db() as db:
+        row = db.query(BorrowRecord).filter(BorrowRecord.id == context.renew_record_id).first()
+        row.due_at = datetime.now() - timedelta(days=1)
+        row.status = BorrowRecord.STATUS_OVERDUE
+        db.commit()
+        context.due_before = row.due_at
+
+
+@when("尝试自助续借")
+def step_try_renew_self(context):
+    context.renew_attempt = context.client.post(
+        f"/api/miniapp/borrows/{context.renew_record_id}/renew",
+        json={"child_id": context.child["id"]},
+        headers=context.mini,
+    )
+
+
+@then("系统拒绝续借")
+def step_renew_rejected(context):
+    assert context.renew_attempt.status_code == 422, context.renew_attempt.text
+    assert "已逾期" in context.renew_attempt.json()["detail"], context.renew_attempt.text
+
+
+@then("馆员人工办理也不可突破一次续借上限")
+def step_admin_cannot_bypass(context):
+    """按**现状**断言两件事：① 逾期书的馆员续借同样被拒（无放行参数；PRD §5.4 允许人工办理的差异登记为 G7）；
+    ② 上限不是"自助才有"——馆员对新书续借一次后，第二次（代办或自助）一律拒绝。"""
+    staff = context.client.post(
+        "/api/admin/circulation/renew",
+        json={"record_id": context.renew_record_id},
+        headers=context.h,
+    )
+    assert staff.status_code == 422, (
+        f"现状：逾期书馆员也办不了（PRD §5.4 允许人工办理，差异登记为 G7）：{staff.text[:120]}"
+    )
+    _, copy_ids = _book_with_copies(context, "上限对照样例")
+    created = _borrow(context, context.child["id"], copy_id=copy_ids[0])
+    assert created.status_code == 200, created.text
+    record_id = created.json()["id"]
+    first = context.client.post(
+        "/api/admin/circulation/renew", json={"record_id": record_id}, headers=context.h
+    )
+    assert first.status_code == 200, first.text
+    second_staff = context.client.post(
+        "/api/admin/circulation/renew", json={"record_id": record_id}, headers=context.h
+    )
+    second_self = context.client.post(
+        f"/api/miniapp/borrows/{record_id}/renew",
+        json={"child_id": context.child["id"]},
+        headers=context.mini,
+    )
+    assert second_staff.status_code == 422 and second_self.status_code == 422, (
+        f"1 次上限谁也突破不了：代办={second_staff.status_code} 自助={second_self.status_code}"
+    )
+
+
 # ---------- 场景：馆员代办续借的上限（原「逾期图书不可续借」的人工办理部分，独立真跑） ----------
 
 
@@ -638,6 +725,7 @@ def step_renew_due(context, days):
 
 @then("该书续借机会已用尽 不可再次续借")
 def step_renew_exhausted(context):
+    """上限**谁都不能突破**（PRD §5.4）：馆员代办与家长自助两条路径都必须拒。"""
     again = context.client.post(
         "/api/admin/circulation/renew",
         json={"record_id": context.renew_record_id},
@@ -645,6 +733,13 @@ def step_renew_exhausted(context):
     )
     assert again.status_code == 422, again.text
     assert "续借机会已用完" in again.json()["detail"], again.text
+    self_again = context.client.post(
+        f"/api/miniapp/borrows/{context.renew_record_id}/renew",
+        json={"child_id": context.child["id"]},
+        headers=context.mini,
+    )
+    assert self_again.status_code == 422, self_again.text
+    assert "续借机会已用完" in self_again.json()["detail"], self_again.text
 
 
 @then("逾期书的馆员人工办理现状为硬拦（与 PRD §5.4「特殊情况可人工办理」不一致，见 G7）")

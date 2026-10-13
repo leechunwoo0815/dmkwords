@@ -4146,6 +4146,20 @@
         "title": "RenewRequest",
         "type": "object"
       },
+      "RenewSelfRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "child_id": {
+            "title": "Child Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "child_id"
+        ],
+        "title": "RenewSelfRequest",
+        "type": "object"
+      },
       "ReservationCancelRequest": {
         "additionalProperties": false,
         "properties": {
@@ -12780,6 +12794,67 @@
           }
         },
         "summary": "Current Borrows",
+        "tags": [
+          "miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/borrows/{record_id}/renew": {
+      "post": {
+        "description": "家长自助续借（PRD §5.1「未逾期的书一键续借」；2026-10-13 第五十三轮 G6 落地）。\n\n校验链与馆员代办同源（`CirculationService._load_renewable`）：越权/不存在同回应 404、\n冻结期拒、会员状态无效拒、逾期拒、每本 1 次（配置）。延期从**原到期日**加 `renew_days`。",
+        "operationId": "renew_borrow_self_api_miniapp_borrows__record_id__renew_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenewSelfRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Renew Borrow Self",
         "tags": [
           "miniapp"
         ]

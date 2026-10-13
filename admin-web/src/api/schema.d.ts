@@ -2536,6 +2536,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/miniapp/borrows/{record_id}/renew": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Renew Borrow Self
+         * @description 家长自助续借（PRD §5.1「未逾期的书一键续借」；2026-10-13 第五十三轮 G6 落地）。
+         *
+         *     校验链与馆员代办同源（`CirculationService._load_renewable`）：越权/不存在同回应 404、
+         *     冻结期拒、会员状态无效拒、逾期拒、每本 1 次（配置）。延期从**原到期日**加 `renew_days`。
+         */
+        post: operations["renew_borrow_self_api_miniapp_borrows__record_id__renew_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/miniapp/checkins": {
         parameters: {
             query?: never;
@@ -5615,6 +5638,11 @@ export interface components {
         RenewRequest: {
             /** Record Id */
             record_id: number;
+        };
+        /** RenewSelfRequest */
+        RenewSelfRequest: {
+            /** Child Id */
+            child_id: number;
         };
         /** ReservationCancelRequest */
         ReservationCancelRequest: {
@@ -10536,6 +10564,43 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    renew_borrow_self_api_miniapp_borrows__record_id__renew_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                record_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenewSelfRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

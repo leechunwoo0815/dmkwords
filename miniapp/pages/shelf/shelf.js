@@ -69,6 +69,10 @@ Page({
           record_id: b.record_id,
           dueText: this.dueText(b),
           overdue: !!b.overdue,
+          // 自助续借（G6）：能不能点由**服务端**算（can_renew），前端不猜
+          canRenew: !!b.can_renew,
+          renewDays: b.renew_days || 7,
+          renewUsed: b.renew_used || 0,
           passed: passedIds.includes(b.book_id),
         })),
         borrowCount: (borrows || []).length,
@@ -97,6 +101,32 @@ Page({
     if (days < 0) return `已逾期 ${-days} 天`
     if (days === 0) return '今天到期'
     return `${days} 天后到期`
+  },
+
+  // 自助续借（PRD §5.1，2026-10-13 G6）：二次确认（写明延期天数）→ 提交 → 刷新
+  onRenew(e) {
+    const item = e.currentTarget.dataset.item
+    const that = this
+    if (!item || !item.canRenew) return
+    wx.showModal({
+      title: '续借这本书',
+      content: `将从原到期日延长 ${item.renewDays} 天，每本书限续借 1 次。确认续借吗？`,
+      confirmColor: '#FF6B35',
+      success(res) {
+        if (!res.confirm) return
+        api.renewBorrow(item.record_id, that.data.childId)
+          .then(function (data) {
+            const due = data && data.due_at ? String(data.due_at).slice(0, 10) : ''
+            wx.showToast({ title: due ? `续借成功，${due} 到期` : '续借成功', icon: 'none' })
+            that.load()
+          })
+          .catch(function () {
+            // 失败 toast 已由 request.js 统一弹（逾期/机会已用完/冻结/会员状态）；
+            // 这里兜底刷新，防"按钮还在、其实已不能续"的状态漂移
+            that.load()
+          })
+      },
+    })
   },
 
   async onCancelFav(e) {
