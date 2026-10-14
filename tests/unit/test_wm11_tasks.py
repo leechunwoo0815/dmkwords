@@ -456,7 +456,8 @@ def test_task_board_and_run_log(client: TestClient):
     # 2026-09-23 新增 media_census（媒体体检：每日盘点孤儿图 + 回收站到期），15 → 16
     # 2026-10-08 新增 wechat_cert_refresh（WM12-A：微信平台证书轮换，每日 04:00），16 → 17
     # 同日 WM12-B 新增 payment_reconcile（每日资金对账，03:30），17 → 18
-    assert len(names) == 18
+    # 2026-10-14 新增 deposit_settle_remind（待结清每周提醒，第五十九批 G1：PRD §3.6「系统持续提醒馆员」），18 → 19
+    assert len(names) == 19
 
     _run(client, h, "member_expire_check")
     runs = client.get("/api/admin/tasks/runs", headers=h).json()["items"]

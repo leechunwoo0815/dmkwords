@@ -49,6 +49,13 @@ def _member_expire_remind(db: Session) -> int:
     return ChildService(db).member_expire_remind()
 
 
+def _deposit_settle_remind(db: Session) -> int:
+    """G1（2026-10-14）：待结清赔偿款每周提醒馆员（PRD §3.6「系统持续提醒馆员」）。"""
+    from backend.domain.billing.service import DepositService
+
+    return DepositService(db).unpaid_settle_weekly()
+
+
 def _pending_evaluation_weekly(db: Session) -> int:
     from backend.domain.identity.service import ChildService
 
@@ -205,7 +212,7 @@ def _payment_reconcile(db: Session) -> int:
     return int(result["diff_total"])
 
 
-# 18 项定时任务（WM13-4 新增 transfer_expiring_warn 后 12→13；WM14-B 新增
+# 19 项定时任务（第五十九批 +deposit_settle_remind）（WM13-4 新增 transfer_expiring_warn 后 12→13；WM14-B 新增
 # circle_rank_snapshot / circle_image_cleanup 后 13→15；2026-09-23 新增 media_census 后 15→16；
 # 2026-10-08 WM12-A 新增 wechat_cert_refresh 后 16→17；同日 WM12-B 新增 payment_reconcile 后 17→18；
 # 周月报定时生成不在本批）
@@ -218,6 +225,9 @@ TASKS: dict[str, TaskSpec] = {
     ),
     "pending_evaluation_weekly": TaskSpec(
         "pending_evaluation_weekly", "待评估每周名单", "会员", 3600, _pending_evaluation_weekly
+    ),
+    "deposit_settle_remind": TaskSpec(
+        "deposit_settle_remind", "待结清每周提醒", "资金", 3600, _deposit_settle_remind
     ),
     "reservation_expire_check": TaskSpec(
         "reservation_expire_check", "预约超时释放", "借阅", 300, _reservation_expire_check

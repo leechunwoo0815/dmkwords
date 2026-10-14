@@ -11,7 +11,6 @@ from decimal import Decimal
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from backend.common.admin_notification_models import AdminNotification
 from backend.common.config_service import ConfigService
 from backend.common.events import BookBorrowedEvent, BookReturnedEvent, event_bus
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
@@ -264,6 +263,7 @@ class CirculationService:
         # ---- 校验链 ----
         warnings: list[str] = []
         unpaid_override = False  # 未入会放行借阅：72 小时借期（R-313）
+        expired_override = False  # 过期放行借阅：生成「续费跟进」待办（PRD §3.7，2026-10-14 G11）
         # 会员状态段判定：**单一来源**（与卡面提示共用 borrow_gate.member_gate，别在两处各写一遍）
         allow_unpaid = ConfigService(self.db).get_value("allow_unpaid_offline_borrow") == "true"
         held_now = (
@@ -290,6 +290,7 @@ class CirculationService:
             unpaid_override = True
             warnings.append(f"未入会临时借书（原因：{override_reason}）：72 小时内归还或入会")
         elif gate_m.code == "expired" and not gate_m.reason:
+            expired_override = True
             warnings.append(f"会员已过期，馆员放行借书（原因：{override_reason}）")
 
         # 押金校验
@@ -394,6 +395,16 @@ class CirculationService:
         self.db.add(record)
         copy.status = BookCopy.STATUS_BORROWED
         self.db.flush()
+        # PRD §5.2：确认借出时**自动创建这本书的阅读记录**（第五十九批 G8；实现抽在 reading 域，
+        # 原子插入 + `uq_reading_progress_child_book` 唯一索引兜底，书后补音频时分母自愈）
+        from backend.domain.reading.service import ensure_progress_row
+
+        ensure_progress_row(
+            self.db,
+            child_id=child_id,
+            book_id=copy.book_id,
+            total_seconds=book.audio_duration_seconds or 0,
+        )
         # 借到手 = 预约目的达成：把该孩子对**这本书**的在用预约一并关掉（转"已借出"）。
         # 为什么要在这里做（用户 2026-09-21 反馈"预约的书成功借阅了就应该释放预约"）：
         # 预约占额度（FEAT-036），若借到书后预约还停在 active，它会**一直占着 1 个名额**，
@@ -436,23 +447,19 @@ class CirculationService:
             },
             reason=override_reason or "正常借书",
         )
-        # R-313：未入会临时借书 → 生成「入会跟进任务」（管理端待办，馆员跟进家长入会）。
-        # 幂等：同孩子 dedup_key 固定 → 多次放行只留一条；显示态由 todo_service 按
-        # 孩子会员状态实时推导（一旦入会即自动审结）。
-        if unpaid_override:
-            from backend.common.admin_notifications import AdminNotifyService
+        # 放行借书后的「会籍跟进」待办（两处口径同源，逻辑见 followups.py）：
+        # · 未入会 →「入会跟进」（R-313）；· 已过期 →「续费跟进」（PRD §3.7，G11）
+        from backend.domain.circulation.followups import (
+            send_join_followup,
+            send_renewal_followup,
+        )
 
-            AdminNotifyService(self.db).send(
-                scene=AdminNotification.SCENE_MEMBER_FOLLOW_UP,
-                title="入会跟进",
-                content=(
-                    f"{child.name} 未入会临时借书《{book.title}》（{due_hint}）"
-                    f"，放行原因：{override_reason}。请跟进家长办理入会。"
-                ),
-                ref_type=AdminNotification.REF_CHILD,
-                ref_id=child.id,
-                applicant_name=child.name,
+        if unpaid_override:
+            send_join_followup(
+                self.db, child=child, book=book, due_hint=due_hint, override_reason=override_reason
             )
+        if expired_override:
+            send_renewal_followup(self.db, child=child, book=book, override_reason=override_reason)
         event_bus.publish(
             BookBorrowedEvent(
                 child_id=child_id,

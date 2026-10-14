@@ -72,6 +72,23 @@ def coverage_of(intervals: list[list[int]]) -> int:
     return sum(e - s for s, e in intervals)
 
 
+def ensure_progress_row(db: Session, *, child_id: int, book_id: int, total_seconds: int) -> None:
+    """确保 (孩子, 书目) 有阅读进度行（PRD §5.2「借出时自动创建阅读记录」，第五十九批 G8）。
+
+    由 circulation.borrow 调用（放在本域因为 `reading_progress` 的归属在这里）；
+    原子插入 + `uq_reading_progress_child_book` 唯一索引兜底：并发借同书两册只留一行，
+    既有行原样保留（空更新）。`total_seconds` 先按书目音频时长写，书后补音频时由
+    `report_progress` 自愈刷新（见该函数内注释）。
+    """
+    from sqlalchemy.dialects.mysql import insert as mysql_insert
+
+    db.execute(
+        mysql_insert(ReadingProgress)
+        .values(child_id=child_id, book_id=book_id, total_seconds=total_seconds, is_deleted=0)
+        .on_duplicate_key_update(id=ReadingProgress.id)  # 空更新：保留既有行
+    )
+
+
 class ReadingService:
     def __init__(self, db: Session):
         self.db = db
@@ -138,6 +155,11 @@ class ReadingService:
                 .populate_existing()
                 .first()
             )
+
+        # G8（2026-10-14 第五十九批）：借出即建的进度行当时可能**还没有音频**（total_seconds=0），
+        # 之后馆员补传音频 → 这里把分母刷新成书目真实时长，避免覆盖率永远算 0（自愈，幂等）。
+        if progress.total_seconds != total:
+            progress.total_seconds = total
 
         # 构造本次区间
         start = (

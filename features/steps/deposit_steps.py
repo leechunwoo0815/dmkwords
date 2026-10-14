@@ -14,10 +14,11 @@
 - 小程序补缴受 R-313 权限矩阵约束——`member_status=none`（未缴费）返回 422「入会员后可用」，
   故"家长在小程序补缴"的场景先在 Given 里办入会（真实门店顺序也是先入会再押金）；
   同理"预约被硬拦截"必须让孩子在册，否则先撞"仅有效会员可预约"，测不到押金闸门。
-- "系统持续提醒馆员跟进待结清"的**在位实现** = 管理端押金列表恒显 `unpaid_balance`
-  + 借还台孩子卡面 `borrow_block` 回显欠款原因 + 预约硬拦。**主动提醒通道（管理端待办/推送）
-  尚未实现**，属已登记缺口（PRD §3.6「系统持续提醒馆员」），本文件只断言在位机制，
-  不假装有推送通道。
+- "系统持续提醒馆员跟进待结清"（PRD §3.6）＝ ①**在位可见性**（管理端押金列表恒显 `unpaid_balance`
+  + 借还台孩子卡面回显欠款原因 + 预约硬拦）**＋ ②主动提醒通道**。②原先未实现（缺口 G1，2026-10-13
+  如实登记），**2026-10-14 第五十九批已补齐**：每周任务 `deposit_settle_remind` 逐人写管理端待办
+  （`admin.deposit_settle`，内容含欠款金额），显示态按未结清余额推导（**补缴结清即自动审结**），
+  dedup 按 ISO 周。本步骤两层都断。
 - "定价 68 元的书"是**线下协商依据**，书目表没有 price 字段；赔偿金额由馆员登记时输入，
   场景里的元数就是登记金额。
 """
@@ -257,7 +258,8 @@ def step_fully_deducted(context, zero, diff):
 
 @then("系统持续提醒馆员跟进待结清")
 def step_pending_settlement_surfaced(context):
-    """在位提醒面（无主动推送，见文件头缺口说明）：管理端押金列表恒显待结清 + 借还台卡面回显。"""
+    """① 在位可见性（押金列表恒显 + 卡面回显）；② **主动提醒通道**（G1 已落地）：每周任务
+    把"待结清"写成管理端待办（待处理），补缴结清后自动审结（不靠人工销项）。"""
     listed = context.client.get(
         "/api/admin/deposits",
         params={"keyword": context.child_name},
@@ -270,6 +272,29 @@ def step_pending_settlement_surfaced(context):
         f"/api/admin/circulation/children/{context.child['id']}/card", headers=context.h
     ).json()
     assert "有未结清赔偿款" in (card.get("borrow_block") or ""), card
+
+    # ② 主动提醒通道（G1，2026-10-14 第五十九批落地）：跑真任务 → 待办墙实名待办
+    res = context.client.post("/api/admin/tasks/deposit_settle_remind/run", headers=context.h)
+    assert res.status_code == 200 and res.json().get("processed", 0) >= 1, res.text
+    inbox = context.client.get(
+        "/api/admin/admin-notifications", params={"page_size": 50}, headers=context.h
+    ).json()
+    mine = [
+        n
+        for n in inbox["items"]
+        if n["ref_type"] == "child"
+        and n["ref_id"] == str(context.child["id"])
+        and n["title"] == "待结清跟进"
+    ]
+    assert mine, f"待结清应有主动提醒待办：{[n['title'] for n in inbox['items']]}"
+    assert mine[0]["effective_status"] == "pending", mine[0]
+    assert "未结清" in mine[0]["content"], mine[0]
+    counts = context.client.get("/api/admin/todo-counts", headers=context.h).json()
+    assert counts["deposit_settle_followup"] >= 1, counts
+
+    # 闭环（补缴结清 → 自动审结）不在此处断：本步骤**不允许改状态**——同场景后面还要用
+    # "有待结清"这个前提（「待结清期间借书需人工放行」）→ 见红线「副作用步骤要放到最后」。
+    # 该闭环由单测覆盖：tests/unit/test_gap_fixes_20261014.py::test_g1_todo_auto_resolves_after_settled
 
 
 @then("待结清期间借书需馆员人工放行 预约被硬拦截")

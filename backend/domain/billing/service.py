@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import or_
@@ -319,6 +320,41 @@ class DepositService:
                 for r in ledgers[:20]
             ],
         }
+
+    def unpaid_settle_weekly(self) -> int:
+        """待结清每周提醒（PRD §3.6）：押金扣到 0 仍不足的部分记为"待结清"，**系统持续提醒馆员**。
+
+        2026-10-14（第五十九批 G1）：原实现只有"管理端恒显 + 操作时被拦"，**主动提醒通道未做**
+        （PRD §3.6 该行 2026-10-13 已如实标注缺口）。现在逐人写管理端待办（`admin.deposit_settle`），
+        显示态由 `todo_service` 按**未结清余额**推导（补缴结清即自动审结），`dedup_key` 取 **ISO 周**
+        → "持续提醒" = 每周一次、不刷屏。返回待结清人数（任务看板 processed 口径）。
+        """
+        from backend.common.admin_notification_models import AdminNotification
+        from backend.common.admin_notifications import AdminNotifyService
+
+        rows = (
+            self.db.query(Deposit).filter(Deposit.is_deleted == 0, Deposit.unpaid_balance > 0).all()
+        )
+        iso_year, iso_week, _ = datetime.now().isocalendar()
+        for dep in rows:
+            child = self.db.query(Child).filter(Child.id == dep.child_id).first()
+            name = child.name if child else f"孩子#{dep.child_id}"
+            AdminNotifyService(self.db).send(
+                scene=AdminNotification.SCENE_DEPOSIT_SETTLE,
+                title="待结清跟进",
+                content=(
+                    f"{name} 有未结清赔偿款 {dep.unpaid_balance} 元，请跟进补缴"
+                    f"（补缴结清后本条自动审结）。"
+                ),
+                ref_type=AdminNotification.REF_CHILD,
+                ref_id=dep.child_id,
+                applicant_name=name,
+                amount=dep.unpaid_balance,
+                dedup_key=f"week:{iso_year}-{iso_week}",
+            )
+        if rows:
+            self.db.commit()
+        return len(rows)
 
     def list_deposits(self, page: int, page_size: int, status: str | None, keyword: str | None):
 

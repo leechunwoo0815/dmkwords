@@ -54,6 +54,14 @@ class AdminNotification(BaseModel):
     # 一个节点一条（dedup_key=节点词数）、按孩子去重；显示态固定"已达成·可线下表扬"，
     # **不计入待办数**（待办数只统计需要人工审结的申请类事项）。
     SCENE_MILESTONE_ACHIEVED = "admin.milestone_achieved"
+    # G12（2026-10-14 第五十九批）：PRD §3.3「系统每周自动整理一份"待评估超过 7 天"的孩子名单
+    # **提醒馆员跟进**」——原先只返回一个计数（名单没落到任何人看得到的地方）。现在逐人写待办，
+    # 显示态按会员状态推导（转正/退会即自动审结），dedup_key=ISO 周（同一周只提醒一次）。
+    SCENE_PENDING_EVALUATION = "admin.pending_evaluation"
+    # G1（2026-10-14 第五十九批）：PRD §3.6「押金不够扣…差额记为"待结清"，**系统持续提醒馆员**」——
+    # 原先只有"随时可见 + 操作时被拦"（PRD 该行 2026-10-13 已如实标注缺口）。现在逐人写待办，
+    # 显示态按押金未结清余额推导（结清即自动审结），dedup_key=ISO 周（持续提醒 = 每周一次）。
+    SCENE_DEPOSIT_SETTLE = "admin.deposit_settle"
 
     # ref_type 取值
     REF_REFUND_REQUEST = "refund_request"

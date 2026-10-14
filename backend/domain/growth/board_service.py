@@ -45,6 +45,12 @@ class LeaderboardService:
             q = q.filter(WordsLedger.created_at >= start)
         if end is not None:
             q = q.filter(WordsLedger.created_at < end)
+        if not active_only:
+            # G10（2026-10-14 第五十九批）：总榜是"历史荣誉"，但**「未入会却有词账」是异常数据**
+            # （正常流程词账必须经测验入账、而测验要求入会）——它只可能出现在数据修复之后，
+            # 原先会直接出现在总榜上（家长看到没入会的孩子在榜上）。这里按 member_status 过滤掉；
+            # 过期/退会孩子**保留**（他们的历史荣誉口径不变，`is_history` 标记照旧）。
+            q = q.filter(Child.member_status != Child.MEMBER_NONE)
         if active_only:
             # 周期榜仅有效会员（R-317）；正式会员到期即剔除（D1：不依赖定时任务落库）
             today = datetime.now().date()

@@ -405,10 +405,34 @@ class ChildService:
         )
         self.db.commit()
 
+    @staticmethod
+    def _audit_rejected_change(admin, child: Child, *, to: str, guard: str) -> None:
+        """G13（2026-10-14 第五十九批）：被守卫拒绝的**状态变更尝试**留痕（独立会话）。
+
+        纯状态守卫（不是 matrix 拦截）走这里；留痕必须独立于主事务——拒绝即抛异常，
+        同事务写审计会随回滚一起丢（详见 `audit_events.publish_rejection_audit`）。
+        """
+        from backend.domain.catalog.audit_events import publish_rejection_audit
+
+        publish_rejection_audit(
+            actor=admin,
+            action="member.transition_rejected",
+            target_type="child",
+            target_id=str(child.id),
+            detail={"child": child.name, "from": child.member_status, "to": to, "guard": guard},
+            reason=f"状态变更被拒：{guard}",
+        )
+
     def mark_pending_evaluation(self, admin, child_id: int, reason: str) -> Child:
         """观察期 → 待评估（C13/决策 8：馆员手动标记留痕；到期自动转换任务在 WM11）。"""
         child = self._get_child(child_id)
         if child.member_status != Child.MEMBER_OBSERVATION:
+            self._audit_rejected_change(
+                admin,
+                child,
+                to=Child.MEMBER_PENDING_EVALUATION,
+                guard="仅观察期孩子可标记待评估",
+            )
             raise ValidationError(f"仅观察期孩子可标记待评估（当前状态 {child.member_status}）")
         self._transition(child, Child.MEMBER_PENDING_EVALUATION)
         self.db.flush()
@@ -433,6 +457,12 @@ class ChildService:
         沿用 OrderService 判定），收款确认后自动转正式会员。审计与订单同一事务提交。"""
         child = self._get_child(child_id)
         if child.member_status != Child.MEMBER_PENDING_EVALUATION:
+            self._audit_rejected_change(
+                admin,
+                child,
+                to=Child.MEMBER_FORMAL,
+                guard="仅待评估孩子可评估通过转正",
+            )
             raise ValidationError(f"仅待评估孩子可评估通过转正（当前状态 {child.member_status}）")
         if child.operation_locked:
             raise ValidationError("孩子正在转让/退会审核流程中，不能办理转正")
@@ -519,20 +549,45 @@ class ChildService:
         return changed
 
     def pending_evaluation_weekly(self) -> int:
-        """待评估每周名单（PRD §12 提醒行）：超过 N 天未评估的待评估孩子计数（馆员看板跟进）。"""
+        """待评估每周名单（PRD §3.3）：超过 N 天未评估的孩子 → **管理端待办提醒馆员跟进**。
+
+        2026-10-14（第五十九批 G12）：原实现只返回一个计数——PRD 原文要求"系统每周自动整理一份
+        『待评估超过 7 天』的孩子名单**提醒馆员跟进**"，计数落不到任何人手上（缺口登记于第五十八轮）。
+        现在逐人写待办（`admin.pending_evaluation`），显示态由 `todo_service` 按会员状态推导
+        （转正/退会即自动审结），`dedup_key` 取 **ISO 周** → 同一周重复跑只留一条，下周再提醒一次。
+        返回值仍是**名单人数**（任务看板 processed 口径不变）。
+        """
+        from backend.common.admin_notification_models import AdminNotification
+        from backend.common.admin_notifications import AdminNotifyService
         from backend.common.config_service import ConfigService
 
         threshold = int(ConfigService(self.db).get_value("pending_evaluation_remind_days", "7"))
-        cutoff = datetime.now() - timedelta(days=threshold)
-        return (
-            self.db.query(func.count(Child.id))
+        now = datetime.now()
+        cutoff = now - timedelta(days=threshold)
+        rows = (
+            self.db.query(Child)
             .filter(
                 Child.is_deleted == 0,
                 Child.member_status == Child.MEMBER_PENDING_EVALUATION,
                 Child.update_time < cutoff,
             )
-            .scalar()
+            .all()
         )
+        iso_year, iso_week, _ = now.isocalendar()
+        for child in rows:
+            days = max(threshold, (now - child.update_time).days)
+            AdminNotifyService(self.db).send(
+                scene=AdminNotification.SCENE_PENDING_EVALUATION,
+                title="待评估跟进",
+                content=f"{child.name} 待评估已 {days} 天，请及时跟进评估（转正或办理退会）。",
+                ref_type=AdminNotification.REF_CHILD,
+                ref_id=child.id,
+                applicant_name=child.name,
+                dedup_key=f"week:{iso_year}-{iso_week}",
+            )
+        if rows:
+            self.db.commit()
+        return len(rows)
 
     def member_expire_remind(self) -> int:
         """会员到期提醒（PRD §12：前 30/14/7 天 + 当天；每节点只发一次）。

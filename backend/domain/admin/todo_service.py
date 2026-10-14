@@ -70,12 +70,23 @@ class AdminTodoService:
         activity_states = self._activity_states(by_type.get("activity", []))
         enroll_states = self._enroll_states(by_type.get("activity_enrollment", []))
         child_states = self._child_states(by_type.get("child", []))
+        settle_states = self._deposit_states(
+            [n for n in notifications if n.scene == AdminNotification.SCENE_DEPOSIT_SETTLE]
+        )
 
         for n in notifications:
             if n.scene == AdminNotification.SCENE_MILESTONE_ACHIEVED:
                 # G9（2026-10-13 第五十五轮）：里程碑达成是**知会**（线下表扬/朋友圈/颁奖候选），
                 # 没有"待审"状态机 → 固定显示态、不计入待办数（PRD §7.4 口径）。
                 result[n.id] = {"effective_status": ST_DONE, "status_text": "已达成·可线下表扬"}
+            elif n.scene == AdminNotification.SCENE_PENDING_EVALUATION:
+                # G12（2026-10-14 第五十九批）：待评估跟进——仍处待评估 → 待处理；
+                # 馆员处理（转正/退会/过期）后**自动审结**，不需要人工销项。
+                result[n.id] = self._decide_pending_evaluation(child_states.get(n.ref_id))
+            elif n.scene == AdminNotification.SCENE_DEPOSIT_SETTLE:
+                # G1（2026-10-14 第五十九批)：待结清跟进——仍有未结清余额 → 待处理；
+                # 补缴结清/押金账户消失 → 自动审结。
+                result[n.id] = self._decide_deposit_settle(settle_states.get(n.ref_id))
             elif n.ref_type == "refund_request":
                 status = refund_states.get(n.ref_id)
                 if n.scene == AdminNotification.SCENE_REFUND_EXECUTE_FAILED:
@@ -181,29 +192,91 @@ class AdminTodoService:
         return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
 
     @staticmethod
+    def _decide_pending_evaluation(member_status: str | None) -> dict:
+        """G12：待评估跟进显示态——仍待评估 → 待处理；其余（转正/退会/过期/清理）→ 已审结。
+
+        孩子被物理清理等极端情况（status 为 None）→ 已审结兜底（不挂待办墙）。
+        """
+        from backend.domain.identity.models import Child
+
+        if member_status == Child.MEMBER_PENDING_EVALUATION:
+            return {"effective_status": ST_PENDING, "status_text": TEXT_PENDING}
+        return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
+
+    @staticmethod
+    def _decide_deposit_settle(unpaid_balance) -> dict:
+        """G1：待结清跟进显示态——仍有未结清余额 → 待处理；结清/查无押金账户 → 已审结。"""
+        if unpaid_balance is None:
+            return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
+        if unpaid_balance > 0:
+            return {"effective_status": ST_PENDING, "status_text": TEXT_PENDING}
+        return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
+
+    def _deposit_states(self, notifications: list) -> dict[str, object]:
+        """{child_id: 待结清余额}（ref_id=child，批量查押金表，零 N+1）。"""
+        if not notifications:
+            return {}
+        from backend.domain.billing.models import Deposit
+
+        ids = [int(n.ref_id) for n in notifications]
+        rows = self.db.query(Deposit.child_id, Deposit.unpaid_balance).filter(
+            Deposit.child_id.in_(ids), Deposit.is_deleted == 0
+        )
+        return {str(c): b for c, b in rows}
+
+    @staticmethod
     def _decide_member_followup(member_status: str | None) -> dict:
-        """R-313 入会跟进：孩子仍**未入会**（none）→ 待处理；一旦入会 → 自动审结。
+        """会籍跟进（ref_type=child）显示态：**未入会 / 已过期 → 待处理；成为有效会员 → 自动审结**。
+
+        - 未入会（none）→ 「入会跟进」待办（R-313 原有口径）；
+        - 已过期（expired，含"formal 但到期日已过"的读时兜底态）→ 「续费跟进」待办
+          （PRD §3.7，2026-10-14 G11）。
+        两者共用同一 scene，靠通知标题区分；家长一旦入会/续费即自动审结，无需人工销项。
 
         孩子被物理清理等极端情况 → 已审结兜底（不挂待办墙，与其它场景同款防御）。"""
         from backend.domain.identity.models import Child
 
         if member_status is None:
             return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
-        if member_status == Child.MEMBER_NONE:
+        if member_status in (Child.MEMBER_NONE, Child.MEMBER_EXPIRED):
             return {"effective_status": ST_PENDING, "status_text": TEXT_PENDING}
         return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
 
+    def _scene_pending_count(self, scene: str) -> int:
+        """某场景下**显示态为待处理**的条数（与列表同源 resolver，禁各算一遍）。"""
+        rows = (
+            self.db.query(AdminNotification)
+            .filter(AdminNotification.scene == scene, AdminNotification.is_deleted == 0)
+            .all()
+        )
+        resolved = self.resolve_many(rows)
+        return sum(1 for n in rows if resolved[n.id]["effective_status"] == ST_PENDING)
+
     def _child_states(self, notifications: list) -> dict[str, str]:
-        """R-313：{child_id: member_status}（ref_type=child 批量查，零 N+1）。"""
+        """{child_id: **有效**会员状态}（ref_type=child 批量查，零 N+1）。
+
+        取的是**有效状态**（不是库里的原始 status）：`formal` 但到期日已过 → 归一为 `expired`，
+        与 `Child.is_expired_member` 的读时兜底同口径。为什么必须归一：过期放行的「续费跟进」
+        待办生成在**任务落库之前**（馆员当场放行那一刻），若只看原始 status（还是 formal），
+        待办会立刻被判成"已审结"而挂不上墙——跟进就此丢失。
+        """
         if not notifications:
             return {}
+        from datetime import date
+
         from backend.domain.identity.models import Child
 
         ids = [int(n.ref_id) for n in notifications]
-        rows = self.db.query(Child.id, Child.member_status).filter(
+        rows = self.db.query(Child.id, Child.member_status, Child.member_expire).filter(
             Child.id.in_(ids), Child.is_deleted == 0
         )
-        return {str(i): s for i, s in rows}
+        today = date.today()
+        return {
+            str(i): (
+                Child.MEMBER_EXPIRED if s == Child.MEMBER_FORMAL and exp and exp < today else s
+            )
+            for i, s, exp in rows
+        }
 
     @staticmethod
     def _decide_enroll(status: str | None) -> dict:
@@ -541,6 +614,17 @@ class AdminTodoService:
                 if resolved_followup[n.id]["effective_status"] == ST_PENDING
             )
             counts["admin_total"] += counts["member_follow_up"]
+            # G12/G1（2026-10-14 第五十九批）：待评估跟进 / 待结清跟进——同一 resolver 口径
+            # （显示态 pending 才计入；馆员处理完自动归零），进 admin_total（运营视角一个数）。
+            counts["pending_evaluation_followup"] = self._scene_pending_count(
+                AdminNotification.SCENE_PENDING_EVALUATION
+            )
+            counts["deposit_settle_followup"] = self._scene_pending_count(
+                AdminNotification.SCENE_DEPOSIT_SETTLE
+            )
+            counts["admin_total"] += (
+                counts["pending_evaluation_followup"] + counts["deposit_settle_followup"]
+            )
             # WM14-A：阅读圈未赞数（member.manage 角色可赞——徽标语义是"你能处理的"）
             from backend.domain.reading_circle.admin_service import AdminCircleService
 

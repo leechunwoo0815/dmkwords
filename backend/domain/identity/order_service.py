@@ -453,6 +453,7 @@ class OrderService(OrderGuardMixin):
                 order.child_id,
                 Child.MEMBER_OBSERVATION,
                 self._config_int("observation_period_days", 30),
+                actor=actor,
             )
         elif order.order_type == Order.TYPE_FORMAL:
             child = self.db.query(Child).filter(Child.id == order.child_id).first()
@@ -466,7 +467,7 @@ class OrderService(OrderGuardMixin):
                 )
                 else date.today()
             )
-            self._transition_member(child, Child.MEMBER_FORMAL)
+            self._transition_member(child, Child.MEMBER_FORMAL, actor=actor)
             child.member_start = child.member_start or date.today()
             # 年费时长进配置（审查 P2-3）：改口径只改配置，不发版
             child.member_expire = base + timedelta(days=self._config_int("formal_period_days", 365))
@@ -557,17 +558,34 @@ class OrderService(OrderGuardMixin):
             db=self.db,
         )
 
-    def _open_membership(self, child_id: int, status: str, days: int) -> Child:
+    def _open_membership(self, child_id: int, status: str, days: int, *, actor=None) -> Child:
         child = self.db.query(Child).filter(Child.id == child_id).first()
-        self._transition_member(child, status)
+        self._transition_member(child, status, actor=actor)
         today = date.today()
         child.member_start = today
         child.member_expire = today + timedelta(days=days)
         self.db.flush()
         return child
 
-    def _transition_member(self, child: Child, new_status: str) -> None:
+    def _transition_member(self, child: Child, new_status: str, *, actor=None) -> None:
         if not child.can_transition(new_status):
+            # G13（2026-10-14 第五十九批）：**违规尝试留痕**。这里必须用独立会话写审计——
+            # 拒绝要抛异常、主事务（订单结算等）会整体回滚，同事务写的留痕必然丢失。
+            from backend.domain.catalog.audit_events import publish_rejection_audit
+
+            publish_rejection_audit(
+                actor=actor,
+                action="member.transition_rejected",
+                target_type="child",
+                target_id=str(child.id),
+                detail={
+                    "child": child.name,
+                    "from": child.member_status,
+                    "to": new_status,
+                    "guard": "ALLOWED_TRANSITIONS（转移矩阵）",
+                },
+                reason="状态机拦截：转移矩阵不允许该流转",
+            )
             raise ValidationError(
                 f"会员状态不允许从 {child.member_status} 变更为 {new_status}（转移矩阵拦截）"
             )

@@ -1546,13 +1546,16 @@ def step_child_none(context, child_name):
 def step_none_absent(context):
     """周期榜（周/月/年）按 R-317 只含有效会员 → 未入会必不出现（已断言）。
 
-    **如实标注缺口 G10**：`未入会但账上有词` 的异常数据仍会进**总榜**——`_entries(active_only=False)`
-    只过滤 `is_deleted`，而总榜的设计意图是"历史学员（过期/退会）"。该状态正常流程不可达
-    （词账需先入会），只在数据修复后出现；本步骤按现状只断言周期榜，不假装总榜也干净。
+    **G10 已修（2026-10-14 第五十九批）**：总榜按设计要收"历史学员（过期/退会）"，但
+    `未入会却有词账` 是**异常数据**（正常流程不可达，只可能出现在数据修复之后）——原先会直接
+    出现在总榜上。现在 `_entries(active_only=False)` 额外过滤 `member_status == none`；
+    过期/退会孩子的历史荣誉照旧保留。本步骤继续断周期榜，并**加断总榜也不含未入会孩子**。
     """
     for period in ("week", "month", "year"):
         board = _board(context, period)
         assert _entry(board, context.other["id"]) is None, f"{period} 榜不应出现未入会孩子"
+    total = _board(context, "total")
+    assert _entry(total, context.other["id"]) is None, "总榜也不应出现「未入会却有词账」的异常数据"
 
 
 @given("小明本周 {this_week:d} 词 上周 {last_week:d} 词")
@@ -1648,12 +1651,22 @@ def step_no_visibility_toggle(context):
 def step_soft_delete(context):
     _member(context)
     context.other = _child_api(context, "软删孩子", english_name="Ghost")
+    # 2026-10-14（第五十九批 G10）：总榜已过滤「未入会却有词账」的异常数据 →
+    # 造数孩子必须先入会（否则「删前应在榜上」的前提不成立，测的就不是软删了）
+    _make_active(context, context.other["id"])
     _seed_words(context.other["id"], 4000, tag="（待软删）")
     assert _entry(_board(context, "total"), context.other["id"]) is not None, "删前应在榜上"
-    r = context.client.delete(
-        f"/api/admin/members/children/{context.other['id']}", headers=context.h
-    )
-    assert r.status_code == 200, r.text
+    # 2026-10-14（第五十九批）：**软删走「数据修复」路径（直改库）**——场景原文就是
+    # "超管因数据修复软删除"。为什么不能走 API：`DELETE /members/children/{id}` 对**有订单**
+    # 的孩子是 409 守卫（`ChildService.delete`：成员必有收款订单）→ 而"在榜"的孩子又必须是成员
+    # （G10 之后未入会的异常数据不进总榜）→ **两条守卫合起来让"API 删掉一个在榜孩子"不可达**。
+    # 数据修复的现实路径就是直改 `is_deleted`（与"不可达态用 DB 直插"同一手法）；本场景要验的是
+    # **总榜滤软删**这个判据，不是删除端点本身（删除守卫由订单守卫自己的用例覆盖）。
+    from backend.domain.identity.models import Child
+
+    with _db() as db:
+        db.query(Child).filter(Child.id == context.other["id"]).update({"is_deleted": 1})
+        db.commit()
 
 
 @then("该学生从总榜消失")

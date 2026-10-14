@@ -10,8 +10,10 @@
 - AR 是**软提示**：`warnings` 里出现"AR 超范围提示：孩子 AR x，本书 AR y（不拦截，请确认）"。
 - 未入会：开关 `allow_unpaid_offline_borrow` 关闭 = **HARD 拦截（填原因也放不出去）**；
   开启 = 可放行、**每次限 1 本**、due = +72h、并生成 `admin.member_follow_up` 待办。
-- 「借出时自动创建阅读记录」按口实况：借出写的是**借阅记录**（书架在借列表的源头），
-  阅读进度行在首次播放上报时创建（PRD §5.2 字面要求未实现，已登记 G8）。
+- 「借出时自动创建阅读记录」（PRD §5.2）＝ 借出**立刻写借阅记录**（书架在借列表的源头）
+  **＋ 立刻建阅读进度行**。后者原先是"首次播放上报才建"（缺口 G8，2026-10-13 登记），
+  **2026-10-14 第五十九批已按字面补齐**：`circulation.borrow` → `reading.ensure_progress_row`
+  （原子插入 + 唯一索引兜底，`total_seconds` 取音频时长；书后补音频由上报自愈刷新分母）。
 - **小程序自助续借已于 2026-10-13（第五十三轮 G6）落地**：`POST /api/miniapp/borrows/{id}/renew`
   （与馆员代办**共用** `CirculationService._load_renewable` 校验链），本域两个续借场景全部真跑。
 - "逾期人工办理被硬拦 vs PRD §5.4 允许人工办理"的差异仍按**现状**断言并登记为 **G7**（待产品口径）。
@@ -255,11 +257,11 @@ def step_record_created(context, count):
 
 @then("系统自动创建该书的阅读记录")
 def step_reading_record(context):
-    """按口实况断言"孩子书架立刻能看到、无需馆员登记"。
+    """按 PRD §5.2 字面断言：借出即创建**阅读记录**（两层都断）。
 
-    **如实标注**：借出写的是**借阅记录**（`borrow_records`，书架在借列表的源头）；
-    **阅读进度行**（`reading_progress`）在首次播放上报时创建——PRD §5.2 字面写"借出时自动创建
-    阅读记录"未按字面实现，属口径差（已登记 docs/09 第五十二轮 G8）。
+    ① 借阅记录（`borrow_records`）→ 孩子书架在借列表立刻可见、无需馆员登记；
+    ② 阅读进度行（`reading_progress`）→ **借出当时就已经存在**（第五十九批 G8 补齐；
+    原先要等首次播放上报才建）。
     """
     shelf = context.client.get(
         "/api/miniapp/borrows", params={"child_id": context.child["id"]}, headers=context.mini
@@ -269,6 +271,22 @@ def step_reading_record(context):
     rows = data["items"] if isinstance(data, dict) and "items" in data else data
     hits = [r for r in rows if r.get("book_id") == context.record["book_id"]]
     assert hits, f"借出后孩子的书架/在借列表必须立刻出现这本书：{rows}"
+
+    # ② 阅读进度行：借出当时就建（G8 补齐；原先要等首次播放上报）
+    from backend.domain.reading.models import ReadingProgress
+
+    with _db() as db:
+        row = (
+            db.query(ReadingProgress)
+            .filter(
+                ReadingProgress.child_id == context.child["id"],
+                ReadingProgress.book_id == context.record["book_id"],
+                ReadingProgress.is_deleted == 0,
+            )
+            .first()
+        )
+    assert row is not None, "PRD §5.2：确认借出时系统应同时自动创建这本书的阅读记录（进度行）"
+    assert row.finished == 0 and row.coverage_seconds == 0, (row.finished, row.coverage_seconds)
 
 
 # ---------- 场景：借阅上限校验 ----------
