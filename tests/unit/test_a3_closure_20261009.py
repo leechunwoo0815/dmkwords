@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from datetime import time as dtime
 
 from sqlalchemy import text
 
@@ -96,12 +97,16 @@ def test_book_due_reminder_catches_up_after_downtime(client):
     # 真实补发场景：节点表只有"1 天后"，而这本书**昨天就该命中 1 天节点**（昨天它=1 天后），
     # 但任务昨天没跑（停机）→ 今天它已经"今天到期"。精确匹配的旧实现永久漏发；
     # 带 1 天补发窗口的新实现今天仍发出，文案按实际天数说"今天"。
+    # 2026-10-13 修时刻敏感（本批门禁在 23:2x 跑时抓到）：原写 `now + 2 小时`——晚上 22 点后
+    # 这个时刻跨到明天，`actual_days` 变 1、文案成"1 天后"，**与代码无关、与跑测时刻有关**。
+    # 改成"今天中午"：任何时刻跑都落在今天（文案必为"今天"），且仍在 1 天补发窗口
+    # [今天, 后天) 内——语义与原来的"昨天=1 天后、今天=今天到期"一致但不再看表。
     with _db() as db:
         db.execute(
             text("UPDATE system_configs SET config_value='1' WHERE config_key='due_remind_days'")
         )
         db.commit()
-    _borrow_record(child["id"], datetime.now() + timedelta(hours=2))
+    _borrow_record(child["id"], datetime.combine(datetime.now().date(), dtime(12, 0)))
 
     from backend.domain.circulation.service import CirculationService
 
