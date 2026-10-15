@@ -37,6 +37,24 @@ from backend.domain.catalog.audit_events import publish_audit
 #: 后续新增同类（纯知会、无人工审结动作）的 scene 时加进本元组即可。
 NOTICE_SCENES: tuple[str, ...] = (AdminNotification.SCENE_MILESTONE_ACHIEVED,)
 
+#: **人工销项类场景**（2026-10-14 第六十轮新增）：事项**没有可推导显示态的业务单据**或
+#: 推导依据（报损赔偿要等馆员线下定赔、资金异常要人工核查、活动订单作废要知会收银台），
+#: 故生成即「待处理」，馆员跟进完后**手动标记已处理**收口（T20c 覆盖层对 pending 生效）。
+#:
+#: 为什么必须在这里显式列举：`resolve_many` 原先**只按 `ref_type` 分派**，这三类
+#: （2026-10-12 拍板 P4/P5/P10 新增）的 ref_type 分别撞上了别人的分支——
+#: `copy_damage_compensation`/`payment_anomaly` 用 `REF_CHILD` → 落进「入会跟进」推导
+#: （孩子是有效会员就显示"已审结"，赔偿待办等于挂不上墙）；`activity_order_voided` 用
+#: `REF_ACTIVITY` → 落进「活动批量退款」推导（活动已取消、无退款单 → 立即"已审结"）。
+#: 且 `payment_anomaly` 的 ref_id 是**订单号 `DMK…`**（非数字），流经 `_child_states` 的
+#: `int()` 会抛 ValueError → **整张待办墙 500**（超管视角 `/to-do-counts` 与 `/inbox` 同挂）。
+#: 场景一级判定放在 ref_type 分派之前，两个症状一并消除。
+MANUAL_PENDING_SCENES: dict[str, str] = {
+    AdminNotification.SCENE_COPY_DAMAGE_COMPENSATION: "赔偿待处理",
+    AdminNotification.SCENE_PAYMENT_ANOMALY: "资金异常·待核查",
+    AdminNotification.SCENE_ACTIVITY_ORDER_VOIDED: "已作废·请知会收银台",
+}
+
 
 class AdminTodoService:
     """WM13 管理待办查询/聚合/显示态解析（编排层）。
@@ -70,12 +88,21 @@ class AdminTodoService:
         activity_states = self._activity_states(by_type.get("activity", []))
         enroll_states = self._enroll_states(by_type.get("activity_enrollment", []))
         child_states = self._child_states(by_type.get("child", []))
+        reservation_states = self._state_map(
+            AdminNotification.REF_RESERVATION, by_type, self._reservation_states()
+        )
         settle_states = self._deposit_states(
             [n for n in notifications if n.scene == AdminNotification.SCENE_DEPOSIT_SETTLE]
         )
 
         for n in notifications:
-            if n.scene == AdminNotification.SCENE_MILESTONE_ACHIEVED:
+            if n.scene in MANUAL_PENDING_SCENES:
+                # 2026-10-14 第六十轮：人工销项类**先于 ref_type 判定**（理由见常量处注释）
+                result[n.id] = {
+                    "effective_status": ST_PENDING,
+                    "status_text": MANUAL_PENDING_SCENES[n.scene],
+                }
+            elif n.scene == AdminNotification.SCENE_MILESTONE_ACHIEVED:
                 # G9（2026-10-13 第五十五轮）：里程碑达成是**知会**（线下表扬/朋友圈/颁奖候选），
                 # 没有"待审"状态机 → 固定显示态、不计入待办数（PRD §7.4 口径）。
                 result[n.id] = {"effective_status": ST_DONE, "status_text": "已达成·可线下表扬"}
@@ -107,6 +134,10 @@ class AdminTodoService:
             elif n.ref_type == "child":
                 # R-313：入会跟进——按孩子会员状态实时推导（入会即自动审结）
                 result[n.id] = self._decide_member_followup(child_states.get(n.ref_id))
+            elif n.ref_type == AdminNotification.REF_RESERVATION:
+                # G5（2026-10-14 第六十轮）：预约异常待跟进——预约仍在 exception → 待处理；
+                # 单据推进（ended/消失）或馆员手动标记 → 自动审结。
+                result[n.id] = self._decide_reservation(reservation_states.get(n.ref_id))
             elif n.ref_type == "activity_enrollment":
                 # T6：报名待确认——pending_payment→待处理；enrolled/checked_in/
                 # refund_pending→已审结（收款/流转完成）；cancelled→已失效
@@ -212,6 +243,34 @@ class AdminTodoService:
             return {"effective_status": ST_PENDING, "status_text": TEXT_PENDING}
         return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
 
+    @staticmethod
+    def _decide_reservation(status: str | None) -> dict:
+        """G5：预约异常待跟进显示态——仍是 `exception` → 待处理；单据推进/消失 → 已审结。
+
+        `exception` 是预约的终态（没有代码路径把它改回去），所以这条待办正常就靠馆员
+        线下跟进后**手动标记已处理**收口；预约行被软删/物理清理等极端情况按已审结兜底。
+        """
+        from backend.domain.reading.models import Reservation
+
+        if status is None:
+            return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
+        if status == Reservation.STATUS_EXCEPTION:
+            return {"effective_status": ST_PENDING, "status_text": TEXT_PENDING}
+        return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
+
+    def _reservation_states(self):
+        """{预约id: status}（ref_id=reservation，批量查，零 N+1）。"""
+        from backend.domain.reading.models import Reservation
+
+        def q(ids: list[str]) -> dict[str, str]:
+            rows = self.db.query(Reservation.id, Reservation.status).filter(
+                Reservation.id.in_([int(i) for i in ids]),
+                Reservation.is_deleted == 0,
+            )
+            return {str(r.id): r.status for r in rows}
+
+        return q
+
     def _deposit_states(self, notifications: list) -> dict[str, object]:
         """{child_id: 待结清余额}（ref_id=child，批量查押金表，零 N+1）。"""
         if not notifications:
@@ -266,7 +325,12 @@ class AdminTodoService:
 
         from backend.domain.identity.models import Child
 
-        ids = [int(n.ref_id) for n in notifications]
+        # 2026-10-14 第六十轮：**非数字 ref_id 必须跳过**——`ref_type=child` 是张通用标签，
+        # 挂在这上面的不都是孩子 id：资金异常待办挂的是**订单号 `DMK…`**、报损待办在"未在借"
+        # 时挂的是**副本 id**（与孩子 id 同域，错查会读到别人的会员状态）。
+        # 原先裸 `int(n.ref_id)` 遇订单号直接 ValueError → 超管的待办墙与计数**整页 500**。
+        # 这些场景的显示态已由 `MANUAL_PENDING_SCENES` 在进入本函数前定好，这里只需不炸。
+        ids = [int(n.ref_id) for n in notifications if str(n.ref_id).isdigit()]
         rows = self.db.query(Child.id, Child.member_status, Child.member_expire).filter(
             Child.id.in_(ids), Child.is_deleted == 0
         )
@@ -512,6 +576,12 @@ class AdminTodoService:
             "transfer_pending": 0,
             "transfer_expiring": 0,
             "activity_batch_refund": 0,
+            # 2026-10-12 拍板三类（活动订单作废 / 副本报损赔偿 / 资金异常）——原先缺这三个键，
+            # 结果既没被 scene_key 计数落桶、也没进 admin_total（**待办墙有、徽标没有**）。
+            # 2026-10-14 第六十轮补齐：口径 = 与收件箱 pending_count 严格一致（同 resolver）。
+            "activity_orders_voided": 0,
+            "copy_damage_pending": 0,
+            "payment_anomaly": 0,
             "order_pending_manual": 0,
             "admin_total": 0,
             # T1（计数同源第 6 案）：家长通知未读全量数——胶囊兜底数据源，
@@ -521,6 +591,8 @@ class AdminTodoService:
             "activity_enroll_pending": 0,
             # R-313：入会跟进待办（member.manage 角色可见可处理；计入 admin_total）
             "member_follow_up": 0,
+            # G5（2026-10-14 第六十轮）：预约异常待跟进（副本转维护/遗失且无副本可换）——计入 admin_total
+            "reservation_exception": 0,
             # WM14-A：阅读圈今日新帖未馆长赞数（冷启动巡场动线——单独口径
             # 不进 admin_total，侧边栏阅读圈徽标+页顶胶囊共用同一源）
             "circle_unliked": 0,
@@ -550,6 +622,8 @@ class AdminTodoService:
                 AdminNotification.SCENE_ACTIVITY_ORDER_VOIDED: "activity_orders_voided",
                 AdminNotification.SCENE_COPY_DAMAGE_COMPENSATION: "copy_damage_pending",
                 AdminNotification.SCENE_PAYMENT_ANOMALY: "payment_anomaly",
+                # G5（2026-10-14 第六十轮）：预约异常待跟进
+                AdminNotification.SCENE_RESERVATION_EXCEPTION: "reservation_exception",
             }
             for n in all_rows:
                 if resolved[n.id]["effective_status"] != ST_PENDING:
@@ -565,6 +639,11 @@ class AdminTodoService:
                     "transfer_pending",
                     "transfer_expiring",
                     "activity_batch_refund",
+                    # 2026-10-12 三类 + 2026-10-14 G5 预约异常，均与收件箱 pending_count 同源
+                    "activity_orders_voided",
+                    "copy_damage_pending",
+                    "payment_anomaly",
+                    "reservation_exception",
                 )
             )
         if role_has_permission(admin.role, "member.manage"):

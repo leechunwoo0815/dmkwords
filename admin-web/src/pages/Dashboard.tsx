@@ -66,6 +66,8 @@ const TODO_ROWS: { key: keyof TodoCounts; label: string; route: string }[] = [
   { key: "transfer_pending", label: "待审转让", route: "/refund-center" },
   { key: "activity_batch_refund", label: "活动批量退款", route: "/activities" },
   { key: "transfer_expiring", label: "转让临近超时", route: "/refund-center" },
+  // G5（2026-10-14）：预约期间副本转维护/遗失且无副本可换 → 预约转异常，需馆员跟进改约/补书
+  { key: "reservation_exception", label: "预约异常待跟进", route: "/reservations" },
 ];
 
 function TodoCard({

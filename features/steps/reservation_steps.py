@@ -12,8 +12,10 @@
   本批按现行口径**改写场景文本**（不是弱化断言——旧口径本身已裁定作废）。
 - 超时释放没有读侧惰性触发（只有 `reservation_expire_check` 任务，周期 300s），
   故 BDD 用管理端**手动触发端点** `POST /api/admin/tasks/reservation_expire_check/run`，属真实链路。
-- 「预约期间副本转维护 → 自动锁定同书其他副本 / 无副本转异常态」**未实现**
-  （`STATUS_EXCEPTION` 有常量无写入点、无改锁逻辑），该场景保留 `@draft`（G5）。
+- 「预约期间副本转维护 → 自动锁定同书其他副本 / 无副本转异常态」**2026-10-14（第六十批 G5）已实现**：
+  `reading.reservation_ops.handle_copy_unavailable` 挂在"副本转维护中/遗失"的两条**可达**写入链上
+  （管理端改副本状态 / 报损·遗失），`@draft` 清零——原场景拆成两个（换锁成功 / 无副本可换），
+  理由见 `reservation.feature` 顶部注释。
 """
 
 from datetime import datetime, timedelta
@@ -380,3 +382,92 @@ def step_reserve_again(context):
 def step_duplicate_rejected(context):
     assert context.duplicate.status_code == 409, context.duplicate.text
     assert "进行中的预约" in context.duplicate.json()["detail"], context.duplicate.text
+
+
+# ---------- 场景：预约期间副本转维护（G5，2026-10-14 第六十批解封） ----------
+
+
+def _book_with_copies(context, title: str, copies: int) -> tuple[int, list[int]]:
+    """建一本上架书 + N 个副本，返回 (book_id, [副本id…])（按 id 升序 = 预约取副本的顺序）。"""
+    created = context.client.post(
+        "/api/admin/books",
+        json={"isbn": None, "title": title, "word_count": 100, "copy_count": copies},
+        headers=context.h,
+    )
+    assert created.status_code == 200, created.text
+    book_id = created.json()["id"]
+    force_book_on(context.client, context.h, book_id)
+    rows = context.client.get(f"/api/admin/books/{book_id}/copies", headers=context.h).json()
+    return book_id, [r["id"] for r in rows]
+
+
+@given("《{title}》在馆 {copies:d} 册 且 小明已预约其中一册")
+@given("《{title}》在馆 {copies:d} 册 且 小明已预约该册")  # 单册场景的自然说法（同一实现）
+def step_book_copies_reserved(context, title, copies):
+    context.book_id, copy_ids = _book_with_copies(context, title, copies)
+    assert len(copy_ids) == copies, f"应建出 {copies} 册，实得 {len(copy_ids)}"
+    context.copy_id = copy_ids[0]  # 预约锁的是 id 最小的在馆副本（create 的 order_by(id)）
+    r = _reserve(context, context.book_id)
+    assert r.status_code == 200, r.text
+    context.reservation = r.json()
+    row = _reservation_row(context.reservation["id"])
+    assert row.status == "active" and row.copy_id == context.copy_id, "预约须锁住第一册"
+
+
+@when("被预约的那册被标记维护")
+def step_mark_maintenance(context):
+    # 走真实端点（管理端改副本状态）——这正是 G5 两条挂钩链中的第一条
+    r = context.client.put(
+        f"/api/admin/copies/{context.copy_id}/status",
+        json={"status": "maintenance", "reason": "书脊开胶，送修"},
+        headers=context.h,
+    )
+    assert r.status_code == 200, r.text
+
+
+@then("系统自动尝试锁定同书其他在馆副本")
+def step_switched_to_other_copy(context):
+    row = _reservation_row(context.reservation["id"])
+    assert row.status == "active", f"同书还有在馆副本，预约必须继续有效：{row.status}"
+    assert row.copy_id != context.copy_id, "应改锁到另一册"
+    assert _copy_status(context, context.book_id, row.copy_id) == "reserved", "新副本须转 reserved"
+    assert _copy_status(context, context.book_id, context.copy_id) == "maintenance"
+
+
+@then("预约仍然有效 名额继续占用")
+def step_still_occupied(context):
+    card = _card(context)
+    assert _active_reservation_count(context) == 1, "换锁不释放名额"
+    assert card["available_quota"] == card["borrow_limit"] - card["active_borrows"] - 1, card
+
+
+@then("无其他副本时预约转异常状态并通知家长与馆员")
+def step_exception_both_notified(context):
+    res = _reservation_row(context.reservation["id"])
+    assert res.status == "exception", f"无副本可换 → 预约转异常：{res.status}"
+    assert _copy_status(context, context.book_id, context.copy_id) == "maintenance"
+    r = context.client.get(
+        "/api/miniapp/notifications",
+        params={"scene": "reservation.exception"},
+        headers=context.mini,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["items"], "家长消息中心应出现「预约异常」通知"
+    a = context.client.get(
+        "/api/admin/admin-notifications",
+        params={"scene": "admin.reservation_exception"},
+        headers=context.h,
+    )
+    assert a.status_code == 200, a.text
+    items = [i for i in a.json()["items"] if i["ref_id"] == str(res.id)]
+    assert items, "馆员待办墙应出现「预约异常待跟进」"
+    assert items[0]["effective_status"] == "pending", items[0]
+
+
+@then("预约名额立即释放")
+def step_quota_released(context):
+    card = _card(context)
+    assert _active_reservation_count(context) == 0, "异常态不再是 active 预约"
+    assert card["available_quota"] == card["borrow_limit"] - card["active_borrows"], (
+        f"名额须按 §5.4 公式立即释放：{card}"
+    )

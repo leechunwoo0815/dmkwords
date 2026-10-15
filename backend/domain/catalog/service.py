@@ -20,6 +20,10 @@ from backend.domain.catalog.repository import (
 )
 from backend.domain.catalog.schemas import BookCreateRequest, BookUpdateRequest
 
+# G5（2026-10-14 第六十轮）：副本退场（转维护中/遗失）时的预约善后——PRD §5.5。
+# 与本域无环（reading.reservation_ops 只依赖 catalog 的 models/audit_events，不依赖 catalog.service）。
+from backend.domain.reading.reservation_ops import handle_copy_unavailable
+
 # P2-7：排序白名单（copy_count 需 join 子查询）
 SORT_WHITELIST = {"id", "word_count", "copy_count"}
 
@@ -466,6 +470,10 @@ class BookService:
                 "请先办理还书；若书在家长手上损坏或丢失，请用「报损·遗失」登记"
             )
         old = copy.status
+        if new_status in (BookCopy.STATUS_MAINTENANCE, BookCopy.STATUS_LOST):
+            # G5：本册退场可能牵连活跃预约（PRD §5.5 换锁 / 转异常）。**必须在写 copy.status 之前**
+            # 调用——本函数取锁顺序为 Reservation → copy，与核销/取消/超时释放同向（见模块头锁序）。
+            handle_copy_unavailable(self.db, copy, reason=f"副本状态改为{new_status}", admin=admin)
         copy.status = new_status
         self.copy_repo.update(copy)
         self._audit(
@@ -495,6 +503,8 @@ class BookService:
             raise ValidationError("该副本已是此状态，无需重复登记")
         active = self._active_borrow_of(copy_id)
         old = copy.status
+        # G5：报损同样让副本退场——先走预约善后（换锁/转异常），再落本册状态（锁序 Reservation → copy）
+        handle_copy_unavailable(self.db, copy, reason=f"报损:{reason}", admin=admin)
         copy.status = target
         self.copy_repo.update(copy)
         book = self.db.query(Book).filter(Book.id == copy.book_id).first()

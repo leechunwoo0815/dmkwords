@@ -43,6 +43,9 @@ SCENE_ACTIVITY_CANCEL = "activity.cancel"
 SCENE_RESERVATION_CREATED = "reservation.created"
 SCENE_RESERVATION_EXPIRING = "reservation.expiring"
 SCENE_RESERVATION_RELEASED = "reservation.released"
+# G5（2026-10-14 第六十轮）：预约期间副本转维护/遗失、**无同书在馆副本可换** → 预约转异常态。
+# PRD §5.5「没有其他副本了，预约转『异常』状态并通知家长和馆员」（§八 预约类通知第三项）。
+SCENE_RESERVATION_EXCEPTION = "reservation.exception"
 SCENE_REPORT_GENERATED = "report.generated"
 SCENE_OTHER_EVALUATION_UPLOADED = "other.evaluation_uploaded"
 SCENE_OTHER_TRANSFER_RESULT = "other.transfer_result"

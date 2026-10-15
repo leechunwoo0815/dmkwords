@@ -185,6 +185,8 @@ export interface TodoCounts {
   circle_unliked: number;
   /** R-313：未入会临时借书产生的入会跟进待办（孩子入会后自动归零） */
   member_follow_up: number;
+  /** G5（2026-10-14）：预约异常待跟进（副本转维护/遗失且无副本可换；馆员线下跟进后手动销项） */
+  reservation_exception: number;
 }
 
 export function apiTodoCounts(): Promise<TodoCounts> {

@@ -62,6 +62,10 @@ class AdminNotification(BaseModel):
     # 原先只有"随时可见 + 操作时被拦"（PRD 该行 2026-10-13 已如实标注缺口）。现在逐人写待办，
     # 显示态按押金未结清余额推导（结清即自动审结），dedup_key=ISO 周（持续提醒 = 每周一次）。
     SCENE_DEPOSIT_SETTLE = "admin.deposit_settle"
+    # G5（2026-10-14 第六十轮）：PRD §5.5「预约期间书出意外…转『异常』状态并**通知家长和馆员**」的
+    # 馆员侧通道。它是**要人做事的待办**（联系家长改约/补书），不是知会——故进待办墙默认名单、
+    # 计入 admin_total；显示态按预约行实时推导（仍是 exception → 待处理；单据推进/消失 → 自动审结）。
+    SCENE_RESERVATION_EXCEPTION = "admin.reservation_exception"
 
     # ref_type 取值
     REF_REFUND_REQUEST = "refund_request"
@@ -69,6 +73,7 @@ class AdminNotification(BaseModel):
     REF_TRANSFER = "transfer"
     REF_ACTIVITY = "activity"
     REF_CHILD = "child"
+    REF_RESERVATION = "reservation"
 
     scene = Column(String(64), nullable=False, index=True, comment="场景标识（admin.*）")
     title = Column(String(100), nullable=False, comment="事项标题")
