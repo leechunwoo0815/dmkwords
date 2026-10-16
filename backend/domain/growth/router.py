@@ -24,7 +24,10 @@ class ResetAttemptsRequest(BaseSchema):
 
 class AdjustPointsRequest(BaseSchema):
     # 2026-10-12 审查 P2（T11）：积分列是 INT，入参原先无边界 → 溢出 500
-    points: int = Field(..., ge=-1_000_000, le=1_000_000, description="调整积分（正数加）")
+    # P2 #19（2026-10-16，第三轮大审查）：**只收正数**——原先 `ge=-1_000_000` 允许负值，
+    # 与 PRD §7.2「积分不扣、非负、永久」及本字段注释"正数"矛盾，且能把 points_total 打成负数
+    # （榜单/护照到处显示负分）。确需纠正多发积分，属产品口径变更，先走裁定再加口子。
+    points: int = Field(..., gt=0, le=1_000_000, description="调整积分（正整数，只加不减）")
     reason: str = Field(..., min_length=2, max_length=200, description="调整原因（必填留痕）")
 
 

@@ -38,14 +38,24 @@ def book_due_remind(db: Session) -> int:
     today = datetime.now().date()
     sent = 0
     catchup = timedelta(days=1)
-    for days in sorted(set(remind_days)):
+    nodes = sorted(set(remind_days))
+    for idx, days in enumerate(nodes):
         target = today + timedelta(days=days)
+        # P2 #18（2026-10-16，第三轮大审查）：**节点窗口必须互不重叠**。原实现每个节点都向前放宽
+        # 1 天（补发窗口），于是相邻整数节点（1 与 0）的窗口都盖住"今天到期"这一档 → 同一条记录
+        # 命中两个节点、发**两条**站内信（两节点 dedup_key 不同，唯一索引拦不住）。
+        # 修法：低边界取 `max(节点-1天, 上一个更小节点的 target+1天)`——补发能力保留（最低节点与
+        # 间隔 ≥2 天的节点窗口不变），只是不再与更紧迫的节点抢同一天。
+        lower = target - catchup
+        if idx > 0:
+            prev_target = today + timedelta(days=nodes[idx - 1])
+            lower = max(lower, prev_target + timedelta(days=1))
         records = (
             db.query(BorrowRecord)
             .filter(
                 BorrowRecord.is_deleted == 0,
                 BorrowRecord.status == BorrowRecord.STATUS_ACTIVE,
-                BorrowRecord.due_at >= target - catchup,
+                BorrowRecord.due_at >= lower,
                 BorrowRecord.due_at < target + timedelta(days=1),
             )
             .all()

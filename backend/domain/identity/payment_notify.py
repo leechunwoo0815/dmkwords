@@ -38,6 +38,12 @@ class PaymentNotifyMixin:
             self._audit_anomaly("退款回调缺商户退款单号", reason=event_type)
             return 400, {"code": "FAIL", "message": "缺少退款单号"}
         req = refund_online.find_by_out_refund_no(self.db, out_refund_no)
+        # P2 #22（2026-10-16，第三轮大审查）：**先判 None 再解引用**。原实现下面立刻读
+        # `req.out_refund_no` → AttributeError → 被 handle_notify 的兜底吞成 200（404 分支是死代码）：
+        # 真正"单号对不上"的告警被降级成"已记录待人工处理"，排查时看不到原因。
+        if req is None:
+            self._audit_anomaly("退款回调找不到退款单", reason=f"out_refund_no={out_refund_no}")
+            return 404, {"code": "FAIL", "message": "退款单不存在"}
         # 2026-10-12 审查 P2（T2）：**反解到单 ≠ 这笔通知属于当前提交**。换号重试后
         # （RF{id}-2-1），旧号（RF{id}-1-1）的迟到通知会落到"正在进行中的那一笔"上：
         # 旧笔 CLOSED 会把在途单判成失败（管理员据此换号重提 = 二次出款），旧笔 SUCCESS
@@ -51,10 +57,6 @@ class PaymentNotifyMixin:
                 reason=f"通知={out_refund_no} 当前={req.out_refund_no}",
             )
             return 200, {"code": "SUCCESS", "message": "已忽略（单号非当前提交）"}
-        if req is None:
-            self._audit_anomaly("退款回调找不到退款单", reason=f"out_refund_no={out_refund_no}")
-            return 404, {"code": "FAIL", "message": "退款单不存在"}
-
         finalize = RefundService(self.db)._finalize_refund
         state = (data.refund_status or "").upper()
         if state == "SUCCESS":

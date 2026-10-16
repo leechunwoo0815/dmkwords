@@ -402,7 +402,9 @@ class TransferService:
             .all()
         ]
         if req.source_child_id not in child_ids or req.target_child_id not in child_ids:
-            raise ValidationError("无权操作该转让申请")
+            # P2 #25（2026-10-16，第三轮大审查）：**越权与不存在同回应**（铁律 128）——
+            # 原先是 422「无权操作」，与"不存在"的 404 可区分，id 连续即可枚举出别人有哪些申请。
+            raise NotFoundError("转让申请不存在")
         if req.status != TransferRequest.STATUS_PENDING:
             raise ValidationError(f"转让状态 {req.status}，不可操作")
         return req

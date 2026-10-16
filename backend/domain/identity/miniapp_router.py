@@ -296,11 +296,15 @@ def transfer_list(auth: Any = Depends(get_current_parent)):
 def transfer_conditions(
     source_child_id: int, target_child_id: int, auth: Any = Depends(get_current_parent)
 ):
-    """转让前置条件核对（前端逐条展示差什么）。"""
+    """转让前置条件核对（前端逐条展示差什么；仅限本家长名下的孩子）。"""
     parent, db = auth
+    # P1 #9（2026-10-16，第三轮大审查）：**归属校验**此前缺失——直接 `svc._child(任意 id)`，任一登录
+    # 家长即可枚举他人 child_id 并逐个读回：会员态/在会期、在借与预约、未结清赔偿、是否在退会/转让/
+    # 冻结中（财务与流程状态外泄）。改用 `child_of_parent`（与其它小程序端点同一口径：
+    # 越权与不存在同回应「孩子不存在」）。
+    source = child_of_parent(db, parent.id, source_child_id)
+    target = child_of_parent(db, parent.id, target_child_id)
     svc = TransferService(db)
-    source = svc._child(source_child_id)
-    target = svc._child(target_child_id)
     return {"conditions": svc.check_conditions(parent, source, target)}
 
 

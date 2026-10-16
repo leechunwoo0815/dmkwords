@@ -268,9 +268,12 @@ def test_delete_post_permissions(client: TestClient):
     _, m2 = _mk_parent_with_child(client, h, "13800000710", "他删孩", "Outsider")
     ms = _award_milestone(c1, 1000000)
     post_id = _share(client, m1, c1, MILESTONE, ms).json()["post_id"]
-    # 他人家长删 → 422
+    # 他人家长删 → 404（P2 #25，2026-10-16：越权与不存在同回应，铁律 128——原先 422 可与
+    # "不存在"的 404 区分，id 连续即可枚举出"这条帖子存在但不是我的"）
     r = client.delete(f"/api/miniapp/circle/posts/{post_id}", headers=m2)
-    assert r.status_code == 422
+    ghost = client.delete("/api/miniapp/circle/posts/999999", headers=m2)
+    assert r.status_code == ghost.status_code == 404, (r.text, ghost.text)
+    assert r.json() == ghost.json()
     # 家长删自己帖 → 200 且从信息流消失（Q15：DELETE 无 body）
     r = client.delete(f"/api/miniapp/circle/posts/{post_id}", headers=m1)
     assert r.status_code == 200, r.text

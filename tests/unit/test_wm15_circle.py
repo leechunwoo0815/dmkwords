@@ -132,7 +132,11 @@ def test_like_with_child_identity_and_liker_wall(client: TestClient):
         assert row.child_id == c2  # fix33：社交主体=孩子
         assert row.liker_child_id == c2  # 名义快照列同值（downgrade 可回滚）
 
-    items = client.get(f"/api/miniapp/circle/posts?child_id={c2}", headers=m1).json()["items"]
+    # P2 #24（2026-10-16）：`child_id` 现在要过**归属校验**（原先传谁都行 → 可探测他人孩子 liked_by_me）。
+    # 观看方是 m1，这里传**自己的孩子** c1；点赞墙（likers）与观看方无关，断言口径不变。
+    foreign = client.get(f"/api/miniapp/circle/posts?child_id={c2}", headers=m1)
+    assert foreign.status_code in (404, 422), f"别人的 child_id 必须被拒：{foreign.status_code}"
+    items = client.get(f"/api/miniapp/circle/posts?child_id={c1}", headers=m1).json()["items"]
     me = next(x for x in items if x["id"] == post_id)
     assert len(me["likers"]) == 1 and me["likers"][0]["child_id"] == c2
 

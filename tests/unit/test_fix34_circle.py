@@ -126,7 +126,8 @@ def test_level_delivered_to_feed_likers_and_board(client: TestClient):
 
     item = next(
         p
-        for p in client.get(f"/api/miniapp/circle/posts?child_id={c2}", headers=m1).json()["items"]
+        # P2 #24（2026-10-16）：child_id 现需归属校验——m1 观看传自己的孩子 c1
+        for p in client.get(f"/api/miniapp/circle/posts?child_id={c1}", headers=m1).json()["items"]
         if p["id"] == post_id
     )
     assert item["level"] == "F"  # 发帖孩子等级

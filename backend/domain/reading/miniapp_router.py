@@ -238,7 +238,13 @@ def observation_image(path: str, token: str = "", db: Session = Depends(get_db))
     parent = _parent_from_token(token, db)
     root = os.path.abspath(get_settings().UPLOADS_DIR)
     full = os.path.abspath(os.path.join(root, "observation", path))
-    if not full.startswith(os.path.join(root, "observation")) or not os.path.isfile(full):
+    # P2 #26（2026-10-16，第三轮大审查）：路径判定改用项目**单一口径** `media_paths.is_within`。
+    # 原先裸 `full.startswith(root/observation)` 会被同前缀兄弟目录骗过
+    # （`observation/../observation-evil/x` → abspath 落在 `uploads/observation-evil/`，前缀仍成立）；
+    # 当前被后续 DB 归属校验兜住，属"未来旁路"，按 docs/15 §22.5 单一口径收口。
+    from backend.common.media_paths import is_within
+
+    if not is_within(os.path.join(root, "observation"), full) or not os.path.isfile(full):
         raise NotFoundError("图片不存在")
     # C-12/T25（P0-F1 同族第五案）：数据归属校验下沉 Service（架构关 Router 零 ORM）
     # images JSON 精确匹配 + 家长归属；查无归属一律 404（防枚举探测）

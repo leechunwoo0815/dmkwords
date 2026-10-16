@@ -88,10 +88,19 @@ class ScanService:
             .first()
         )
         if active:
-            record = self.circ.return_book(admin, active.copy_id, "normal")
+            # P2 #15（2026-10-16，第三轮大审查）：归还条件**跟着副本当前状态走**，别再硬编码 "normal"——
+            # 副本可能已被「报损·遗失」登记为 maintenance/lost（报损不动在借记录），硬编码 normal 会在
+            # 还书那一刻把它**静默改回在馆**：赔偿待办还挂着，书却已经能再借出去。
+            copy_row = self.db.query(BookCopy).filter(BookCopy.id == active.copy_id).first()
+            cond = {
+                BookCopy.STATUS_MAINTENANCE: "maintenance",
+                BookCopy.STATUS_LOST: "lost",
+            }.get(copy_row.status if copy_row else "", "normal")
+            record = self.circ.return_book(admin, active.copy_id, cond)
+            label = {"maintenance": "按维护中归架", "lost": "按遗失归架"}.get(cond, "正常归架")
             return {
                 "action": "return",
-                "message": f"已还《{book.title}》（正常归架）",
+                "message": f"已还《{book.title}》（{label}）",
                 "book_title": book.title,
                 "copy_id": active.copy_id,
                 "due_at": record.due_at,

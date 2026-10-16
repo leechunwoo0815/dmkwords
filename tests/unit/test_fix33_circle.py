@@ -115,7 +115,9 @@ def test_siblings_both_like_same_post(client: TestClient):
         assert {row.child_id for row in rows} == {a, b}
         assert len(rows) == 2
 
-    view = _feed(client, owner_mini, post_id, a)
+    # P2 #24（2026-10-16）：信息流的 child_id 现在要过**归属校验**——观看方是 owner_mini，
+    # 故传自己的孩子 owner_c（头像墙/计数与观看方无关，断言口径不变；原先借别的家长的孩子当观看上下文）
+    view = _feed(client, owner_mini, post_id, owner_c)
     assert view["like_count"] == 2
     assert {lk["child_id"] for lk in view["likers"]} == {a, b}
 

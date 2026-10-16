@@ -7,9 +7,10 @@
 from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from backend.common.notification_models import Notification, TaskRunLog
-from backend.database import get_session
+from backend.database import engine, get_session
 from backend.domain.identity.models import Child, Order
 from tests.unit.helpers import force_book_on
 
@@ -490,13 +491,18 @@ def test_task_specs_last_run(client: TestClient):
     ran = by_name["member_expire_check"]
     assert ran["last_run"] is not None
     assert ran["last_run"]["status"] == "success"
-    # 从未跑过的任务（先清掉它的运行记录再断言；本测试库中其余任务应无记录）
-    never = by_name["first_activity_90d_remind"]
-    assert never["last_run"] is None or never["last_run"]["status"] in (
-        "success",
-        "failed",
-        "skipped",
-    )
+    # 从未跑过的任务：**先真的清掉它的运行记录**再断言 last_run 为空。
+    # P2 #29（2026-10-16，第三轮大审查）：原注释写着"先清掉再断言"、代码里却没有任何清理，
+    # 断言 `is None or status in (success/failed/skipped)` 近乎恒真（只在恰好 running 时才可能红）
+    # ——是"注释与代码不符 + 假绿断言"的组合。清完之后断言就是硬断言。
+    with engine.begin() as conn:
+        conn.execute(
+            text("DELETE FROM task_run_logs WHERE task_name = :n"),
+            {"n": "first_activity_90d_remind"},
+        )
+    specs2 = client.get("/api/admin/tasks", headers=h).json()["items"]
+    never = {s["name"]: s for s in specs2}["first_activity_90d_remind"]
+    assert never["last_run"] is None, f"清空运行记录后 last_run 必须为空：{never['last_run']}"
 
 
 # ---------- F3（C39）：手动触发写审计 task.manual_run；调度器自动路径不审计 ----------

@@ -531,7 +531,8 @@ class CircleService:
         if not post:
             raise NotFoundError("帖子不存在")
         if post.parent_id != parent.id:
-            raise ValidationError("只能删除自己发布的帖子")
+            # P2 #25（2026-10-16）：越权与不存在同回应（铁律 128）——原 422 可与 404 区分
+            raise NotFoundError("帖子不存在")
         post.is_pinned = 0  # 删帖联动取消置顶
         post.soft_delete()
         self.db.commit()

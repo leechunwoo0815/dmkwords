@@ -24,6 +24,11 @@ def sms_sdk_available(provider: str) -> bool:
     return True
 
 
+#: `validate_production` 允许"本机/测试环境"跳过的环境名（P2 #23，2026-10-16）——
+#: 用**白名单**而不是"不等于 production"：拼错的环境名不该静默关掉生产红线。
+_DEV_ENVS = ("dev", "development", "local", "test")
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -120,11 +125,20 @@ class Settings(BaseSettings):
         `APP_ENV=production` 时即使 `DEBUG=true` 也全量校验（DEBUG 只该影响日志与开发态行为，
         不该能一句话关掉支付 mock 拒启、空凭证、LOGIN_DEV_CODE 全部红线）。
         """
-        if self.APP_ENV.strip().lower() != "production" and self.DEBUG:
+        # P2 #23（2026-10-16，第三轮大审查）：跳过条件改成**明确的本机/测试环境白名单**。
+        # 原先写"不等于 production 且 DEBUG"——`APP_ENV` 拼错（prod / prduction）+ `DEBUG=true`
+        # 会把整段红线**静默跳过**（支付 mock 拒启、空凭证、固定验证码、CORS localhost 全不查），
+        # 正是"生产实为 mock 通道"那类事故的形状。
+        if self.APP_ENV.strip().lower() in _DEV_ENVS and self.DEBUG:
             return
         problems: list[str] = []
-        if self.SECRET_KEY == "change-in-production":
-            problems.append("SECRET_KEY 未更换")
+        # P2 #23：空串/弱密钥原先放行（只比一个默认字面量）——换成"长度下限"判定
+        if (
+            not self.SECRET_KEY
+            or self.SECRET_KEY == "change-in-production"
+            or len(self.SECRET_KEY) < 32
+        ):
+            problems.append("SECRET_KEY 未更换或过弱（生产要求 ≥32 位随机串）")
         if not self.DB_PASSWORD:
             problems.append("DB_PASSWORD 为空")
         if not self.WECHAT_APP_ID or not self.WECHAT_APP_SECRET:

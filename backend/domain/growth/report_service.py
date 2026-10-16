@@ -340,6 +340,8 @@ class ReportAdminService:
         from backend.common.notification_models import Notification
         from backend.common.notifications import SCENE_REPORT_GENERATED, NotificationService
 
+        period_label = svc.period_range(kind)[2]  # period_range 在 ReportService 上（本类不继承）
+
         NotificationService(self.db).send(
             parent_id=child.parent_id,
             scene=SCENE_REPORT_GENERATED,
@@ -353,7 +355,10 @@ class ReportAdminService:
             child_id=child.id,
             ref_type="child",
             ref_id=str(child.id),
-            dedup_key=kind,
+            # P2 #21（2026-10-16，第三轮大审查）：去重键原先只有 kind → **同一孩子终身只收到一条**
+            # 周报/月报通知（第二周起静默吞掉）。键里带上**报告覆盖期**（period_range 的 label，
+            # 周报=上个自然周 / 月报=上个自然月），一个周期一条。
+            dedup_key=f"{kind}-{period_label}",
         )
         self.db.commit()
         return {"path": rel, "url": f"/api/admin/uploads/{rel}", "data": data}

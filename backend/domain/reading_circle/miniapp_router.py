@@ -50,6 +50,10 @@ def circle_posts(
 ):
     """信息流（时间倒序真分页 + 置顶帖置首）。"""
     parent, db = auth
+    # P2 #24（2026-10-16，第三轮大审查）：`child_id` 只用于 `liked_by_me`，原先不校验归属——任一登录
+    # 家长传别人的 child_id 就能看出「那个孩子点赞了哪些帖」。现按小程序统一口径校验。
+    if child_id is not None:
+        child_of_parent(db, parent.id, child_id)
     return CircleService(db).list_posts(parent, page, page_size, child_id)
 
 

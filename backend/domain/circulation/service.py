@@ -193,6 +193,9 @@ class CirculationService:
         isbn: str | None,
         override_reason: str | None = None,
     ) -> tuple[BorrowRecord, list[str]]:
+        # P2 #16（2026-10-16，第三轮大审查）：人工放行原因先 strip 再判空——原先只判真值，
+        # 全空格串（"   "）能通过"必须填原因"的闸（额度/押金/会员全绕），留痕还是空白。
+        override_reason = (override_reason or "").strip() or None
         # 锁主体行：同一孩子的并发借书串行化（模式手册 P10）
         child = (
             self.db.query(Child)
@@ -411,6 +414,10 @@ class CirculationService:
         # 这里兜住"没走核销、直接借出/扫码借出"的路径（幂等：只改 ACTIVE）。
         from backend.domain.reading.models import Reservation as _Res
 
+        # P2 #17（2026-10-16，第三轮大审查）：这里是**锁定读 + 状态守卫**，不是快照读 + 无条件覆盖写。
+        # 原先 `.all()` 普通读 + 直接赋 `checked_out`：并发下（家长此刻取消预约 / 定时任务超时释放）
+        # 会把已 cancelled/expired 的单**覆盖回 checked_out**，家长端显示"已借出"而书已还回馆里。
+        # 锁定读（当前读）保证拿到的是最新已提交值，守卫再挡一次，双保险。
         for _r in (
             self.db.query(_Res)
             .filter(
@@ -419,8 +426,13 @@ class CirculationService:
                 _Res.status == _Res.STATUS_ACTIVE,
                 _Res.is_deleted == 0,
             )
+            .order_by(_Res.id)
+            .with_for_update()
+            .populate_existing()
             .all()
         ):
+            if _r.status != _Res.STATUS_ACTIVE:
+                continue
             _r.status = _Res.STATUS_CHECKED_OUT
             # 顺带把这条预约锁着的**另一册**放回在馆：预约关了却还锁着书，是"鬼锁"——
             # 那册谁都借不走、预约管理页也不再显示它（同书另一副本被借走的场景）。
@@ -503,6 +515,7 @@ class CirculationService:
             .first()
         )
 
+        prev_status = copy.status  # P2 #15：判断"这次归还是否**新**引入损坏/遗失"
         was_overdue = record.due_at < datetime.now()
         record.status = BorrowRecord.STATUS_RETURNED
         record.returned_at = datetime.now()
@@ -516,7 +529,12 @@ class CirculationService:
             record.status = BorrowRecord.STATUS_LOST
             copy.status = BookCopy.STATUS_LOST
         self.db.flush()
-        if condition in ("maintenance", "lost"):
+        # 赔偿待办只在"**这次归还是损坏/遗失的首次登记**"时写：副本本来就已被「报损·遗失」
+        # 标成维护/遗失的（报损不动在借记录），还书只是收尾——再写一条就变成同一次损失两条待办。
+        if condition in ("maintenance", "lost") and prev_status not in (
+            BookCopy.STATUS_MAINTENANCE,
+            BookCopy.STATUS_LOST,
+        ):
             from backend.domain.catalog.damage_ops import notify_return_damage_compensation
 
             notify_return_damage_compensation(

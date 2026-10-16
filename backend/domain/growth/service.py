@@ -25,7 +25,6 @@ from backend.common.exceptions import NotFoundError, ValidationError
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.catalog.models import Book, QuizQuestion
 from backend.domain.growth.models import (
-    CheckinStreakRecord,
     ChildGrowthState,
     MilestoneAward,
     PointLedger,
@@ -198,44 +197,11 @@ class GrowthService:
         return result
 
     def on_checkin(self, child_id: int, streak: int) -> list[dict]:
-        """打卡周期奖（7/30 独立周期；防重复发）。"""
+        """打卡周期奖（7/30 独立周期；幂等与周期口径见 `growth.checkin_awards`）。"""
+        from backend.domain.growth.checkin_awards import award_checkin_cycles
+
         state = self.ensure_state(child_id)
-        awarded: list[dict] = []
-        for cycle_days, key, rtype in (
-            (7, "checkin_7days_bonus", "checkin_7"),
-            (30, "checkin_30days_bonus", "checkin_30"),
-        ):
-            if streak > 0 and streak % cycle_days == 0:
-                cycle_no = streak // cycle_days
-                dup = (
-                    self.db.query(func.count(CheckinStreakRecord.id))
-                    .filter(
-                        CheckinStreakRecord.child_id == child_id,
-                        CheckinStreakRecord.cycle_type == f"days{cycle_days}",
-                        CheckinStreakRecord.cycle_no == cycle_no,
-                        CheckinStreakRecord.is_deleted == 0,
-                    )
-                    .scalar()
-                )
-                if not dup:
-                    bonus = int(ConfigService(self.db).get_value(key))
-                    if bonus > 0:
-                        self._add_points(
-                            state,
-                            bonus,
-                            rtype,
-                            f"连续打卡 {streak} 天（第 {cycle_no} 个 {cycle_days} 天周期）",
-                        )
-                        self.db.add(
-                            CheckinStreakRecord(
-                                child_id=child_id,
-                                cycle_type=f"days{cycle_days}",
-                                cycle_no=cycle_no,
-                                streak_at=streak,
-                            )
-                        )
-                        awarded.append({"type": rtype, "points": bonus})
-        return awarded
+        return award_checkin_cycles(self.db, state, child_id, streak, add_points=self._add_points)
 
     # ---------- 汇总视图 ----------
     def summary(self, child: Child) -> dict:

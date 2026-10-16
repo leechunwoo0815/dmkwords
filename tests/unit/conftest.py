@@ -36,6 +36,9 @@ ADMIN_TABLES = [
     "transfer_requests",
     "withdrawal_requests",
     "refund_requests",
+    # P2 #28（2026-10-16，第三轮大审查）：对账表原先漏清——LEDGER 的"第四十九批·清理补对账表"
+    # 与代码不符（grep 该表名 = 0）。漏清的后果：对账类用例读到上个用例残留的账单行。
+    "payment_reconciliations",
     "activity_enrollments",
     "activities",
     "vocabularies",
