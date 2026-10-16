@@ -4702,6 +4702,20 @@ export interface components {
             /** Child Id */
             child_id: number;
         };
+        /**
+         * FavoriteAddRequest
+         * @description 收藏入参（类型化：非法入参由 FastAPI 归为 422）。
+         *
+         *     2026-10-16（第六十五批·收藏夹域解封）：原先是裸 `body: dict` + `int(body.get(...))`——
+         *     `{"child_id": "abc"}` / 数组 / 字符串会抛 `ValueError`/`AttributeError` → **500**（应为 422）。
+         *     形状与前端既有传参一致（仍是 `{child_id, book_id}`），只是把校验交给 FastAPI。
+         */
+        FavoriteAddRequest: {
+            /** Book Id */
+            book_id: number;
+            /** Child Id */
+            child_id: number;
+        };
         /** FinishedBookItem */
         FinishedBookItem: {
             /** Author */
@@ -11386,9 +11400,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["FavoriteAddRequest"];
             };
         };
         responses: {

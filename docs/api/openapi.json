@@ -2205,6 +2205,26 @@
         "title": "EnrollmentActionRequest",
         "type": "object"
       },
+      "FavoriteAddRequest": {
+        "additionalProperties": false,
+        "description": "收藏入参（类型化：非法入参由 FastAPI 归为 422）。\n\n2026-10-16（第六十五批·收藏夹域解封）：原先是裸 `body: dict` + `int(body.get(...))`——\n`{\"child_id\": \"abc\"}` / 数组 / 字符串会抛 `ValueError`/`AttributeError` → **500**（应为 422）。\n形状与前端既有传参一致（仍是 `{child_id, book_id}`），只是把校验交给 FastAPI。",
+        "properties": {
+          "book_id": {
+            "title": "Book Id",
+            "type": "integer"
+          },
+          "child_id": {
+            "title": "Child Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "child_id",
+          "book_id"
+        ],
+        "title": "FavoriteAddRequest",
+        "type": "object"
+      },
       "FinishedBookItem": {
         "additionalProperties": false,
         "properties": {
@@ -14071,9 +14091,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "title": "Body",
-                "type": "object"
+                "$ref": "#/components/schemas/FavoriteAddRequest"
               }
             }
           },

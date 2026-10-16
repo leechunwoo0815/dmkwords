@@ -338,6 +338,18 @@ def vocabulary_remove(vocabulary_id: int, child_id: int, auth: Any = Depends(get
 # ---------- 收藏夹（WM8） ----------
 
 
+class FavoriteAddRequest(BaseSchema):
+    """收藏入参（类型化：非法入参由 FastAPI 归为 422）。
+
+    2026-10-16（第六十五批·收藏夹域解封）：原先是裸 `body: dict` + `int(body.get(...))`——
+    `{"child_id": "abc"}` / 数组 / 字符串会抛 `ValueError`/`AttributeError` → **500**（应为 422）。
+    形状与前端既有传参一致（仍是 `{child_id, book_id}`），只是把校验交给 FastAPI。
+    """
+
+    child_id: int
+    book_id: int
+
+
 @router.get("/favorites")
 def favorites_list(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
@@ -346,11 +358,11 @@ def favorites_list(child_id: int, auth: Any = Depends(get_current_parent)):
 
 
 @router.post("/favorites")
-def favorites_add(body: dict, auth: Any = Depends(get_current_parent)):
+def favorites_add(body: FavoriteAddRequest, auth: Any = Depends(get_current_parent)):
     parent, db = auth
-    child = child_of_parent(db, parent.id, int(body.get("child_id") or 0))
+    child = child_of_parent(db, parent.id, body.child_id)
     guards.require_member_action(db, child, guards.FAVORITE_WRITE)
-    return FavoriteService(db).add(child, int(body.get("book_id") or 0))
+    return FavoriteService(db).add(child, body.book_id)
 
 
 @router.delete("/favorites/{book_id}")
