@@ -51,10 +51,10 @@ def test_import_grade_whitelist(client: TestClient):
     ws = wb.active
     ws.title = "图书导入"
     ws.append(["ISBN", "书名*", "作者", "AR值", "词数*", "主题", "适读阶段", "副本数"])
-    # 非法 grade
-    ws.append(["", "坏书目", "作者", "", "100", "", "垃圾年级", "1"])
+    # 非法 grade（2026-10-15 G17 后：Excel 行必须有 ISBN——无 ISBN 只能后台单本录入，PRD §4.3）
+    ws.append(["9787111111111", "坏书目", "作者", "", "100", "", "垃圾年级", "1"])
     # 合法 grade
-    ws.append(["", "好书目", "作者", "", "100", "", "7-8岁（小学低年级）", "1"])
+    ws.append(["9787111111112", "好书目", "作者", "", "100", "", "7-8岁（小学低年级）", "1"])
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)

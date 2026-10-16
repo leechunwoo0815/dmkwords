@@ -185,6 +185,22 @@ class PaymentService(PaymentNotifyMixin):
                 raise ValidationError(
                     f"押金当前状态为 {existing.status}，无需重复缴纳（补缴请走押金补缴入口）"
                 )
+            # P1 #13（2026-10-15 大审查，亲验）：**在途押金单**同样要拦。上一道闸只看"已有押金
+            # 账户"，而全新孩子（未缴过押金 = 没有 Deposit 行）恰恰是这道闸完全看不见的情形：
+            # 双击/旧页面连建两笔都是 200，两笔都能付——第一笔把押金缴成 PAID，第二笔走回调兜底
+            # （anomaly：钱收了、押金不动、只剩人工退款）。押金是担保账户：宁可少收，不许错收。
+            inflight = (
+                self.db.query(func.count(Order.id))
+                .filter(
+                    Order.child_id == child.id,
+                    Order.order_type.in_((Order.TYPE_DEPOSIT, Order.TYPE_DEPOSIT_SUPPLEMENT)),
+                    Order.status.in_((Order.STATUS_PENDING_PAYMENT, Order.STATUS_PENDING_MANUAL)),
+                    Order.is_deleted == 0,
+                )
+                .scalar()
+            )
+            if inflight:
+                raise ValidationError("该孩子已有一笔待支付的押金订单，请先完成支付或取消后再下单")
         from backend.domain.identity.order_service import OrderService
 
         amount = OrderService(self.db).price_member_order(parent, child, order_type)
@@ -245,6 +261,33 @@ class PaymentService(PaymentNotifyMixin):
                 "如确需先收欠款，请先撤销退会申请"
             )
 
+    def _assert_deposit_payable(self, order: Order) -> None:
+        """押金类订单**发起支付前**的资格复核（P1 #13，2026-10-15 大审查）。
+
+        判据与结算链 `billing.on_deposit_order_paid` 同源（那两处仍是最终权威，这里只提前）：
+        - 缴押金：账户已存在且不是 unpaid/空 → 拒（重复缴）；
+        - 补缴：账户不存在或不在"已扣减"态 → 拒（无需补缴）。
+        放在调网关前 = 钱动之前就拦住；旧待支付单（管理端造的线下单）同样受此闸约束。
+        """
+        from backend.domain.billing.models import Deposit
+
+        dep = (
+            self.db.query(Deposit)
+            .filter(Deposit.child_id == order.child_id, Deposit.is_deleted == 0)
+            .first()
+        )
+        if order.order_type == Order.TYPE_DEPOSIT:
+            if dep is not None and dep.status != Deposit.STATUS_UNPAID:
+                raise ValidationError(
+                    f"押金当前状态为 {dep.status}，无需重复缴纳（补缴请走押金补缴入口）"
+                )
+            return
+        if dep is None or dep.status not in (
+            Deposit.STATUS_PARTIALLY_DEDUCTED,
+            Deposit.STATUS_FULLY_DEDUCTED,
+        ):
+            raise ValidationError("押金当前无需补缴")
+
     def _prepay_once(self, parent: Parent, order: Order) -> dict:
         """单次预支付（三段式）——调用方已持有该订单的进程内锁。"""
         if order.status == Order.STATUS_PAID:
@@ -269,6 +312,14 @@ class PaymentService(PaymentNotifyMixin):
             )
         if order.order_type == Order.TYPE_FIRST_ACTIVITY:
             self._assert_first_activity_payable(order)
+        if order.order_type in (Order.TYPE_DEPOSIT, Order.TYPE_DEPOSIT_SUPPLEMENT):
+            # P1 #13（2026-10-15 大审查，亲验）：押金资格必须在**调网关之前**判。原先只在结算链里
+            # 判（`billing.on_deposit_order_paid`）——而 prepay 的 Phase 1 会先把订单推进
+            # pending_payment 并提交、Phase 2 再调网关；等结算链失败时**微信已经收了钱**，
+            # 回调只能兜底成 anomaly（押金账户不动，人工退款）。实测证据：本用例里 mock 网关
+            # 已被调用（[MockPay] 下单成功），订单停在待支付。
+            # 判据与结算链同源（押金账户态/可补缴态），此处只是把它提前到"钱动之前"。
+            self._assert_deposit_payable(order)
 
         # Phase 1：先落库（状态置线上待支付 + 提交），把锁放掉再谈网络。
         # 2026-10-12 审查 P2（T3）：原先是无条件 ORM 赋值——家长点"去支付"与管理员取消/超时

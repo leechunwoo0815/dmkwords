@@ -159,9 +159,16 @@ class NotificationService:
         child_id: int | None = None,
         ref_type: str = "",
         ref_id: str = "",
+        dedup_key: str = "1",
         openid: str | None = None,
     ) -> None:
-        """事件订阅器专用：不抛异常（通知失败不阻断业务事务）。"""
+        """事件订阅器专用：不抛异常（通知失败不阻断业务事务）。
+
+        `dedup_key`（2026-10-15 大审查 P1 #2）：默认 "1" =「同一家长 × 场景 × 对象**终身一条**」，
+        对"每次提交后都要发"的重复事件（测验成绩/等级升级/里程碑）是错的——第 2 次起会被
+        唯一索引静默吞掉（若第一次是"未通过"，之后的"通过"也永远发不出）。
+        重复事件必须传业务对象键，见 `tasks/notify_handlers.py` 三个处理器的取键口径。
+        """
         try:
             self.send(
                 parent_id=parent_id,
@@ -172,6 +179,7 @@ class NotificationService:
                 child_id=child_id,
                 ref_type=ref_type,
                 ref_id=ref_id,
+                dedup_key=dedup_key,
                 openid=openid,
             )
         except Exception as exc:

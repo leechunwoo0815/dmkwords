@@ -76,7 +76,8 @@ def test_d1_import_defaults_off(client: TestClient):
     wb = Workbook()
     ws = wb.active
     ws.append(["ISBN", "书名*", "作者", "AR值", "词数*", "主题", "适读阶段", "副本数"])
-    ws.append([None, "导入书", "", "3.5", "100", "", "", "1"])
+    # 2026-10-15 G17：Excel 行必须有 ISBN（无 ISBN 只能后台单本录入，PRD §4.3）
+    ws.append(["9787112222222", "导入书", "", "3.5", "100", "", "", "1"])
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)

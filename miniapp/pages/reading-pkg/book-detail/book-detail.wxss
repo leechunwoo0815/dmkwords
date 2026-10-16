@@ -82,6 +82,12 @@
   color: var(--muted);
 }
 
+/* P1 #11（2026-10-15）：下架标注（PRD §4.4）——琥珀档，不与"番茄红=错误"混淆 */
+.tag-off {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
 .tag-time {
   display: inline-flex;
   align-items: center;

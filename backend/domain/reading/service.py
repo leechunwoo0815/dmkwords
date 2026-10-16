@@ -34,7 +34,9 @@ from backend.domain.reading.models import (
 
 MAX_SPEED = 2.0  # PRD D20：倍速五档上限
 SPEED_TOLERANCE = 1.2  # R-151：容差
-REPORT_GRACE_SECONDS = 60  # 首次上报/网络抖动宽限（心跳 10s 的理论上限为 10×2.0×1.2=24s）
+REPORT_GRACE_SECONDS = (
+    60  # **仅首笔上报**的宽限（对时/首帧抖动）；心跳 10s 的理论上限为 10×2.0×1.2=24s
+)
 
 
 def _clean_intervals(raw: object) -> list[list[int]]:
@@ -181,11 +183,18 @@ class ReadingService:
         merged = merge_intervals(intervals, [start, end])
         new_cov = coverage_of(merged)
         delta_cov = new_cov - old_cov
-        # 服务端时间差 = 距上次上报的墙上时钟秒数；声明跨度可伪造，不作依据
-        elapsed = (
+        # 服务端时间差 = 距上次上报的墙上时钟秒数；声明跨度可伪造，不作依据。
+        # `max(0, ...)`：`last_report_at` 是 DATETIME（秒级四舍五入），上一拍 05.63s 落库成 06s，
+        # 下一拍立刻上报就读到"未来 0.4s" → elapsed 为负、容差跟着变负 → 零新增覆盖的正常上报被
+        # 判成异常（2026-10-16 实测随机红/绿）。钳 0 = 这一拍不给新增额度，也不给刷量留口子。
+        raw_elapsed = (
             (now - progress.last_report_at).total_seconds() if progress.last_report_at else 0.0
         )
-        allowed = elapsed * MAX_SPEED * SPEED_TOLERANCE + REPORT_GRACE_SECONDS
+        elapsed = max(0.0, raw_elapsed)
+        # P1 #1（2026-10-15 大审查）：宽限**只在首笔**加——原实现对每笔都加 60 秒，心跳 1 秒一次时
+        # 每笔可新增 62.4 秒覆盖（≈60 倍速）：600 秒书 29 秒墙上时间即可刷满 95% 完播。
+        grace = REPORT_GRACE_SECONDS if progress.last_report_at is None else 0.0
+        allowed = elapsed * MAX_SPEED * SPEED_TOLERANCE + grace
         if delta_cov > allowed:
             raise ValidationError("播放数据异常（覆盖增速超过物理可能），本次上报被拒绝")
 

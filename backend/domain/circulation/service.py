@@ -17,7 +17,6 @@ from backend.common.exceptions import ConflictError, NotFoundError, ValidationEr
 from backend.common.gateways.payment.types import yuan_to_cents
 from backend.common.notification_models import Notification
 from backend.common.notifications import (
-    SCENE_BORROW_DUE_REMIND,
     SCENE_BORROW_OVERDUE,
     NotificationService,
 )
@@ -474,7 +473,11 @@ class CirculationService:
 
     # ---------- 还书 ----------
     def return_book(self, admin, copy_id: int, condition: str = "normal") -> BorrowRecord:
-        """condition: normal / maintenance / lost（遗失联动押金赔偿提示）。"""
+        """condition: normal / maintenance / lost。
+
+        带损归还（maintenance/lost）与「报损·遗失」同口径（2026-10-15 大审查 P2 #14）：
+        除改副本状态外还写一条**赔偿待办**给运营（PRD §3.6；实现见 `catalog.damage_ops`）。
+        """
         if condition not in ("normal", "maintenance", "lost"):
             raise ValidationError("归还状态仅支持 normal/maintenance/lost")
         # P1-F5：锁定读（锁序 record → copy 全局统一）——并发双还时后到者
@@ -513,6 +516,12 @@ class CirculationService:
             record.status = BorrowRecord.STATUS_LOST
             copy.status = BookCopy.STATUS_LOST
         self.db.flush()
+        if condition in ("maintenance", "lost"):
+            from backend.domain.catalog.damage_ops import notify_return_damage_compensation
+
+            notify_return_damage_compensation(
+                self.db, copy, condition=condition, admin=admin, child_id=record.child_id
+            )
         publish_audit(
             self.db,
             admin=admin,
@@ -641,69 +650,10 @@ class CirculationService:
         }
 
     def book_due_remind(self) -> int:
-        """借阅即将到期提醒（due_remind_days 节点；每节点一次）。"""
-        from backend.common.config_service import ConfigService
+        """借阅即将到期提醒（任务体见 `circulation.reminders`——本文件受 god-file ≤800 约束）。"""
+        from backend.domain.circulation.reminders import book_due_remind
 
-        remind_days = [
-            int(x)
-            for x in ConfigService(self.db).get_value("due_remind_days", "5,3,1,0").split(",")
-            if x.strip() != ""
-        ]
-        if not remind_days:
-            return 0
-        today = datetime.now().date()
-        sent = 0
-        # P2-5（2026-10-09 审查）：**补发窗口**——原按"节点日"精确匹配（due_at ∈ [target, target+1)），
-        # 停机一整天该节点就永久漏发（无补发）。现在每个节点向前放宽 1 天，文案按**实际剩余天数**
-        # 算（不会把昨天到期的说成"今天到期"）；幂等键仍是节点值 `str(days)` → 补发不重复。
-        catchup = timedelta(days=1)
-        for days in sorted(set(remind_days)):
-            target = today + timedelta(days=days)
-            records = (
-                self.db.query(BorrowRecord)
-                .filter(
-                    BorrowRecord.is_deleted == 0,
-                    BorrowRecord.status == BorrowRecord.STATUS_ACTIVE,
-                    BorrowRecord.due_at >= target - catchup,
-                    BorrowRecord.due_at < target + timedelta(days=1),
-                )
-                .all()
-            )
-            for rec in records:
-                child = self.db.query(Child).filter(Child.id == rec.child_id).first()
-                if not child:
-                    continue
-                book = self.db.query(Book).filter(Book.id == rec.book_id).first()
-                title = book.title if book else f"书目#{rec.book_id}"
-                parent = self.db.query(Parent).filter(Parent.id == child.parent_id).first()
-                actual_days = (rec.due_at.date() - today).days
-                label = (
-                    "今天"
-                    if actual_days == 0
-                    else (
-                        f"{actual_days} 天后"
-                        if actual_days > 0
-                        else f"已逾期 {abs(actual_days)} 天"
-                    )
-                )
-                if NotificationService(self.db).send(
-                    parent_id=child.parent_id,
-                    scene=SCENE_BORROW_DUE_REMIND,
-                    title="借阅到期提醒",
-                    content=(
-                        f"《{title}》将于{label}（{rec.due_at:%Y-%m-%d}）到期，请及时归还或续借。"
-                    ),
-                    category=Notification.CATEGORY_BORROW,
-                    child_id=child.id,
-                    ref_type="borrow_record",
-                    ref_id=str(rec.id),
-                    dedup_key=str(days),
-                    openid=parent.wechat_openid if parent else None,
-                ):
-                    sent += 1
-        if sent:
-            self.db.commit()
-        return sent
+        return book_due_remind(self.db)
 
     def overdue_mark(self) -> int:
         """逾期标记落库（接管原"访问列表时惰性标记"）+ 通知家长。幂等。"""

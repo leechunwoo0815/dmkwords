@@ -242,9 +242,12 @@ Page({
       const perm = await api.audioPermission(childId, book.id)
       if (!perm.allowed) {
         const guide = {
-          unpaid: { title: '收听音频需要入会', btn: '了解入会' },
-          withdrawn: { title: '会员已退会，重新入会请到店咨询', btn: '知道了' },
-          expired: { title: '会员已过期，续费请到店咨询', btn: '知道了' },
+          unpaid: { title: '收听音频需要入会', btn: '了解入会', buy: true },
+          withdrawn: { title: '会员已退会，重新入会请到店咨询', btn: '知道了', buy: true },
+          expired: { title: '会员已过期，续费请到店咨询', btn: '知道了', buy: true },
+          // G15（2026-10-15 第六十一批）：下架即停播（PRD §4.4）。这不是权限问题，
+          // **不能**把人引去购买页（`buy` 缺省即 falsy）；恢复上架后进度照旧接得上
+          off_shelf: { title: '该书已下架，暂不能播放', btn: '知道了' },
         }[perm.reason] || { title: '暂无收听权限', btn: '知道了' }
         wx.showModal({
           title: '提示',
@@ -252,6 +255,7 @@ Page({
           confirmText: guide.btn,
           showCancel: false,
           success: () => {
+            if (!guide.buy) return
             // 2026-10-12 拍板（P12）：原跳 `/pages/member/member` 是 **tabBar 页**，
             // `wx.navigateTo` 对 tabBar 页必然失败（点了什么都不发生）；购买页早已存在。
             wx.navigateTo({ url: `/pages/member-pkg/purchase/purchase?child_id=${this.data.childId}` })

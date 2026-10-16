@@ -59,7 +59,13 @@ const cellValue = (o: Overview | null, key: string): number | string | null => {
   return raw;
 };
 
-/** WM13 待办卡（提案 §6.3）：实时计数+跳转；失败禁假 0（U10）；零待办绿色态。 */
+/** WM13 待办卡（提案 §6.3）：实时计数+跳转；失败禁假 0（U10）；零待办绿色态。
+ *
+ * P1 #10（2026-10-15 大审查）：本表**必须与后端 `admin_total` 的求和项逐个对齐**——
+ * 原先少了「活动订单作废 / 报损赔偿 / 资金异常 / 待评估跟进 / 待结清跟进」5 项，
+ * 于是只有这几类待办时卡片显示绿色「全部处理完毕」而侧边栏徽标 >0（同屏自相矛盾，
+ * 且把资金异常这种最该被看见的假绿掉）。后端求和项见 `admin/todo_service.todo_counts`。
+ */
 const TODO_ROWS: { key: keyof TodoCounts; label: string; route: string }[] = [
   { key: "refund_pending", label: "待审退款", route: "/refund-center" },
   { key: "withdrawal_pending", label: "待审退会", route: "/refund-center" },
@@ -68,6 +74,42 @@ const TODO_ROWS: { key: keyof TodoCounts; label: string; route: string }[] = [
   { key: "transfer_expiring", label: "转让临近超时", route: "/refund-center" },
   // G5（2026-10-14）：预约期间副本转维护/遗失且无副本可换 → 预约转异常，需馆员跟进改约/补书
   { key: "reservation_exception", label: "预约异常待跟进", route: "/reservations" },
+  // 2026-10-12 拍板三类 + 2026-10-14 G12/G1 两类跟进（均计入 admin_total，本卡不得漏列）
+  {
+    key: "activity_orders_voided",
+    label: "活动订单作废",
+    route: "/notifications?box=admin&scene=admin.activity_order_voided",
+  },
+  {
+    key: "copy_damage_pending",
+    label: "报损赔偿",
+    route: "/notifications?box=admin&scene=admin.copy_damage_compensation",
+  },
+  {
+    key: "payment_anomaly",
+    label: "资金异常",
+    route: "/notifications?box=admin&scene=admin.payment_anomaly",
+  },
+];
+
+/** member.manage 角色的待办行（同样必须与 admin_total 求和项对齐） */
+const STAFF_TODO_ROWS: { key: keyof TodoCounts; label: string; route: string }[] = [
+  { key: "order_pending_manual", label: "待确认收款", route: "/members?tab=orders" },
+  // R-313：未入会临时借书 → 入会跟进（点进去到会员管理跟进家长入会）
+  { key: "member_follow_up", label: "入会跟进", route: "/members" },
+  // T6/R10：活动报名待确认——计入 admin_total（运营视角一个数），原先本卡漏列
+  { key: "activity_enroll_pending", label: "活动报名待确认", route: "/activities" },
+  // G12/G1（2026-10-14 第五十九批）：两类跟进待办（此前只在后端计数、不进本卡）
+  {
+    key: "pending_evaluation_followup",
+    label: "待评估跟进",
+    route: "/notifications?box=admin&scene=admin.pending_evaluation",
+  },
+  {
+    key: "deposit_settle_followup",
+    label: "待结清跟进",
+    route: "/notifications?box=admin&scene=admin.deposit_settle",
+  },
 ];
 
 function TodoCard({
@@ -86,13 +128,7 @@ function TodoCard({
   // 行级权限粒度（Q9 裁定）：审计类仅超管可见；待确认收款跟 member.manage 走
   const rows = [
     ...(isSuper ? TODO_ROWS : []),
-    ...(hasPermission(permissions, "member.manage")
-      ? [
-          { key: "order_pending_manual" as const, label: "待确认收款", route: "/members?tab=orders" },
-          // R-313：未入会临时借书 → 入会跟进（点进去到会员管理跟进家长入会）
-          { key: "member_follow_up" as const, label: "入会跟进", route: "/members" },
-        ]
-      : []),
+    ...(hasPermission(permissions, "member.manage") ? STAFF_TODO_ROWS : []),
   ];
   const total = counts ? rows.reduce((s, r) => s + (counts[r.key] || 0), 0) : 0;
   return (

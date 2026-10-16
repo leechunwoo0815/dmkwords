@@ -11,6 +11,7 @@
   观察期费：按剩余天数比例（分母 = 观察期时长，配置）
   年费：按剩余天数比例（分母 = 年费时长，配置）
   首场活动费 / 活动费：未签到未开始全额（是否可退由人工审核判断）
+    ——"是否已签到/已开始"的判据 = `activity_refund_block`（家长申请入口与退会结算**共用**）
 """
 
 from __future__ import annotations
@@ -46,6 +47,45 @@ def refundable_amount(db: Session, order: Order) -> Decimal:
         return (order.amount * Decimal(remaining) / Decimal(period)).quantize(Decimal("0.01"))
     # 首场活动费 / 活动费：未签到未开始全额（是否可退由审核判断）
     return order.amount
+
+
+def activity_refund_block(db: Session, order: Order) -> str | None:
+    """活动类订单**不可退原因**（None = 按规则可退）。
+
+    2026-10-15 大审查 P1 #3 抽出：原先这段判据只写在家长申请入口（`wm10_service.apply_refund`），
+    而退会结算链（`wm10_withdrawal_service._settle_items`）按类型白名单一把扫 PAID 单 +
+    `refundable_amount` 对活动类**全额退** → 已签到参加过活动（成本已发生）的孩子走
+    「申请退会 → 审核通过」即可自动建退款单出款；`rule_text` 自己写着"审核时核对"却无人核。
+    两条链必须同一判据，故收进本模块（退款口径唯一来源）。
+
+    馆员批量路径（活动取消 T16，`skip_lock_check=True`）**不适用**本判据：那条链要退的
+    正是 `cancelled` 报名，由调用方自行豁免。
+    """
+    from backend.domain.activity.models import Activity, ActivityEnrollment
+
+    e = (
+        db.query(ActivityEnrollment)
+        .filter(
+            ActivityEnrollment.order_id == order.id,
+            ActivityEnrollment.is_deleted == 0,
+        )
+        .first()
+    )
+    if not e:
+        return None
+    if e.status == ActivityEnrollment.STATUS_CHECKED_IN:
+        return "已签到，不能退款（人都来了，成本已发生）"
+    if e.status in (
+        ActivityEnrollment.STATUS_CANCELLED,
+        ActivityEnrollment.STATUS_REFUNDED,
+    ):
+        return f"报名状态 {e.status} 不可申请退款"
+    # REFUND_PENDING 不在此拦（活动侧 apply_refund 先翻状态再委托本方法，
+    # 泛拦会切断委托链；重复申请由 dup 检查兜底）
+    a = db.query(Activity).filter(Activity.id == e.activity_id).first()
+    if a and a.start_at <= datetime.now():
+        return "活动已开始，请线下与馆员协商处理"
+    return None
 
 
 def rule_text(db: Session, order: Order) -> str:

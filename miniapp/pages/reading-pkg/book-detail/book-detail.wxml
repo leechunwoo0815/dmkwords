@@ -9,6 +9,9 @@
       <view class="hero-tags">
         <text class="tag-words">{{book.word_count}} 词</text>
         <text wx:if="{{book.ar_level}}" class="tag-ar">AR {{book.ar_level}}</text>
+        <!-- P1 #11（2026-10-15 大审查）：PRD §4.4 下架标注——后端 `off_shelf` 一直有值，
+             前端全仓零消费（下架书与正常书外观一致，点进来点播放才被拦） -->
+        <text wx:if="{{book.off_shelf}}" class="tag-off">已下架</text>
         <view wx:if="{{book.has_audio && durationText}}" class="tag-time">
         <image class="tag-time-icon" src="/icons/ui/headphone.png" mode="aspectFit" /><text>{{durationText}}</text>
       </view>

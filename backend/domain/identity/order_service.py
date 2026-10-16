@@ -283,6 +283,8 @@ class OrderService(OrderGuardMixin):
         # 纹丝不动（余额还能再退一次）、对账跨通道看不见。与家长端 `wm10_service._paid_order` 同口径。
         if order.order_type in (Order.TYPE_DEPOSIT, Order.TYPE_DEPOSIT_SUPPLEMENT):
             raise ValidationError("押金退款不能单独发起（随退会/权益转让流程自动发起）")
+        # P1 #4（2026-10-15 大审查）：transferred + 活动矩阵两道闸（判据与家长侧共用，见 order_guards）
+        self.assert_refund_allowed(order)
         # 在途退款单闸（与家长端 apply 同口径）：同订单只允许一笔进行中的申请（L5 事后能报，
         # 但钱已经出了）。
         active = (
@@ -429,12 +431,9 @@ class OrderService(OrderGuardMixin):
         为什么必须合并：回调若另写一份"置 paid + 开会员"，会员到期日/押金记账/活动报名转正/
         99 元资格这些口径早晚漂移——那是最贵的一类 bug。调用方负责 commit（本方法只 flush+发事件）。
         """
-        if order.order_type == Order.TYPE_FIRST_ACTIVITY:
-            # P0-A（2026-10-09 外部专家复核 + 本地亲验）：资格复查必须在**结算链路内**。
-            # 原先只有"发起支付前"（_assert_first_activity_payable）与"管理端确认收款"两处各查一次，
-            # 线上回调链（_settle_online）完全不查——同一账号两笔 pending 单各自回调即双收
-            # （管理端造单 × 线上回调同样穿透）。放在这里 = 覆盖全部收款入口，第四个入口也不会漏。
-            self.assert_first_activity_eligible(order)
+        # 结算前置三件（99 元资格 / 冻结期两层闸门 / 锁定孩子主体行）必须在"钱动之前且覆盖全部
+        # 收款入口"——P0-A 与 P1 #5/#6（2026-10-15 大审查）；理由见 order_guards.prepare_settle。
+        locked_child = self.prepare_settle(order)
         order.status = Order.STATUS_PAID
         order.pay_method = pay_method
         # WM3-B2 审查返工 R1：假通道删除——凭证唯一通道为 /voucher 上传端点
@@ -450,13 +449,13 @@ class OrderService(OrderGuardMixin):
         # ---- 会员开通联动（同一事务）----
         if order.order_type == Order.TYPE_OBSERVATION:
             child = self._open_membership(
-                order.child_id,
+                locked_child,
                 Child.MEMBER_OBSERVATION,
                 self._config_int("observation_period_days", 30),
                 actor=actor,
             )
         elif order.order_type == Order.TYPE_FORMAL:
-            child = self.db.query(Child).filter(Child.id == order.child_id).first()
+            child = locked_child
             # 提前续费顺延（V1.1 §3.4）：有效会员且未过期 → 原到期日 +365
             base = (
                 child.member_expire
@@ -558,8 +557,10 @@ class OrderService(OrderGuardMixin):
             db=self.db,
         )
 
-    def _open_membership(self, child_id: int, status: str, days: int, *, actor=None) -> Child:
-        child = self.db.query(Child).filter(Child.id == child_id).first()
+    def _open_membership(self, child: Child, status: str, days: int, *, actor=None) -> Child:
+        """开通会员关系（调用方须已持该 Child 行锁：并发续费防覆盖，见 prepare_settle）。"""
+        if child is None:
+            raise NotFoundError("孩子不存在，无法开通会员")
         self._transition_member(child, status, actor=actor)
         today = date.today()
         child.member_start = today

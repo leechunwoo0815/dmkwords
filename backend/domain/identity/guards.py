@@ -72,14 +72,28 @@ AUDIO_REASON_TEXT = {
     "unpaid": "需入会后才能收听音频（请到店咨询）",
     "withdrawn": "已退会，无法收听音频",
     "expired": "会员已过期，只能收听手中在借的图书音频",
+    # G15（2026-10-15 第六十一批）：PRD §4.4「下架后：在线音频 停止播放（已经听了一半的，进度保留）」
+    "off_shelf": "该书已下架，暂不能播放（已听进度保留）",
 }
 
 
 def check_audio(db: Session, child: Child, book_id: int | None) -> str:
-    """R3：音频收听资格判定（R-313 AUDIO 行）——返回简码 ok/unpaid/withdrawn/expired。
+    """R3：音频收听资格判定（R-313 AUDIO 行）——返回简码 ok/unpaid/withdrawn/expired/off_shelf。
 
     require_member_action(AUDIO) 与 audio-permission 预检端点同源消费（禁漂移）。
+
+    **G15（2026-10-15 第六十一批）**：补 PRD §4.4「下架后在线音频停止播放」。此前本函数只判会员四态，
+    书下架了照放（预检 `allowed=true`、音频流 200，只有进度上报 404）——2026-10-15 解封 catalog 场景时
+    实测到（`docs/09` 第六十一轮）。判定放在**会员判定之前**：下架对谁都不开门，包括"在手在借可听"的
+    过期会员。进度行**不动**（§4.4「已经听了一半的，进度保留」），恢复上架即接着听。
     """
+    if book_id is not None:
+        # 域间依赖用函数内 import（identity 不引入 catalog 的模块级依赖，避免导入环）
+        from backend.domain.catalog.models import Book
+
+        row = db.query(Book.status).filter(Book.id == book_id, Book.is_deleted == 0).first()
+        if row is None or row.status != Book.STATUS_ON:
+            return "off_shelf"
     state = _member_state(child)
     if state == "active":
         return "ok"
@@ -98,8 +112,10 @@ def require_member_action(
 ) -> None:
     """按 R-313 矩阵校验；不通过抛 ValidationError（422）。通过返回 None。"""
     state = _member_state(child)
-    # 在册：全部放行
-    if state == "active":
+    # 在册：全部放行 —— **AUDIO 例外**（G15，2026-10-15 第六十一批）：下架即停播（PRD §4.4）
+    # 与会员态无关，"在册"这条早退还曾把新闸整个绕过（预检走 check_audio 判为 off_shelf、
+    # 音频流却在早退处放行 → 同一本书两个端点结论相反）。放到下面 AUDIO 分支里统一判。
+    if state == "active" and action != AUDIO:
         return
 
     if action == FAVORITE_WRITE:
@@ -127,12 +143,16 @@ def require_member_action(
     if action == AUDIO:
         # R2/C-13：未缴费禁（直链可绕的洞）；过期仅手头在借书允（复用 _holding_book）；
         # 退会禁。403 语义（ForbiddenError）——innerAudioContext 直链失败即 onError。
-        # R3：判定抽 check_audio 同源（audio-permission 预检端点消费，禁两端点漂移）
+        # R3：判定抽 check_audio 同源（audio-permission 预检端点消费，禁两端点漂移）。
+        # P1 #12（2026-10-15 大审查）：403 带 `error_code=audio.<reason>`——此前**全仓没有任何
+        # error_code 生产方**（小程序 request.js 早留了这条通道、恒为空），于是 403 只能弹通用
+        # "无权限"，真实拒因（下架/过期/退会）被丢掉。给通道第一个生产方：调用方可按 code 分支
+        # （如详情页停播并引导入会），`detail` 仍是给人看的原因整句（小程序已按它出文案）。
         reason = check_audio(db, child, book_id)
         if reason != "ok":
             from backend.common.exceptions import ForbiddenError
 
-            raise ForbiddenError(AUDIO_REASON_TEXT[reason])
+            raise ForbiddenError(AUDIO_REASON_TEXT[reason], error_code=f"audio.{reason}")
         return
 
     if action in (VOCAB_WRITE, QUIZ, DEPOSIT_SUPPLEMENT):

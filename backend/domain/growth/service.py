@@ -19,8 +19,6 @@ from backend.common.config_service import ConfigService
 from backend.common.events import (
     LevelAdvancedEvent,
     MilestoneAchievedEvent,
-    QuizFailedEvent,
-    QuizPassedEvent,
     event_bus,
 )
 from backend.common.exceptions import NotFoundError, ValidationError
@@ -34,6 +32,7 @@ from backend.domain.growth.models import (
     QuizAttempt,
     WordsLedger,
 )
+from backend.domain.growth.quiz_events import publish_quiz_result
 from backend.domain.identity.models import Child
 
 LEVEL_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -507,6 +506,12 @@ class QuizService:
         book = self.db.query(Book).filter(Book.id == book_id, Book.is_deleted == 0).first()
         if not book:
             raise NotFoundError("图书不存在")
+        # G16（2026-10-15 第六十一批）：PRD §4.4「下架后：测验 没开始的不能开始；已经通过的成绩保留」。
+        # 此前开始/提交两条链都只过滤 `is_deleted`，下架书只要已解锁照样能考、还能入账（2026-10-15
+        # 解封 catalog 场景时实测）。这里只拦**开始**：§4.4 原话约束的是"没开始的"——**已在做/已通过的
+        # 不动**（已通过的词账与成绩由 `passed_before` / 词账读取链路原样保留，不回收）。
+        if book.status != Book.STATUS_ON:
+            raise ValidationError(f"《{book.title}》已下架，不能开始测验")
         from backend.domain.reading.models import ReadingProgress
 
         progress = (
@@ -670,17 +675,19 @@ class QuizService:
         total_q = len(questions)
         passed = 1 if (total_q > 0 and score * 100 >= total_q * pass_percent) else 0
 
-        self.db.add(
-            QuizAttempt(
-                child_id=child.id,
-                book_id=book_id,
-                score=score,
-                total_questions=total_q,
-                passed=passed,
-                snapshot=json.dumps(snapshot, ensure_ascii=False),
-                submitted_at=datetime.now(),
-            )
+        # P1 #2（2026-10-15 大审查）：flush 取提交记录 id 作通知去重键——默认键会让同一孩子
+        # 第 2 次起的成绩通知被唯一索引静默吞掉（PRD §十要「每次提交后」）。
+        attempt = QuizAttempt(
+            child_id=child.id,
+            book_id=book_id,
+            score=score,
+            total_questions=total_q,
+            passed=passed,
+            snapshot=json.dumps(snapshot, ensure_ascii=False),
+            submitted_at=datetime.now(),
         )
+        self.db.add(attempt)
+        self.db.flush()
 
         result = {
             "score": score,
@@ -713,27 +720,14 @@ class QuizService:
                 result["just_passed"] = True
 
         # WM11：测验成绩 / 等级升级 / 里程碑达成 通知事件（同一事务）
-        if passed:
-            event_bus.publish(
-                QuizPassedEvent(
-                    child_id=child.id,
-                    book_id=book_id,
-                    quiz_id=book_id,
-                    word_count=book.word_count,
-                    submission_id=None,
-                ),
-                db=self.db,
-            )
-        else:
-            event_bus.publish(
-                QuizFailedEvent(
-                    child_id=child.id,
-                    book_id=book_id,
-                    quiz_id=book_id,
-                    score=score,
-                ),
-                db=self.db,
-            )
+        publish_quiz_result(
+            self.db,
+            child=child,
+            book=book,
+            passed=bool(passed),
+            score=score,
+            submission_id=attempt.id,  # 通知去重键（P1 #2：每次提交一条）
+        )
         if result.get("level_up"):
             event_bus.publish(
                 LevelAdvancedEvent(

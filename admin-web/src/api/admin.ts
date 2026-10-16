@@ -187,6 +187,18 @@ export interface TodoCounts {
   member_follow_up: number;
   /** G5（2026-10-14）：预约异常待跟进（副本转维护/遗失且无副本可换；馆员线下跟进后手动销项） */
   reservation_exception: number;
+  // P1 #10（2026-10-15 大审查）：后端 `todo_counts` 里**计入 admin_total** 但前端类型漏声明的
+  // 5 个键——仪表盘待办卡靠这些键求和渲染，缺声明就只能漏列（"全部处理完毕"假绿把资金异常盖掉）。
+  /** 2026-10-12 拍板：活动取消后作废的订单（待人工销项） */
+  activity_orders_voided: number;
+  /** 2026-10-12 拍板：副本报损·遗失赔偿待处理 */
+  copy_damage_pending: number;
+  /** 2026-10-12 拍板：资金异常（回调被兜底/迟到支付等，需人工核对） */
+  payment_anomaly: number;
+  /** G12（2026-10-14）：待评估超过 7 天的孩子跟进名单 */
+  pending_evaluation_followup: number;
+  /** G1（2026-10-14）：押金不足扣减的「待结清」持续提醒 */
+  deposit_settle_followup: number;
 }
 
 export function apiTodoCounts(): Promise<TodoCounts> {

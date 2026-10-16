@@ -190,7 +190,8 @@ def test_p2_12_import_word_count_0_rejected(client: TestClient):
     wb = Workbook()
     ws = wb.active
     ws.append(["ISBN", "书名*", "作者", "AR值", "词数*", "主题", "适读阶段", "副本数"])
-    ws.append([None, "零词数", "", "", "0", "", "", "1"])
+    # 2026-10-15 G17：Excel 行必须有 ISBN（无 ISBN 只能后台单本录入，PRD §4.3）
+    ws.append(["9787114444444", "零词数", "", "", "0", "", "", "1"])
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)

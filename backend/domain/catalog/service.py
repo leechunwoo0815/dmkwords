@@ -474,6 +474,18 @@ class BookService:
             # G5：本册退场可能牵连活跃预约（PRD §5.5 换锁 / 转异常）。**必须在写 copy.status 之前**
             # 调用——本函数取锁顺序为 Reservation → copy，与核销/取消/超时释放同向（见模块头锁序）。
             handle_copy_unavailable(self.db, copy, reason=f"副本状态改为{new_status}", admin=admin)
+        elif new_status == BookCopy.STATUS_AVAILABLE and old == BookCopy.STATUS_RESERVED:
+            # P1 #8（2026-10-15 大审查，亲验）：管理端「释放锁定」（reserved→available）此前**只掐副本、
+            # 不动预约单**——预约单仍 active（占 1 个借阅额度、家长端仍显示"预约中"），副本却已能被
+            # 任何孩子借走；该家长到店核销必 409，只能取消重约。与"副本退场"是同一个善后：
+            # 有同书其他在馆副本 → 改锁那册；没有 → 转异常 + 通知家长 + 馆员待办（名额同时释放）。
+            handle_copy_unavailable(
+                self.db,
+                copy,
+                reason="馆员释放锁定（副本转为可借）",
+                admin=admin,
+                cause="原预约占用的副本已被馆员释放为可借",
+            )
         copy.status = new_status
         self.copy_repo.update(copy)
         self._audit(
@@ -491,9 +503,9 @@ class BookService:
 
         与"改状态"的区别：**不动在借记录**（孩子照常还书/结案），只把副本标成维护中/遗失
         并生成一条**赔偿待办**给运营（赔偿按 PRD §3.6 从押金扣或记待结清）。
+        待办实现与「还书带损」共用 `damage_ops.notify_compensation_todo`（P2 #14 口径统一）。
         """
-        from backend.common.admin_notification_models import AdminNotification
-        from backend.common.admin_notifications import AdminNotifyService
+        from backend.domain.catalog.damage_ops import notify_compensation_todo
 
         if kind not in ("damage", "lost"):
             raise ValidationError("报损类型不合法（damage=损坏 / lost=遗失）")
@@ -507,25 +519,13 @@ class BookService:
         handle_copy_unavailable(self.db, copy, reason=f"报损:{reason}", admin=admin)
         copy.status = target
         self.copy_repo.update(copy)
-        book = self.db.query(Book).filter(Book.id == copy.book_id).first()
-        title = book.title if book else f"副本{copy.copy_code}"
-        child_name = "（未在借）"
-        if active is not None:
-            from backend.domain.identity.models import Child
-
-            c = self.db.query(Child).filter(Child.id == active.child_id).first()
-            child_name = c.name if c else child_name
-        AdminNotifyService(self.db).send(
-            scene=AdminNotification.SCENE_COPY_DAMAGE_COMPENSATION,
-            title="【图书报损·待赔偿】",
-            content=(
-                f"【图书报损·待赔偿】《{title}》（副本 {copy.copy_code}，借阅人 {child_name}）"
-                f"登记为{'遗失' if kind == 'lost' else '损坏'}：{reason}"
-                "——请按赔偿规则处理（押金扣除或记待结清）"
-            ),
-            ref_type=AdminNotification.REF_CHILD,
-            ref_id=str(active.child_id) if active is not None else str(copy.id),
-            applicant_name=child_name,
+        notify_compensation_todo(
+            self.db,
+            copy,
+            kind=kind,
+            reason=reason,
+            admin=admin,
+            child_id=active.child_id if active is not None else None,
         )
         self._audit(
             admin,
@@ -730,7 +730,13 @@ def build_import_template() -> bytes:
 
     guide = wb.create_sheet("填写说明")
     guide.append(["列", "是否必填", "说明"])
-    guide.append(["ISBN", "建议", "重复 ISBN 不重复建书，只加副本；图书唯一性最优解"])
+    guide.append(
+        [
+            "ISBN",
+            "是（Excel）",
+            "重复 ISBN 不重复建书，只加副本；无 ISBN 的书只能后台单本录入，不走 Excel（PRD §4.3）",
+        ]
+    )
     guide.append(["书名", "必填", "其余列可空，管理端补录"])
     guide.append(["作者", "否", ""])
     guide.append(["AR值", "否", "与孩子 AR 差值超范围时借书仅提示"])

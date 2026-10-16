@@ -119,33 +119,15 @@ class RefundService:
         # 「我的订单」通用入口此前可绕过（已签到活动也能建退款单）。
         # skip_lock_check=True（馆员批量取消路径）豁免：活动已 cancelled 时
         # start_at 检查必然失败，批量退款逻辑上必须绕过；家长主动申请不豁免。
+        # 2026-10-15 大审查 P1 #3：判据本体抽到 refund_rules.activity_refund_block，
+        # 与退会结算链（wm10_withdrawal_service._settle_items）**共用同一份**（原先只有本入口查）。
         if (
             order.order_type in (Order.TYPE_ACTIVITY, Order.TYPE_FIRST_ACTIVITY)
             and not skip_lock_check
         ):
-            from backend.domain.activity.models import Activity, ActivityEnrollment
-
-            e = (
-                self.db.query(ActivityEnrollment)
-                .filter(
-                    ActivityEnrollment.order_id == order.id,
-                    ActivityEnrollment.is_deleted == 0,
-                )
-                .first()
-            )
-            if e:
-                if e.status == ActivityEnrollment.STATUS_CHECKED_IN:
-                    raise ValidationError("已签到，不能退款（人都来了，成本已发生）")
-                if e.status in (
-                    ActivityEnrollment.STATUS_CANCELLED,
-                    ActivityEnrollment.STATUS_REFUNDED,
-                ):
-                    raise ValidationError(f"报名状态 {e.status} 不可申请退款")
-                # REFUND_PENDING 不在此拦（活动侧 apply_refund 先翻状态再委托本方法，
-                # 泛拦会切断委托链；重复申请由下方 dup 检查兜底）
-                a = self.db.query(Activity).filter(Activity.id == e.activity_id).first()
-                if a and a.start_at <= datetime.now():
-                    raise ValidationError("活动已开始，请线下与馆员协商处理")
+            block = refund_rules.activity_refund_block(self.db, order)
+            if block:
+                raise ValidationError(block)
         # R1（X6 返工）：0 元禁提交——0 元申请会联动创建退会单+锁孩子，
         # 审核员误批即 withdrawn（真业务陷阱，非纯 UX）
         # 2026-10-12 拍板（P7）：已随权益转让处置的订单不再受理退款

@@ -73,7 +73,13 @@ def import_books(db: Session, admin, file_bytes: bytes) -> dict:
         if not title:
             errors.append(f"第{row_num}行: 书名不能为空")
             continue
-        if isbn and not ISBN_RE.match(isbn):
+        # G17（2026-10-15 第六十一批）：PRD §4.3「没有 ISBN 的书（极少数）：支持录入，系统自动生成
+        # 内部编号，但**只能后台单本录入，不走 Excel**」。此前这里对空 ISBN 照建书目（internal_code=LOCAL-…），
+        # 与 PRD 相反——且无 ISBN 行**没有去重依据**，批量导入必然产出一堆认不出来的重书。
+        if not isbn:
+            errors.append(f"第{row_num}行: 无 ISBN 的书只能后台单本录入，不走 Excel")
+            continue
+        if not ISBN_RE.match(isbn):
             errors.append(f"第{row_num}行: ISBN 格式不正确（{isbn}）")
             continue
         # R7：AR 值与 schema 同规则（格式 + 0-12.9），防脏值漏进「AR 待配置」筛选

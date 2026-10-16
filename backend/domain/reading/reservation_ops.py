@@ -9,12 +9,17 @@
 |---|---|---|
 | 管理端改副本状态 | `catalog/service.py::update_copy_status` | ✅ |
 | 报损·遗失（2026-10-12 拍板 P5） | `catalog/service.py::report_copy_damage` | ✅ |
+| **管理端「释放锁定」**（`reserved→available`，2026-10-15 大审查 P1 #8） | `catalog/service.py::update_copy_status` | ✅ |
 | 还书带损 `condition=maintenance\\|lost` | `circulation/service.py::return_book` | ✗ **结构上不可达** |
 
-不挂第三条是**可达性论证**、不是遗漏：`return_book` 要求该副本有 `active`/`overdue` 的借阅记录
+不挂后者是**可达性论证**、不是遗漏：`return_book` 要求该副本有 `active`/`overdue` 的借阅记录
 ⇒ 副本必为 `borrowed`；而预约锁定要求副本 `available→reserved`（`ReservationService.create`），
 两状态互斥，且 `circulation.borrow()` 遇 `reserved` 副本直接拒绝并提示"走预约核销"。
 **若将来口径变成"预约可锁 borrowed 副本"或借出链改锁序，本段结论必须重判。**
+
+**「释放锁定」为什么也走本漏斗**（P1 #8）：该跃迁只把副本改成可借、**不动预约单**，结果
+预约单仍 `active`（占额度、家长端仍显示"预约中"），副本却已能被任何人借走——家长到店核销必 409。
+与"副本退场"是同一个善后：有别的在馆副本就改锁，没有就转异常 + 通知 + 待办。
 
 **锁序（宪法 §二 并发红线：全局 `Reservation → copy`）**：调用方必须在**写 `copy.status` 之前**
 调用本函数——本函数先锁预约行、再锁替换副本，原副本由调用方在其后更新，全程无反向边。
@@ -39,8 +44,16 @@ from backend.domain.identity.models import Child, Parent
 from backend.domain.reading.models import Reservation
 
 
-def handle_copy_unavailable(db: Session, copy: BookCopy, *, reason: str, admin) -> dict:
-    """副本转维护中/遗失后的预约善后（PRD §5.5）。**由调用方在写 `copy.status` 之前调用。**
+def handle_copy_unavailable(
+    db: Session,
+    copy: BookCopy,
+    *,
+    reason: str,
+    admin,
+    cause: str = "原预约的副本已转为维护/遗失",
+) -> dict:
+    """副本退场（维护/遗失/**馆员释放锁定**）后的预约善后（PRD §5.5）。
+    **由调用方在写 `copy.status` 之前调用。**
 
     分两路处置该副本上**唯一一条**活跃预约（同副本同时只能有一条——`create` 是在把副本锁成
     `reserved` 的前提下建单的）：
@@ -48,6 +61,8 @@ def handle_copy_unavailable(db: Session, copy: BookCopy, *, reason: str, admin) 
     - **有**同书其他在馆副本 → 预约**改锁**那册（`expires_at` 不变，预约继续有效）；
     - **没有** → 预约转 `Reservation.STATUS_EXCEPTION` + 通知家长 + 馆员待办；异常态不再是
       `active`，故额度按 §5.4 公式（`可借 = 上限 − 在借 − **预约中(active)**`）**自动释放**。
+
+    `cause`：给家长/馆员看的**原因整句**（触发点不同，措辞不同；默认是维护/遗失口径）。
 
     返回 `{"switched": [预约id…], "excepted": [预约id…]}`（调用方可不理会；单测/审计取用）。
     """
@@ -115,7 +130,7 @@ def handle_copy_unavailable(db: Session, copy: BookCopy, *, reason: str, admin) 
                 scene=SCENE_RESERVATION_EXCEPTION,
                 title="预约已转异常",
                 content=(
-                    f"《{title}》原预约的副本已转为维护/遗失，且暂无其他在馆副本可替换，"
+                    f"《{title}》{cause}，且暂无其他在馆副本可替换，"
                     f"该预约已转为异常（不再占用借阅名额）。馆员会尽快与您联系，"
                     f"您也可以在小程序重新预约该书或其他书。"
                 ),
@@ -129,7 +144,7 @@ def handle_copy_unavailable(db: Session, copy: BookCopy, *, reason: str, admin) 
             scene=AdminNotification.SCENE_RESERVATION_EXCEPTION,
             title="【预约异常·待跟进】",
             content=(
-                f"《{title}》预约（#{res.id}，{child_name}）因副本转维护/遗失且无其他在馆副本，"
+                f"《{title}》预约（#{res.id}，{child_name}）因{cause}且无其他在馆副本，"
                 f"已转异常并已通知家长：{reason}——请跟进改约或补书"
             ),
             ref_type=AdminNotification.REF_RESERVATION,

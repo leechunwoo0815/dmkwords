@@ -339,6 +339,9 @@ class WithdrawalService:
         与「只要申请退会就该把能退的都退掉」的预期不符 → 改为扫**全部已支付订单**；
         各单能退多少仍由订单类型规则决定（未开始的活动全额、已用/过期按规则为 0）。
         同时排除已有「在办/已退」退款单的订单与押金，避免与独立退款流程叠加重复退。
+
+        2026-10-15（大审查 P1 #3）：活动类订单另过 `activity_refund_block`——"已签到/已开始/
+        报名已取消或已退"一律不入清单（原先只管类型、不看参加状态，已签到也照退）。
         """
         from backend.domain.billing.models import Deposit
 
@@ -387,6 +390,14 @@ class WithdrawalService:
         )
         for order in orders:
             if order.id in settled_order_ids:
+                continue
+            # P1 #3（2026-10-15 大审查，亲验）：活动单必须与家长申请入口**同一判据**——
+            # 原先这里只按类型白名单扫，`refundable_amount` 对活动类全额退，于是"已签到参加过"
+            # 的活动费也被自动结算成退款单（成本已发生还退钱，家长零成本触发）。
+            # 判据本体在 refund_rules.activity_refund_block（口径唯一来源），不可退即不入清单。
+            if order.order_type in (Order.TYPE_ACTIVITY, Order.TYPE_FIRST_ACTIVITY) and (
+                refund_rules.activity_refund_block(self.db, order)
+            ):
                 continue
             amount = refund_rules.refundable_amount(self.db, order)
             if amount <= 0:

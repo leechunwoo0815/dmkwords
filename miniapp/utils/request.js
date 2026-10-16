@@ -79,12 +79,17 @@ function doRequest(app, method, url, data, options, showLoading, resolve, reject
       }
 
       if (res.statusCode === 403) {
-        // 带 error_code 的 403（如 consent_required）交给调用方处理 UX，不弹通用提示
+        // 带 error_code 的 403（如 audio.off_shelf）交给调用方处理 UX，不弹通用提示
         const errCode = (res.data && res.data.error_code) || null
+        // P1 #12（2026-10-15 大审查）：无 error_code 的 403 **必须显示服务端 detail**——
+        // 原先一律弹「无权限执行此操作」，于是"该书已下架，暂不能播放（已听进度保留）"
+        // 与"会员已过期，只能收听手中在借的图书音频"这类**真实原因**家长永远看不到
+        // （真正的原因藏在 detail 里，前端把它丢了）。
+        const msg403 = (res.data && res.data.detail) || ''
         if (!errCode) {
-          wx.showToast({ title: '无权限执行此操作', icon: 'none' })
+          wx.showToast({ title: msg403 || '无权限执行此操作', icon: 'none' })
         }
-        const err403 = new Error((res.data && res.data.detail) || '无权限')
+        const err403 = new Error(msg403 || '无权限')
         err403.errorCode = errCode
         err403.statusCode = 403
         reject(err403)

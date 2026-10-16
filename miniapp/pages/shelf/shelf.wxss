@@ -106,6 +106,8 @@
 .tag { font-size: 18rpx; padding: 2rpx 14rpx; border-radius: 999rpx; font-weight: 700; }
 .tag-words { background: var(--success-soft); color: var(--success); }
 .tag-ar { background: var(--accent-soft); color: var(--accent); }
+/* P1 #11（2026-10-15）：下架标注（PRD §4.4）——琥珀档，与"绿=可借"区分开 */
+.tag-off { background: var(--warning-soft); color: var(--warning); }
 
 /* ---------- 操作按钮 ---------- */
 /* 2026-09-15：原先 10/24rpx 内边距 + 3rpx 边 + 700 字重，按钮列宽到 ~166rpx，

@@ -98,6 +98,9 @@ class QuizFailedEvent(DomainEvent):
     book_id: int = 0
     quiz_id: int = 0
     score: float = 0.0
+    # P1 #2（2026-10-15 大审查）：通知去重键挂在**业务提交记录**上（QuizAttempt.id），
+    # 与 QuizPassedEvent 对齐——默认键 "1" 下同一孩子第 2 次起的成绩通知全被静默吞掉。
+    submission_id: int | None = None
 
 
 @dataclass

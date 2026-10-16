@@ -68,6 +68,22 @@ def _on_order_paid(event: OrderPaidEvent, db: Session) -> None:
     )
 
 
+def _quiz_dedup_key(event: object, outcome: str) -> str:
+    """测验成绩通知的去重键（P1 #2，2026-10-15 大审查）。
+
+    PRD §十 明文「测验成绩（**每次提交后**）」→ 一条提交一条通知。
+    键 = 提交记录 id（`QuizAttempt.id`，唯一且随"重置测试机会"也不会复用）；
+    极端情况下事件没带提交号（外部发布方/历史代码）时退化为发生时刻——
+    **宁可多发一条，也不要把"通过"永久吞掉**（默认键 "1" 正是那个坑）。
+    """
+    submission_id = getattr(event, "submission_id", None)
+    if submission_id:
+        return f"{outcome}-sub-{submission_id}"
+    occurred_at = getattr(event, "occurred_at", None)
+    stamp = occurred_at.strftime("%Y%m%d%H%M%S%f") if occurred_at else "unknown"
+    return f"{outcome}-at-{stamp}-b{getattr(event, 'book_id', 0)}"
+
+
 def _on_level_up(event: LevelAdvancedEvent, db: Session) -> None:
     from backend.domain.identity.models import Child
 
@@ -87,6 +103,9 @@ def _on_level_up(event: LevelAdvancedEvent, db: Session) -> None:
         child_id=event.child_id,
         ref_type="child",
         ref_id=str(event.child_id),
+        # P1 #2（2026-10-15 大审查）：去重键=升级跃迁（from→to）。默认 "1" 会让同一孩子
+        # **终身只收到第一条**升级通知（第二次升级起静默吞掉）。
+        dedup_key=f"{event.from_level}->{event.to_level}",
         openid=_parent_openid(db, parent_id),
     )
 
@@ -110,6 +129,7 @@ def _on_quiz_passed(event: QuizPassedEvent, db: Session) -> None:
         child_id=event.child_id,
         ref_type="child",
         ref_id=str(event.child_id),
+        dedup_key=_quiz_dedup_key(event, "pass"),
         openid=_parent_openid(db, parent_id),
     )
 
@@ -133,6 +153,7 @@ def _on_quiz_failed(event: QuizFailedEvent, db: Session) -> None:
         child_id=event.child_id,
         ref_type="child",
         ref_id=str(event.child_id),
+        dedup_key=_quiz_dedup_key(event, "fail"),
         openid=_parent_openid(db, parent_id),
     )
 
@@ -269,6 +290,9 @@ def _on_milestone_achieved(event: MilestoneAchievedEvent, db: Session) -> None:
         child_id=child.id,
         ref_type="child",
         ref_id=str(event.child_id),
+        # P1 #2（2026-10-15 大审查）：去重键=本次达成的节点集合（`_check_milestones` 只返回
+        # 未发过的节点 → 每个节点终身一条）。默认 "1" 会让一个孩子**终身只收到第一个**里程碑通知。
+        dedup_key="nodes-" + ",".join(str(n) for n in sorted(event.nodes)),
         openid=_parent_openid(db, child.parent_id),
     )
     # G9（2026-10-13 第五十五轮）：PRD §7.4"同时通知家长和馆员"的**馆员侧**——写管理端待办墙

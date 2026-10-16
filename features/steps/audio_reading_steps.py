@@ -589,7 +589,12 @@ def step_drag_to_end(context):
     child, book = context.ming, context.book
     _play(context, child, book["id"], 0, 60)
     _play(context, child, book["id"], 60, 300, wall=250)
-    context.seek = _play(context, child, book["id"], BOOK_SECONDS - 1, BOOK_SECONDS)
+    # 末秒那一小段要真的花掉 1 秒墙钟（`wall=1`，判定口径 `Δt×2.4`）——
+    # 2026-10-16 订正：原先不给墙钟（=上报距上一拍 0 秒却声称覆盖了 1 秒音频），
+    # 属于**物理上不可能的造数**；宽限改为"只给首笔"（P1 #1）后当场被 422 拒，
+    # 暴露的正是这处造假（判据本身没问题：真实客户端是 onSeeked 记新起点、下一次心跳
+    # 才上报新段，中间自然有 ≥10 秒墙钟）。
+    context.seek = _play(context, child, book["id"], BOOK_SECONDS - 1, BOOK_SECONDS, wall=1)
 
 
 @then("覆盖仅计 5 分钟多一点 判定未读完")

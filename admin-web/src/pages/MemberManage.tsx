@@ -93,6 +93,15 @@ export default function MemberManage() {
   const configs = useConfigs();
   const { message } = AntdApp.useApp();
   const { user } = useAuth();
+  // 二孩年费（下单弹窗的订单类型文案用）：配置 `second_child_discount_percent` 的语义是
+  // **按此比例收取**（90 = 收 90% = 九折），与后端定价同源——`order_service.price_member_order`
+  // 就是 `base * percent / 100`。
+  // 2026-10-15 修正（用户现场发现）：本页文案原先写成 `1 - percent/100`，把 90 当成了"折扣幅度
+  // 90%"，于是 6000 元年费显示成「二孩自动 600」。后端实际收 5400 —— 属**纯标签算错**（不影响下单金额）。
+  const formalFee = cfgNum(configs, "formal_fee", 6000);
+  const siblingFee = Math.round(
+    (formalFee * cfgNum(configs, "second_child_discount_percent", 90)) / 100,
+  );
   // W5 URL 状态镜像：tab/keyword/page 进 URL（replaceState 不堆栈），刷新还原
   const readUrl = () => new URLSearchParams(window.location.search);
   const updateUrl = useCallback((params: Record<string, string | undefined>) => {
@@ -811,11 +820,8 @@ export default function MemberManage() {
               },
               {
                 value: "formal_fee",
-                label: `正式年费（${money(cfgNum(configs, "formal_fee", 6000))} 元，二孩自动 ${money(
-                  Math.round(
-                    cfgNum(configs, "formal_fee", 6000) *
-                      (1 - cfgNum(configs, "second_child_discount_percent", 10) / 100),
-                  ),
+                label: `正式年费（${money(formalFee)} 元，二孩 ${money(siblingFee)}，省 ${money(
+                  formalFee - siblingFee,
                 )}）`,
               },
               {

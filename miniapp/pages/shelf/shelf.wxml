@@ -59,6 +59,8 @@
         <view class="asset-tags">
           <text class="tag tag-ar" wx:if="{{item.ar_level}}">AR {{item.ar_level}}</text>
           <text class="tag tag-words">{{item.word_count}} 词</text>
+          <!-- P1 #11（2026-10-15 大审查）：PRD §4.4「收藏夹里仍然显示，标注『已下架』」 -->
+          <text class="tag tag-off" wx:if="{{item.off_shelf}}">已下架</text>
         </view>
       </view>
       <view class="asset-actions">
