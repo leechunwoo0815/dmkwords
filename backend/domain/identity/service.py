@@ -644,7 +644,12 @@ class ChildService:
                     child_id=child.id,
                     ref_type="child",
                     ref_id=str(child.id),
-                    dedup_key=str(days),
+                    # 第四轮大审查 P1-5（2026-10-17）：键必须带**覆盖期**。原先是 `str(days)`
+                    # （30/14/7/0），而 ref_id 是终身不变的 child_id → 家长续费一年后再次进入
+                    # 同一窗口时命中上一周期那行 → **此后再也收不到任何到期提醒**（实测 1 → 0 条）。
+                    # 口径与 `circulation/followups.py` 的 `renew:{member_expire}` 同款：
+                    # 一"期"（同一个到期日）一个键，换期即新键。
+                    dedup_key=f"{child.member_expire}-{days}",
                     openid=parent.wechat_openid if parent else None,
                 ):
                     sent += 1

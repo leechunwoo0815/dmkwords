@@ -232,6 +232,7 @@ class RefundService:
             raise ValidationError(f"申请状态 {req.status}，不可撤销")
         req.assert_transition(RefundRequest.STATUS_CANCELLED)
         req.status = RefundRequest.STATUS_CANCELLED
+        self._restore_deposit_if_refund_terminal(req)  # 家长撤销押金退款 = 钱没出去 → 押金复位
         if req.order_id:
             order = self.db.query(Order).filter(Order.id == req.order_id).first()
             if order and order.refund_status in (Order.REFUND_STATUS_PENDING,):
@@ -307,6 +308,7 @@ class RefundService:
                 raise ValidationError("拒绝退款必须填写原因（家长可见）")
             req.assert_transition(RefundRequest.STATUS_REJECTED)
             req.status = RefundRequest.STATUS_REJECTED
+            self._restore_deposit_if_refund_terminal(req)  # 押金退款被拒 = 钱没出去 → 押金复位
             if req.kind == RefundRequest.KIND_ORDER and req.order_id:
                 order = (
                     self.db.query(Order)
@@ -725,6 +727,22 @@ class RefundService:
             w.status = WithdrawalRequest.STATUS_REJECTED
             if child:
                 child.operation_locked = 0
+
+    def _restore_deposit_if_refund_terminal(self, req: RefundRequest) -> None:
+        """押金退款单走到「钱没出去」的终态（rejected/cancelled）→ 押金账户从 `refunding` 复位。
+
+        第四轮大审查（2026-10-17，PRD §3.6 同日增补第二条回退边）：`refunding` 此前没有回退边，
+        馆员拒绝或家长撤销押金退款单后，押金永久卡在退款中——孩子是会员却借不了书、约不了、
+        扣不了赔偿、补缴/建单全拒，唯一出路是再提一次退会。
+
+        判据挂在**退款单**的终态上（而不是"退会单终态"）：退会结算会同时建「会员费退款单」与
+        「押金退款单」，只拒押金那一张时退会单还没到终态，但押金的钱确实没出去、必须当场复位。
+        """
+        if req.kind != RefundRequest.KIND_DEPOSIT:
+            return
+        from backend.domain.billing.service import DepositService
+
+        DepositService(self.db).restore_after_refund_rejected(req.child_id)
 
     def _refund_activity_enrollment(self, order: Order, admin=None) -> None:
         from backend.domain.activity.models import ActivityEnrollment

@@ -142,12 +142,17 @@ def test_member_expire_remind_dedup_per_node(client: TestClient):
     assert r2["processed"] == 0  # 幂等：同一节点不重复
 
     with get_session() as db:
+        # 2026-10-17（第六十六批·第四轮大审查 P1-5）：去重键从「只剩天数」改成**覆盖期键**
+        # `{member_expire}-{days}`——原键在家长续费后被上一周期占住，此后终身静默
+        # （回归 `test_audit4_fix_20261017.py::test_member_expire_remind_survives_renewal_cycle`）。
+        # 本用例的"同一节点不重复"判据不变，只是键的形状跟着口径走。
+        child = db.query(Child).filter(Child.id == c["id"]).first()
         rows = (
             db.query(Notification)
             .filter(
                 Notification.parent_id == p["id"],
                 Notification.scene == "member.expire_remind",
-                Notification.dedup_key == "30",
+                Notification.dedup_key == f"{child.member_expire}-30",
             )
             .all()
         )

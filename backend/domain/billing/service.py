@@ -128,6 +128,62 @@ class DepositService:
         )
         return dep
 
+    def reset_refunded_on_rejoin(self, child_id: int) -> None:
+        """重新入会时把**已退还**的押金账户归零复位为「未缴」（第四轮大审查 P1-2，2026-10-17）。
+
+        为什么必须有：退会/转让结算会把押金置 `refunded`（钱已退给家长），而 `refunded` 此前是
+        **终态**——四条缴款入口（在线缴 / 管理端造单 / 补缴 / 小程序补缴）全部以「押金状态不是 unpaid」
+        为由拒绝，`deposits.child_id` 又是单列唯一（建不出第二行）→ 孩子成了"有效会员但永远缴不了押金"，
+        借书被 `borrow_gate` 拒、只能馆员人工放行=无担保出借。
+
+        `WITHDRAWN → OBSERVATION/FORMAL` 是 R-301 明文的重新入会边，缴费即入会；入会成功时把押金
+        账户按「重新缴押金」的语义归零（金额/可用/已扣/待结清全 0），**历史流水（`deposit_ledgers`）
+        保留**——押金台账是资金事实，只记不改；新一笔缴纳会再落一条 `pay` 行。
+        """
+        from backend.domain.billing.models import Deposit
+
+        dep = (
+            self.db.query(Deposit)
+            .filter(Deposit.child_id == child_id, Deposit.is_deleted == 0)
+            .first()
+        )
+        if dep is None or dep.status != Deposit.STATUS_REFUNDED:
+            return
+        dep.status = Deposit.STATUS_UNPAID
+        dep.amount = Decimal("0")
+        dep.available_amount = Decimal("0")
+        dep.deducted_amount = Decimal("0")
+        dep.unpaid_balance = Decimal("0")
+
+    def restore_after_refund_rejected(self, child_id: int) -> None:
+        """押金退款单被**拒绝/撤销**（钱没出去）→ 押金账户从 `refunding` 回到退款前的状态。
+
+        第四轮大审查（2026-10-17，PRD §3.6 同日增补）：此前 `refunding` **没有回退边**——馆员拒绝或
+        家长撤销押金退款单后，退会单推 rejected、孩子解锁，而押金永久停在 `refunding`：预约硬拦、
+        借书只能人工放行、赔偿扣除 422、补缴/建单全拒（孩子是会员却什么都做不了，唯一出路是再提一次退会）。
+
+        状态按余额重算，规则与 `on_deposit_order_paid` 的补缴分支**同一套**（不另立判据）：
+        有未结清 → fully_deducted；可用额低于标准额 → partially_deducted；否则 → paid。
+        """
+        from backend.domain.billing.models import Deposit
+
+        dep = (
+            self.db.query(Deposit)
+            .filter(Deposit.child_id == child_id, Deposit.is_deleted == 0)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+        if dep is None or dep.status != Deposit.STATUS_REFUNDING:
+            return
+        standard = dep.amount or Decimal("0")
+        if (dep.unpaid_balance or Decimal("0")) > 0:
+            dep.status = Deposit.STATUS_FULLY_DEDUCTED
+        elif dep.available_amount < standard:
+            dep.status = Deposit.STATUS_PARTIALLY_DEDUCTED
+        else:
+            dep.status = Deposit.STATUS_PAID
+
     def create_deposit_order(self, admin, child_id: int) -> Order:
         """创建押金订单（1200，金额从配置读）。"""
         child = self.db.query(Child).filter(Child.id == child_id, Child.is_deleted == 0).first()

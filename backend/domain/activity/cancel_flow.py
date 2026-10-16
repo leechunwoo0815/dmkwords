@@ -86,7 +86,13 @@ class ActivityCancelMixin:
                     )
                     if voided:
                         voided_orders += 1
-                        self.db.expire_all()
+                        # 第四轮大审查 P0-1（2026-10-17）：这里原先是 `self.db.expire_all()`——
+                        # 本项目 session 是 **autoflush=False**，而 `expire_all()` 会把**所有未 flush 的
+                        # 挂起修改整段丢弃**（不是"刷新缓存"）：活动置 cancelled（本函数开头）与报名置
+                        # cancelled（上面几行）都还没落库，于是"取消"实际只作废了订单——活动仍 published
+                        # （**还能被继续报名**）、报名仍 pending_payment，而接口回报 `cancelled: 1`。
+                        # 这里需要的是"把挂起修改落库后继续"，那是 `flush()`。
+                        self.db.flush()
             elif e.status == ActivityEnrollment.STATUS_ENROLLED:
                 if e.order_id:
                     # T16/B-9：付费报名 → 退款待审 + 统一台账 RefundRequest

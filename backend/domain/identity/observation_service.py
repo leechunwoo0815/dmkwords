@@ -44,7 +44,10 @@ class ObservationReportService:
             uploaded_by=admin.id,
         )
         self.db.add(report)
+        self.db.flush()  # 先落库拿 id（下面拿它当去重键：报告 id 是"不会重来的事实"）
         # WM11：评估报告上传通知家长
+        # 第四轮大审查 P2-14（2026-10-17）：此前不传 dedup_key（默认 "1"）+ ref_id=child_id
+        # → **同一孩子终身只发第一条上传通知**（第 2 期起家长收不到）；P1 #2 家族漏网的第 4 处。
         NotificationService(self.db).send(
             parent_id=child.parent_id,
             scene=SCENE_OTHER_EVALUATION_UPLOADED,
@@ -54,6 +57,7 @@ class ObservationReportService:
             child_id=child.id,
             ref_type="child",
             ref_id=str(child.id),
+            dedup_key=str(report.id),
         )
         publish_audit(
             self.db,

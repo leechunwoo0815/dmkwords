@@ -57,25 +57,59 @@ class AdminNotifyService:
         applicant_name: str = "",
         amount: Decimal | None = None,
         dedup_key: str = "1",
+        ignore_handled: bool = False,
     ) -> bool:
         """写入管理待办通知（幂等）。返回是否新写入（False=重复已存在）。
 
-        并发安全：INSERT IGNORE 撞唯一约束静默忽略（rowcount=0），零异常、
+        并发安全：INSERT IGNORE 撞唯一约束静默忽略（rowcount=0）、零异常、
         不污染事务——同事务触发点（申请落库）不会连坐回滚（B11/家长通知 P0 同款）。
+
+        `ignore_handled=True`（第四轮大审查 P1-3，2026-10-17）：幂等只看**未处理**的待办——
+        适用于"同一个对象可以反复出事"的事项（如赔偿待办：这本书修好后又坏了一次，
+        上一轮待办已经处理过 → 应当再提醒）。默认 False 保持既有语义（同一对象只提醒一次）。
         """
-        exists = (
-            self.db.query(func.count(AdminNotification.id))
-            .filter(
-                AdminNotification.scene == scene,
-                AdminNotification.ref_type == ref_type,
-                AdminNotification.ref_id == str(ref_id),
-                AdminNotification.dedup_key == dedup_key,
-                AdminNotification.is_deleted == 0,
-            )
-            .scalar()
-        )
+        filters = [
+            AdminNotification.scene == scene,
+            AdminNotification.ref_type == ref_type,
+            AdminNotification.ref_id == str(ref_id),
+            AdminNotification.dedup_key == dedup_key,
+            AdminNotification.is_deleted == 0,
+        ]
+        if ignore_handled:
+            filters.append(AdminNotification.handled_at.is_(None))
+        exists = self.db.query(func.count(AdminNotification.id)).filter(*filters).scalar()
         if exists:
             return False
+
+        if ignore_handled:
+            # 唯一索引 (scene, ref_type, ref_id, dedup_key, is_deleted) **不含 handled 状态**：
+            # 上面只查了"未处理行"，若键上躺着一条**已处理**的历史行，下面的 INSERT IGNORE 会被
+            # 唯一索引挡掉（rowcount=0）→ 事件被静默吞掉。这里就地**复活**那条行
+            # （清 handled_at/handled_by + 刷新文案与时间）：一条待办对应最近一次事件。
+            revived = (
+                self.db.query(AdminNotification)
+                .filter(
+                    AdminNotification.scene == scene,
+                    AdminNotification.ref_type == ref_type,
+                    AdminNotification.ref_id == str(ref_id),
+                    AdminNotification.dedup_key == dedup_key,
+                    AdminNotification.is_deleted == 0,
+                )
+                .update(
+                    {
+                        AdminNotification.handled_at: None,
+                        AdminNotification.handled_by: None,
+                        AdminNotification.title: title,
+                        AdminNotification.content: content,
+                        AdminNotification.applicant_name: applicant_name,
+                        AdminNotification.amount: amount,
+                        AdminNotification.created_at: datetime.now(),
+                    },
+                    synchronize_session=False,
+                )
+            )
+            if revived:
+                return True
 
         stmt = mysql_insert(AdminNotification).values(
             scene=scene,

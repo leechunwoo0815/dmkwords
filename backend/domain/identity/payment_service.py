@@ -288,6 +288,25 @@ class PaymentService(PaymentNotifyMixin):
         ):
             raise ValidationError("押金当前无需补缴")
 
+    def _assert_observation_payable(self, order: Order) -> None:
+        """观察期费**发起支付前**复核（第四轮大审查 P1-1，2026-10-17）。
+
+        与建单侧同源（`OrderService.price_member_order` 的状态机判据）：建单到支付之间孩子可能已经
+        入会（另一笔单先结算、或馆员人工开通）→ 此时再付这笔观察期费就会重演「钱收了、转移矩阵拒、
+        回调兜底成资金异常 + 人工退款」。押金（P1 #13）与 99 元首场都是这个两层形状，观察期费补齐。
+        """
+        from backend.domain.identity.models import Child
+
+        child = (
+            self.db.query(Child).filter(Child.id == order.child_id).first()
+            if order.child_id
+            else None
+        )
+        if child is not None and not child.can_transition(Child.MEMBER_OBSERVATION):
+            raise ValidationError(
+                "孩子已是有效会员，无需再缴观察期费（如需续期请购买正式会员年费）"
+            )
+
     def _prepay_once(self, parent: Parent, order: Order) -> dict:
         """单次预支付（三段式）——调用方已持有该订单的进程内锁。"""
         if order.status == Order.STATUS_PAID:
@@ -320,6 +339,9 @@ class PaymentService(PaymentNotifyMixin):
             # 已被调用（[MockPay] 下单成功），订单停在待支付。
             # 判据与结算链同源（押金账户态/可补缴态），此处只是把它提前到"钱动之前"。
             self._assert_deposit_payable(order)
+        if order.order_type == Order.TYPE_OBSERVATION:
+            # 第四轮大审查 P1-1（2026-10-17）：观察期费同样必须在**调网关之前**复核资格。
+            self._assert_observation_payable(order)
 
         # Phase 1：先落库（状态置线上待支付 + 提交），把锁放掉再谈网络。
         # 2026-10-12 审查 P2（T3）：原先是无条件 ORM 赋值——家长点"去支付"与管理员取消/超时

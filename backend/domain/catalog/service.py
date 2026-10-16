@@ -526,6 +526,8 @@ class BookService:
             reason=reason,
             admin=admin,
             child_id=active.child_id if active is not None else None,
+            # 幂等键（P1-3）：同一册 + 同一性质算同一次（不同册/不同性质必各提醒一条）
+            event_key=f"copy:{copy.id}:{kind}",
         )
         self._audit(
             admin,

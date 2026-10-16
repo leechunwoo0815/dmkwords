@@ -27,11 +27,6 @@ class OrderService(OrderGuardMixin):
     def __init__(self, db: Session):
         self.db = db
 
-    def _config_decimal(self, key: str) -> Decimal:
-        from backend.common.config_service import ConfigService
-
-        return Decimal(ConfigService(self.db).get_value(key))
-
     def _config_int(self, key: str, default: int) -> int:
         from backend.common.config_service import ConfigService
 
@@ -186,51 +181,13 @@ class OrderService(OrderGuardMixin):
         return order
 
     def price_member_order(self, parent: Parent, child: Child, order_type: str) -> Decimal:
-        """会员类订单定价（**唯一来源**：管理端造单与管理小程序在线下单都走它）。
-
-        - 99 元首场（R-321）：每账号一次，存在未被全额退款的已付单则拒绝
-        - 观察期费：读配置
-        - 年费：下单时刻该账号另有有效会员孩子 → 二孩折扣（V1.1 §3.1，有效=日期感知口径 D1）
-        - 押金：读标准配置不可自输（R3/FEAT-080；确认收款时联动建 Deposit+Ledger）
+        """会员类订单定价（**唯一来源**）——实现已抽到 `identity/order_pricing.py`（god-file ≤800，
+        2026-10-17 第六十六批）；保留本方法作**委托**，调用方（管理端造单 / 小程序下单 / 购买页 plans）
+        零改动。
         """
-        if order_type == Order.TYPE_FIRST_ACTIVITY:
-            exists = (
-                self.db.query(func.count(Order.id))
-                .filter(
-                    Order.parent_id == parent.id,
-                    Order.order_type == Order.TYPE_FIRST_ACTIVITY,
-                    Order.status == Order.STATUS_PAID,
-                    Order.refund_status != Order.REFUND_STATUS_REFUNDED,
-                    Order.is_deleted == 0,
-                )
-                .scalar()
-            )
-            if exists:
-                raise ConflictError("该账号已购买过首场亲子活动（每账号仅一次）")
-            return self._config_decimal("first_activity_fee")
-        if order_type == Order.TYPE_OBSERVATION:
-            return self._config_decimal("observation_fee")
-        if order_type == Order.TYPE_FORMAL:
-            base = self._config_decimal("formal_fee")
-            discount = self._config_decimal("second_child_discount_percent")
-            siblings = (
-                self.db.query(Child)
-                .filter(
-                    Child.parent_id == parent.id,
-                    Child.id != child.id,
-                    Child.is_deleted == 0,
-                )
-                .all()
-            )
-            siblings_active = any(s.is_active_member for s in siblings)
-            return (
-                (base * discount / Decimal(100)).quantize(Decimal("0.01"))
-                if siblings_active
-                else base
-            )
-        if order_type == Order.TYPE_DEPOSIT:
-            return self._config_decimal("deposit_amount")
-        raise ValidationError("订单类型不正确")
+        from backend.domain.identity.order_pricing import price_member_order
+
+        return price_member_order(self.db, parent, child, order_type)
 
     def _create_activity_order(self, child: Child, activity, fee) -> Order:
         """活动报名订单（家长小程序发起；占名额待收款确认；不 commit 由调用方统一提交）。"""
@@ -565,6 +522,10 @@ class OrderService(OrderGuardMixin):
         today = date.today()
         child.member_start = today
         child.member_expire = today + timedelta(days=days)
+        # 重新入会时把已退还的押金账户归零复位（第四轮大审查 P1-2；实现归押金域）
+        from backend.domain.billing.service import DepositService
+
+        DepositService(self.db).reset_refunded_on_rejoin(child.id)
         self.db.flush()
         return child
 

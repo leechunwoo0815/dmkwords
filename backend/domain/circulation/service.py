@@ -538,7 +538,12 @@ class CirculationService:
             from backend.domain.catalog.damage_ops import notify_return_damage_compensation
 
             notify_return_damage_compensation(
-                self.db, copy, condition=condition, admin=admin, child_id=record.child_id
+                self.db,
+                copy,
+                condition=condition,
+                admin=admin,
+                child_id=record.child_id,
+                borrow_record_id=record.id,  # 幂等键：一次借阅 = 一个"不会重来的事实"（P1-3）
             )
         publish_audit(
             self.db,
