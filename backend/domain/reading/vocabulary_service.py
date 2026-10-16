@@ -125,6 +125,48 @@ class VocabularyService:
             )
         return out
 
+    def summary(self, child: Child) -> dict:
+        """生词本统计三口径（PRD §8.1.1 实现说明：**服务端聚合，前端不另算**）。
+
+        BDD 解封暴露的缺口（2026-10-16）：早先这三个数字由小程序拿到列表后
+        `reduce`/`Set` 现算——列表一旦分页/裁剪就与真实口径漂移，且同一数字两处算法。
+
+        - `word_count`：当前**可见**生词条数（不含已移出）；
+        - `lookup_total`：**历史全部**查词次数累加，**含已移出的词**——查过的次数是已发生的
+          历史，删除不回退（否则"移出一个词"等于抹掉一段阅读足迹）；
+        - `book_count`：当前可见生词的来源书数（同一本只算一次、未记来源的词不计）。
+        """
+        from sqlalchemy import func as _func
+
+        word_count = (
+            self.db.query(_func.count(Vocabulary.id))
+            .filter(Vocabulary.child_id == child.id, Vocabulary.is_deleted == 0)
+            .scalar()
+            or 0
+        )
+        # 不加 is_deleted 过滤：软删行的次数仍计入（见 docstring 第二条）
+        lookup_total = (
+            self.db.query(_func.coalesce(_func.sum(Vocabulary.lookup_count), 0))
+            .filter(Vocabulary.child_id == child.id)
+            .scalar()
+            or 0
+        )
+        book_count = (
+            self.db.query(_func.count(_func.distinct(Vocabulary.book_id)))
+            .filter(
+                Vocabulary.child_id == child.id,
+                Vocabulary.is_deleted == 0,
+                Vocabulary.book_id.isnot(None),
+            )
+            .scalar()
+            or 0
+        )
+        return {
+            "word_count": int(word_count),
+            "lookup_total": int(lookup_total),
+            "book_count": int(book_count),
+        }
+
     def remove(self, child: Child, vocabulary_id: int) -> None:
         row = (
             self.db.query(Vocabulary)

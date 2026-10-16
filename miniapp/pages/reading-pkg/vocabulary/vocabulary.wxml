@@ -8,7 +8,7 @@
       <view class="vh-sub">{{heroSub}}</view>
     </view>
     <view class="vh-count" wx:if="{{!loading && !loadError}}">
-      <text class="vh-count-num">{{words.length}}</text>
+      <text class="vh-count-num">{{wordCount}}</text>
       <text class="vh-count-unit">词</text>
     </view>
   </view>

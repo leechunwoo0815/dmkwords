@@ -305,6 +305,19 @@ def vocabulary_lookup(
     return VocabularyService(db).lookup(child, word, book_id)
 
 
+@router.get("/vocabulary/summary")
+def vocabulary_summary(child_id: int, auth: Any = Depends(get_current_parent)):
+    """生词本统计三口径（PRD §8.1.1 实现说明：**服务端聚合，前端不另算**）。
+
+    与列表同挂 VOCAB_VIEW（未缴费禁、过期/退会只读=查看放行）——统计行是列表页的一部分，
+    两个端点必须同一门禁，否则会出现"看得到列表却拉不到统计数字"。
+    """
+    parent, db = auth
+    child = child_of_parent(db, parent.id, child_id)
+    guards.require_member_action(db, child, guards.VOCAB_VIEW)
+    return VocabularyService(db).summary(child)
+
+
 @router.get("/vocabulary")
 def vocabulary_list(child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth

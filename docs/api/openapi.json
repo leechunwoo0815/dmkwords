@@ -16210,6 +16210,57 @@
         ]
       }
     },
+    "/api/miniapp/vocabulary/summary": {
+      "get": {
+        "description": "生词本统计三口径（PRD §8.1.1 实现说明：**服务端聚合，前端不另算**）。\n\n与列表同挂 VOCAB_VIEW（未缴费禁、过期/退会只读=查看放行）——统计行是列表页的一部分，\n两个端点必须同一门禁，否则会出现\"看得到列表却拉不到统计数字\"。",
+        "operationId": "vocabulary_summary_api_miniapp_vocabulary_summary_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "child_id",
+            "required": true,
+            "schema": {
+              "title": "Child Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Vocabulary Summary",
+        "tags": [
+          "miniapp"
+        ]
+      }
+    },
     "/api/miniapp/vocabulary/{vocabulary_id}": {
       "delete": {
         "operationId": "vocabulary_remove_api_miniapp_vocabulary__vocabulary_id__delete",

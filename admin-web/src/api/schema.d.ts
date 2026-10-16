@@ -3641,6 +3641,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/miniapp/vocabulary/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vocabulary Summary
+         * @description 生词本统计三口径（PRD §8.1.1 实现说明：**服务端聚合，前端不另算**）。
+         *
+         *     与列表同挂 VOCAB_VIEW（未缴费禁、过期/退会只读=查看放行）——统计行是列表页的一部分，
+         *     两个端点必须同一门禁，否则会出现"看得到列表却拉不到统计数字"。
+         */
+        get: operations["vocabulary_summary_api_miniapp_vocabulary_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/miniapp/vocabulary/{vocabulary_id}": {
         parameters: {
             query?: never;
@@ -12706,6 +12729,39 @@ export interface operations {
                 word: string;
                 child_id: number;
                 book_id?: number | null;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vocabulary_summary_api_miniapp_vocabulary_summary_get: {
+        parameters: {
+            query: {
+                child_id: number;
             };
             header?: {
                 authorization?: string;

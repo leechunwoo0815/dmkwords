@@ -198,8 +198,8 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 | 步 | 内容 | 命令（gate.sh 内部） |
 | :--- | :--- | :--- |
 | 1 | lint | `ruff check backend/ tests/ features/ scripts/` + `ruff format --check .`（**lint 范围不含 `alembic/versions/`**——那一批是历史文件，`ruff check .` 会报出 123 个既存问题，别被误导） |
-| 2 | 单测 + 覆盖率 | `pytest tests/ -q --cov=backend --cov-fail-under=25`（**passed 数以 `gate-runs/` 最新一次输出为准**：2026-10-15 `gate-round61-catalog` = **758 passed / 88.44%**；阈值 25% 是"防覆盖率塌方"下限，不是目标值） |
-| 3 | BDD | `behave features/ --no-capture -q`（当前 **214 scenarios / 836 steps**（23 features 在图内 + 15 个特性全 @draft 跳过）——2026-10-13~15 第五十一~六十一轮解封押金/退会/转让、借阅/预约、词数/测验/积分/里程碑/榜单、**活动域 45 场景**、**音频收听域 14 场景**、**会员生命周期域 13 场景**、**预约域转维护 2 场景（G5）**、**图书资产管理域 11 场景（第六十一批，@draft 清零）**，并补齐小程序自助续借（G6）、逾期书馆员人工续借（G7）、里程碑馆员通知（G9）、过期放行「续费跟进」（G11）、下架停播/禁测（G15/G16）、无 ISBN 禁走 Excel（G17）；基线原为 9/36/127） |
+| 2 | 单测 + 覆盖率 | `pytest tests/ -q --cov=backend --cov-fail-under=25`（**passed 数以 `gate-runs/` 最新一次输出为准**：2026-10-16 `gate-round64-vocab` = **798 passed / 89%**；阈值 25% 是"防覆盖率塌方"下限，不是目标值） |
+| 3 | BDD | `behave features/ --no-capture -q`（当前 **224 scenarios / 870 steps**（24 features 在图内 + 15 个特性全 @draft 跳过；剩余 `@draft` **88 场景 / 17 文件**）——2026-10-13~16 第五十一~六十四轮解封押金/退会/转让、借阅/预约、词数/测验/积分/里程碑/榜单、**活动域 45 场景**、**音频收听域 14 场景**、**会员生命周期域 13 场景**、**预约域转维护 2 场景（G5）**、**图书资产管理域 11 场景（第六十一批，@draft 清零）**、**生词本与查词域 10 场景（第六十四批，@draft 清零）**，并补齐小程序自助续借（G6）、逾期书馆员人工续借（G7）、里程碑馆员通知（G9）、过期放行「续费跟进」（G11）、下架停播/禁测（G15/G16）、无 ISBN 禁走 Excel（G17）、生词本统计三口径收口服务端（第六十四批）；基线原为 9/36/127） |
 | 4 | 架构关 | `python -m scripts.verify_architecture`（Router 违规 0 / 单文件 ≤800 行 / 域四件套 / import 白名单 / 锁定读 `populate_existing` / 无 sqlite） |
 | 5 | 契约与反假绿 | `check_fake_assertions`（假绿断言 + **时间炸弹**：测试禁写死的近期未来绝对时间） + `check_miniapp_bindings` + `check_docs_code_alignment` + `check_rbac_consistency` + **`check_miniapp_style`**（R1–**R16** + S1–S3 自证；R14 = WXML 注释/标签结构，2026-09-20 补；**R16 = 类名两端对账**，2026-09-23 补）+ **`check_media_discipline`**（M1 落盘单出口 / M2 破缓存单出口 / M3 清理脚本默认 dry-run + S1 注入自证） + **`check_copy_emoji`**（R13d：管理端与后端导出文案零 emoji，2026-09-23 补） |
 | 6 | 数据库迁移一致性 | `alembic check`（"No new upgrade operations detected"） |

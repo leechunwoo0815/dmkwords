@@ -199,6 +199,10 @@ module.exports = {
   listVocabulary(childId) {
     return req.get('/api/miniapp/vocabulary', null, { params: { child_id: childId } })
   },
+  // 统计三口径（收录词数/累计查词/来源书目）由服务端聚合，前端不另算（PRD §8.1.1 实现说明）
+  summaryVocabulary(childId) {
+    return req.get('/api/miniapp/vocabulary/summary', null, { params: { child_id: childId } })
+  },
   removeVocabulary(id, childId) {
     return req.del(`/api/miniapp/vocabulary/${id}`, null, { params: { child_id: childId } })
   },

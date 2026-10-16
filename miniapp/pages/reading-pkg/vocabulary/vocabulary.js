@@ -1,6 +1,8 @@
 // pages/reading-pkg/vocabulary/vocabulary.js — 生词本（WM8）
 // 2026-09-21 呈现重排（用户裁定「分不清哪个是我查过的词 / 颜色和书名一样 / 没有分行 / 字体不大 /
 // 要有统计次数 / 点词弹闪卡」）：成就头卡 + 四指标 + 每行书封锚点 + 三层信息 + 长按移除。
+// 2026-10-16（第六十四批）：统计三口径（收录词数/累计查词/来源书目）改**服务端聚合**
+// （`GET /api/miniapp/vocabulary/summary`，PRD §8.1.1 实现说明）——前端不再 reduce/Set 自算。
 // 口径：docs/15 §二十一 成就类页面呈现规范。
 const api = require('../../../utils/api')
 
@@ -23,9 +25,12 @@ Page({
     words: [],
     loading: true,
     loadError: false,
-    // 统计：收录数在 words.length；其余前端汇总（列表整份返回，不必加接口/改契约）
+    // 统计三口径（收录词数 / 累计查词 / 来源书目）**服务端聚合**（PRD §8.1.1 实现说明）：
+    // 列表一旦分页/裁剪，前端 reduce 出来的数就与真实口径漂移，故不前端另算。
+    wordCount: 0,
     totalLookups: 0,
     bookCount: 0,
+    // 本周新增 / 查过多次：纯展示指标，仍按列表现算（不为它们加聚合查询）
     weekCount: 0,
     repeatCount: 0,
     heroSub: '',
@@ -50,23 +55,27 @@ Page({
     if (!this._childId) return
     this.setData({ loading: true, loadError: false })
     try {
-      const rows = await api.listVocabulary(this._childId)
+      // 三口径走服务端聚合（两次请求并发，少一个 RTT）
+      const [rows, stats] = await Promise.all([
+        api.listVocabulary(this._childId),
+        api.summaryVocabulary(this._childId),
+      ])
       const list = (rows || []).map((w) => ({ ...w, dateText: fmtDate(w.created_at) }))
-      const totalLookups = list.reduce((sum, w) => sum + (Number(w.lookup_count) || 1), 0)
-      const bookCount = new Set(list.map((w) => w.source_title).filter(Boolean)).size
+      const wordCount = Number(stats.word_count) || 0
       const weekCount = list.filter((w) => isThisWeek(w.created_at)).length
       const repeatCount = list.filter((w) => (Number(w.lookup_count) || 1) > 1).length
       this.setData({
         words: list,
-        totalLookups,
-        bookCount,
+        wordCount,
+        totalLookups: Number(stats.lookup_total) || 0,
+        bookCount: Number(stats.book_count) || 0,
         weekCount,
         repeatCount,
-        heroSub: this._heroSub(list.length),
+        heroSub: this._heroSub(wordCount),
       })
     } catch (e) {
       // F-M12/T26：fetch 失败进错误态（点击重试），不再静默置空渲染为合法空态（禁假 0）
-      this.setData({ words: [], totalLookups: 0, bookCount: 0, weekCount: 0, repeatCount: 0, loadError: true })
+      this.setData({ words: [], wordCount: 0, totalLookups: 0, bookCount: 0, weekCount: 0, repeatCount: 0, loadError: true })
     } finally {
       this.setData({ loading: false })
     }
