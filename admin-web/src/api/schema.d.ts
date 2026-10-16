@@ -3576,7 +3576,7 @@ export interface paths {
         };
         /**
          * Transfer Conditions
-         * @description 转让前置条件核对（前端逐条展示差什么）。
+         * @description 转让前置条件核对（前端逐条展示差什么；仅限本家长名下的孩子）。
          */
         get: operations["transfer_conditions_api_miniapp_transfers_conditions_get"];
         put?: never;
@@ -3833,7 +3833,7 @@ export interface components {
         AdjustPointsRequest: {
             /**
              * Points
-             * @description 调整积分（正数加）
+             * @description 调整积分（正整数，只加不减）
              */
             points: number;
             /**
