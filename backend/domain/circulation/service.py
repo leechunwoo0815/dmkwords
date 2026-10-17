@@ -233,7 +233,32 @@ class CirculationService:
             if _dup:
                 raise ConflictError("该书尚未归还，不能重复借阅")
 
-        # 定位副本
+        # ---- 取锁顺序（全局不变量，第四轮大审查 P1-6，2026-10-17）----
+        # 本函数必须先锁**预约行**、再锁**副本行**：预约善后漏斗（`handle_copy_unavailable`）、
+        # 预约取消/超时释放/核销都是 `Reservation → copy`；此前 borrow 是 `copy → Reservation`
+        # （P2 #17 的锁定读修复新引入的边）→ 与漏斗构成 AB-BA：A 持 copy2 等预约行、B 持预约行等 alt=copy2。
+        # 现在统一为 `Child → Reservation → copy`。书目标识复用上面重复借阅检查里**已经解析出的普通读结果**
+        # （`_c.book_id` / `_b.id`），无需额外查库，也不在锁之前引入新的读。
+        from backend.domain.reading.models import Reservation as _Res
+
+        _book_id_for_lock = _dup_book_id
+        reserved_rows: list = []
+        if _book_id_for_lock:
+            reserved_rows = (
+                self.db.query(_Res)
+                .filter(
+                    _Res.child_id == child_id,
+                    _Res.book_id == _book_id_for_lock,
+                    _Res.status == _Res.STATUS_ACTIVE,
+                    _Res.is_deleted == 0,
+                )
+                .order_by(_Res.id)  # 锁序稳定：多行按 id 升序，与漏斗/取消/核销同向
+                .with_for_update()
+                .populate_existing()  # 锁后当前读（P1-F4 同款）：等锁期间可能被并发置终态
+                .all()
+            )
+
+        # 定位副本（在预约行之后加锁，锁序见上）
         if copy_id:
             copy = (
                 self.db.query(BookCopy)
@@ -412,25 +437,12 @@ class CirculationService:
         # 预约占额度（FEAT-036），若借到书后预约还停在 active，它会**一直占着 1 个名额**，
         # 且预约管理页长期挂着一条永远核销不掉的单；走预约核销的路径已在 checkout 里置过，
         # 这里兜住"没走核销、直接借出/扫码借出"的路径（幂等：只改 ACTIVE）。
-        from backend.domain.reading.models import Reservation as _Res
-
-        # P2 #17（2026-10-16，第三轮大审查）：这里是**锁定读 + 状态守卫**，不是快照读 + 无条件覆盖写。
-        # 原先 `.all()` 普通读 + 直接赋 `checked_out`：并发下（家长此刻取消预约 / 定时任务超时释放）
-        # 会把已 cancelled/expired 的单**覆盖回 checked_out**，家长端显示"已借出"而书已还回馆里。
-        # 锁定读（当前读）保证拿到的是最新已提交值，守卫再挡一次，双保险。
-        for _r in (
-            self.db.query(_Res)
-            .filter(
-                _Res.child_id == child_id,
-                _Res.book_id == book.id,
-                _Res.status == _Res.STATUS_ACTIVE,
-                _Res.is_deleted == 0,
-            )
-            .order_by(_Res.id)
-            .with_for_update()
-            .populate_existing()
-            .all()
-        ):
+        # P2 #17（2026-10-16，第三轮大审查）：锁定读 + 状态守卫（不是快照读 + 无条件覆盖写）——
+        # 并发下（家长此刻取消预约 / 定时任务超时释放）不能把已 cancelled/expired 的单覆盖回
+        # `checked_out`。P1-6（2026-10-17）：这一步的锁定读**提前到锁副本之前**了（全局锁序
+        # `Reservation → copy`），这里直接复用已锁定的 `reserved_rows`，不再二次查询/加锁；
+        # `populate_existing` 给的是等锁后的最新已提交值，状态守卫原样保留。
+        for _r in reserved_rows:
             if _r.status != _Res.STATUS_ACTIVE:
                 continue
             _r.status = _Res.STATUS_CHECKED_OUT
