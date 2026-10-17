@@ -181,6 +181,13 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 | **D 级** | 仅文档/文字：`docs/**`、`*.md`、`error_list/**`、`外部专家意见/**`、代码注释文字 | **不跑门禁**（无代码语义变更） | ❌ **不单独推、不等 CI** | 攒批合并进下一次推送（红线 37）；判据：`git diff --name-only` 全落在上述路径 |
 
 > **2026-09-21 用户质问「该文档为什么要跑门禁？」后的订正**：上面 B′/B″ 两行是补的空白——此前表里只有 admin-web/backend/models/docs 四类，
+> **2026-10-17 纠偏（用户当面指出：「改一个小文件就跑一次全量门禁，太影响效率」）**：本节分级是硬约束，不是参考——
+> ① **每批只在推送前跑一次全量门禁**（C 级），不要「改一处 → 全量 → 再改一处 → 再全量」；
+> ② 开全量之前先跑**四个秒级单点检查**兜住最常见的红：`ruff check/format`（2s）、`python -m scripts.verify_architecture`（1s）、
+>    `python -m scripts.check_docs_code_alignment`（2s）、`bash scripts/dev.sh status`（确认现场已停，防 BDD 抢库卡住）；
+> ③ 全量门禁红了，**只重跑失败的那一步**（`pytest <那个文件>` / 那个 checker），修完再跑一次全量，而不是每修一处就重跑 9 步；
+> ④ A 级只跑 tsc、B 级只跑该域 pytest + ruff、D 级不跑门禁也不单独推；最终兜底交给 CI 的全量 gate。
+
 > **`miniapp/**` 与 `scripts/**` 没有归级**，我（模型）于是习惯性对"改了 seed 一处书名 + 交接文档"也开全量门禁，白跑 15 分钟。**分级照改动面判定，验证成本与风险成正比**（本条与本节开头那句同源）。
 
 ### 不变纪律
