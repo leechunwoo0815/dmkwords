@@ -69,17 +69,36 @@ function ensureLogin() {
   }
   return true
 }
-function logout() {
-  // P1-11（2026-10-09）：退出登录要**真的撤销**——通知服务端把 token 代数 +1，
-  // 旧 token（含媒体 URL 里带的）立即失效；失败也不阻断本地清理（离线也能退出）。
-  try {
-    const api = require('./api')
-    api.logout && api.logout()
-  } catch (e) { /* 忽略：本地清理照常 */ }
+/** 本地清理（退出登录的第二步；见下面为什么不能在请求之前做）。 */
+function _clearLocalSession() {
   ;['token', 'parent', 'children', 'currentChildId'].forEach((k) => wx.removeStorageSync(k))
   const app = getApp()
   app.globalData.token = ''
   app.globalData.userInfo = null
   app.globalData.currentChild = null
+}
+
+function logout() {
+  // P1-11（2026-10-09）：退出登录要**真的撤销**——通知服务端把 token 代数 +1，
+  // 旧 token（含媒体 URL 里带的）立即失效；失败也不阻断本地清理（离线也能退出）。
+  //
+  // P1-8（2026-10-17，第四轮大审查）：**顺序**同样是判据。原先"先本地清 token、再调 api.logout()"，
+  // 而 `request.js` 是在 `wx.getNetworkType` 的**异步回调**里才读 `app.globalData.token` 拼 Authorization
+  // → 请求真正发出时 token 已被清空 → 服务端 401 → `revoke_parent_tokens` 永不执行，
+  // 旧 token（含媒体 URL 里带的）继续可用 30 天——注释里承诺的"真撤销"实际上从未发生。
+  // 现在：**先发撤销请求**，等它落定（成功/失败/超时）再清本地；请求失败照常清（离线也能退出）。
+  // 页面随后 reLaunch 不受影响：wx.request 不随页面销毁而中断。
+  const done = () => { try { _clearLocalSession() } catch (e) { /* 清理失败不阻断退出 */ } }
+  try {
+    const api = require('./api')
+    if (api.logout) {
+      const pending = api.logout()
+      if (pending && typeof pending.then === 'function') {
+        pending.catch(() => {}).then(done)
+        return
+      }
+    }
+  } catch (e) { /* 忽略：本地清理照常 */ }
+  done()
 }
 module.exports = { getParent, getChildren, getCurrentChild, setCurrentChild, patchParent, isLoggedIn, ensureLogin, refreshChildren, logout }

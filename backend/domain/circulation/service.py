@@ -623,6 +623,14 @@ class CirculationService:
         base = now if is_overdue else record.due_at
         record.due_at = base + timedelta(days=renew_days)
         record.renew_used += 1
+        if is_overdue:
+            # 第四轮大审查 P1-4（2026-10-17）：人工续借后**必须把记录推回 `ACTIVE`**。
+            # `overdue` 这个状态只由「逾期标记」任务落库，而**到期提醒（`book_due_remind`）与逾期标记
+            # 都只扫 `status == ACTIVE`** —— 原实现只改 `due_at` 不改状态，于是续借后的书：
+            # ① 新到期日的到期提醒**永远不发**；② 再次逾期时**二轮逾期通知也丢失**（状态还是 overdue，
+            # 不会被重新标记/通知）；③ 借阅台永久显示红色「逾期」（而同屏"其中逾期"计数按 `due_at`
+            # 算却是 0，两个数互相矛盾）。续借后的新到期日 = 办理时刻 + N 天，必然在未来，故回 ACTIVE 是准确的。
+            record.status = BorrowRecord.STATUS_ACTIVE
         self.db.flush()
         return record, is_overdue, overdue_days
 

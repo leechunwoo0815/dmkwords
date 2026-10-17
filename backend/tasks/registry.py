@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -382,6 +383,17 @@ SCHEDULER_LOCK_NAME = "dmkwords:scheduler"
 #: 持有命名锁的连接（**保持打开 = 保持锁**；进程退出/被杀时由 MySQL 自动释放）
 _lock_conn = None
 
+#: 保护 `_lock_conn` 的互斥锁（第四轮大审查 P1-7，2026-10-17）：
+#: APScheduler 默认 `ThreadPoolExecutor`，每个 job 入口（`guarded_run`）都会复核单实例锁；
+#: 并发 tick（如两个 interval 任务同秒到期）会让**同一个 `Connection` 被多个线程同时使用**——
+#: 探针实测（8 线程 × 两查一提交）：`Lost connection to MySQL server during query` /
+#: `PyMemoryView_FromBuffer(): info->buf must not be NULL` / `PendingRollbackError` 全部出现，
+#: 0/320 次成功。`_holds_scheduler_lock()` 捕异常后 `return False` → 走"锁已丢失"分支
+#: → **任务被静默跳过**；释放与重取之间的窗口里另一个副本可能拿到锁 → **定时任务双跑**
+#: （正是这套锁要防的事）。故所有触碰 `_lock_conn` 的操作一律串行化。
+#: 只在**叶子函数**加锁（`_acquire/_holds/release`），`ensure_scheduler_lock()` 不再加（避免自锁）。
+_lock_guard = threading.Lock()
+
 
 def _acquire_scheduler_lock() -> bool:
     """尝试取调度器单实例锁。True=本进程可调度；False=别的进程正在调度。
@@ -395,6 +407,13 @@ def _acquire_scheduler_lock() -> bool:
 
     from backend.database import engine
 
+    with _lock_guard:
+        return _acquire_scheduler_lock_locked(text, engine)
+
+
+def _acquire_scheduler_lock_locked(text, engine) -> bool:
+    """`_acquire_scheduler_lock` 的加锁体（调用方须已持 `_lock_guard`）。"""
+    global _lock_conn
     try:
         conn = engine.connect()
         got = conn.execute(text("SELECT GET_LOCK(:n, 0)"), {"n": SCHEDULER_LOCK_NAME}).scalar()
@@ -415,18 +434,19 @@ def _holds_scheduler_lock() -> bool:
     必须每次复核：`wait_timeout` 掐断空闲连接时锁会**静默消失**（本进程还以为自己在调度，
     而另一个副本可能同时取到了锁）——守门人不能只信启动那一刻的结果。
     """
-    if _lock_conn is None:
-        return False
-    from sqlalchemy import text
+    with _lock_guard:
+        if _lock_conn is None:
+            return False
+        from sqlalchemy import text
 
-    try:
-        holder = _lock_conn.execute(
-            text("SELECT IS_USED_LOCK(:n)"), {"n": SCHEDULER_LOCK_NAME}
-        ).scalar()
-        mine = _lock_conn.execute(text("SELECT CONNECTION_ID()")).scalar()
-        _lock_conn.commit()
-    except Exception:  # noqa: BLE001
-        return False
+        try:
+            holder = _lock_conn.execute(
+                text("SELECT IS_USED_LOCK(:n)"), {"n": SCHEDULER_LOCK_NAME}
+            ).scalar()
+            mine = _lock_conn.execute(text("SELECT CONNECTION_ID()")).scalar()
+            _lock_conn.commit()
+        except Exception:  # noqa: BLE001
+            return False
     return holder is not None and int(holder) == int(mine)
 
 
@@ -437,7 +457,8 @@ def release_scheduler_lock() -> None:
     DBAPI 会话没断、会话级命名锁会跟着池里的连接留下来（实测踩到）——下一副本就永远起不来。
     """
     global _lock_conn
-    conn, _lock_conn = _lock_conn, None
+    with _lock_guard:
+        conn, _lock_conn = _lock_conn, None
     if conn is None:
         return
     from sqlalchemy import text

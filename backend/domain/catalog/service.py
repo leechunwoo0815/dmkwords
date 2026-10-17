@@ -456,6 +456,19 @@ class BookService:
 
     def update_copy_status(self, admin, copy_id: int, new_status: str, reason: str) -> BookCopy:
         copy = self.copy_repo.get_by_id_or_raise(copy_id)
+        # 第四轮大审查 P1-9/P2-7（2026-10-17）：**收窄到运维安全子集**——`borrowed`（借出）与
+        # `reserved`（预约锁定）是**业务动线置位**的状态，不能由这个管理端接口手工写：
+        # ① `reserved→borrowed` 不触预约善后 → 预约单仍 active（占额度、家长端仍显示"预约中"），
+        #    家长到店核销必 409，而且 2026-10-15 P1 #8 对 `reserved→available` 的修复被这条边绕过；
+        # ② `available→borrowed` 造出**无借阅记录的"已借出"副本**——借还台拒收（只收 available）、
+        #    `return_book` 报"该副本没有进行中的借阅"，仪表盘却算作已借出。
+        # 前端下拉早就只给安全子集（`BookDetail.tsx` 的 `COPY_STATUS_TRANSITIONS`），但 API 面不设防
+        # （curl 即可）；"释放锁定"（reserved→available）不受影响，仍是允许的运维动作。
+        if new_status in (BookCopy.STATUS_BORROWED, BookCopy.STATUS_RESERVED):
+            raise ValidationError(
+                f"副本的「{'已借出' if new_status == BookCopy.STATUS_BORROWED else '预约锁定'}」由借阅/预约流程置位，"
+                "不能手工修改（借出请走借还台；锁定请走预约；释放锁定可以把它改回在馆）"
+            )
         if not copy.can_transition(new_status):
             raise ValidationError(
                 f"副本状态不允许从 {copy.status} 变更为 {new_status}（转移矩阵拦截）"
@@ -486,8 +499,21 @@ class BookService:
                 admin=admin,
                 cause="原预约占用的副本已被馆员释放为可借",
             )
-        copy.status = new_status
-        self.copy_repo.update(copy)
+        # 第四轮大审查 P2-8（2026-10-17）：终局写入改**条件 UPDATE**（CAS）——上面那道"在借禁改"
+        # 守卫是快照读，与并发 `borrow()`（会锁副本行并提交 `borrowed`）之间存在 TOCTOU：
+        # 原先无条件覆盖写会把刚借出的副本再改成维护/遗失（孩子手里有书、系统以为书已退场，
+        # 且这条路径**不写赔偿待办**）。CAS 后并发改动 → rowcount=0 → 显式 409（不是静默覆盖）。
+        # 为什么不用行锁：本函数在写状态前要调预约善后漏斗（内部锁序 Reservation → alt copy），
+        # 先锁副本会让锁序变成 copy → Reservation，与漏斗反向 → 自己造 AB-BA 死锁（详见 docs/09 第六十七轮）。
+        moved = (
+            self.db.query(BookCopy)
+            .filter(BookCopy.id == copy_id, BookCopy.status == old)
+            .update({BookCopy.status: new_status}, synchronize_session=False)
+        )
+        if not moved:
+            self.db.rollback()
+            raise ConflictError("副本状态已被并发修改，请刷新后重试")
+        self.db.expire(copy)
         self._audit(
             admin,
             "copy.status",
@@ -517,8 +543,18 @@ class BookService:
         old = copy.status
         # G5：报损同样让副本退场——先走预约善后（换锁/转异常），再落本册状态（锁序 Reservation → copy）
         handle_copy_unavailable(self.db, copy, reason=f"报损:{reason}", admin=admin)
-        copy.status = target
-        self.copy_repo.update(copy)
+        # 第四轮大审查 P2-8（2026-10-17）：与 `update_copy_status` 同一处置——终局写改用**条件 UPDATE**
+        # （CAS）。报损路径同样有"快照读守卫 + 无条件覆盖写"的 TOCTOU：并发借出（拿 copy 行锁并提交
+        # `borrowed`）之后，这里会把副本直接改成维护/遗失，而借阅记录还在 → 孩子手里有书、系统以为书已退场。
+        moved = (
+            self.db.query(BookCopy)
+            .filter(BookCopy.id == copy_id, BookCopy.status == old)
+            .update({BookCopy.status: target}, synchronize_session=False)
+        )
+        if not moved:
+            self.db.rollback()
+            raise ConflictError("副本状态已被并发修改，请刷新后重试")
+        self.db.expire(copy)
         notify_compensation_todo(
             self.db,
             copy,

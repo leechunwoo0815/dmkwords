@@ -94,12 +94,13 @@ def test_copy_status_matrix(client: TestClient):
         headers=h,
     )
     assert r.status_code == 200
-    # maintenance -> borrowed 非法（矩阵拦截）
+    # maintenance -> borrowed 非法。2026-10-17（第六十七批）：`borrowed`/`reserved` 属**工作流状态**，
+    # 现在由更早的闸拦下（提示改走借阅/预约动线），不再是"矩阵拦截"文案——判据（非法）未变。
     r = client.put(
         f"/api/admin/copies/{copy_id}/status", json={"status": "borrowed", "reason": "x"}, headers=h
     )
     assert r.status_code == 422
-    assert "转移矩阵" in r.json()["detail"]
+    assert "不能手工修改" in r.json()["detail"]
     # maintenance -> available（修复）-> lost -> available（找回）
     client.put(
         f"/api/admin/copies/{copy_id}/status",

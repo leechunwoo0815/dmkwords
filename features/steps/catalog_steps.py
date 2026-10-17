@@ -628,7 +628,11 @@ def step_try_transition(context, to_status):
 def step_transition_rejected(context):
     r = context.transition
     assert r.status_code == 422, f"非法流转应 422，实得 {r.status_code}：{r.text[:160]}"
-    assert "转移矩阵拦截" in r.json()["detail"], r.text
+    # 2026-10-17（第六十七批·第四轮大审查 P1-9/P2-7）：`borrowed`/`reserved` 是**工作流状态**
+    # （借阅/预约流程置位），现在由更早的一道闸拦下——提示改走借还台/预约动线，不再落到矩阵文案。
+    # 判据未变：非法流转必须被拒 **且副本状态原样不动**。
+    detail = r.json()["detail"]
+    assert ("转移矩阵拦截" in detail) or ("不能手工修改" in detail), r.text
     assert _copy_status(context.copy_id) == "lost", "被拒后状态必须原样不动"
 
 

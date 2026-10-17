@@ -70,6 +70,19 @@ export function apiBatchToggleBookStatus(
   });
 }
 
+/** 报损·遗失（2026-10-12 拍板 P5）：不动在借记录，标状态 + 生成赔偿待办。
+ *  2026-10-17（第四轮大审查 P1-10）：后端早已实现，管理端此前**没有入口**——
+ *  副本行 409 文案指向的按钮不存在，运营只能走"归还→标记遗失"那条后果更差的链。 */
+export function apiReportCopyDamage(
+  copyId: number,
+  body: { kind: "damage" | "lost"; reason: string }
+): Promise<BookCopy> {
+  return request(`/api/admin/copies/${copyId}/report-damage`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export function apiListCopies(bookId: number): Promise<BookCopy[]> {
   return request(`/api/admin/books/${bookId}/copies`);
 }

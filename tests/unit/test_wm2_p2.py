@@ -240,12 +240,14 @@ def test_c2_borrow_reserved_copy_chinese_error(client: TestClient):
 
     ensure_book_on(client, h, book["id"])  # 本模块锁定"新建默认下架"契约 → 借阅用例自行上架
     copies = client.get(f"/api/admin/books/{book['id']}/copies", headers=h).json()
-    r = client.put(
-        f"/api/admin/copies/{copies[0]['id']}/status",
-        json={"status": "reserved", "reason": "测试预约锁定"},
-        headers=h,
-    )
-    assert r.status_code == 200, r.text
+    # 2026-10-17（第六十七批）：`reserved` 是**工作流状态**，管理端接口已收窄（不能手工写）。
+    # 本用例考的是"借 reserved 副本的中文报错"，预约锁定属造数 → 直插（与"不可达态用 DB 直插"同款）。
+    from backend.domain.catalog.models import BookCopy
+    from tests.unit.test_wm10_concurrency import _db as _db_session
+
+    with _db_session() as db:
+        db.query(BookCopy).filter(BookCopy.id == copies[0]["id"]).update({"status": "reserved"})
+        db.commit()
 
     resp = client.post(
         "/api/admin/circulation/borrow",

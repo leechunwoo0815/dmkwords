@@ -32,6 +32,7 @@ import {
   apiMediaUrl,
   apiToggleQuestion,
   apiUpdateBook,
+  apiReportCopyDamage,
   apiUpdateCopyStatus,
   apiUpdateQuestion,
   apiUploadAudio,
@@ -97,6 +98,10 @@ export default function BookDetail() {
   const [addCopiesCount, setAddCopiesCount] = useState<number>(1);
   const [pendingCopy, setPendingCopy] = useState<{ copyId: number; newStatus: string; label: string } | null>(null);
   const [copyReason, setCopyReason] = useState("");
+  // P1-10（2026-10-17，第四轮大审查）：报损·遗失入口（后端早有端点，管理端此前没有按钮）
+  const [damageCopy, setDamageCopy] = useState<{ copyId: number; copyCode: string } | null>(null);
+  const [damageKind, setDamageKind] = useState<"damage" | "lost">("damage");
+  const [damageReason, setDamageReason] = useState("");
   // P2-11：题目 Modal 打开时快照（受控 state 的脏判定用对比实现，判断题 ["对","错"] 恒非空不可用 touched/非空启发式）
   const qSnapshotRef = useRef("");
   const takeQSnapshot = (opts: string[], idx: number) => {
@@ -322,22 +327,38 @@ export default function BookDetail() {
             { title: "副本码", dataIndex: "copy_code", width: 160, render: (v) => <Typography.Text code>{v}</Typography.Text> },
             { title: "状态", dataIndex: "status", width: 110, render: (s: string) => <Tag color={COPY_STATUS_COLOR[s]}>{COPY_STATUS_LABEL[s] ?? s}</Tag> },
           {
-            title: "操作", key: "op", width: 160,
+            title: "操作", key: "op", width: 250,
             render: (_, r) => (
-              <Select
-                size="small" style={{ width: 120 }} value={r.status}
-                disabled={COPY_STATUS_TRANSITIONS[r.status]?.length === 0}
-                onChange={(v) => {
-                  const label = COPY_STATUS_TRANSITIONS[r.status]?.find((o) => o.value === v)?.label ?? v;
-                  setPendingCopy({ copyId: r.id, newStatus: v, label });
-                  setCopyReason("");
-                }}
-                options={[
-                  // 复核修复：当前状态必须作为禁用首选项，否则 Select 找不到匹配项会显示英文原始值
-                  { value: r.status, label: COPY_STATUS_LABEL[r.status] ?? r.status, disabled: true },
-                  ...(COPY_STATUS_TRANSITIONS[r.status] ?? []),
-                ]}
-              />
+              <Space size={6}>
+                <Select
+                  size="small" style={{ width: 120 }} value={r.status}
+                  disabled={COPY_STATUS_TRANSITIONS[r.status]?.length === 0}
+                  onChange={(v) => {
+                    const label = COPY_STATUS_TRANSITIONS[r.status]?.find((o) => o.value === v)?.label ?? v;
+                    setPendingCopy({ copyId: r.id, newStatus: v, label });
+                    setCopyReason("");
+                  }}
+                  options={[
+                    // 复核修复：当前状态必须作为禁用首选项，否则 Select 找不到匹配项会显示英文原始值
+                    { value: r.status, label: COPY_STATUS_LABEL[r.status] ?? r.status, disabled: true },
+                    ...(COPY_STATUS_TRANSITIONS[r.status] ?? []),
+                  ]}
+                />
+                {/* P1-10（2026-10-17，第四轮大审查）：书在家长手上损坏/丢失时走这条登记链——
+                    不动在借记录，标状态 + 生成赔偿待办（押金扣除/记待结清）。此前后端有端点、
+                    界面无入口，运营被迫走"归还→标记遗失"（那条会把在借记录直接结案）。 */}
+                <Button
+                  size="small" danger
+                  disabled={r.status === "lost" || r.status === "maintenance"}
+                  onClick={() => {
+                    setDamageCopy({ copyId: r.id, copyCode: r.copy_code });
+                    setDamageKind("damage");
+                    setDamageReason("");
+                  }}
+                >
+                  报损·遗失
+                </Button>
+              </Space>
             ),
           },
           ]}
@@ -502,6 +523,48 @@ export default function BookDetail() {
             value={copyReason}
             placeholder="如：预约超时释放 / 修复破损 / 找回遗失副本"
             onChange={(e) => setCopyReason(e.target.value)}
+          />
+        </Space>
+      </Modal>
+
+      {/* P1-10（2026-10-17）：报损·遗失登记（不动在借记录；生成赔偿待办） */}
+      <Modal
+        title={damageCopy ? `报损·遗失：${damageCopy.copyCode}` : "报损·遗失"}
+        open={damageCopy !== null}
+        onOk={async () => {
+          if (!damageCopy) return;
+          try {
+            await apiReportCopyDamage(damageCopy.copyId, {
+              kind: damageKind,
+              reason: damageReason.trim(),
+            });
+            message.success("已登记，赔偿待办已生成（管理待办「报损赔偿」）");
+            setDamageCopy(null);
+            load();
+          } catch (e) {
+            message.error(e instanceof Error ? e.message : "操作失败");
+          }
+        }}
+        onCancel={() => setDamageCopy(null)}
+        okText="确认登记" cancelText="取消"
+        okButtonProps={{ disabled: !damageReason.trim(), danger: true }}
+      >
+        <Space direction="vertical" style={{ width: "100%" }}>
+          <Typography.Text type="secondary">
+            书在家长手上损坏或丢失时用这条登记：<b>不动在借记录</b>，只把副本标成维护中/遗失，并生成一条「报损·遗失·待赔偿」待办（押金扣除或记待结清）。
+          </Typography.Text>
+          <Radio.Group value={damageKind} onChange={(e) => setDamageKind(e.target.value)}>
+            <Radio.Button value="damage">损坏（转维护）</Radio.Button>
+            <Radio.Button value="lost">遗失</Radio.Button>
+          </Radio.Group>
+          <Typography.Text type="secondary">登记原因（必填，写入审计，会带进赔偿待办）</Typography.Text>
+          <Input.TextArea
+            rows={3}
+            maxLength={200}
+            showCount
+            value={damageReason}
+            placeholder="如：还书时发现内页撕破 / 家长告知遗失"
+            onChange={(e) => setDamageReason(e.target.value)}
           />
         </Space>
       </Modal>
