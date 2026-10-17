@@ -38,6 +38,8 @@ export interface QuizOverviewItem {
   attempts_used: number;
   best_score: number;
   max_attempts: number;
+  /** P2-16（2026-10-17）：该书**当前启用题数**——「最高分」的分母（原先前端硬编码 5） */
+  total_questions: number;
   passed: boolean;
 }
 

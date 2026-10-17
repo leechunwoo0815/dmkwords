@@ -171,7 +171,9 @@ def test_pending_evaluation_weekly(client: TestClient):
         child = db.query(Child).filter(Child.id == c["id"]).first()
         child.member_status = Child.MEMBER_PENDING_EVALUATION
         # 定时任务造历史态无 API 路径，有意直改
-        child.update_time = datetime.now() - timedelta(days=10)
+        # P2-13（2026-10-17 第六十九批）：待评估时钟已落库（`pending_evaluation_at`），
+        # 不再挂 `update_time`（任意字段更新都会刷新它 → 名单永远凑不满阈值）
+        child.pending_evaluation_at = datetime.now() - timedelta(days=10)
         db.commit()
     result = _run(client, h, "pending_evaluation_weekly")
     assert result["status"] == "success"
@@ -463,7 +465,9 @@ def test_task_board_and_run_log(client: TestClient):
     # 2026-10-08 新增 wechat_cert_refresh（WM12-A：微信平台证书轮换，每日 04:00），16 → 17
     # 同日 WM12-B 新增 payment_reconcile（每日资金对账，03:30），17 → 18
     # 2026-10-14 新增 deposit_settle_remind（待结清每周提醒，第五十九批 G1：PRD §3.6「系统持续提醒馆员」），18 → 19
-    assert len(names) == 19
+    # 2026-10-17 第六十九批（大审查 P2-28）新增 refund_review_timeout_warn / withdrawal_review_timeout_warn
+    # （审核超时提醒补齐到三条：转让 / 退款 / 退会——此前退款、退会两条只有零读取方的死键），19 → 21
+    assert len(names) == 21
 
     _run(client, h, "member_expire_check")
     runs = client.get("/api/admin/tasks/runs", headers=h).json()["items"]

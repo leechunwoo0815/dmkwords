@@ -121,5 +121,8 @@ def test_dashboard_business_cells(client: TestClient, admin_headers: dict) -> No
     assert body["today_returned"] >= 1  # 还了一次
     assert body["overdue_active"] == 0  # 刚借未到期
     assert body["member_total"] == 1  # 仅 formal 在册（none 不计）
-    assert body["member_new_week"] == 2  # c1/c2 均为本周创建
+    # P2-17（2026-10-17 第六十九批·大审查）：口径由"本周建档"改为"本周**入会**且当前在会"——
+    # c2 只有建档、未入会 → 不再计入（原断言 2 是旧口径，同屏与 member_total 互相否认）。
+    assert body["member_new_week"] == 1
+    assert body["member_new_week"] <= body["member_total"]
     assert body["activity_enroll_recent"] == 1

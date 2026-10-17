@@ -6,6 +6,7 @@ from __future__ import annotations
 import io
 
 from openpyxl import load_workbook
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.domain.catalog.audit_events import publish_audit
@@ -114,13 +115,23 @@ def import_books(db: Session, admin, file_bytes: bytes) -> dict:
             if existing:
                 # 同 ISBN = 增副本（V1.1 §4.1）
                 seq = _max_copy_seq(copy_repo, existing) + 1
-                for i in range(copy_n):
-                    copy_repo.create(
-                        BookCopy(
-                            book_id=existing.id,
-                            copy_code=copy_repo.next_copy_code(existing, seq + i),
-                        )
+                # P2-20（2026-10-17 第六十九批·大审查）：副本码全局唯一（ISBN 后 8 位），
+                # 前缀录错撞码时原先直抛 IntegrityError → 整批 500、**整批结果全丢**。
+                # SAVEPOINT 把冲突锁在单行：记一条行级错误，继续处理其余行。
+                try:
+                    with db.begin_nested():
+                        for i in range(copy_n):
+                            copy_repo.create(
+                                BookCopy(
+                                    book_id=existing.id,
+                                    copy_code=copy_repo.next_copy_code(existing, seq + i),
+                                )
+                            )
+                except IntegrityError:
+                    errors.append(
+                        f"第{row_num}行: 副本码冲突（ISBN 后 8 位与已有书目相同）——请核对 ISBN"
                     )
+                    continue
                 added_copies.append({"isbn": isbn, "added": copy_n})
                 success += 1
                 continue
@@ -136,15 +147,22 @@ def import_books(db: Session, admin, file_bytes: bytes) -> dict:
             # D1：导入一律下架入库——馆员逐本完善后再上架
             status=Book.STATUS_OFF,
         )
-        book_repo.create(book)
-        if not isbn:
-            book.internal_code = f"LOCAL-{book.id:06d}"
-            book_repo.update(book)
-        seq = _max_copy_seq(copy_repo, book) + 1
-        for i in range(copy_n):
-            copy_repo.create(
-                BookCopy(book_id=book.id, copy_code=copy_repo.next_copy_code(book, seq + i))
-            )
+        # P2-20：新书这一行同样用 SAVEPOINT 隔离（副本码冲突只废掉该行，书目行一并回滚，
+        # 不留"没有副本的半本书"，其余行照常导入）。
+        try:
+            with db.begin_nested():
+                book_repo.create(book)
+                if not isbn:
+                    book.internal_code = f"LOCAL-{book.id:06d}"
+                    book_repo.update(book)
+                seq = _max_copy_seq(copy_repo, book) + 1
+                for i in range(copy_n):
+                    copy_repo.create(
+                        BookCopy(book_id=book.id, copy_code=copy_repo.next_copy_code(book, seq + i))
+                    )
+        except IntegrityError:
+            errors.append(f"第{row_num}行: 副本码冲突（ISBN 后 8 位与已有书目相同）——请核对 ISBN")
+            continue
         created_books.append({"title": title, "isbn": isbn})
         success += 1
 

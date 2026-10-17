@@ -46,9 +46,13 @@ class Notification(BaseModel):
 
     # 微信通道状态
     WECHAT_NONE = "none"  # 未启用/未发送
-    WECHAT_SENT = "sent"  # 已送达
-    WECHAT_FAILED = "failed"  # 发送失败（记录原因）
-    WECHAT_SKIPPED = "skipped"  # 主动跳过（未授权/额度不足/模板缺失/通道未启用）
+    WECHAT_SENT = "sent"  # 已送达（**微信回执成功**）
+    WECHAT_FAILED = "failed"  # 发送失败（记录**真实**原因）
+    WECHAT_SKIPPED = "skipped"  # 主动跳过（未授权/模板缺失/通道未启用——原因如实写 wechat_error）
+    # P2-24（2026-10-17 第六十九批·大审查）：异步订阅消息"已提交、结果未知"的中间态。
+    # 此前"入了队"就被写成 sent（管理端绿标「微信已送达」+ Excel 导出），真实结果只在进程日志；
+    # 现由后台线程拿到微信回执后回写 sent/failed（见 `notifications.NotificationService._writeback`）。
+    WECHAT_QUEUED = "queued"  # 已提交微信，等待回执
 
     parent_id = Column(Integer, nullable=False, index=True, comment="接收家长ID")
     child_id = Column(Integer, nullable=True, index=True, comment="关联孩子ID（可为空）")

@@ -632,13 +632,14 @@ class ActivityService(ActivityCancelMixin):
         now = datetime.now()
         if a.start_at <= now:
             raise ValidationError("活动已开始，请线下与馆员协商处理")
-        # 域H M-6+M-1（T29 处置）：activity_refund_cutoff_hours 死配置接线
-        # （原硬编码 2h），配置默认 2 与 PRD §9.3 一致
-        from backend.common.config_service import ConfigService
+        # 域H M-6+M-1（T29 处置）：activity_refund_cutoff_hours 死配置接线（原硬编码 2h）。
+        # P2-4（2026-10-17 第六十九批·大审查）：判据本体收进 refund_rules（退款口径唯一来源）
+        # ——通用订单退款入口（家长「我的订单」）也要过同一道闸，两处各写一份必然漂移。
+        from backend.domain.identity import refund_rules
 
-        cutoff_hours = int(ConfigService(self.db).get_value("activity_refund_cutoff_hours", "2"))
-        if a.start_at - now < timedelta(hours=cutoff_hours):
-            raise ValidationError("距开始不足 2 小时，线上退款已关闭，请找馆员线下处理")
+        cutoff_block = refund_rules.activity_cutoff_block(self.db, a.start_at)
+        if cutoff_block:
+            raise ValidationError(cutoff_block)
         e.status = ActivityEnrollment.STATUS_REFUND_PENDING
         e.cancel_reason = "家长申请退款（活动未开始）"
         # 统一台账：RefundRequest(pending) + order.refund_status=pending + 管理待办通知

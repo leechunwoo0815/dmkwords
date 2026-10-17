@@ -184,19 +184,29 @@ export default function TaskBoard() {
               title: "操作",
               width: 110,
               render: (_: unknown, r) => (
-                <Popconfirm
-                  title={`确认手动执行「${r.display_name}」？`}
-                  onConfirm={() => void trigger(r.name, r.display_name)}
-                >
-                  <Button
-                    size="small"
-                    type="primary"
-                    icon={<PlayCircleOutlined />}
-                    loading={running === r.name}
+                // P2-21（2026-10-17 第六十九批·大审查）：无权触发的任务**禁按钮 + 说明**，
+                // 不再让专员点了才吃 403（判据来自后端 `manual_allowed`，与服务层强制点同源）
+                r.manual_allowed === false ? (
+                  <Popover content="该任务属资金/系统组，仅超级管理员可手动触发（调度器照常自动执行）">
+                    <Button size="small" disabled icon={<PlayCircleOutlined />}>
+                      手动触发
+                    </Button>
+                  </Popover>
+                ) : (
+                  <Popconfirm
+                    title={`确认手动执行「${r.display_name}」？`}
+                    onConfirm={() => void trigger(r.name, r.display_name)}
                   >
-                    手动触发
-                  </Button>
-                </Popconfirm>
+                    <Button
+                      size="small"
+                      type="primary"
+                      icon={<PlayCircleOutlined />}
+                      loading={running === r.name}
+                    >
+                      手动触发
+                    </Button>
+                  </Popconfirm>
+                )
               ),
             },
           ]}

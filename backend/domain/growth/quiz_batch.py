@@ -75,7 +75,11 @@ def quiz_status_batch(db, child, book_ids: list[int]) -> list[dict]:
         used = attempt_map[bid][1] if bid in attempt_map else 0
         best = attempt_map[bid][2] if bid in attempt_map else 0
         total = total_map.get(bid, 0)
-        if bid not in finished_ids:
+        # P2-15（2026-10-17 第六十九批·大审查）：解锁判据与 `get_quiz` 严格一致——
+        # **有词账即已解锁**（通过测验的前提就是听完；词账/测验记录可能早于或独立于
+        # ReadingProgress 存在，如榜单/里程碑造数只落词账）。此前先判 `finished` → 那类书
+        # 在书架角标显示 `locked`，而同一孩子的「已通过」页签与详情页却是 PASSED（同屏自相矛盾）。
+        if bid not in finished_ids and bid not in passed_ids:
             status = "locked"
         elif bid in passed_ids:
             status = "passed"

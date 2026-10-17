@@ -300,19 +300,39 @@ class GrowthService:
         ]
 
     def quiz_overview(self, child_id: int) -> list[dict]:
-        """孩子全部书目测验状态（管理端）。"""
+        """孩子全部书目测验状态（管理端）。
+
+        P2-16（2026-10-17 第六十九批·大审查）：此前**不回 `total_questions`**，管理端只能用
+        硬编码分母 5 渲染「最高分」——题量配置改成 8 就显示 `5/5` 满分假象；某书只有 3 题时
+        显示 `3/5` 假未通过。分母取 **`QuizAttempt.total_questions`（那次作答的实际题量快照）**：
+        服务端出题按 `min(题库启用题数, quiz_questions_per_book)` 截断（`_load_questions`），
+        故"题库题数"与"卷面题数"并不相等——只有快照才如实反映那次得分是几分制；
+        同分时取**最近**一次（题量配置改过就以后来的为准）。
+        """
         from backend.domain.catalog.models import Book
 
         rows = (
             self.db.query(
                 QuizAttempt.book_id,
-                func.count(QuizAttempt.id),
-                func.max(QuizAttempt.score),
+                QuizAttempt.score,
+                QuizAttempt.total_questions,
+                QuizAttempt.id,
             )
             .filter(QuizAttempt.child_id == child_id, QuizAttempt.is_deleted == 0)
-            .group_by(QuizAttempt.book_id)
+            .order_by(QuizAttempt.id)  # 升序：同分时后面的覆盖前面的 = 取最近一次
             .all()
         )
+        per_book: dict[int, dict] = {}
+        for book_id, score, total, _attempt_id in rows:
+            cur = per_book.get(book_id)
+            if cur is None:
+                per_book[book_id] = {"used": 1, "best": int(score or 0), "total": int(total or 0)}
+                continue
+            cur["used"] += 1
+            if int(score or 0) >= cur["best"]:
+                cur["best"] = int(score or 0)
+                cur["total"] = int(total or 0)
+
         max_attempts = int(ConfigService(self.db).get_value("quiz_max_attempts"))
         books = {b.id: b for b in self.db.query(Book).filter(Book.is_deleted == 0).all()}
         words_books = {
@@ -322,14 +342,15 @@ class GrowthService:
             .all()
         }
         out = []
-        for book_id, used, best in rows:
+        for book_id, agg in per_book.items():
             out.append(
                 {
                     "book_id": book_id,
                     "title": books[book_id].title if book_id in books else f"#{book_id}",
-                    "attempts_used": int(used),
-                    "best_score": int(best or 0),
+                    "attempts_used": agg["used"],
+                    "best_score": agg["best"],
                     "max_attempts": max_attempts,
+                    "total_questions": agg["total"],
                     "passed": book_id in words_books,
                 }
             )

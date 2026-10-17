@@ -105,6 +105,10 @@ function wechatTag(status: string): React.ReactNode {
   switch (status) {
     case "sent":
       return <Tag color="green">微信已送达</Tag>;
+    case "queued":
+      // P2-24（2026-10-17 第六十九批）：异步通道的「已提交、结果未知」中间态——
+      // 拿到微信回执后由后台线程回写 sent/failed，这里不许显示成「已送达」
+      return <Tag color="blue">微信已提交·待回执</Tag>;
     case "failed":
       return <Tag color="red">微信失败</Tag>;
     case "skipped":

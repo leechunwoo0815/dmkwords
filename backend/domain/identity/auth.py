@@ -226,6 +226,11 @@ def bind_wechat(db, bind_ticket: str, phone: str, code: str) -> dict:
     occupied = parent_by_openid(db, openid)
     if occupied and occupied.id != parent.id:
         raise ValidationError("该微信已绑定其他手机号，请联系馆员处理")
+    # P2-6（2026-10-17 第六十九批·大审查）：软删家长仍占着 `wechat_openid` 全局唯一索引；
+    # 直接绑定会撞索引、被下面兜底成"刚刚已被绑定"（误导）。这里先如实拦截并给可执行指引。
+    stale = db.query(Parent).filter(Parent.wechat_openid == openid, Parent.is_deleted != 0).first()
+    if stale is not None:
+        raise ValidationError("该微信曾绑定一个已删除的家长档案，请联系馆员在后台处理后重试")
     parent.wechat_openid = openid
     try:
         db.commit()

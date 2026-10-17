@@ -593,6 +593,9 @@ class AdminTodoService:
             "member_follow_up": 0,
             # G5（2026-10-14 第六十轮）：预约异常待跟进（副本转维护/遗失且无副本可换）——计入 admin_total
             "reservation_exception": 0,
+            # P2-28（2026-10-17 第六十九批）：审核超时提醒（退款/退会）——审计类，仅超管、计入 admin_total
+            "refund_review_timeout": 0,
+            "withdrawal_review_timeout": 0,
             # WM14-A：阅读圈今日新帖未馆长赞数（冷启动巡场动线——单独口径
             # 不进 admin_total，侧边栏阅读圈徽标+页顶胶囊共用同一源）
             "circle_unliked": 0,
@@ -624,6 +627,10 @@ class AdminTodoService:
                 AdminNotification.SCENE_PAYMENT_ANOMALY: "payment_anomaly",
                 # G5（2026-10-14 第六十轮）：预约异常待跟进
                 AdminNotification.SCENE_RESERVATION_EXCEPTION: "reservation_exception",
+                # P2-28（2026-10-17 第六十九批）：审核超时提醒（退款/退会）——同属"审计类仅超管"，
+                # 计数进 admin_total（否则"待办墙有、徽标没有"，P1-10 假绿家族）。
+                AdminNotification.SCENE_REFUND_REVIEW_TIMEOUT: "refund_review_timeout",
+                AdminNotification.SCENE_WITHDRAWAL_REVIEW_TIMEOUT: "withdrawal_review_timeout",
             }
             for n in all_rows:
                 if resolved[n.id]["effective_status"] != ST_PENDING:
@@ -644,6 +651,9 @@ class AdminTodoService:
                     "copy_damage_pending",
                     "payment_anomaly",
                     "reservation_exception",
+                    # P2-28（2026-10-17 第六十九批）：审核超时提醒两条
+                    "refund_review_timeout",
+                    "withdrawal_review_timeout",
                 )
             )
         if role_has_permission(admin.role, "member.manage"):

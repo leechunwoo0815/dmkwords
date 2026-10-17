@@ -404,13 +404,14 @@ def step_pending_45_days(context, days):
     _order(context, "小明", "observation_fee")
     context.benefit_book = _book(context, "待评估无时限样例书")
     _pay_deposit(context, "小明")
-    # 造数：状态 + update_time 同一笔写（任务按 update_time 判"超过 7 天"，且模型有 onupdate）
+    # 造数：状态 + **待评估时钟**同一笔写（P2-13 第六十九批：任务按 `pending_evaluation_at`
+    # 判"超过 7 天"——原先挂 update_time，家长换头像这类无关更新会把时钟归零）
     _child_db(
         context,
         "小明",
         member_status="pending_evaluation",
         member_expire=date.today() - days * DAY,
-        update_time=datetime.now() - days * DAY,
+        pending_evaluation_at=datetime.now() - days * DAY,
     )
     assert _child_view(context, "小明")["member_status"] == "pending_evaluation"
 

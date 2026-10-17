@@ -38,6 +38,7 @@ ADR-001 决策记录：
   - 事件类型必须是字符串常量，不允许动态拼接
 """
 
+import json
 import logging
 from collections import defaultdict
 from collections.abc import Callable
@@ -384,12 +385,18 @@ class EventBus:
             for handler in handlers:
                 try:
                     handler(event, db)
-                except Exception:
+                except Exception as exc:
                     logger.error(
                         f"Event handler failed (shared session): "
                         f"{event.event_type} -> {handler.__name__}",
                         exc_info=True,
                     )
+                    # P2-18（2026-10-17 第六十九批·大审查）：共享事务**会被调用方回滚**
+                    # （业务一致性优先，此处不能吞异常——那会留下半个事务），但失败事件必须
+                    # 留下**能活过回滚**的痕迹：用独立 session 落 `dead_letters` 后再 re-raise。
+                    # 此前本分支零落库（且注释误称"新项目无死信表"）→ 生产里死信表**永远 0 行**，
+                    # 订阅器失败只剩进程日志（重启即丢）。
+                    self._record_dead_letter(event, handler.__name__, exc, retry_count=0)
                     raise
         else:
             # 独立 session 模式（定时任务）：每个 handler 独立事务
@@ -410,7 +417,7 @@ class EventBus:
                             f"Failed to create retry session: {create_err}",
                             exc_info=True,
                         )
-                        self._record_dead_letter(event, handler.__name__, str(create_err))
+                        self._record_dead_letter(event, handler.__name__, create_err, retry_count=0)
                         continue
                     try:
                         handler(event, retry_session)
@@ -422,7 +429,7 @@ class EventBus:
                             f"{event.event_type} -> {handler.__name__}: {retry_err}",
                             exc_info=True,
                         )
-                        self._record_dead_letter(event, handler.__name__, retry_err)
+                        self._record_dead_letter(event, handler.__name__, retry_err, retry_count=1)
                     finally:
                         try:
                             retry_session.close()
@@ -431,15 +438,59 @@ class EventBus:
                 finally:
                     session.close()
 
-    def _record_dead_letter(self, event: DomainEvent, handler_name: str, error: str) -> None:
-        """死信兜底：新项目无死信表（WM11 通知任务中心再定形态），仅结构化日志留痕。"""
+    def _record_dead_letter(
+        self, event: DomainEvent, handler_name: str, error: object, *, retry_count: int = 0
+    ) -> None:
+        """死信落库 + 结构化日志（`dead_letters` 表；D6 正式形态）。
+
+        P2-18（2026-10-17 第六十九批·大审查）：本方法此前**只写日志**，注释还写着
+        "新项目无死信表"——而模型（`common/notification_models.DeadLetter`）与迁移
+        （`f7a2c9e3b5d4`）**都在**，且共享事务分支从不调用它 → 生产死信表零写入。
+        现在两条分支都落库：共享分支记 `retry_count=0`（业务事务一致回滚，不重试），
+        `db=None` 分支在"重试一次仍失败"后记 `retry_count=1`。
+
+        落库必须用**独立 session**（共享 session 马上要回滚）且**绝不允许影响原异常**：
+        建会话/写库任何失败都吞掉并记日志——死信是兜底，不能自己变成故障。
+        """
+        payload = json.dumps(
+            {k: str(v)[:200] for k, v in event.__dict__.items()}, ensure_ascii=False
+        )
+        message = str(error)[:2000]
         logger.error(
-            "Dead letter (no table in new project, logged only): event=%s handler=%s error=%s data=%s",
+            "Dead letter: event=%s handler=%s retry_count=%s error=%s data=%s",
             event.event_type,
             handler_name,
-            str(error)[:2000],
-            {k: str(v)[:200] for k, v in event.__dict__.items()},
+            retry_count,
+            message,
+            payload,
         )
+        try:
+            from backend.common.notification_models import DeadLetter
+            from backend.database import get_session
+
+            session = get_session()
+        except Exception as exc:  # noqa: BLE001 — 死信落库失败不能盖住原异常
+            logger.error("死信落库不可用（建会话失败）：%s", exc)
+            return
+        try:
+            session.add(
+                DeadLetter(
+                    event_type=event.event_type,
+                    handler_name=handler_name,
+                    payload=payload,
+                    error=message,
+                    retry_count=retry_count,
+                )
+            )
+            session.commit()
+        except Exception as exc:  # noqa: BLE001 — 同上，只记日志
+            session.rollback()
+            logger.error("死信落库失败：%s", exc)
+        finally:
+            try:
+                session.close()
+            except Exception:
+                pass
 
     def clear(self) -> None:
         """清空所有处理器（测试用）"""

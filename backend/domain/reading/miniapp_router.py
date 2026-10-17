@@ -106,7 +106,13 @@ def report_progress(body: ProgressReportRequest, auth: Any = Depends(get_current
 
 
 @router.get("/checkins")
-def checkin_calendar(child_id: int, days: int = 30, auth: Any = Depends(get_current_parent)):
+def checkin_calendar(
+    child_id: int,
+    # P2-11（2026-10-17 第六十九批·大审查）：原先无上下界——`days=-1` 会 `.limit(-1)` 直落
+    # MySQL 报错（500）；`days=10**9` 则一次拉全量（无分页，可拖垮库）。钉在 1..365（一年）。
+    days: int = Query(30, ge=1, le=365),
+    auth: Any = Depends(get_current_parent),
+):
     parent, db = auth
     child = child_of_parent(db, parent.id, child_id)  # P0-F1 归属校验
     return ReadingService(db).checkin_calendar(child, days)

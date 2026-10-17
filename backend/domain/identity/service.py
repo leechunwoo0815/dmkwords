@@ -75,14 +75,30 @@ class ParentService:
         self.db = db
 
     def create(self, admin, req) -> Parent:
-        if (
-            self.db.query(func.count(Parent.id))
-            .filter(Parent.phone == req.phone, Parent.is_deleted == 0)
-            .scalar()
-        ):
+        active = (
+            self.db.query(Parent).filter(Parent.phone == req.phone, Parent.is_deleted == 0).first()
+        )
+        if active:
             raise ConflictError(f"手机号 {req.phone} 已存在家长账号")
-        parent = Parent(name=req.name, phone=req.phone, remark=req.remark)
-        self.db.add(parent)
+        # P2-6（2026-10-17 第六十九批·大审查）：`parents.phone` 是**全局唯一索引（不含 is_deleted）**，
+        # 而服务层查重只看未删行 → 软删家长后同手机号再建档必撞唯一索引（探针实测 1062 → 500），
+        # 且没有恢复入口。按"同一手机号 = 同一个人"就地**复活**那一行（清软删 + 覆盖姓名/备注）；
+        # 行锁保证两个馆员同时建档同一号码时串行（后到者看到已被复活 → ConflictError）。
+        revived = (
+            self.db.query(Parent)
+            .filter(Parent.phone == req.phone, Parent.is_deleted != 0)
+            .with_for_update()
+            .populate_existing()  # B-16：锁定读必须刷新身份映射快照
+            .first()
+        )
+        if revived is not None:
+            revived.is_deleted = 0
+            revived.name = req.name
+            revived.remark = req.remark
+            parent = revived
+        else:
+            parent = Parent(name=req.name, phone=req.phone, remark=req.remark)
+            self.db.add(parent)
         self.db.flush()
         publish_audit(
             self.db,
@@ -90,7 +106,11 @@ class ParentService:
             action="parent.create",
             target_type="parent",
             target_id=str(parent.id),
-            detail={"name": req.name, "phone": req.phone},
+            detail={
+                "name": req.name,
+                "phone": req.phone,
+                **({"revived_soft_deleted": True} if revived is not None else {}),
+            },
         )
         self.db.commit()
         return parent
@@ -283,7 +303,9 @@ class ChildService:
             raise ValidationError(
                 f"会员状态不允许从 {child.member_status} 变更为 {new_status}（转移矩阵拦截）"
             )
-        child.member_status = new_status
+        # P2-13（2026-10-17 第六十九批·大审查）：状态写口收拢到模型方法——顺带维护
+        # `pending_evaluation_at`（待评估时钟），不再依赖会被任意字段更新刷新的 `update_time`
+        child.set_member_status(new_status)
 
     def update_avatar(self, child_id: int, avatar: str) -> Child:
         """WM15-R3：家长自助设置孩子内置头像（白名单；空串=清空）。"""
@@ -564,18 +586,22 @@ class ChildService:
         threshold = int(ConfigService(self.db).get_value("pending_evaluation_remind_days", "7"))
         now = datetime.now()
         cutoff = now - timedelta(days=threshold)
+        # P2-13（2026-10-17 第六十九批·大审查）：判据从 `update_time` 改为**进入待评估的时刻**
+        # （`pending_evaluation_at`）。原判据下，家长自助换头像这类无关更新会把时钟归零 →
+        # 该孩子从每周名单与待办里消失（"待评估超过 N 天"永远凑不满 N 天）。
         rows = (
             self.db.query(Child)
             .filter(
                 Child.is_deleted == 0,
                 Child.member_status == Child.MEMBER_PENDING_EVALUATION,
-                Child.update_time < cutoff,
+                Child.pending_evaluation_at.isnot(None),
+                Child.pending_evaluation_at < cutoff,
             )
             .all()
         )
         iso_year, iso_week, _ = now.isocalendar()
         for child in rows:
-            days = max(threshold, (now - child.update_time).days)
+            days = max(threshold, (now - child.pending_evaluation_at).days)
             AdminNotifyService(self.db).send(
                 scene=AdminNotification.SCENE_PENDING_EVALUATION,
                 title="待评估跟进",

@@ -70,6 +70,11 @@ class Child(BaseModel):
     member_status = Column(
         String(24), nullable=False, default=MEMBER_NONE, index=True, comment="会员状态"
     )
+    # P2-13（2026-10-17 第六十九批·大审查）：**进入待评估的时刻**。
+    # 为什么必须单独落库：`pending_evaluation_weekly` 原先把 `update_time` 当这个时钟，而任意字段
+    # 更新（含家长自助换头像）都会刷新它 → "待评估超过 N 天"的名单每次被家长动一下就把时钟归零，
+    # 该孩子从周名单/待办里消失。进入 pending_evaluation 时写入，离开该状态时清空（见 `set_member_status`）。
+    pending_evaluation_at = Column(DateTime, nullable=True, comment="进入待评估状态的时刻")
     member_start = Column(Date, nullable=True, comment="会员开始日")
     member_expire = Column(Date, nullable=True, comment="会员到期日")
     withdraw_reason = Column(
@@ -95,6 +100,21 @@ class Child(BaseModel):
 
     def can_transition(self, new_status: str) -> bool:
         return new_status in self.ALLOWED_TRANSITIONS.get(self.member_status, set())
+
+    def set_member_status(self, new_status: str) -> None:
+        """写会员状态并维护**待评估时钟**（P2-13，2026-10-17 第六十九批·大审查）。
+
+        唯一写口：把它当"会员状态写入口"用（`IdentityService._transition` /
+        `OrderService._transition_member` 都走这里），时钟才不会漏维护——
+        进入 `pending_evaluation` 记时刻，离开则清空（下次进入重新计时）。
+        状态合法性仍由调用方 `can_transition` 把关（本方法只负责写与时钟）。
+        """
+        from datetime import datetime as _dt
+
+        self.member_status = new_status
+        self.pending_evaluation_at = (
+            _dt.now() if new_status == self.MEMBER_PENDING_EVALUATION else None
+        )
 
     @property
     def is_active_member(self) -> bool:

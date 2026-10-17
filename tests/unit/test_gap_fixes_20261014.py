@@ -94,7 +94,7 @@ def test_g12_pending_evaluation_weekly_creates_todo(client: TestClient):
     _set_child(
         child_id=c["id"],
         member_status="pending_evaluation",
-        update_time=datetime.now() - timedelta(days=45),
+        pending_evaluation_at=datetime.now() - timedelta(days=45),
     )
 
     res = _run_task(client, h, "pending_evaluation_weekly")
@@ -102,7 +102,7 @@ def test_g12_pending_evaluation_weekly_creates_todo(client: TestClient):
 
     row = _row(client, h, title="待评估跟进", child_id=c["id"])
     assert row["effective_status"] == "pending", row
-    # 文案里的天数按"现在 − update_time"算：DATETIME 秒级四舍五入会让"整 45 天"落成 44 天
+    # 文案里的天数按"现在 − pending_evaluation_at"算（P2-13 第六十九批：时钟落库，不再挂 update_time）：DATETIME 秒级四舍五入会让"整 45 天"落成 44 天
     # （红线 117：造「整 N 天」要留舍入余量）→ 断言"超过阈值"而不是钉死 45
     import re
 
@@ -121,7 +121,7 @@ def test_g12_todo_auto_resolves_after_promotion(client: TestClient):
     _set_child(
         child_id=c["id"],
         member_status="pending_evaluation",
-        update_time=datetime.now() - timedelta(days=10),
+        pending_evaluation_at=datetime.now() - timedelta(days=10),
     )
     _run_task(client, h, "pending_evaluation_weekly")
     row_id = _row(client, h, title="待评估跟进", child_id=c["id"])["id"]
@@ -141,7 +141,7 @@ def test_g12_weekly_dedup_within_same_week(client: TestClient):
     _set_child(
         child_id=c["id"],
         member_status="pending_evaluation",
-        update_time=datetime.now() - timedelta(days=30),
+        pending_evaluation_at=datetime.now() - timedelta(days=30),
     )
     _run_task(client, h, "pending_evaluation_weekly")
     _run_task(client, h, "pending_evaluation_weekly")
@@ -156,7 +156,7 @@ def test_g12_weekly_dedup_within_same_week(client: TestClient):
 
     with get_session() as db:
         row = db.query(Child).filter(Child.id == c["id"]).first()
-        row.update_time = datetime.now() - timedelta(days=40)
+        row.pending_evaluation_at = datetime.now() - timedelta(days=40)
         db.commit()
     from backend.common.admin_notification_models import AdminNotification
     from backend.common.admin_notifications import AdminNotifyService

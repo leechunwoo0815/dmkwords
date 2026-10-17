@@ -193,7 +193,14 @@ class FavoriteService:
         rows = (
             self.db.query(Favorite, Book)
             .join(Book, Favorite.book_id == Book.id)
-            .filter(Favorite.child_id == child.id, Favorite.is_deleted == 0)
+            .filter(
+                Favorite.child_id == child.id,
+                Favorite.is_deleted == 0,
+                # P2-10（2026-10-17 第六十九批·大审查）：**软删书目不进收藏夹**。原先不过滤
+                # `Book.is_deleted`，而软删书 status 仍是上架 → 卡片显示成正常书（off_shelf=false），
+                # 点进详情 404。与全站"软删=对用户不存在"口径一致（续听/书架/列表都过滤它）。
+                Book.is_deleted == 0,
+            )
             .order_by(Favorite.id.desc())
             .all()
         )

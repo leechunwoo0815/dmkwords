@@ -68,12 +68,20 @@ class DepositService:
         standard = Decimal(ConfigService(self.db).get_value("deposit_amount"))
 
         if order.order_type == Order.TYPE_DEPOSIT:
-            if dep.status == Deposit.STATUS_PAID:
+            # P2-1（2026-10-17 第六十九批·大审查）：原判据是"当前状态 == paid"——双击建出的
+            # 第二笔押金单在中间发生过赔偿扣除/部分退款后状态已不是 paid → 盖章通过，
+            # `amount/available_amount` 被**覆盖回标准额**（deducted_amount 不回落 → 台账三笔
+            # 无法回推、家庭多付）。判据改为"本押金账户**是否已有本金**"（amount > 0）：
+            # 已缴过就拒绝重复缴纳，不管中间发生过什么。
+            if dep.amount > 0 or dep.status == Deposit.STATUS_PAID:
                 raise ValidationError("押金已缴纳，请勿重复")
-            dep.amount = standard
-            dep.available_amount = standard
+            # 金额取**订单实收**（`order.amount`），不取"确认时刻的当前配置"：建单后改配置时，
+            # 原实现让 `dep.amount = standard` 而台账记 `order.amount` → 实收 ≠ 入账。
+            received = (order.amount or Decimal("0")).quantize(Decimal("0.01"))
+            dep.amount = received
+            dep.available_amount = received
             dep.status = Deposit.STATUS_PAID
-            self._ledger(dep, DepositLedger.ENTRY_PAY, order.amount, "押金缴纳", admin)
+            self._ledger(dep, DepositLedger.ENTRY_PAY, received, "押金缴纳", admin)
         else:  # deposit_supplement 补缴（R-312：补至全额；E-20260909-03：金额含待结清）
             if dep.status not in (Deposit.STATUS_PARTIALLY_DEDUCTED, Deposit.STATUS_FULLY_DEDUCTED):
                 raise ValidationError("押金当前无需补缴")
@@ -302,7 +310,14 @@ class DepositService:
                 if dep.available_amount == 0
                 else Deposit.STATUS_PARTIALLY_DEDUCTED
             )
-        self._ledger(dep, DepositLedger.ENTRY_DEDUCT, amount, reason, admin, copy_id)
+        # P2-2（2026-10-17 第六十九批·大审查）：台账 `amount` 记**实际扣除额**（与退款行
+        # "amount=实退额"同口径）——原实现记"索赔全额"，超扣场景（押金 1200、赔偿 2000）
+        # 会落 amount=2000 / balance_after=0 → 用台账回推余额得 −800，与"台账即资金事实"冲突。
+        # 索赔全额与转待结清部分写进 reason，人工追溯不丢信息。
+        ledger_reason = reason
+        if over > 0:
+            ledger_reason = f"{reason}（索赔 {amount}，实扣 {deduct}，转待结清 {over}）"
+        self._ledger(dep, DepositLedger.ENTRY_DEDUCT, deduct, ledger_reason, admin, copy_id)
         publish_audit(
             self.db,
             admin=admin,

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 
 from sqlalchemy.orm import Session
@@ -9,8 +10,11 @@ from sqlalchemy.orm import Session
 from backend.common.exceptions import NotFoundError, ValidationError
 from backend.common.notification_models import Notification
 from backend.common.notifications import SCENE_OTHER_EVALUATION_UPLOADED, NotificationService
+from backend.config import get_settings
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, ObservationReport
+
+logger = logging.getLogger(__name__)
 
 
 class ObservationReportService:
@@ -31,12 +35,26 @@ class ObservationReportService:
         from backend.common.file_storage import read_image_policy, save_observation_image
 
         policy = read_image_policy(self.db, "doc")
-        paths = []
+        # P2-26（2026-10-17 第六十九批·大审查）：**先全量校验、再统一落盘**。
+        # 原先是"边校验边落盘"——第 3 张扩展名不合法时前 2 张已写进 observation/，
+        # 而该目录在 PROTECTED_PREFIXES 里（媒体体检只计 protected_total、清理白名单不含它）
+        # → **永久孤儿文件**，每次误传多图即复现、无任何清理路径。
+        exts: list[str] = []
         for f in files:
             ext = os.path.splitext(f.filename or "")[1].lower()
             if ext not in (".png", ".jpg", ".jpeg"):
                 raise ValidationError(f"仅支持 PNG/JPG 图片（{f.filename}）")
-            paths.append(save_observation_image(child.id, f.file.read(), ext, policy))
+            exts.append(ext)
+        paths: list[str] = []
+        try:
+            for f, ext in zip(files, exts, strict=True):
+                paths.append(save_observation_image(child.id, f.file.read(), ext, policy))
+        except Exception:
+            # 落盘途中仍可能出错（磁盘满 / 解码失败 / 单图超限）——回收本次已写文件。
+            # 内容是**内容寻址**的（同名=同图），可能已被历史报告引用（observation/ 不可再生），
+            # 故只回收"无任何报告行引用"的那些（保守方向：宁可留孤儿，不能删活引用）。
+            self._cleanup_unreferenced(paths)
+            raise
         report = ObservationReport(
             child_id=child.id,
             images=json.dumps(paths, ensure_ascii=False),
@@ -70,6 +88,39 @@ class ObservationReportService:
         )
         self.db.commit()
         return {"id": report.id, "images": paths}
+
+    def _cleanup_unreferenced(self, paths: list[str]) -> None:
+        """回收本次上传中途失败时已落盘、且**无任何报告行引用**的图片（P2-26）。
+
+        判据保守：`observation_reports.images` 里出现过该相对路径的**一段子串**即视为
+        "被引用"（宁可留下孤儿，也绝不删掉其它报告正在用的图）；路径必须先过
+        `media_paths.is_within` 才允许删（同前缀兄弟目录不放行——与下发端同一口径）。
+        """
+        if not paths:
+            return
+        from backend.common.media_paths import is_within
+        from backend.common.sql_utils import escape_like
+
+        root = os.path.abspath(get_settings().UPLOADS_DIR)
+        keep: set[str] = set()
+        for rel in paths:
+            like = f"%{escape_like(rel)}%"
+            if (
+                self.db.query(ObservationReport.id)
+                .filter(ObservationReport.images.like(like, escape="\\"))
+                .first()
+            ):
+                keep.add(rel)
+        for rel in paths:
+            if rel in keep:
+                continue
+            full = os.path.abspath(os.path.join(root, rel))
+            if not is_within(root, full) or not os.path.isfile(full):
+                continue
+            try:
+                os.remove(full)
+            except OSError as exc:  # 清理失败不回滚原异常——如实记日志
+                logger.warning("评估报告孤儿图清理失败：%s（%s）", rel, exc)
 
     def list_for_child(self, child_id: int) -> list[dict]:
         rows = (

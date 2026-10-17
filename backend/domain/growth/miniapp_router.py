@@ -126,7 +126,12 @@ def report_image(kind: str, child_id: int, token: str = "", db: Session = Depend
 
     root_dir = os.path.abspath(get_settings().UPLOADS_DIR)
     full = os.path.abspath(os.path.join(root_dir, rel))
-    if not full.startswith(root_dir) or not os.path.isfile(full):
+    # P2-27（2026-10-17 第六十九批·大审查）：此前用**裸前缀** `full.startswith(root_dir)`——
+    # 同前缀的兄弟目录（`uploads-evil/x.jpg`）能骗过它。同类已在 catalog/reading 两处收口到
+    # `media_paths.is_within`，这里是全仓最后一处漏改（口径漏改，当前不可利用）。
+    from backend.common.media_paths import is_within
+
+    if not is_within(root_dir, full) or not os.path.isfile(full):
         from backend.common.exceptions import NotFoundError
 
         raise NotFoundError("报告图片不存在")

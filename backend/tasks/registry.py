@@ -93,6 +93,18 @@ def _transfer_expiring_warn(db: Session) -> int:
     return TransferService(db).transfer_expiring_warn()
 
 
+def _refund_review_timeout_warn(db: Session) -> int:
+    from backend.domain.identity.review_timeout import refund_review_timeout_warn
+
+    return refund_review_timeout_warn(db)
+
+
+def _withdrawal_review_timeout_warn(db: Session) -> int:
+    from backend.domain.identity.review_timeout import withdrawal_review_timeout_warn
+
+    return withdrawal_review_timeout_warn(db)
+
+
 def _book_due_remind(db: Session) -> int:
     from backend.domain.circulation.service import CirculationService
 
@@ -213,9 +225,10 @@ def _payment_reconcile(db: Session) -> int:
     return int(result["diff_total"])
 
 
-# 19 项定时任务（第五十九批 +deposit_settle_remind）（WM13-4 新增 transfer_expiring_warn 后 12→13；WM14-B 新增
+# 21 项定时任务（第五十九批 +deposit_settle_remind）（WM13-4 新增 transfer_expiring_warn 后 12→13；WM14-B 新增
 # circle_rank_snapshot / circle_image_cleanup 后 13→15；2026-09-23 新增 media_census 后 15→16；
 # 2026-10-08 WM12-A 新增 wechat_cert_refresh 后 16→17；同日 WM12-B 新增 payment_reconcile 后 17→18；
+# 2026-10-17 第六十九批（大审查 P2-28）新增 refund_review_timeout_warn / withdrawal_review_timeout_warn 后 19→21；
 # 周月报定时生成不在本批）
 TASKS: dict[str, TaskSpec] = {
     "member_expire_check": TaskSpec(
@@ -246,6 +259,19 @@ TASKS: dict[str, TaskSpec] = {
     ),
     "transfer_expiring_warn": TaskSpec(
         "transfer_expiring_warn", "转让超时预警", "会员", 3600, _transfer_expiring_warn
+    ),
+    # P2-28（2026-10-17 第六十九批·大审查）：审核超时提醒从"只有转让一条"补齐到三条。
+    # 退款放在**资金**组（动钱 → 手动触发仅超管，与 order_timeout_cancel 同组）；
+    # 退会放在**会员**组（与 transfer_expiring_warn 同款，日常运维专员可手动触发）。
+    "refund_review_timeout_warn": TaskSpec(
+        "refund_review_timeout_warn", "退款审核超时提醒", "资金", 3600, _refund_review_timeout_warn
+    ),
+    "withdrawal_review_timeout_warn": TaskSpec(
+        "withdrawal_review_timeout_warn",
+        "退会审核超时提醒",
+        "会员",
+        3600,
+        _withdrawal_review_timeout_warn,
     ),
     "activity_remind": TaskSpec("activity_remind", "活动开始提醒", "活动", 3600, _activity_remind),
     "activity_auto_finish": TaskSpec(

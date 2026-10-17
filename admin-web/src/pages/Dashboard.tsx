@@ -90,6 +90,19 @@ const TODO_ROWS: { key: keyof TodoCounts; label: string; route: string }[] = [
     label: "资金异常",
     route: "/notifications?box=admin&scene=admin.payment_anomaly",
   },
+  // P2-28（2026-10-17 第六十九批·大审查）：审核超时提醒补齐到三条（此前只有转让的
+  // 「转让临近超时」一行）；退款/退会两条同样计入 admin_total（超管视角），故必须在这里有行
+  // ——`scripts/check_admin_todo_rows.py` 按视角断言，漏一行即门禁红。
+  {
+    key: "refund_review_timeout",
+    label: "退款审核超时",
+    route: "/notifications?box=admin&scene=admin.refund_review_timeout",
+  },
+  {
+    key: "withdrawal_review_timeout",
+    label: "退会审核超时",
+    route: "/notifications?box=admin&scene=admin.withdrawal_review_timeout",
+  },
 ];
 
 /** member.manage 角色的待办行（同样必须与 admin_total 求和项对齐） */

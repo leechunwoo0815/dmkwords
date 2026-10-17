@@ -199,18 +199,32 @@ def create_book(
     return _to_book_response(book, body.copy_count)
 
 
+def _book_response_fresh(db, book) -> BookResponse:
+    """按**当前库内状态**组装 BookResponse（副本总数 / 题量 / missing 全重算）。
+
+    P2-22（2026-10-17 第六十九批·大审查）：封面与音频上传原先写死 `copy_count=0`——
+    该字段声明是"在册副本总数"，下发即错的契约值（此前前端上传后全量刷新才没暴露）。
+    本函数是"重算型响应"的**单一口径**（get_book / update_book / 两个上传端点共用）。
+    """
+    _, copies = BookService(db).get_book(book.id)
+    quiz_repo = QuizQuestionRepository(db)
+    return _to_book_response(
+        book,
+        len(copies),
+        len(quiz_repo.list_by_book(book.id, active_only=False)),
+        len(quiz_repo.list_by_book(book.id, active_only=True)),
+        BookService(db).get_onboarding_missing(book.id),
+    )
+
+
 @router.get("/books/{book_id}", response_model=BookResponse)
 def get_book(
     book_id: int,
     admin: Any = Depends(require_perm("book.manage")),
     db: Session = Depends(get_db),
 ):
-    book, copies = BookService(db).get_book(book_id)
-    quiz_repo = QuizQuestionRepository(db)
-    question_count = len(quiz_repo.list_by_book(book_id, active_only=False))
-    question_active_count = len(quiz_repo.list_by_book(book_id, active_only=True))
-    missing = BookService(db).get_onboarding_missing(book_id)
-    return _to_book_response(book, len(copies), question_count, question_active_count, missing)
+    book, _copies = BookService(db).get_book(book_id)
+    return _book_response_fresh(db, book)
 
 
 @router.put("/books/{book_id}", response_model=BookResponse)
@@ -221,13 +235,8 @@ def update_book(
     db: Session = Depends(get_db),
 ):
     book = BookService(db).update_book(admin, book_id, body)
-    _, copies = BookService(db).get_book(book_id)
-    quiz_repo = QuizQuestionRepository(db)
-    question_count = len(quiz_repo.list_by_book(book_id, active_only=False))
-    question_active_count = len(quiz_repo.list_by_book(book_id, active_only=True))
     # D1 收尾：编辑响应重算 missing（编辑是补 AR/词数的主路径）
-    missing = BookService(db).get_onboarding_missing(book_id)
-    return _to_book_response(book, len(copies), question_count, question_active_count, missing)
+    return _book_response_fresh(db, book)
 
 
 @router.delete("/books/{book_id}")
@@ -319,7 +328,9 @@ def upload_cover(
     ext = os.path.splitext(file.filename or "")[1]
     book = BookService(db).upload_cover(admin, book_id, data, ext)
     # D1 收尾：上传响应重算 missing（前端「待完善」Tag 依据）
-    return _to_book_response(book, 0, missing=BookService(db).get_onboarding_missing(book_id))
+    # P2-22（2026-10-17 第六十九批·大审查）：原先写死 `copy_count=0`——字段声明是"在册副本
+    # 总数"，下发即错的契约值（此前前端上传后全量刷新才没暴露）。这里与 `update_book` 同款重算。
+    return _book_response_fresh(db, book)
 
 
 @router.post("/books/{book_id}/audio", response_model=BookResponse)
@@ -338,7 +349,7 @@ def upload_audio(
     data = file.file.read()
     book = BookService(db).upload_audio(admin, book_id, data, file.filename or "")
     # D1 收尾：上传响应重算 missing（前端「待完善」Tag 依据）
-    return _to_book_response(book, 0, missing=BookService(db).get_onboarding_missing(book_id))
+    return _book_response_fresh(db, book)
 
 
 @router.post("/books/import", response_model=ImportResultResponse)

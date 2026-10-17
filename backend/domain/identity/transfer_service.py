@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from backend.common.config_service import ConfigService
@@ -160,8 +160,23 @@ class TransferService:
     def apply(self, parent, source_child_id: int, target_child_id: int) -> dict:
         if source_child_id == target_child_id:
             raise ValidationError("转出方和受让方不能是同一个孩子")
-        source = self._child(source_child_id)
-        target = self._child(target_child_id)
+        # P2-12（2026-10-17 第六十九批·大审查）：并发双击时两个请求可能**都过了条件检查、
+        # 都插单**（表上也没有唯一约束）。这里按 id 升序锁住双方 Child 行（锁序纪律：
+        # 全局锁序里 Child 最先；两行同向加锁避免 AB-BA），锁定后重读快照——后到者会看到
+        # `operation_locked=1` 而在条件检查处失败（串行化，不产生第二条 pending）。
+        locked = (
+            self.db.query(Child)
+            .filter(Child.id.in_(sorted({source_child_id, target_child_id})))
+            .order_by(Child.id)
+            .with_for_update()
+            .populate_existing()
+            .all()
+        )
+        by_id = {c.id: c for c in locked}
+        source = by_id.get(source_child_id)
+        target = by_id.get(target_child_id)
+        if source is None or target is None or source.is_deleted or target.is_deleted:
+            raise NotFoundError("孩子不存在")
         if source.parent_id != parent.id or target.parent_id != parent.id:
             raise ValidationError("只能在自己账号的孩子之间转让")
         checks = self.check_conditions(parent, source, target)
@@ -382,7 +397,28 @@ class TransferService:
         return expired
 
     def _unlock_both(self, req: TransferRequest) -> None:
+        """解除双方冻结——**仅当该孩子没有其它 pending 转让**（P2-12，2026-10-17 第六十九批）。
+
+        原实现无条件解锁：并发/历史数据下若有两条 pending 转让牵涉同一孩子，撤销或超时
+        其中一条会把另一条**仍在审核**的申请的冻结提前解除（该申请失去"审核期冻结"保护，
+        孩子可被借书/退会/再转让）。解锁时逐人复查"还有没有别的在途申请"。
+        """
         for cid in (req.source_child_id, req.target_child_id):
+            other = (
+                self.db.query(TransferRequest.id)
+                .filter(
+                    TransferRequest.id != req.id,
+                    TransferRequest.is_deleted == 0,
+                    TransferRequest.status == TransferRequest.STATUS_PENDING,
+                    or_(
+                        TransferRequest.source_child_id == cid,
+                        TransferRequest.target_child_id == cid,
+                    ),
+                )
+                .first()
+            )
+            if other:
+                continue
             child = self.db.query(Child).filter(Child.id == cid).first()
             if child:
                 child.operation_locked = 0
@@ -560,9 +596,8 @@ class TransferService:
             target.member_status = Child.MEMBER_FORMAL
             target.member_start = date.today()
             target.member_expire = source.member_expire
-            # 6) 解锁双方
-            source.operation_locked = 0
-            target.operation_locked = 0
+            # 6) 解锁双方（P2-12：若还有其它在途申请则不解除——由 _unlock_both 统一判定）
+            self._unlock_both(req)
             # 7) 留痕
             publish_audit(
                 self.db,

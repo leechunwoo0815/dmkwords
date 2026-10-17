@@ -4,6 +4,7 @@
 import asyncio
 import logging
 import threading
+from collections.abc import Callable
 from datetime import datetime
 
 import httpx
@@ -36,35 +37,64 @@ def get_template_for_title(title: str) -> str:
     return ""
 
 
-def push_subscribe_message(openid: str, title: str, content: str) -> bool:
-    """SystemMessage 落库后调用 — 触发微信订阅消息推送（异步、失败静默）
+def push_subscribe_message(
+    openid: str,
+    title: str,
+    content: str,
+    on_result: Callable[[bool, str], None] | None = None,
+) -> tuple[bool, str]:
+    """SystemMessage 落库后调用 — 排队微信订阅消息推送。
 
-    条件：总开关开启（WECHAT_SUBSCRIBE_ENABLED）+ openid 有效 +
-    标题命中高价值映射 + 模板 ID 已配置。任一不满足 → 降级只落库，返回 False。
-    发送在 daemon 线程执行 asyncio.run（避免在请求/事件循环线程内冲突），
-    网络失败/微信拒发均不阻塞主流程。
+    返回 `(是否已入队, 原因/说明)`（P2-24，2026-10-17 第六十九批·大审查）：
+    - **未入队**（False）：条件不满足，`原因` 是**真实原因**（通道未启用 / 标题未命中模板映射 /
+      模板未配置）——调用方据此写 `skipped` 并展示原因，不许再伪装成"发送失败（额度不足/用户拒收）"；
+    - **已入队**（True）：**"已提交"不等于"已送达"**——发送在 daemon 线程执行 asyncio.run
+      （避免在请求/事件循环线程内冲突），真实结果通过 `on_result(ok, error)` 回调告知
+      （调用方在后台线程里用独立 session 回写 `sent`/`failed`）。
+
+    条件：总开关开启（WECHAT_SUBSCRIBE_ENABLED）+ openid 有效 + 标题命中高价值映射
+    + 模板 ID 已配置。网络失败/微信拒发均不阻塞主流程。
     """
     from backend.config import get_settings
 
     if not get_settings().WECHAT_SUBSCRIBE_ENABLED:
-        return False
+        return False, "通道未启用"
     if not openid:
-        return False
-    template_id = get_template_for_title(title)
+        return False, "家长未授权（无 openid）"
+    attr = _match_template_attr(title)
+    if not attr:
+        return False, f"标题未命中订阅模板映射（{title[:16]}）——仅站内消息"
+    template_id = getattr(SubscribeTemplate, attr, "") or ""
     if not template_id:
-        return False
+        return False, f"订阅模板 {attr} 未配置（微信后台申请后填入 .env）"
 
     def _runner():
         try:
             asyncio.run(
                 WeChatSubscribe.send(openid, template_id, _build_template_data(title, content))
             )
-        except Exception:
+            ok, error = True, ""
+            logger.info(f"Subscribe push ok: template={template_id}, title={title[:20]}")
+        except Exception as exc:  # noqa: BLE001 — 网络失败不阻塞主流程，但结果要如实回报
+            ok, error = False, f"微信订阅发送失败: {str(exc)[:200]}"
             logger.exception(f"Subscribe push failed: title={title[:20]}")
+        if on_result is not None:
+            try:
+                on_result(ok, error)
+            except Exception:  # noqa: BLE001 — 回写失败只记日志，不影响已完成的发送
+                logger.exception("Subscribe push on_result 回调失败")
 
     threading.Thread(target=_runner, daemon=True).start()
     logger.info(f"Subscribe push queued: template={template_id}, title={title[:20]}")
-    return True
+    return True, f"已提交微信（模板 {attr}）"
+
+
+def _match_template_attr(title: str) -> str:
+    """按标题匹配模板 attr（未命中返回空串）——与 `get_template_for_title` 共用同一份映射表。"""
+    for keyword, attr in _TITLE_TEMPLATE_RULES:
+        if keyword in title:
+            return attr
+    return ""
 
 
 def _build_template_data(title: str, content: str) -> dict:

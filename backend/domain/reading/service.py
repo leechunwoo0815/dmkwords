@@ -39,56 +39,13 @@ REPORT_GRACE_SECONDS = (
 )
 
 
-def _clean_intervals(raw: object) -> list[list[int]]:
-    """清洗历史 intervals：丢弃非法区间（非 [a,b]、含非数字、a>=b、负起点），
-    保证 merge/coverage 对脏数据永不 500（E-20260830-12 防御）。"""
-    if not isinstance(raw, list):
-        return []
-    cleaned: list[list[int]] = []
-    for item in raw:
-        if (
-            isinstance(item, (list, tuple))
-            and len(item) >= 2
-            and isinstance(item[0], (int, float))
-            and isinstance(item[1], (int, float))
-        ):
-            start, end = int(item[0]), int(item[1])
-            if 0 <= start < end:
-                cleaned.append([start, end])
-    return cleaned
-
-
-def merge_intervals(intervals: object, new: list[int]) -> list[list[int]]:
-    """合并区间并集（排序 + 线性合并）。intervals 为脏数据时清洗后合并，不抛异常。"""
-    all_intervals = sorted(_clean_intervals(intervals) + [list(new)], key=lambda x: x[0])
-    merged: list[list[int]] = []
-    for start, end in all_intervals:
-        if merged and start <= merged[-1][1]:
-            merged[-1][1] = max(merged[-1][1], end)
-        else:
-            merged.append([start, end])
-    return merged
-
-
-def coverage_of(intervals: list[list[int]]) -> int:
-    return sum(e - s for s, e in intervals)
-
-
-def ensure_progress_row(db: Session, *, child_id: int, book_id: int, total_seconds: int) -> None:
-    """确保 (孩子, 书目) 有阅读进度行（PRD §5.2「借出时自动创建阅读记录」，第五十九批 G8）。
-
-    由 circulation.borrow 调用（放在本域因为 `reading_progress` 的归属在这里）；
-    原子插入 + `uq_reading_progress_child_book` 唯一索引兜底：并发借同书两册只留一行，
-    既有行原样保留（空更新）。`total_seconds` 先按书目音频时长写，书后补音频时由
-    `report_progress` 自愈刷新（见该函数内注释）。
-    """
-    from sqlalchemy.dialects.mysql import insert as mysql_insert
-
-    db.execute(
-        mysql_insert(ReadingProgress)
-        .values(child_id=child_id, book_id=book_id, total_seconds=total_seconds, is_deleted=0)
-        .on_duplicate_key_update(id=ReadingProgress.id)  # 空更新：保留既有行
-    )
+# 进度区间/进度行工具已抽至 progress_utils.py（第六十九批：service.py 触 800 行上限）——
+# 保持 re-export，circulation 与测试的既有 import 路径不变。
+from backend.domain.reading.progress_utils import (  # noqa: E402,F401 — 兼容旧引用
+    coverage_of,
+    ensure_progress_row,
+    merge_intervals,
+)
 
 
 class ReadingService:
@@ -292,16 +249,20 @@ class ReadingService:
         }
 
     def continue_listening(self, child: Child) -> dict | None:
-        """首页"继续听"卡：最近一次有进度但未读完（finished=0）的上一本（A-1/T6 下沉）。"""
+        """首页"继续听"卡：最近一次有进度但未读完（finished=0）的上一本（A-1/T6 下沉）。
+
+        P2-9（2026-10-17 第六十九批·大审查）：借阅行原先用无条件 `isouter` join——同一本书
+        "还了又借"时有多条借阅记录，join 出多行、排序键只有 `last_report_at`（同书同进度行的
+        时间完全相同）→ **可能取到 `returned` 那一条** ⇒ `in_borrow=False`、`due_at` 丢失
+        （"X 天后到期"退化成"可续听"）。现分两步定行：先选进度行（口径不变：最近一次未读完），
+        再单独取该 (孩子, 书目) 的**优先级最高**借阅行（在借/逾期优先、其次最新）——
+        两次都是单行查询，结果确定（相关子查询写法会退化成笛卡尔积，SQLAlchemy 已告警）。
+        """
+        from sqlalchemy import case
+
         row = (
-            self.db.query(ReadingProgress, Book, BorrowRecord)
+            self.db.query(ReadingProgress, Book)
             .join(Book, ReadingProgress.book_id == Book.id)
-            .join(
-                BorrowRecord,
-                (BorrowRecord.child_id == ReadingProgress.child_id)
-                & (BorrowRecord.book_id == ReadingProgress.book_id),
-                isouter=True,
-            )
             .filter(
                 ReadingProgress.child_id == child.id,
                 ReadingProgress.finished == 0,
@@ -315,7 +276,28 @@ class ReadingService:
         )
         if not row:
             return None
-        p, book, br = row
+        p, book = row
+        br = (
+            self.db.query(BorrowRecord)
+            .filter(
+                BorrowRecord.child_id == child.id,
+                BorrowRecord.book_id == book.id,
+                BorrowRecord.is_deleted == 0,
+            )
+            .order_by(
+                case(
+                    (
+                        BorrowRecord.status.in_(
+                            [BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]
+                        ),
+                        0,
+                    ),
+                    else_=1,
+                ),
+                BorrowRecord.id.desc(),
+            )
+            .first()
+        )
         in_borrow = bool(
             br and br.status in (BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE)
         )

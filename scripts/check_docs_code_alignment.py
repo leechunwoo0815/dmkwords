@@ -294,7 +294,11 @@ def collect_symbols() -> set[str]:
     return out
 
 
-ARCHIVE_HEADING_RE = re.compile(r"^##\s*v\d+·")
+#: 交接卡归档层的截断标记。**两种形态都要认**（第六十九批·P2-28 收口时修）：
+#: ① `## vNN·`（规格类文档的归档小标题）；② `# DmkWords 项目交接 - vNN【已归档】`
+#: （交接卡主文件的归档块标题——此前不认这一种，于是 v92 及更早的归档层里"19 任务"
+#: 这类**当时真值**被当成悬空引用报红。归档层按本文件既定意图跳过，只校验当前层）。
+ARCHIVE_HEADING_RE = re.compile(r"^(?:##\s*v\d+·|#\s*DmkWords 项目交接 - v\d+【已归档】)")
 
 # 数量断言只在"当前规格类"文档校验：这些文档的数字声称描述**当前事实**。
 # 其余文档（docs/01 阶段表 / LEDGER 时序行 / PRD 签署稿+历史注 / error_list 叙事）

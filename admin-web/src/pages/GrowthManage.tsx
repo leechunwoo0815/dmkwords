@@ -272,7 +272,7 @@ export default function GrowthManage() {
                       pagination={false}
                       columns={[
                         { title: "书名", dataIndex: "title" },
-                        { title: "最高分", dataIndex: "best_score", width: 90, render: (_, r) => `${r.best_score}/${r.max_attempts > 0 ? 5 : "?"}` },
+                        { title: "最高分", dataIndex: "best_score", width: 90, render: (_, r) => `${r.best_score}/${r.total_questions > 0 ? r.total_questions : "?"}` },
                         { title: "已用次数", dataIndex: "attempts_used", width: 90, render: (_, r) => `${r.attempts_used}/${r.max_attempts}` },
                         { title: "状态", key: "s", width: 90, render: (_, r) => r.passed ? <Tag color="green">已通过</Tag> : r.attempts_used >= r.max_attempts ? <Tag color="red">已用完</Tag> : <Tag>进行中</Tag> },
                         {

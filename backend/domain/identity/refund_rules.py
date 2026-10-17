@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -47,6 +47,22 @@ def refundable_amount(db: Session, order: Order) -> Decimal:
         return (order.amount * Decimal(remaining) / Decimal(period)).quantize(Decimal("0.01"))
     # 首场活动费 / 活动费：未签到未开始全额（是否可退由审核判断）
     return order.amount
+
+
+def activity_cutoff_block(db: Session, start_at) -> str | None:
+    """活动「开始前 N 小时关线上退款」判据（None = 未触碰关闸）。
+
+    P2-4（2026-10-17 第六十九批·大审查）：此前这条判据**只写在活动专属入口**
+    （`activity/service.apply_refund`），家长走「我的订单」的通用退款入口不带它 →
+    同一笔退款两个入口两套规则（开始前 1 小时仍可自助退）。判据收进本模块（退款口径唯一来源），
+    两个入口都过它；文案里的小时数取配置（`activity_refund_cutoff_hours`，默认 2）。
+    """
+    if start_at is None:
+        return None
+    cutoff_hours = int(ConfigService(db).get_value("activity_refund_cutoff_hours", "2"))
+    if start_at - datetime.now() < timedelta(hours=cutoff_hours):
+        return f"距活动开始不足 {cutoff_hours} 小时，线上退款已关闭，请找馆员线下协商"
+    return None
 
 
 def activity_refund_block(db: Session, order: Order) -> str | None:
@@ -85,7 +101,8 @@ def activity_refund_block(db: Session, order: Order) -> str | None:
     a = db.query(Activity).filter(Activity.id == e.activity_id).first()
     if a and a.start_at <= datetime.now():
         return "活动已开始，请线下与馆员协商处理"
-    return None
+    # P2-4：通用入口同样要过"开始前 N 小时关线上退款"（判据本体在 activity_cutoff_block）
+    return activity_cutoff_block(db, a.start_at if a else None)
 
 
 def rule_text(db: Session, order: Order) -> str:

@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import json
-
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -16,7 +14,6 @@ from backend.domain.catalog.models import Book, BookCopy, QuizQuestion
 from backend.domain.catalog.repository import (
     BookCopyRepository,
     BookRepository,
-    QuizQuestionRepository,
 )
 from backend.domain.catalog.schemas import BookCreateRequest, BookUpdateRequest
 
@@ -240,12 +237,24 @@ class BookService:
             book.internal_code = f"LOCAL-{book.id:06d}"
             self.book_repo.update(book)
         next_seq = self._max_copy_seq(book) + 1
-        for i in range(req.copy_count):
-            self.copy_repo.create(
-                BookCopy(
-                    book_id=book.id, copy_code=self.copy_repo.next_copy_code(book, next_seq + i)
+        # P2-20（2026-10-17 第六十九批·大审查）：副本码 = `C{ISBN 后 8 位}-序号`，而
+        # `uq_copy_code` 是**全局唯一**——ISBN 前缀录错（978… vs 970…）且后 8 位相同时，
+        # 这里原先直接撞索引 → 500。与 `add_copies` 同款兜底：回滚并转业务异常（禁止裸 500）。
+        from sqlalchemy.exc import IntegrityError
+
+        try:
+            for i in range(req.copy_count):
+                self.copy_repo.create(
+                    BookCopy(
+                        book_id=book.id, copy_code=self.copy_repo.next_copy_code(book, next_seq + i)
+                    )
                 )
-            )
+        except IntegrityError:
+            self.db.rollback()
+            raise ConflictError(
+                f"副本编码冲突：《{req.title}》的副本码由 ISBN 后 8 位生成，与已有书目相撞"
+                "——请核对 ISBN 是否录错（前缀不同但后 8 位相同的书会撞码）"
+            ) from None
         self._audit(admin, "book.create", str(book.id), {"title": book.title, "isbn": isbn})
         self.db.commit()
         return book
@@ -615,106 +624,6 @@ class BookService:
         return book
 
 
-class QuizQuestionService:
-    def __init__(self, db: Session):
-        self.db = db
-        self.question_repo = QuizQuestionRepository(db)
-
-    def _audit(self, admin, action: str, book_id: int, question_id: int, detail: dict) -> None:
-        """R9：题目写操作留痕（影响 WM7 计分，必须可追溯）。"""
-        publish_audit(
-            self.db,
-            admin=admin,
-            action=action,
-            target_type="book",
-            target_id=str(book_id),
-            detail={"question_id": question_id, **detail},
-            reason="测验题库",
-        )
-
-    def list_by_book(self, book_id: int) -> list[QuizQuestion]:
-        return self.question_repo.list_by_book(book_id, active_only=False)
-
-    def _validate_question(self, question_type: str, options: list[str], answer: str) -> list[str]:
-        if question_type == QuizQuestion.TYPE_BOOLEAN:
-            valid_options = ["对", "错"]
-            if [o.strip() for o in options] != valid_options:
-                raise ValidationError("判断题选项固定为 [对, 错]")
-        else:
-            if len(options) < 2:
-                raise ValidationError("单选题至少 2 个选项")
-        if answer not in options:
-            raise ValidationError("正确答案必须是选项之一")
-        return answer
-
-    def create(self, admin, book_id: int, req) -> QuizQuestion:
-        self._validate_question(req.question_type, req.options, req.answer)
-        # C29：序号由服务端分配（max(sort_order)+1），前端不再传（避免删除后重号）
-        max_sort = (
-            self.db.query(func.max(QuizQuestion.sort_order))
-            .filter(
-                QuizQuestion.book_id == book_id,
-                QuizQuestion.is_deleted == 0,
-            )
-            .scalar()
-        )
-        q = QuizQuestion(
-            book_id=book_id,
-            question_type=req.question_type,
-            question_text=req.question_text.strip(),
-            options=json.dumps(req.options, ensure_ascii=False),
-            answer=req.answer,
-            sort_order=(max_sort or 0) + 1,
-        )
-        self.question_repo.create(q)
-        self._audit(
-            admin,
-            "quiz.create",
-            book_id,
-            q.id,
-            {"question_type": q.question_type, "question_text": q.question_text},
-        )
-        self.db.commit()
-        return q
-
-    def update(self, admin, question_id: int, req) -> QuizQuestion:
-        """C28：编辑题目（题干/类型/选项/答案；sort_order 不动）。"""
-        q = self.question_repo.get_by_id_or_raise(question_id)
-        self._validate_question(req.question_type, req.options, req.answer)
-        q.question_type = req.question_type
-        q.question_text = req.question_text.strip()
-        q.options = json.dumps(req.options, ensure_ascii=False)
-        q.answer = req.answer
-        self.question_repo.update(q)
-        self._audit(
-            admin,
-            "quiz.update",
-            q.book_id,
-            q.id,
-            {
-                "question_type": q.question_type,
-                "question_text": q.question_text,
-                "answer": q.answer,
-            },
-        )
-        self.db.commit()
-        return q
-
-    def toggle_active(self, admin, question_id: int) -> QuizQuestion:
-        q = self.question_repo.get_by_id_or_raise(question_id)
-        q.is_active = 0 if q.is_active == 1 else 1
-        self.question_repo.update(q)
-        self._audit(admin, "quiz.toggle", q.book_id, q.id, {"is_active": q.is_active})
-        self.db.commit()
-        return q
-
-    def delete(self, admin, question_id: int) -> None:
-        q = self.question_repo.get_by_id_or_raise(question_id)
-        self.question_repo.soft_delete(question_id)
-        self._audit(admin, "quiz.delete", q.book_id, q.id, {"question_text": q.question_text})
-        self.db.commit()
-
-
 IMPORT_TEMPLATE_HEADERS = [
     "ISBN",
     "书名*",
@@ -791,3 +700,8 @@ def build_import_template() -> bytes:
     buf = BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+# QuizQuestionService 已迁至 quiz_service.py（第六十九批：service.py 触 800 行上限）——
+# 保持 re-export，router 等既有 import 路径不变。
+from backend.domain.catalog.quiz_service import QuizQuestionService  # noqa: E402,F401

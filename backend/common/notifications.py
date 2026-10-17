@@ -65,32 +65,82 @@ class NotificationService:
         content: str,
         openid: str | None,
     ) -> None:
-        """微信订阅尽力送达（Core UPDATE 回写状态，不碰 ORM 事务状态）。"""
-        try:
-            settings = get_settings()
-            if not getattr(settings, "WECHAT_SUBSCRIBE_ENABLED", False):
-                status, error = Notification.WECHAT_SKIPPED, "通道未启用"
-            elif not openid:
-                status, error = Notification.WECHAT_SKIPPED, "家长未授权（无 openid）"
-            else:
-                from backend.integrations.wechat.subscribe import push_subscribe_message
+        """微信订阅尽力送达（Core UPDATE 回写状态，不碰 ORM 事务状态）。
 
-                ok = push_subscribe_message(openid, title, content)
-                if ok:
-                    status, error = Notification.WECHAT_SENT, ""
-                else:
-                    status, error = (
-                        Notification.WECHAT_FAILED,
-                        "微信订阅发送失败（额度不足/用户拒收等）",
-                    )
+        P2-24（2026-10-17 第六十九批·大审查）：此前把"**已入队**"当成"**已送达**"写库
+        （`push_subscribe_message` 起线程后立刻 `return True` → 管理端渲染绿色「微信已送达」
+        并进 Excel 导出，真实结果只在进程日志里）；反方向则把"标题未命中模板映射"写成
+        `failed` + 假原因"额度不足/用户拒收"。现在三态如实：
+        - **跳过**（通道未启用/无 openid/模板未配）→ `skipped` + **真实**原因；
+        - **已提交**（线程已起、结果未知）→ `queued` + "等待微信回执"，线程拿到真实结果后
+          **回写** sent/failed（见 `_writeback`，独立 session：请求事务早已结束）；
+        - **异常** → `failed` + 真实异常文案。
+        """
+        settings = get_settings()
+        if not getattr(settings, "WECHAT_SUBSCRIBE_ENABLED", False):
+            self._set_wechat(notification_id, Notification.WECHAT_SKIPPED, "通道未启用")
+            return
+        if not openid:
+            self._set_wechat(
+                notification_id, Notification.WECHAT_SKIPPED, "家长未授权（无 openid）"
+            )
+            return
+        try:
+            from backend.integrations.wechat.subscribe import push_subscribe_message
+
+            queued, reason = push_subscribe_message(
+                openid,
+                title,
+                content,
+                on_result=lambda ok, err: self._writeback(notification_id, ok, err),
+            )
         except Exception as exc:  # 网关异常不阻断站内消息
             logger.warning("wechat push failed: %s", exc)
-            status, error = Notification.WECHAT_FAILED, f"发送异常: {str(exc)[:200]}"
+            self._set_wechat(
+                notification_id, Notification.WECHAT_FAILED, f"发送异常: {str(exc)[:200]}"
+            )
+            return
+        if not queued:
+            # 未入队 = **主动跳过**（模板未命中/未配置等），原因如实记录——不许伪装成"发送失败"
+            self._set_wechat(notification_id, Notification.WECHAT_SKIPPED, reason)
+            return
+        self._set_wechat(notification_id, Notification.WECHAT_QUEUED, "已提交微信，等待回执")
+
+    def _set_wechat(self, notification_id: int, status: str, error: str) -> None:
         self.db.execute(
             update(Notification)
             .where(Notification.id == notification_id)
             .values(wechat_status=status, wechat_error=error)
         )
+
+    @staticmethod
+    def _writeback(notification_id: int, ok: bool, error: str) -> None:
+        """后台线程拿到微信真实结果后回写（**独立 session**：发起时的请求事务早已结束）。"""
+        from backend.database import get_session
+
+        try:
+            session = get_session()
+        except Exception as exc:  # noqa: BLE001 — 回写失败只记日志，绝不反向影响主流程
+            logger.warning("wechat writeback 建会话失败：%s", exc)
+            return
+        try:
+            session.execute(
+                update(Notification)
+                .where(Notification.id == notification_id)
+                .values(
+                    wechat_status=Notification.WECHAT_SENT if ok else Notification.WECHAT_FAILED,
+                    wechat_error="" if ok else error,
+                )
+            )
+            session.commit()
+        except Exception as exc:  # noqa: BLE001
+            session.rollback()
+            logger.warning("wechat writeback 失败：%s", exc)
+        finally:
+            try:
+                session.close()
+            except Exception:
+                pass
 
     def send(
         self,

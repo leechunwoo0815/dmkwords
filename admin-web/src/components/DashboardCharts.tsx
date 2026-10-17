@@ -271,15 +271,35 @@ function MemberMix({ items }: { items: { status: string; count: number }[] }) {
   );
 }
 
+/** 依赖聚合端点的三张图的共同占位（P2-23，2026-10-17 第六十九批·大审查）。
+ *
+ * 为什么必须区分"加载中/加载失败"：原先失败只 `.catch(() => {})`（保留上一帧），但**首帧
+ * 没有上一帧** → 三张图各自渲染成"暂无数据 / 近 30 天暂无借阅 / 暂无会员档案"——
+ * 店外大屏上的**假 0**（U10"失败禁假 0"在图形区被绕过）。有上一帧时仍保留上一帧（投屏无人交互，
+ * 不弹错）；**没有上一帧时如实说失败**。
+ */
+function ChartsPlaceholder({ failed }: { failed: boolean }) {
+  return (
+    <div className="chart-empty">
+      {failed ? "图表加载失败 · 60 秒后自动重试" : "加载中…"}
+    </div>
+  );
+}
+
 export default function DashboardCharts({ data }: { data: Overview }) {
   const d = data as unknown as Record<string, number>;
   const [charts, setCharts] = useState<ChartsData | null>(null);
+  // 首帧失败标记：拿到过数据就置回 false（此后失败＝保留上一帧，不显示失败态）
+  const [chartsFailed, setChartsFailed] = useState(false);
 
   const load = useCallback(() => {
     // 投屏场景：图形区自己 60 秒轮询；失败保留上一帧、不弹错误框（店里电视无人交互）
     apiDashboardCharts(14, 5)
-      .then(setCharts)
-      .catch(() => {});
+      .then((r) => {
+        setCharts(r);
+        setChartsFailed(false);
+      })
+      .catch(() => setChartsFailed(true));
   }, []);
 
   useEffect(() => {
@@ -321,15 +341,23 @@ export default function DashboardCharts({ data }: { data: Overview }) {
       </Card>
 
       <Card size="small" className="chart-card" title="近 14 天借还趋势">
-        <TrendLine points={charts?.borrow_trend ?? []} />
+        {charts ? (
+          <TrendLine points={charts.borrow_trend ?? []} />
+        ) : (
+          <ChartsPlaceholder failed={chartsFailed} />
+        )}
       </Card>
 
       <Card size="small" className="chart-card" title="热门书 TOP5（近 30 天）">
-        <HotBooks items={charts?.hot_books ?? []} />
+        {charts ? <HotBooks items={charts.hot_books ?? []} /> : <ChartsPlaceholder failed={chartsFailed} />}
       </Card>
 
       <Card size="small" className="chart-card" title="小读者构成">
-        <MemberMix items={charts?.member_status ?? []} />
+        {charts ? (
+          <MemberMix items={charts.member_status ?? []} />
+        ) : (
+          <ChartsPlaceholder failed={chartsFailed} />
+        )}
       </Card>
     </div>
   );

@@ -551,7 +551,8 @@ class OrderService(OrderGuardMixin):
             raise ValidationError(
                 f"会员状态不允许从 {child.member_status} 变更为 {new_status}（转移矩阵拦截）"
             )
-        child.member_status = new_status
+        # P2-13（2026-10-17 第六十九批）：状态写口收拢到模型方法（顺带维护待评估时钟）
+        child.set_member_status(new_status)
 
     def list_orders(
         self,
@@ -709,19 +710,30 @@ class OrderService(OrderGuardMixin):
         return marked
 
     def first_activity_90d_remind(self) -> int:
-        """99 元首场活动购后 90 天提醒转年费（FEAT-068）。每家长一条。"""
+        """99 元首场活动购后 90 天提醒转年费（FEAT-068）。每家长一条。
+
+        P2-5（2026-10-17 第六十九批·大审查）：原判据只看"99 元单已付满 N 天"，**不看会员态**
+        ——已经转正式会员（或已在观察期/待评估）的家庭仍被催"可办理正式会员"；而 dedup 是
+        `ref_type=parent` + 固定键（每家长终身一条），发出去就无法纠正。
+        现在按**孩子会员态**过滤：只有"还没有会员关系（未入会/已过期/已退会）"才值得催。
+        """
         from backend.common.config_service import ConfigService
 
         days = int(ConfigService(self.db).get_value("first_activity_90d_remind_days", "90"))
         cutoff = datetime.now() - timedelta(days=days)
         rows = (
             self.db.query(Order)
+            .join(Child, Child.id == Order.child_id)
             .filter(
                 Order.is_deleted == 0,
                 Order.order_type == Order.TYPE_FIRST_ACTIVITY,
                 Order.status == Order.STATUS_PAID,
                 Order.paid_at.isnot(None),
                 Order.paid_at < cutoff,
+                Child.is_deleted == 0,
+                Child.member_status.in_(
+                    [Child.MEMBER_NONE, Child.MEMBER_EXPIRED, Child.MEMBER_WITHDRAWN]
+                ),
             )
             .all()
         )

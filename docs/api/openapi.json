@@ -12913,6 +12913,8 @@
             "required": false,
             "schema": {
               "default": 30,
+              "maximum": 365,
+              "minimum": 1,
               "title": "Days",
               "type": "integer"
             }

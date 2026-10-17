@@ -199,6 +199,12 @@ export interface TodoCounts {
   pending_evaluation_followup: number;
   /** G1（2026-10-14）：押金不足扣减的「待结清」持续提醒 */
   deposit_settle_followup: number;
+  // P2-28（2026-10-17 第六十九批·大审查）：审核超时提醒补齐到三条（此前只有转让）——
+  // 退款/退会待审超过配置时限后各写一条待办，**计入 admin_total**（超管视角）。
+  /** 退款申请待审超时（`refund_review_timeout_hours`，默认 72 小时） */
+  refund_review_timeout: number;
+  /** 退会申请待审超时（`withdrawal_review_timeout_days`，默认 3 天） */
+  withdrawal_review_timeout: number;
 }
 
 export function apiTodoCounts(): Promise<TodoCounts> {
@@ -216,6 +222,8 @@ export interface TaskSpecItem {
   last_run?: { status: string; processed: number; error: string | null; started_at: string } | null;
   // 2026-10-12 拍板（P10）：连续失败次数（看板标红用；一次成功会把 last_run 洗白）
   consecutive_failures?: number;
+  /** P2-21（2026-10-17）：本账号能否手动触发该任务（资金/系统组仅超管；判据同服务层强制点） */
+  manual_allowed?: boolean;
 }
 
 export interface TaskRunItem {

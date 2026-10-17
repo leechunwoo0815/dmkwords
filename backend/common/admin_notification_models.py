@@ -66,6 +66,14 @@ class AdminNotification(BaseModel):
     # 馆员侧通道。它是**要人做事的待办**（联系家长改约/补书），不是知会——故进待办墙默认名单、
     # 计入 admin_total；显示态按预约行实时推导（仍是 exception → 待处理；单据推进/消失 → 自动审结）。
     SCENE_RESERVATION_EXCEPTION = "admin.reservation_exception"
+    # P2-28（2026-10-17 第六十九批·大审查）：审核超时提醒此前**只有转让一条链**
+    # （SCENE_TRANSFER_EXPIRING），退款/退会两条只有配置中心两个零读取方的死键。
+    # 现按转让同款补齐：`ref_type` 复用 `refund_request` / `withdrawal_request` →
+    # 显示态直接复用既有 resolver（单据仍 pending → 待处理；审结/撤销 → 已审结/已失效），
+    # 单据动线推进后提醒**自动归零**、不会变孤儿。dedup 默认值"1"（唯一索引含 ref_id）
+    # = **每单一条**，不随每次扫描刷屏。
+    SCENE_REFUND_REVIEW_TIMEOUT = "admin.refund_review_timeout"
+    SCENE_WITHDRAWAL_REVIEW_TIMEOUT = "admin.withdrawal_review_timeout"
 
     # ref_type 取值
     REF_REFUND_REQUEST = "refund_request"

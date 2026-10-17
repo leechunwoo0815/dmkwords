@@ -44,9 +44,18 @@ def verify_password(plain: str, hashed: str) -> bool:
 # ---------- JWT ----------
 
 
-def create_admin_token(admin_id: int, role: str, token_generation: int = 0) -> str:
+def create_admin_token(
+    admin_id: int, role: str, token_generation: int = 0, expire_hours: int | None = None
+) -> str:
+    """签发后台 token。
+
+    `expire_hours`（P2-28，2026-10-17 第六十九批）：配置中心 `admin_token_expire_hours`
+    的**生效点**。不传或非法（<=0）时回落 `settings.ADMIN_TOKEN_EXPIRE_HOURS`——
+    取值/校验策略留在调用方（`AuthService._token_expire_hours`），安全层不读库。
+    """
     settings = get_settings()
-    expire = datetime.now(UTC) + timedelta(hours=settings.ADMIN_TOKEN_EXPIRE_HOURS)
+    hours = expire_hours if expire_hours and expire_hours > 0 else settings.ADMIN_TOKEN_EXPIRE_HOURS
+    expire = datetime.now(UTC) + timedelta(hours=hours)
     payload = {
         "sub": str(admin_id),
         "role": role,

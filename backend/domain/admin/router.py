@@ -231,7 +231,8 @@ def task_specs(
     admin: AdminUser = Depends(require_perm("dashboard.view")),
     db: Session = Depends(get_db),
 ):
-    return {"items": TaskAdminService(db).specs()}
+    # P2-21（2026-10-17 第六十九批）：带 admin 进去 → 每条带 `manual_allowed`（看板据此禁按钮）
+    return {"items": TaskAdminService(db).specs(admin)}
 
 
 @router.get("/tasks/runs")

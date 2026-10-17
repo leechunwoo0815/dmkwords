@@ -14,6 +14,14 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# ── 时区钉死（P2-25，2026-10-17 第六十九批·大审查） ──
+# 为什么必须钉：APScheduler 的时区写死 Asia/Shanghai，但**任务体**一律用宿主本地
+# `datetime.now()` / `date.today()`。部署机若为 UTC（容器/云主机默认常见），03:30 的对账
+# 会按 UTC 的"今天"算 → 落到**前天**账单；到期提醒/逾期标记同样整体偏 8 小时。
+# 宿主时区本就正确时本行无副作用；显式传 TZ 之后，"部署机时区"不再是隐性前置条件。
+export TZ="${TZ:-Asia/Shanghai}"
+echo "[start-backend] TZ=$TZ（任务体用宿主本地时间，必须与 APScheduler 时区一致）"
+
 PORT="${BACKEND_PORT:-8002}"
 PYTHON_BIN=".venv/bin/python"
 UVICORN_BIN=".venv/bin/uvicorn"

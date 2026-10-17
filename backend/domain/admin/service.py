@@ -30,6 +30,7 @@ from backend.common.security import (
     verify_password,
 )
 from backend.common.sql_utils import escape_like
+from backend.config import get_settings
 from backend.domain.admin.models import AdminUser, AuditLog, SystemConfig
 from backend.domain.admin.repository import (
     AdminUserRepository,
@@ -100,7 +101,9 @@ class AuthService:
         if user.status != AdminUser.STATUS_ACTIVE:
             raise ForbiddenError("账号已禁用，请联系超级管理员")
 
-        token = create_admin_token(user.id, user.role, user.token_generation)
+        token = create_admin_token(
+            user.id, user.role, user.token_generation, expire_hours=self._token_expire_hours()
+        )
         user.last_login_at = datetime.now()
         self.user_repo.update(user)
         self.audit_repo.create(
@@ -118,6 +121,24 @@ class AuthService:
         )
         self.db.commit()
         return token, user
+
+    #: 后台登录有效期上限（小时）：误填（如 100000）不改变安全边界，回落环境默认
+    TOKEN_EXPIRE_MAX_HOURS = 24 * 365
+
+    def _token_expire_hours(self) -> int:
+        """后台登录有效期（小时）：**配置中心优先**，回落环境默认（P2-28，第六十九批）。
+
+        为什么由配置中心覆盖 env：配置页对 `admin_token_expire_hours` 写着"修改立即生效"，
+        而它此前**全仓零读取方**——改了什么都不发生（死键）。同一判据两处实现必然漂移
+        （红线 154），故取法固定为"DB 配置 > 环境默认"，与 `renew_limit` 等键同款。
+        非数字/<=0/超上限（一年）一律回落默认——绝不因一条配置把登录锁死或无限期放行。
+        """
+        default = get_settings().ADMIN_TOKEN_EXPIRE_HOURS
+        try:
+            hours = ConfigService(self.db).get_int("admin_token_expire_hours", default)
+        except (ValueError, TypeError):
+            return default
+        return hours if 0 < hours <= self.TOKEN_EXPIRE_MAX_HOURS else default
 
 
 class AuditService:
@@ -235,9 +256,26 @@ class DashboardService:
             or 0
         )
         week_start = today_start - timedelta(days=datetime.now().weekday())
+        # P2-17（2026-10-17 第六十九批·大审查）：口径原先按 `Child.create_time >= 本周一` 数，
+        # **把未入会的建档也算成"新增会员"**——同屏的 `member_total` 明确排除了 `none`，
+        # 两个数互相否认（"本周新增 5 人"而"会员总数"只有 3）。改按**入会时间**数：
+        # `member_start` 在每次新开会员关系（观察期费/转正式/重新入会）时写入，
+        # 建档不给会员关系 → NULL，天然排除；再叠加 `member_total` 同一套在会状态过滤，
+        # 避免把"本周入会又当周退会/过期"的孩子算成新增会员。
         member_new_week = (
             self.db.query(func.count(Child.id))
-            .filter(Child.is_deleted == 0, Child.create_time >= week_start)
+            .filter(
+                Child.is_deleted == 0,
+                Child.member_start.isnot(None),
+                Child.member_start >= week_start.date(),
+                Child.member_status.in_(
+                    [
+                        Child.MEMBER_OBSERVATION,
+                        Child.MEMBER_PENDING_EVALUATION,
+                        Child.MEMBER_FORMAL,
+                    ]
+                ),
+            )
             .scalar()
             or 0
         )
@@ -516,57 +554,9 @@ class NotifyAdminService:
         return buf.getvalue()
 
 
-class TaskAdminService:
-    """WM11 定时任务看板（任务清单/运行记录/手动触发）。"""
-
-    def __init__(self, db: Session):
-        self.db = db
-
-    def specs(self) -> list[dict]:
-        """任务清单 + 最近一次运行 + 连续失败次数（组装逻辑见 task_specs.build_specs）。"""
-        from backend.domain.admin.task_specs import build_specs
-
-        return build_specs(self.db)
-
-    def recent_runs(self, limit: int = 20) -> list[dict]:
-        from backend.common.notification_models import TaskRunLog
-
-        rows = (
-            self.db.query(TaskRunLog)
-            .filter(TaskRunLog.is_deleted == 0)
-            .order_by(TaskRunLog.id.desc())
-            .limit(limit)
-            .all()
-        )
-        return [
-            {
-                "task_name": r.task_name,
-                "status": r.status,
-                "processed": r.processed,
-                "error": r.error,
-                "started_at": r.started_at.strftime("%Y-%m-%d %H:%M:%S") if r.started_at else "",
-                "finished_at": r.finished_at.strftime("%Y-%m-%d %H:%M:%S") if r.finished_at else "",
-            }
-            for r in rows
-        ]
-
-    #: 手动触发**仅超管**的任务分组——资金（动钱：订单超时取消/转让超时）与
-    #: 系统（动磁盘：媒体体检含回收站到期清除）。其余分组（会员/借阅/活动/阅读圈）
-    #: 专员可触发（日常运维需要）。审查 P1-5：此前一律 dashboard.view，专员可间接触发删文件。
-    SUPERADMIN_ONLY_TASK_GROUPS = ("资金", "系统")
-
-    def run(self, task_name: str, manual: bool = False, admin=None) -> dict:
-        from backend.tasks.registry import TASKS, run_task
-
-        if manual and admin is not None:
-            spec = TASKS.get(task_name)
-            if (
-                spec
-                and spec.group in self.SUPERADMIN_ONLY_TASK_GROUPS
-                and admin.role != AdminUser.ROLE_SUPER_ADMIN
-            ):
-                raise ForbiddenError(f"「{spec.display_name}」仅超级管理员可手动触发")
-        return run_task(task_name, manual=manual, admin=admin)
+# TaskAdminService 已迁至 task_specs.py（第六十九批：service.py 触 800 行上限）——
+# 保持 re-export，router 等既有 import 路径不变。
+from backend.domain.admin.task_specs import TaskAdminService  # noqa: E402,F401 — 兼容旧引用
 
 
 class AuditExportService:
