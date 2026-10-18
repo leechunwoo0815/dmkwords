@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from decimal import Decimal
@@ -193,12 +194,23 @@ class PaymentNotifyMixin:
             from backend.common.admin_notification_models import AdminNotification
             from backend.common.admin_notifications import AdminNotifyService
 
+            # P1-3（2026-10-18 第七十五批）：原先 `ref_id=target_id or "-"` + **默认去重键**
+            # （`"1"`）+ 不传 `ignore_handled` → ① 定位不到对象的异常**全系统挤在一条待办**上；
+            # ② 一旦被标记已处理，后续同类异常**永久静默**（唯一索引命中已处理行）。
+            # 改法（同 `catalog/damage_ops.py` 赔偿待办先例）：业务键 = 异常类型；
+            # 无对象时 `ref_id` 按**报文指纹**各自成键（同一报文重投仍幂等）；
+            # `ignore_handled=True` 让"处理过之后又出事"能重新提醒。
+            digest = getattr(self, "_body_digest", "") or hashlib.sha1(
+                f"{message}|{reason}".encode()
+            ).hexdigest()[:12]
             AdminNotifyService(self.db).send(
                 scene=AdminNotification.SCENE_PAYMENT_ANOMALY,
                 title="【资金异常】",
                 content=f"【资金异常】{message}｜{reason[:160]}",
                 ref_type=AdminNotification.REF_CHILD,
-                ref_id=target_id or "-",
+                ref_id=target_id or f"anomaly:{digest}",
+                dedup_key=f"evt:{message}",
+                ignore_handled=True,
                 applicant_name="系统",
             )
         except Exception:  # noqa: BLE001 —— 待办失败不能反过来影响资金留痕

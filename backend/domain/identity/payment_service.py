@@ -413,6 +413,11 @@ class PaymentService(PaymentNotifyMixin):
         """
         if not self.enabled():
             return 503, {"code": "FAIL", "message": "线上支付未开启"}
+        # P1-3（2026-10-18 第七十五批）：给异常留痕一个**报文指纹**——同一报文重投仍幂等
+        # （一条待办），不同报文各自成条（`_audit_anomaly` 在无对象可定位时用它当业务键）。
+        import hashlib
+
+        self._body_digest = hashlib.sha1((body or "").encode("utf-8")).hexdigest()[:12]
         try:
             return self._notify_impl(
                 body=body, signature=signature, timestamp=timestamp, nonce=nonce
