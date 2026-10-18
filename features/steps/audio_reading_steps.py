@@ -838,3 +838,43 @@ def step_cross_verify(context):
     ], [(str(r.checkin_date), r.streak) for r in rows]
     assert rows[1].streak == 6, f"昨天 5 → 今天 6（连续不断）：{rows[1].streak}"
     assert rows[0].streak == 5, "昨天那行不得被覆盖"
+
+
+# ---------- P3-4（2026-10-18 第七十六批）：完播阈值的**边界**钉死 ----------
+# 为什么必须补：原场景只覆盖"100% 读完"与"明显不足未读完"两端——把阈值从 95% 改成 90%
+# 现有场景**不会红**，红线级判据（完播防刷）的阈值本身没被钉住。
+# 判据实现：`new_cov * 100 >= total * threshold`（`reading/service.py:161`，阈值取配置
+# `audio_finish_threshold_percent`，默认 95）；30 分钟（1800s）书的边界 = **1710s**。
+
+
+@when("小明累计真实播放覆盖全书 {coverage:d} 秒（{percent}%）")
+def step_cover_exact_seconds(context, coverage: int, percent: str):
+    """按**精确秒数**分段上报（每段配足墙钟，落在 R-151 容差内）——用于钉阈值边界。"""
+    child, book = context.ming, context.book
+    total = book["seconds"]
+    assert coverage <= total, f"覆盖 {coverage}s 不能超过音频总长 {total}s"
+    step_size = 450  # Δ覆盖 450 ≤ 225×2.4+60 = 600 ✓（与 _finish 同款）
+    start = 0
+    while start < coverage:
+        end = min(start + step_size, coverage)
+        wall = max(60, (end - start) // 2)
+        context.last = _play(context, child, book["id"], start, end, wall=wall, total=total)
+        start = end
+
+
+@then("该书判定为未读完（覆盖率 {percent}%）")
+def step_not_finished_boundary(context, percent: str):
+    view = context.last.json()
+    assert view["finished"] is False, f"{percent}% 不应判读完：{view}"
+    p = _progress_db(context.ming["id"], context.book["id"])
+    assert p.finished == 0, p.finished
+
+
+@then("该书判定为读完（覆盖率 {percent}%）")
+def step_finished_boundary(context, percent: str):
+    view = context.last.json()
+    assert view["finished"] is True and view["just_finished"] is True, (
+        f"{percent}% 应判读完：{view}"
+    )
+    p = _progress_db(context.ming["id"], context.book["id"])
+    assert p.finished == 1, p.finished

@@ -31,6 +31,7 @@ from backend.domain.circulation.borrow_gate import (
 )
 from backend.domain.circulation.models import BorrowRecord
 from backend.domain.identity.models import Child, Parent
+from backend.domain.reading.reservation_ops import settle_orphans_after_copy_gone
 
 
 class CirculationService:
@@ -536,6 +537,7 @@ class CirculationService:
         if condition == "normal":
             copy.status = BookCopy.STATUS_AVAILABLE
         elif condition == "maintenance":
+            # P3-3：预约善后不在锁内做（漏斗按预约→副本取锁）——见 settle_orphans_after_copy_gone
             copy.status = BookCopy.STATUS_MAINTENANCE
         else:  # lost
             record.status = BorrowRecord.STATUS_LOST
@@ -577,6 +579,9 @@ class CirculationService:
             db=self.db,
         )
         self.db.commit()
+        if condition in ("maintenance", "lost"):
+            # 提交后行锁已释放 → 按漏斗锁序善后（正常路径零命中；实现归预约域，本文件受 800 行约束）
+            settle_orphans_after_copy_gone(self.db, copy_id=copy_id, admin=admin)
         return record
 
     # ---------- 续借 ----------

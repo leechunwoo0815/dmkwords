@@ -32,6 +32,7 @@
 
 from __future__ import annotations
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.common.admin_notification_models import AdminNotification
@@ -161,3 +162,60 @@ def handle_copy_unavailable(
             reason=reason,
         )
     return out
+
+
+def settle_orphans_after_copy_gone(db: Session, *, copy_id: int, admin) -> None:
+    """副本退场（**还书带损**）后的预约善后 —— 由 `circulation.return_book` **提交后**调用。
+
+    P3-3（2026-10-18 第七十六批）：`报损`/`手工改状态` 都走 `handle_copy_unavailable`（副本退场的
+    预约善后漏斗），**唯独"还书带损"没走**——靠的是"`reserved` 副本不会被借出，所以归还中的副本上
+    没有 active 预约"这条**隐式前提**（审查报告 P3-3 记为"不可利用但属隐式前提"）。
+
+    为什么必须**提交后**调用：`return_book` 持 `record → copy` 行锁，而漏斗按 **`预约 → 副本`**
+    取锁（红线锁序）——反向加锁会与并发借书/预约创建互等死锁。提交后行锁已释放，锁序自然正确。
+
+    正常路径零副作用（查不到 active 预约直接返回）；真命中 = 隐式前提被打破 → **错误日志 + 审计留痕**
+    后按漏斗善后（预约改锁到同书其它在馆副本，或转 exception + 通知家长 + 馆员待办）。
+    """
+    import logging
+
+    from backend.domain.catalog.models import BookCopy
+
+    logger = logging.getLogger(__name__)
+    copy = db.query(BookCopy).filter(BookCopy.id == copy_id).first()
+    if copy is None:
+        return
+    active = (
+        db.query(func.count(Reservation.id))
+        .filter(
+            Reservation.copy_id == copy_id,
+            Reservation.status == Reservation.STATUS_ACTIVE,
+            Reservation.is_deleted == 0,
+        )
+        .scalar()
+    )
+    if not active:
+        return
+    logger.error(
+        "副本 #%s 退场时仍挂着 %s 条 active 预约——「reserved 副本不会被借出」的隐式前提被打破，"
+        "按漏斗善后（预约改锁 / 转异常并通知）",
+        copy_id,
+        active,
+    )
+    publish_audit(
+        db,
+        admin=admin,
+        action="circulation.copy_unavailable_with_active_reservation",
+        target_type="book_copy",
+        target_id=str(copy_id),
+        detail={"active_reservations": active, "trigger": "return_with_damage"},
+        reason="还书带损：副本退场时存在 active 预约（隐式前提被打破，已按漏斗善后）",
+    )
+    handle_copy_unavailable(
+        db,
+        copy,
+        reason="还书带损：副本转为维护/遗失",
+        admin=admin,
+        cause="原预约的副本在还书时被判定损坏或遗失",
+    )
+    db.commit()
