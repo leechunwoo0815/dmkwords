@@ -8557,6 +8557,122 @@
         ]
       }
     },
+    "/api/admin/dead-letters": {
+      "get": {
+        "description": "死信看板（P2-1，2026-10-18）：事件处理器重试后仍失败的兜底队列。\n\n此前**没有任何读取面**（`dead_letters` 只写不读）——跨域副作用（积分/词数/通知/审计）失败\n等于静默数据缺失。这里给运营/超管一个\"看得见 + 能销项\"的入口（与任务看板同权限）。",
+        "operationId": "dead_letters_api_admin_dead_letters_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unresolved_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Unresolved Only",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Dead Letters",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/dead-letters/{dead_letter_id}/handle": {
+      "post": {
+        "description": "死信人工销项（幂等；留审计 `dead_letter.handle`）。",
+        "operationId": "handle_dead_letter_api_admin_dead_letters__dead_letter_id__handle_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dead_letter_id",
+            "required": true,
+            "schema": {
+              "title": "Dead Letter Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Handle Dead Letter",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/admin/deposits": {
       "get": {
         "operationId": "list_deposits_api_admin_deposits_get",

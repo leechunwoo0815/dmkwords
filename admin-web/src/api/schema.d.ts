@@ -1149,6 +1149,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/dead-letters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dead Letters
+         * @description 死信看板（P2-1，2026-10-18）：事件处理器重试后仍失败的兜底队列。
+         *
+         *     此前**没有任何读取面**（`dead_letters` 只写不读）——跨域副作用（积分/词数/通知/审计）失败
+         *     等于静默数据缺失。这里给运营/超管一个"看得见 + 能销项"的入口（与任务看板同权限）。
+         */
+        get: operations["dead_letters_api_admin_dead_letters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/dead-letters/{dead_letter_id}/handle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Handle Dead Letter
+         * @description 死信人工销项（幂等；留审计 `dead_letter.handle`）。
+         */
+        post: operations["handle_dead_letter_api_admin_dead_letters__dead_letter_id__handle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/deposits": {
         parameters: {
             query?: never;
@@ -8112,6 +8155,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    dead_letters_api_admin_dead_letters_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                unresolved_only?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_dead_letter_api_admin_dead_letters__dead_letter_id__handle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dead_letter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
