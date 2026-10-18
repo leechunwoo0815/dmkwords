@@ -32,11 +32,17 @@ def _scan(src: str) -> list[str]:
 
 
 HIT = """
-def bad_case(self):
-    child.member_status = Child.MEMBER_EXPIRED
-    n = self.db.query(func.count(Order.id)).filter(Order.id == 1).count()
+def bad_case(self, db, order_id):
+    order = db.query(Order).filter(Order.id == order_id).first()
+    order.status = "paid"
+    n = self.db.query(Order).filter(Order.status == "paid").count()
     return n
 """
+
+# 2026-10-18（第七轮 P3-1）：检查器改为"**同名实体才告警**"后，本样例原先的跨实体形态
+# （改 `child.member_status` → COUNT `Order`）**不再命中**——那正是被误报清零的形态。
+# 故这里改为**同实体**（读 Order 行 → 改它的状态 → COUNT Order 且无 flush）= 教训 41 的真实形状；
+# 跨实体"零告警"由 `test_verify_architecture_lesson41.py` 的 CROSS_ENTITY 样例守护。
 
 CLEAN_FLUSH = """
 def good_case(self):

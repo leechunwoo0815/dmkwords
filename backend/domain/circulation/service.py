@@ -15,11 +15,6 @@ from backend.common.config_service import ConfigService
 from backend.common.events import BookBorrowedEvent, BookReturnedEvent, event_bus
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
 from backend.common.gateways.payment.types import yuan_to_cents
-from backend.common.notification_models import Notification
-from backend.common.notifications import (
-    SCENE_BORROW_OVERDUE,
-    NotificationService,
-)
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.catalog.models import Book, BookCopy
 from backend.domain.circulation.borrow_gate import (
@@ -704,7 +699,11 @@ class CirculationService:
         return book_due_remind(self.db)
 
     def overdue_mark(self) -> int:
-        """逾期标记落库（接管原"访问列表时惰性标记"）+ 通知家长。幂等。"""
+        """逾期标记落库（接管原"访问列表时惰性标记"）+ 通知家长。幂等。
+
+        执行体在 `circulation/overdue_notify.py`（W6 压测整改 2026-10-18：`service.py` 已到
+        god-file 上限，整改要加批量取数；6000 条逾期实测 104.39s → 见该模块 docstring）。
+        """
         now = datetime.now()
         overdue = (
             self.db.query(BorrowRecord)
@@ -715,45 +714,9 @@ class CirculationService:
             )
             .all()
         )
-        marked = 0
-        from sqlalchemy import update as sa_update
+        from backend.domain.circulation.overdue_notify import mark_and_notify
 
-        for rec in overdue:
-            # P1-F5：状态守卫条件写（只 ACTIVE→OVERDUE），防与还书并发时覆盖已 returned
-            result = self.db.execute(
-                sa_update(BorrowRecord)
-                .where(
-                    BorrowRecord.id == rec.id,
-                    BorrowRecord.status == BorrowRecord.STATUS_ACTIVE,
-                )
-                .values(status=BorrowRecord.STATUS_OVERDUE)
-            )
-            if result.rowcount == 0:
-                continue  # 已被并发方还书/推进，跳过（不误发逾期通知）
-            rec.status = BorrowRecord.STATUS_OVERDUE
-            marked += 1
-            child = self.db.query(Child).filter(Child.id == rec.child_id).first()
-            if not child:
-                continue
-            book = self.db.query(Book).filter(Book.id == rec.book_id).first()
-            title = book.title if book else f"书目#{rec.book_id}"
-            parent = self.db.query(Parent).filter(Parent.id == child.parent_id).first()
-            NotificationService(self.db).send(
-                parent_id=child.parent_id,
-                scene=SCENE_BORROW_OVERDUE,
-                title="图书已逾期",
-                content=f"《{title}》已逾期未还（到期日 {rec.due_at:%Y-%m-%d}），请尽快归还。",
-                category=Notification.CATEGORY_BORROW,
-                child_id=child.id,
-                ref_type="borrow_record",
-                ref_id=str(rec.id),
-                # P1-2（2026-10-18 第七十五批）：原先不传 dedup_key → 落默认 "1"
-                # = 「同一家长 × 场景 × 借阅行**终身一条**」。续借（G7 人工办理）后再次逾期时，
-                # 条件 UPDATE 会重新标记 OVERDUE，但通知被唯一索引静默吞掉 → 家长不知道又逾期了。
-                # 周期类场景的去重键必须**带周期**（本次到期日）。
-                dedup_key=f"overdue:{rec.due_at:%Y%m%d}",
-                openid=parent.wechat_openid if parent else None,
-            )
+        marked = mark_and_notify(self.db, overdue)
         if overdue:
             self.db.commit()
         return marked
@@ -791,6 +754,10 @@ class CirculationService:
                     ),
                 )
                 .values(status=BorrowRecord.STATUS_OVERDUE)
+                # W6 压测（2026-10-18）：`synchronize_session=False`——ORM 版 UPDATE 默认在
+                # session 身份映射里逐对象求值 WHERE，本循环的 session 装着整份逾期名单 → O(N²)；
+                # 下一行手工同步 `record.status`，语义等价（同族分析见 overdue_notify.py）。
+                .execution_options(synchronize_session=False)
             )
             if result.rowcount == 0:
                 continue  # 已被并发还书/推进，跳过且不在名单展示

@@ -692,6 +692,9 @@ class OrderService(OrderGuardMixin):
         for order in orders:
             # E-6/T18：条件 UPDATE 守卫（对齐 overdue_mark 先例）——管理员并发
             # confirm_payment 的 PAID 单不被覆盖回 CANCELLED（钱收了单没了）
+            # W6 压测（2026-10-18）：`synchronize_session=False`——ORM 版 UPDATE 默认在 session
+            # 身份映射里**逐对象求值 WHERE**，本循环的 session 恰装着扫描出的全部待取消单 → O(N²)
+            # （6000 条实测 300+ 秒）；下一行手工同步 `order.status`，故语义等价。
             result = self.db.execute(
                 sa_update(Order)
                 .where(
@@ -699,6 +702,7 @@ class OrderService(OrderGuardMixin):
                     Order.status.in_([Order.STATUS_PENDING_PAYMENT, Order.STATUS_PENDING_MANUAL]),
                 )
                 .values(status=Order.STATUS_CANCELLED)
+                .execution_options(synchronize_session=False)
             )
             if result.rowcount == 0:
                 continue  # 状态已被并发事务改变（如收款确认），跳过（含报名联动全部跳过）

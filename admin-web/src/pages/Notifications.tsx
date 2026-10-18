@@ -169,6 +169,9 @@ export default function Notifications() {
   // 管理待办（WM13）
   const [inbox, setInbox] = useState<AdminInboxItem[]>([]);
   const [inboxTotal, setInboxTotal] = useState(0);
+  // P2-2（第七轮）：候选集被窗口截断时如实告知（total_all = 该筛选下历史精确总数）
+  const [inboxTruncated, setInboxTruncated] = useState(false);
+  const [inboxTotalAll, setInboxTotalAll] = useState(0);
   const [inboxReadOnly, setInboxReadOnly] = useState(false); // T20g：staff 可见只读
   // R3（#5）：staff 待办"查看"=行展开详情（不跨页）——expandedRowKeys 受控
   const [inboxExpanded, setInboxExpanded] = useState<React.Key[]>([]);
@@ -233,6 +236,8 @@ export default function Notifications() {
       });
       setInbox(data.items);
       setInboxTotal(data.total);
+      setInboxTruncated(Boolean(data.truncated));
+      setInboxTotalAll(data.total_all ?? data.total);
       setInboxReadOnly(Boolean(data.read_only)); // T20g
     } catch (e) {
       message.error((e as Error).message);
@@ -654,6 +659,22 @@ export default function Notifications() {
         >
           <Typography.Text type="warning">
             仅超级管理员可操作，您可查看处理进展
+          </Typography.Text>
+        </div>
+      )}
+      {inboxTruncated && (
+        <div
+          style={{
+            background: "#f5f5f5",
+            border: "1px solid #e0e0e0",
+            borderRadius: 6,
+            padding: "6px 12px",
+            marginBottom: 12,
+          }}
+        >
+          <Typography.Text type="secondary">
+            该筛选下历史共 {inboxTotalAll} 条；待办墙按显示态实时排序，只加载最近 2000 条已审结记录
+            （未销项一条不落）。更早的历史可用下方「场景 / 关键词」缩小范围查询。
           </Typography.Text>
         </div>
       )}

@@ -151,7 +151,18 @@ export function apiListAdminInbox(params: {
   status_filter?: string;
   scene?: string;
   keyword?: string;
-}): Promise<{ items: AdminInboxItem[]; total: number; pending_count: number; read_only?: boolean; page: number; page_size: number }> {
+}): Promise<{
+  items: AdminInboxItem[];
+  total: number;
+  /** P2-2（第七轮）：该筛选下历史精确总数（`total` 是候选集内条数，只用于分页） */
+  total_all: number;
+  /** 候选集被窗口截断：已审结历史只取最近 N 条（未销项一条不落） */
+  truncated: boolean;
+  pending_count: number;
+  read_only?: boolean;
+  page: number;
+  page_size: number;
+}> {
   const query = new URLSearchParams({ page: String(params.page), page_size: String(params.page_size) });
   if (params.status_filter) query.set("status_filter", params.status_filter);
   if (params.scene) query.set("scene", params.scene);

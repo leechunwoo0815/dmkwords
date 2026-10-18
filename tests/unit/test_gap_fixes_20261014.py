@@ -134,8 +134,44 @@ def test_g12_todo_auto_resolves_after_promotion(client: TestClient):
     assert _counts(client, h)["pending_evaluation_followup"] == 0
 
 
-def test_g12_weekly_dedup_within_same_week(client: TestClient):
-    """同一周重复跑只留一条（ISO 周去重）；下周会再提醒一次。"""
+def _week_keys(client, h, child_id: int) -> list[str]:
+    """该孩子「待评估跟进」待办的去重键（按库里的真实值取，不猜）。"""
+    from backend.common.admin_notification_models import AdminNotification
+    from backend.database import get_session
+
+    with get_session() as db:
+        return sorted(
+            r.dedup_key
+            for r in db.query(AdminNotification)
+            .filter(
+                AdminNotification.scene == AdminNotification.SCENE_PENDING_EVALUATION,
+                AdminNotification.ref_id == str(child_id),
+                AdminNotification.is_deleted == 0,
+            )
+            .all()
+        )
+
+
+def _freeze_service_now(monkeypatch, when: datetime) -> None:
+    """把 `identity/service.py` 里的 `datetime.now()` 冻结到 `when`（只影响该模块）。"""
+    import backend.domain.identity.service as svc
+
+    class _Frozen(datetime):
+        @classmethod
+        def now(cls, tz=None):  # noqa: ANN001
+            return when
+
+    monkeypatch.setattr(svc, "datetime", _Frozen)
+
+
+def test_g12_weekly_dedup_within_same_week(client: TestClient, monkeypatch):
+    """同一周重复跑只留一条（ISO 周去重）；**下一周由时间推进驱动**再提醒一次。
+
+    P2-3（第七轮，2026-10-18）：原用例的"跨周"是**手工插一条 `dedup_key="week:1999-01"`**——
+    那验证的是"唯一索引容得下两个不同键"，**不是代码的周键推导**：把代码的键改成常量
+    （`week:2000-01`）它照样绿（审查实测变异 M3 存活）。现在改为**冻结时钟到下一 ISO 周**再跑
+    **同一条任务**，断言两条**真实推导出来的**周键——键值写死为断言目标，常量键必红。
+    """
     h = _h(client)
     c = _observation_child(client, h, "13800002013")
     _set_child(
@@ -145,33 +181,21 @@ def test_g12_weekly_dedup_within_same_week(client: TestClient):
     )
     _run_task(client, h, "pending_evaluation_weekly")
     _run_task(client, h, "pending_evaluation_weekly")
-    rows = [
-        n for n in _inbox(client, h) if n["title"] == "待评估跟进" and n["ref_id"] == str(c["id"])
-    ]
-    assert len(rows) == 1, f"同一周只提醒一条：{len(rows)}"
+    y0, w0, _ = datetime.now().isocalendar()
+    assert _week_keys(client, h, c["id"]) == [f"week:{y0}-{w0}"], (
+        f"同一周只提醒一条，实得 {_week_keys(client, h, c['id'])}"
+    )
 
-    # 换一个 ISO 周 → 重新提醒
-    from backend.database import get_session
-    from backend.domain.identity.models import Child
+    # 时间推进 14 天（必跨 ISO 周）→ 同一条任务再跑 → 必须**再**提醒一条，且键是新周
+    later = datetime.now() + timedelta(days=14)
+    y1, w1, _ = later.isocalendar()
+    assert (y1, w1) != (y0, w0), "构造有误：推进 14 天必须换周"
+    _freeze_service_now(monkeypatch, later)
+    _run_task(client, h, "pending_evaluation_weekly")
 
-    with get_session() as db:
-        row = db.query(Child).filter(Child.id == c["id"]).first()
-        row.pending_evaluation_at = datetime.now() - timedelta(days=40)
-        db.commit()
-    from backend.common.admin_notification_models import AdminNotification
-    from backend.common.admin_notifications import AdminNotifyService
-
-    with get_session() as db:
-        AdminNotifyService(db).send(
-            scene=AdminNotification.SCENE_PENDING_EVALUATION,
-            title="待评估跟进",
-            content="下一周再提醒（造数：直接换 dedup_key 模拟跨周）",
-            ref_type=AdminNotification.REF_CHILD,
-            ref_id=c["id"],
-            applicant_name="孩子",
-            dedup_key="week:1999-01",
-        )
-        db.commit()
+    assert _week_keys(client, h, c["id"]) == [f"week:{y0}-{w0}", f"week:{y1}-{w1}"], (
+        f"跨周应各提醒一条且键按真实周推导，实得 {_week_keys(client, h, c['id'])}"
+    )
     assert (
         len(
             [
@@ -181,7 +205,7 @@ def test_g12_weekly_dedup_within_same_week(client: TestClient):
             ]
         )
         == 2
-    ), "不同周应能各提醒一条"
+    ), "不同周应能各提醒一条（列表侧同口径）"
 
 
 # ==================== G1：待结清主动提醒 ====================

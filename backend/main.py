@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.common.exceptions import BusinessException, business_exception_handler
 from backend.config import get_settings
 from backend.middleware.media_cache import MediaCacheMiddleware
+from backend.middleware.rate_limit import WriteRateLimitMiddleware
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -49,6 +50,11 @@ app = FastAPI(
     lifespan=lifespan,
     **docs_endpoint_urls(settings.APP_ENV),
 )
+
+# 全局写限流（第七轮 P2-6）：**注册顺序有意为之**——`add_middleware` 是"后加者在外层"，
+# 故本行写在 CORSMiddleware 之前 = 限流在 CORS **内侧**：429 响应仍带跨域头（否则浏览器
+# 只报 CORS 错、家长看不到"请求过于频繁"的真实原因）。
+app.add_middleware(WriteRateLimitMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

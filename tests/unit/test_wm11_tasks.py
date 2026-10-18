@@ -376,8 +376,15 @@ def test_book_due_remind_and_overdue_mark(client: TestClient):
     with get_session() as db:
         from backend.domain.circulation.models import BorrowRecord
 
-        assert db.get(BorrowRecord, rec["id"]).status == BorrowRecord.STATUS_OVERDUE
-    assert any(n.scene == "borrow.overdue" for n in _notifs(p["id"]))
+        row = db.get(BorrowRecord, rec["id"])
+        assert row.status == BorrowRecord.STATUS_OVERDUE
+        overdue_due = row.due_at
+    # P1-2（2026-10-18 第七十五批）：逾期通知的去重键同样是 `周期:到期日`——原先这里只断言
+    # "有 borrow.overdue 场景"，**键写错也绿**（本批变异矩阵实证：去掉周期后缀仍绿）。按精确值断言。
+    assert any(
+        n.scene == "borrow.overdue" and n.dedup_key == f"overdue:{overdue_due:%Y%m%d}"
+        for n in _notifs(p["id"])
+    ), [(n.scene, n.dedup_key) for n in _notifs(p["id"])]
 
 
 # ---------- 7. 活动提醒 + 自动结束 ----------

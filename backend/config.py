@@ -107,6 +107,11 @@ class Settings(BaseSettings):
     # 生产反代部署：nginx 用 `proxy_set_header X-Forwarded-For $remote_addr;` 覆盖 + 这里设 1（成对）。
     TRUSTED_PROXY_COUNT: int = 0
 
+    # 全局写限流预算（第七轮 P2-6，2026-10-18）：**每分钟 / 每身份 / 每路径类**的写请求上限
+    # （写方法 POST/PUT/PATCH/DELETE；批量导入与上传类另有代码内置更紧值；`/health` 与
+    # `/api/pay/` 微信回调豁免——回调微信会重试，限流会丢单）。0 = 关闭（仅压测/排障，生产禁）。
+    RATE_LIMIT_WRITE_PER_MINUTE: int = 60
+
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

@@ -9,6 +9,7 @@ B10 边界：写入（send/mark_handled）在 common/admin_notifications.py（�
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 
 from sqlalchemy import func
@@ -54,6 +55,17 @@ MANUAL_PENDING_SCENES: dict[str, str] = {
     AdminNotification.SCENE_PAYMENT_ANOMALY: "资金异常·待核查",
     AdminNotification.SCENE_ACTIVITY_ORDER_VOIDED: "已作废·请知会收银台",
 }
+
+logger = logging.getLogger(__name__)
+
+#: 待办墙**已审结历史**的读取窗口（第七轮 P2-2，2026-10-18）：显示态要 JOIN 业务表实时算，
+#: SQL 无法按显示态先分页，故取"最近 N 条"作窗口——万级历史累积后每次开页仍是定长读取。
+#: 窗口外的老记录不丢：界面有说明条，且「通知中心」的场景/关键词筛选可定位。
+TODO_SCAN_LIMIT = 2000
+
+#: **未销项**候选上限（同批）：未销项一条不落是"待处理不丢"的前提，故上限只作灾难兜底
+#: （正常馆的未销项是几十条量级）；触顶时告警 + `truncated` 显形，不静默丢。
+TODO_OPEN_LIMIT = 5000
 
 
 class AdminTodoService:
@@ -302,10 +314,18 @@ class AdminTodoService:
         return {"effective_status": ST_DONE, "status_text": TEXT_DONE}
 
     def _scene_pending_count(self, scene: str) -> int:
-        """某场景下**显示态为待处理**的条数（与列表同源 resolver，禁各算一遍）。"""
+        """某场景下**显示态为待处理**的条数（与列表同源 resolver，禁各算一遍）。
+
+        P2-2（第七轮）：加 `handled_at IS NULL` 收窄——已销项必非 pending（T20c 覆盖层），
+        故计数不变、读取量按已销项占比下降。
+        """
         rows = (
             self.db.query(AdminNotification)
-            .filter(AdminNotification.scene == scene, AdminNotification.is_deleted == 0)
+            .filter(
+                AdminNotification.scene == scene,
+                AdminNotification.is_deleted == 0,
+                AdminNotification.handled_at.is_(None),
+            )
             .all()
         )
         resolved = self.resolve_many(rows)
@@ -472,7 +492,33 @@ class AdminTodoService:
                 (AdminNotification.applicant_name.like(like, escape="\\"))
                 | (AdminNotification.content.like(like, escape="\\"))
             )
-        rows = q.order_by(AdminNotification.created_at.desc(), AdminNotification.id.desc()).all()
+        # P2-2（第七轮，2026-10-18）：**候选集收窄**。显示态要 JOIN 业务表实时算（`resolve_many`），
+        # SQL 无法按显示态先分页——所以"全量加载"是结构性的。修法用一条已存在的精确判据收窄：
+        #   ① 已审结历史只取**最近 `TODO_SCAN_LIMIT` 条**（万级累积不再全量读；走
+        #      `ix_admin_notif_deleted_created` 索引序，无 filesort）；
+        #   ② **未销项（`handled_at IS NULL`）一条不落**——`resolve_many` 的 T20c 覆盖层保证
+        #      "已销项必非 pending"，故 pending 集合 ⊆ 未销项集合：**待处理列表与计数仍精确**。
+        recent = (
+            q.order_by(AdminNotification.created_at.desc(), AdminNotification.id.desc())
+            .limit(TODO_SCAN_LIMIT)
+            .all()
+        )
+        open_rows = (
+            q.filter(AdminNotification.handled_at.is_(None))
+            .order_by(AdminNotification.created_at.asc(), AdminNotification.id.asc())
+            .limit(TODO_OPEN_LIMIT)
+            .all()
+        )
+        if len(open_rows) >= TODO_OPEN_LIMIT:
+            # 未销项积压超上限 = 待办墙已经没人清了（正常馆不会到这一步）——
+            # 不静默丢：告警 + truncated 让界面显形（丢的是"最久未销项"之后的，见窗口定义）
+            logger.warning(
+                "待办墙未销项候选达上限 %d，可能漏显更久的待处理项（请清理积压）",
+                TODO_OPEN_LIMIT,
+            )
+        truncated = len(recent) >= TODO_SCAN_LIMIT or len(open_rows) >= TODO_OPEN_LIMIT
+        total_all = q.count()  # 该筛选下历史精确总数（前端如实显示"共 N 条"）
+        rows = list({n.id: n for n in [*recent, *open_rows]}.values())  # 两集并集去重
 
         resolved = self.resolve_many(rows)
         pending_count = sum(1 for n in rows if resolved[n.id]["effective_status"] == ST_PENDING)
@@ -527,6 +573,8 @@ class AdminTodoService:
         return {
             "items": items,
             "total": total,
+            "total_all": total_all,
+            "truncated": truncated,
             "pending_count": pending_count,
             "read_only": not viewer_is_super,
             "page": page,
@@ -610,8 +658,15 @@ class AdminTodoService:
             or 0
         )
         if admin.role == AdminUser.ROLE_SUPER_ADMIN:
+            # P2-2（第七轮）：整表 → **只读未销项**。计数精确性不变（已销项必非 pending，
+            # 见 `resolve_many` 的 T20c 覆盖层），读取量按"已销项占比"下降。
             all_rows = (
-                self.db.query(AdminNotification).filter(AdminNotification.is_deleted == 0).all()
+                self.db.query(AdminNotification)
+                .filter(
+                    AdminNotification.is_deleted == 0,
+                    AdminNotification.handled_at.is_(None),
+                )
+                .all()
             )
             resolved = self.resolve_many(all_rows)
             scene_key = {
@@ -672,6 +727,8 @@ class AdminTodoService:
                 .filter(
                     AdminNotification.scene == AdminNotification.SCENE_ACTIVITY_ENROLL_MANUAL,
                     AdminNotification.is_deleted == 0,
+                    # P2-2（第七轮）：已销项必非 pending（T20c 覆盖层）→ 计数不变、读取更少
+                    AdminNotification.handled_at.is_(None),
                 )
                 .all()
             )
@@ -693,6 +750,8 @@ class AdminTodoService:
                 .filter(
                     AdminNotification.scene == AdminNotification.SCENE_MEMBER_FOLLOW_UP,
                     AdminNotification.is_deleted == 0,
+                    # P2-2（第七轮）：同 `_scene_pending_count` 的收窄（计数精确性不变）
+                    AdminNotification.handled_at.is_(None),
                 )
                 .all()
             )

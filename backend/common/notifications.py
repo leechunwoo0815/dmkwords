@@ -111,10 +111,16 @@ class NotificationService:
         self._set_wechat(notification_id, Notification.WECHAT_QUEUED, "已提交微信，等待回执")
 
     def _set_wechat(self, notification_id: int, status: str, error: str) -> None:
+        # W6 压测（2026-10-18）：`synchronize_session=False` 正是本类 docstring 说的
+        # "Core UPDATE，不碰 ORM 事务状态"——ORM 版 UPDATE 默认会在 session 身份映射里
+        # **逐对象求值 WHERE**，批量通知场景（6000 条）实测 O(N²)，与 `overdue_mark` 同族
+        # （完整分析见 `domain/circulation/overdue_notify.py`）。本方法只回写
+        # wechat_status/error，调用方随后不读该属性（真回写走独立 session）。
         self.db.execute(
             update(Notification)
             .where(Notification.id == notification_id)
             .values(wechat_status=status, wechat_error=error)
+            .execution_options(synchronize_session=False)
         )
 
     @staticmethod
