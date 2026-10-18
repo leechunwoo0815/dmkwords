@@ -593,7 +593,11 @@ class TransferService:
                 reason="权益转让：年费不退款留痕（R-305）",
             )
             # 5) 受让方转正式会员，到期日继承
-            target.member_status = Child.MEMBER_FORMAL
+            # P1-1（2026-10-18 第七十五批）：改走**会员状态唯一写口**——受让方若是"已退会
+            # （押金已退还）"的孩子，接权益后必须复位押金账户，否则永远缴不了押金。
+            from backend.domain.identity.member_status import write_member_status
+
+            write_member_status(self.db, target, Child.MEMBER_FORMAL)
             target.member_start = date.today()
             target.member_expire = source.member_expire
             # 6) 解锁双方（P2-12：若还有其它在途申请则不解除——由 _unlock_both 统一判定）

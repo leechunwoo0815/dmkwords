@@ -522,10 +522,9 @@ class OrderService(OrderGuardMixin):
         today = date.today()
         child.member_start = today
         child.member_expire = today + timedelta(days=days)
-        # 重新入会时把已退还的押金账户归零复位（第四轮大审查 P1-2；实现归押金域）
-        from backend.domain.billing.service import DepositService
-
-        DepositService(self.db).reset_refunded_on_rejoin(child.id)
+        # 押金复位（第四轮大审查 P1-2）现由**会员状态写口**统一触发（P1-1，2026-10-18）：
+        # `_transition_member` → `write_member_status` → `DepositService.on_member_status_changed`。
+        # 这里不再单独调用——同一件事只留一个触发点，避免"新入口漏接"的老毛病复发。
         self.db.flush()
         return child
 
@@ -551,8 +550,12 @@ class OrderService(OrderGuardMixin):
             raise ValidationError(
                 f"会员状态不允许从 {child.member_status} 变更为 {new_status}（转移矩阵拦截）"
             )
-        # P2-13（2026-10-17 第六十九批）：状态写口收拢到模型方法（顺带维护待评估时钟）
-        child.set_member_status(new_status)
+        # P1-1（2026-10-18 第七十五批）：走**会员状态唯一写口**——它除了写状态（含待评估时钟），
+        # 还负责"重新入会 → 复位已退还押金"这类连带动作。原先只写状态，年费/转让重新入会的
+        # 孩子押金永远停在 refunded（四条缴款入口全拒）→ 有效会员却缴不了押金。
+        from backend.domain.identity.member_status import write_member_status
+
+        write_member_status(self.db, child, new_status)
 
     def list_orders(
         self,

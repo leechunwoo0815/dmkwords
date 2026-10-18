@@ -71,3 +71,30 @@ def notify_withdrawal_reviewed(
         ref_type="withdrawal_request",
         ref_id=str(request_id),
     )
+
+def notify_refund_execute_failed(db: Session, req, child, remark: str) -> None:
+    """退款执行失败 → **管理待办**（运营重试入口，WM13 触发点5 / Q5 裁定）。
+
+    P1-3（2026-10-18 第七十五批）：原先不传 `dedup_key`（落默认 `"1"` = 同一退款单**终身一条**）
+    → 换号重试（attempt 2）再失败时静默不再提醒。改为按**网关尝试次数**分条
+    （同一次尝试重放仍幂等），并 `ignore_handled=True`（处理过之后再失败要重新提醒）。
+    """
+    from backend.common.admin_notification_models import AdminNotification
+    from backend.common.admin_notifications import AdminNotifyService
+    from backend.domain.identity.models import Parent
+
+    parent = db.query(Parent).filter(Parent.id == child.parent_id).first() if child else None
+    AdminNotifyService(db).send(
+        scene=AdminNotification.SCENE_REFUND_EXECUTE_FAILED,
+        title="【退款执行失败】",
+        content=(
+            f"【退款执行失败】{child.name if child else ''}的退款 ￥{req.amount} "
+            f"执行失败：{remark}。请处理后重试"
+        ),
+        ref_type=AdminNotification.REF_REFUND_REQUEST,
+        ref_id=str(req.id),
+        dedup_key=f"attempt:{req.gateway_attempts or 0}",
+        ignore_handled=True,
+        applicant_name=f"{parent.name if parent else ''}·{child.name if child else ''}",
+        amount=req.amount,
+    )

@@ -303,9 +303,12 @@ class ChildService:
             raise ValidationError(
                 f"会员状态不允许从 {child.member_status} 变更为 {new_status}（转移矩阵拦截）"
             )
-        # P2-13（2026-10-17 第六十九批·大审查）：状态写口收拢到模型方法——顺带维护
-        # `pending_evaluation_at`（待评估时钟），不再依赖会被任意字段更新刷新的 `update_time`
-        child.set_member_status(new_status)
+        # P2-13（2026-10-17 第六十九批·大审查）：状态写口收拢——顺带维护 `pending_evaluation_at`。
+        # P1-1（2026-10-18 第七十五批）：改走 `member_status.write_member_status`，
+        # 连带动作（重新入会 → 复位已退还押金）对所有入口生效。
+        from backend.domain.identity.member_status import write_member_status
+
+        write_member_status(self.db, child, new_status)
 
     def update_avatar(self, child_id: int, avatar: str) -> Child:
         """WM15-R3：家长自助设置孩子内置头像（白名单；空串=清空）。"""

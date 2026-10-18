@@ -136,6 +136,24 @@ class DepositService:
         )
         return dep
 
+    #: 重新入会判定（P1-1，2026-10-18 第七十五批）：从"未入会 / 已过期 / 已退会"
+    #: 进入"观察期 / 正式"——与 `Child.ALLOWED_TRANSITIONS` 的重新入会边（R-301）逐条对齐。
+    REJOIN_FROM = (Child.MEMBER_NONE, Child.MEMBER_EXPIRED, Child.MEMBER_WITHDRAWN)
+    REJOIN_TO = (Child.MEMBER_OBSERVATION, Child.MEMBER_FORMAL)
+
+    def on_member_status_changed(self, child, old_status: str, new_status: str) -> None:
+        """**会员态写口**的统一钩子：重新入会 → 复位已退还的押金账户（P1-1）。
+
+        为什么放在这里：`reset_refunded_on_rejoin` 原先只有一个调用点（观察期费开通
+        `_open_membership`），走**年费**或**转让**重新入会的孩子押金永远停在 `refunded`
+        ——而四条缴款入口全拒 `refunded`、`deposits.child_id` 又是单列唯一 → 有效会员却
+        **没有任何押金缴纳入口**（借书只能人工放行＝无担保出借）。
+        现在由 `identity/member_status.write_member_status`（会员状态唯一写口）统一调用，
+        任何入会路径都绕不过去。
+        """
+        if new_status in self.REJOIN_TO and old_status in self.REJOIN_FROM:
+            self.reset_refunded_on_rejoin(child.id)
+
     def reset_refunded_on_rejoin(self, child_id: int) -> None:
         """重新入会时把**已退还**的押金账户归零复位为「未缴」（第四轮大审查 P1-2，2026-10-17）。
 
