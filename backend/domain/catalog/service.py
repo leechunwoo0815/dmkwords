@@ -213,25 +213,39 @@ class BookService:
 
     def create_book(self, admin, req: BookCreateRequest) -> Book:
         isbn = clean_isbn(req.isbn)
+        revived = None
         if isbn:
             if not ISBN_RE.match(isbn):
                 raise ValidationError(f"ISBN 格式不正确: {isbn}")
             if self.book_repo.get_by_isbn(isbn):
                 raise ConflictError(f"ISBN {isbn} 已存在（补货请走副本管理增加副本）")
-        book = Book(
-            isbn=isbn or None,
-            internal_code=None,
-            title=req.title.strip(),
-            author=req.author.strip(),
-            word_count=req.word_count,
-            ar_level=req.ar_level,
-            topic=req.topic,
-            grade=req.grade,
-            description=req.description,
-            # D1：新书一律下架入库——完善封面/音频/AR/测验后再上架
-            status=Book.STATUS_OFF,
-        )
-        self.book_repo.create(book)
+            # P1-4（2026-10-18 第七十五批）：`ix_books_isbn` 是**单列唯一索引（不含 is_deleted）**，
+            # 而 `get_by_isbn` 自动过滤软删行 → 软删书目后再入同号必撞 1062（探针实测 → 裸 500），
+            # 且本项目**没有书目恢复入口**（`delete_book` 只软删）。与 `parents.phone`（P2-6 同形缺陷）
+            # 同法处置：按"同一 ISBN = 同一本书"就地**复活**那一行。行锁保证两个馆员同时入库同号时串行
+            # （后到者先撞上面的 ConflictError，不会并发复活）。
+            revived = self.book_repo.get_by_isbn_including_deleted(isbn, for_update=True)
+        book = revived if revived is not None else Book(internal_code=None)
+        if revived is not None:
+            book.is_deleted = 0
+            # delete_book 已把封面/音频**文件**删掉（`remove_book_media`）：路径若留着会骗过
+            # D1 上架完整性五检（`_onboarding_missing` 只判字段非空）→ 必须清空，回到"待完善"态
+            book.cover_path = None
+            book.audio_path = None
+        book.isbn = isbn or None
+        book.title = req.title.strip()
+        book.author = req.author.strip()
+        book.word_count = req.word_count
+        book.ar_level = req.ar_level
+        book.topic = req.topic
+        book.grade = req.grade
+        book.description = req.description
+        # D1：新书一律下架入库——完善封面/音频/AR/测验后再上架（复活走同一口径）
+        book.status = Book.STATUS_OFF
+        if revived is not None:
+            self.book_repo.update(book)
+        else:
+            self.book_repo.create(book)
         # 无 ISBN 书目生成内部编号
         if not isbn:
             book.internal_code = f"LOCAL-{book.id:06d}"
@@ -274,6 +288,17 @@ class BookService:
                 raise ValidationError(f"ISBN 格式不正确: {new_isbn}")
             if new_isbn and self.book_repo.get_by_isbn(new_isbn):
                 raise ConflictError(f"ISBN {new_isbn} 已存在（补货请走副本管理增加副本）")
+            # P1-4 对偶面（2026-10-18 第七十五批）：软删书目仍占用单列唯一索引 →
+            # 改号改到它头上原先同样撞 1062。此处**如实报错、不复活**："改号"不该顺手把
+            # 另一本书拉回在架池；要恢复那本书，请用该 ISBN 走**新建**（新建 = 复活原行）。
+            ghost = (
+                self.book_repo.get_by_isbn_including_deleted(new_isbn) if new_isbn else None
+            )
+            if ghost is not None and ghost.id != book.id:
+                raise ConflictError(
+                    f"ISBN {new_isbn} 属于一本已删除的书目（《{ghost.title}》，id={ghost.id}）"
+                    "——请改用其他 ISBN；若确要恢复该书目，请用该 ISBN 新建（会复活原行）"
+                )
             book.isbn = new_isbn
         # R1：清空 ISBN 后若从未有内部编号（创建时带 ISBN），补生成，保证 book_code 恒非空
         if not book.isbn and not book.internal_code:

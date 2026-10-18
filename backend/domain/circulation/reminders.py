@@ -26,7 +26,11 @@ def book_due_remind(db: Session) -> int:
     """借阅即将到期提醒（due_remind_days 节点；每节点一次）。
 
     补发窗口（P2-5，2026-10-09 审查）：每个节点向前放宽 1 天，停机一整天也能补发；
-    文案按**实际剩余天数**算；幂等键仍是节点值 `str(days)`。
+    文案按**实际剩余天数**算。
+
+    幂等键（P1-2，2026-10-18）：`f"{节点}:{到期日}"`——**必须带周期**。原先只放节点值
+    `str(days)`，而 `ref_id` 是借阅行 id（终身不变）→ 续借后第二周期走到同一节点时判重命中，
+    提醒被**静默**吞掉（家长以为提醒过）。
     """
     remind_days = [
         int(x)
@@ -82,7 +86,7 @@ def book_due_remind(db: Session) -> int:
                 child_id=child.id,
                 ref_type="borrow_record",
                 ref_id=str(rec.id),
-                dedup_key=str(days),
+                dedup_key=f"{days}:{rec.due_at:%Y%m%d}",
                 openid=parent.wechat_openid if parent else None,
             ):
                 sent += 1

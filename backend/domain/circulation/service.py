@@ -742,6 +742,11 @@ class CirculationService:
                 child_id=child.id,
                 ref_type="borrow_record",
                 ref_id=str(rec.id),
+                # P1-2（2026-10-18 第七十五批）：原先不传 dedup_key → 落默认 "1"
+                # = 「同一家长 × 场景 × 借阅行**终身一条**」。续借（G7 人工办理）后再次逾期时，
+                # 条件 UPDATE 会重新标记 OVERDUE，但通知被唯一索引静默吞掉 → 家长不知道又逾期了。
+                # 周期类场景的去重键必须**带周期**（本次到期日）。
+                dedup_key=f"overdue:{rec.due_at:%Y%m%d}",
                 openid=parent.wechat_openid if parent else None,
             )
         if overdue:

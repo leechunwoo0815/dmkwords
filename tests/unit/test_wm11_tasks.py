@@ -352,7 +352,16 @@ def test_book_due_remind_and_overdue_mark(client: TestClient):
 
     r = _run(client, h, "book_due_remind")
     assert r["status"] == "success"
-    assert any(n.scene == "borrow.due_remind" and n.dedup_key == "3" for n in _notifs(p["id"]))
+    # P1-2（2026-10-18 第七十五批）：去重键从 `"3"` 改成 **`节点:到期日`**——原先只含节点值，
+    # 续借后第二周期走到同一节点会被唯一索引判重**静默吞掉**。断言按新语义给精确值（不弱化）。
+    with get_session() as db:
+        from backend.domain.circulation.models import BorrowRecord
+
+        due = db.query(BorrowRecord).filter(BorrowRecord.id == rec["id"]).first().due_at
+    assert any(
+        n.scene == "borrow.due_remind" and n.dedup_key == f"3:{due:%Y%m%d}"
+        for n in _notifs(p["id"])
+    ), [n.dedup_key for n in _notifs(p["id"])]
 
     with get_session() as db:
         from backend.domain.circulation.models import BorrowRecord

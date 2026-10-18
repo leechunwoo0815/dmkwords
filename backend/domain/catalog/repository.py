@@ -13,6 +13,18 @@ class BookRepository(BaseRepository[Book]):
     def get_by_isbn(self, isbn: str) -> Book | None:
         return self.get_by_field("isbn", isbn)
 
+    def get_by_isbn_including_deleted(self, isbn: str, *, for_update: bool = False) -> Book | None:
+        """含软删行的 ISBN 查询（P1-4，2026-10-18）。
+
+        `ix_books_isbn` 是**单列唯一索引、不含 is_deleted**——软删行照样占用 ISBN。
+        服务层查重走 `get_by_isbn`（自动过滤软删）→ 软删后再入同号必撞 1062。
+        `for_update=True` 供"同号复活"入口使用：锁住那一行，两个馆员同时入库同号时串行。
+        """
+        q = self.db.query(Book).filter(Book.isbn == isbn, Book.is_deleted != 0)
+        if for_update:
+            q = q.with_for_update().populate_existing()  # B-16：锁定读必须刷新身份映射快照
+        return q.first()
+
 
 class BookCopyRepository(BaseRepository[BookCopy]):
     def __init__(self, db: Session):

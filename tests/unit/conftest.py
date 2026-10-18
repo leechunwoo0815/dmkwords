@@ -81,7 +81,13 @@ def _force_books_on_shelf() -> None:
 
 
 #: 这些模块考的就是"新建书目默认下架 + 上架完整性五检"——不能被"建书即上架"基建覆盖
-_OFF_SHELF_CONTRACT_MODULES = ("test_wm2_catalog", "test_wm2_d1d3", "test_wm2_p2")
+_OFF_SHELF_CONTRACT_MODULES = (
+    "test_wm2_catalog",
+    "test_wm2_d1d3",
+    "test_wm2_p2",
+    # 2026-10-18 补：软删同号**复活**后同样必须回下架态（媒体已在软删时清除）
+    "test_audit5_p1_batch1_20261018",
+)
 
 
 @pytest.fixture(autouse=True)

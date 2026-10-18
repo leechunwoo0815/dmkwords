@@ -135,6 +135,16 @@ def import_books(db: Session, admin, file_bytes: bytes) -> dict:
                 added_copies.append({"isbn": isbn, "added": copy_n})
                 success += 1
                 continue
+            # P1-4 同族（2026-10-18 第七十五批）：`ix_books_isbn` 不含 is_deleted，
+            # 软删书目仍占用该 ISBN；上面的 get_by_isbn 过滤软删 → 落到这里建新行会撞 1062。
+            # 批量导入是"行级报错"语义：如实点名冲突，让馆员自己决定恢复还是改号（不静默复活）。
+            ghost = book_repo.get_by_isbn_including_deleted(isbn)
+            if ghost is not None:
+                errors.append(
+                    f"第{row_num}行: ISBN {isbn} 属于一本已删除的书目（《{ghost.title}》，"
+                    f"id={ghost.id}）——请在图书管理里用该 ISBN 新建以恢复，或改用其他 ISBN"
+                )
+                continue
 
         book = Book(
             isbn=isbn or None,
