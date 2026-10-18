@@ -12,6 +12,7 @@ from typing import Any
 
 from backend.common.exceptions import NotFoundError
 from backend.common.file_utils import activity_detail_image_url
+from backend.common.media_paths import is_within
 
 #: 块类型与落盘目录（与 `schemas` / `file_storage` 同源；改这里必须同步那两处）
 BLOCK_PARAGRAPH = "paragraph"
@@ -82,6 +83,6 @@ def resolve_image_file(activity_id: int, name: str) -> str:
         raise NotFoundError("配图不存在")
     root = os.path.abspath(get_settings().UPLOADS_DIR)
     full = os.path.abspath(os.path.join(root, DETAIL_IMAGE_DIR, base))
-    if not full.startswith(root + os.sep) or not os.path.isfile(full):
+    if not is_within(root, full) or not os.path.isfile(full):  # P2-5 收口：口径单点
         raise NotFoundError("配图文件不存在")
     return full

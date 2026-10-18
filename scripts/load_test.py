@@ -308,7 +308,8 @@ def g2_enroll(base: str, h: dict) -> dict:
         f"{base}/api/admin/activities",
         json={
             "title": "压测·名额 5",
-            "start_at": "2030-01-01T10:00:00",
+            # 远期哨兵（≥2050）：门禁 check_fake_assertions 判"时间炸弹"（2030 会到期）
+            "start_at": "2050-01-01T10:00:00",
             "max_quota": 5,
             "fee": "0",
         },

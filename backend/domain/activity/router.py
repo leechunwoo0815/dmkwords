@@ -11,6 +11,8 @@ from pydantic import Field, field_validator
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
+from backend.common.exceptions import NotFoundError
+from backend.common.media_paths import is_within
 from backend.database import get_db
 from backend.domain.activity.admin_service import AdminActivityService
 from backend.domain.activity.schemas import ActivityDetailBlocksRequest
@@ -200,12 +202,15 @@ def activity_cover_media(
     authorize_media(request, token, db)
     rel = AdminActivityService(db).get_cover_path(activity_id)
     if not rel:
-        from backend.common.exceptions import NotFoundError
-
         raise NotFoundError("封面不存在")
     root = get_settings().UPLOADS_DIR
     full = os.path.abspath(os.path.join(root, rel))
-    if not full.startswith(os.path.abspath(root)):
+    # P2-5（第七轮，2026-10-18）：原先**裸前缀** `full.startswith(abspath(root))`——同前缀兄弟目录
+    # （`uploads-evil/x.jpg`）能骗过它；改用单一口径 `is_within`（`common/media_paths.py`，与 P2-27
+    # 第六十九批在 growth/miniapp_router 的修法同源）。
+    # 连带修：`NotFoundError` 原先是**函数内局部 import**（只在 rel 为空分支执行）→ 本分支一旦命中
+    # 就是 `UnboundLocalError`（500 而非 404）——裸前缀放行时它从未暴露。已提为模块级 import。
+    if not is_within(root, full):
         raise NotFoundError("封面文件不存在")
     return FileResponse(full, media_type="image/jpeg")
 

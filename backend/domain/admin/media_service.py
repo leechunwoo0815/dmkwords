@@ -37,6 +37,7 @@ from backend.common.media_paths import (  # noqa: F401 — 再导出，供脚本
     is_protected,
     is_regenerable,
     is_trash_path,
+    is_within,
     norm_rel,
 )
 from backend.config import get_settings
@@ -368,7 +369,7 @@ class MediaHealthService:
     ) -> str | None:
         """八道闸门（**顺序即优先级**）：返回拒绝原因，None = 允许清理。"""
         abs_path = os.path.abspath(os.path.join(root, rel))
-        if not rel or not abs_path.startswith(root + os.sep):
+        if not rel or not is_within(root, abs_path):  # P2-5 收口：口径单点
             return "路径非法（不在 uploads 内）"
         # 2026-10-12 审查 P1：闸门必须判**解析后**的相对路径——原先判 `rel`（未解析）而对解析后的
         # `abs_path` 做 move/delete，`cover/../voucher/x.jpg` 能骗过"保护目录"闸（首段是 cover）。

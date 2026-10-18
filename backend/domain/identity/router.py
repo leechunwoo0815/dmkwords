@@ -7,6 +7,7 @@ from pydantic import Field
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema, PaginatedResponse
+from backend.common.media_paths import is_within
 from backend.database import get_db
 from backend.domain.identity import refund_queries
 from backend.domain.identity.observation_service import ObservationReportService
@@ -317,7 +318,9 @@ def order_voucher_image(
     rel = OrderService.get_voucher_rel_path(db, order_id)
     root = get_settings().UPLOADS_DIR
     full = os.path.abspath(os.path.join(root, rel))
-    if not full.startswith(os.path.abspath(root)):
+    # P2-5（第七轮，2026-10-18）：原先**裸前缀** `full.startswith(abspath(root))`——同前缀兄弟目录
+    # （`uploads-evil/x.jpg`）能骗过它；改用单一口径 `is_within`（`common/media_paths.py`）。
+    if not is_within(root, full):
         from backend.common.exceptions import NotFoundError
 
         raise NotFoundError("凭证文件不存在")

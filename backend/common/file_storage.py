@@ -312,7 +312,7 @@ def remove_activity_detail_images(rels: list[str]) -> int:
     deleted = 0
     for rel in rels:
         full = os.path.abspath(os.path.join(root, rel or ""))
-        if not full.startswith(root + os.sep):
+        if not is_within(root, full):  # P2-5 收口：口径单点（原先手写 root + os.sep）
             continue
         if not rel.replace(os.sep, "/").startswith("activity_detail/"):
             continue
