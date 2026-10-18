@@ -64,6 +64,7 @@ class NotificationService:
         title: str,
         content: str,
         openid: str | None,
+        scene: str = "",
     ) -> None:
         """微信订阅尽力送达（Core UPDATE 回写状态，不碰 ORM 事务状态）。
 
@@ -92,7 +93,10 @@ class NotificationService:
                 openid,
                 title,
                 content,
-                on_result=lambda ok, err: self._writeback(notification_id, ok, err),
+                scene,
+                on_result=lambda ok, err, status=None: self._writeback(
+                    notification_id, ok, err, status
+                ),
             )
         except Exception as exc:  # 网关异常不阻断站内消息
             logger.warning("wechat push failed: %s", exc)
@@ -114,8 +118,12 @@ class NotificationService:
         )
 
     @staticmethod
-    def _writeback(notification_id: int, ok: bool, error: str) -> None:
-        """后台线程拿到微信真实结果后回写（**独立 session**：发起时的请求事务早已结束）。"""
+    def _writeback(notification_id: int, ok: bool, error: str, status: str | None = None) -> None:
+        """后台线程拿到微信真实结果后回写（**独立 session**：发起时的请求事务早已结束）。
+
+        `status`（P1-5，2026-10-18）：43101（用户未订阅/已拒收）由发送线程显式传 `"skipped"`——
+        它是"没送出去但也不是故障"，原先被当成功写成 `sent`（管理端显示绿色"已送达"）。
+        """
         from backend.database import get_session
 
         try:
@@ -128,8 +136,12 @@ class NotificationService:
                 update(Notification)
                 .where(Notification.id == notification_id)
                 .values(
-                    wechat_status=Notification.WECHAT_SENT if ok else Notification.WECHAT_FAILED,
-                    wechat_error="" if ok else error,
+                    wechat_status=(
+                        Notification.WECHAT_SKIPPED
+                        if status == "skipped"
+                        else (Notification.WECHAT_SENT if ok else Notification.WECHAT_FAILED)
+                    ),
+                    wechat_error="" if (ok and status != "skipped") else error,
                 )
             )
             session.commit()
@@ -194,7 +206,7 @@ class NotificationService:
         if result.rowcount == 0:
             return False  # 并发窗口撞唯一索引，已由他事务写入
         new_id = result.inserted_primary_key[0]
-        self._wechat_push(new_id, title, content, openid)
+        self._wechat_push(new_id, title, content, openid, scene)
         return True
 
     def send_event(
