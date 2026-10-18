@@ -11,7 +11,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Text, UniqueConstraint
 
 from backend.common.base_model import BaseModel
 
@@ -100,3 +100,7 @@ class DeadLetter(BaseModel):
     payload = Column(Text, nullable=True, comment="事件负载JSON")
     error = Column(Text, nullable=True, comment="失败原因")
     retry_count = Column(Integer, nullable=False, default=0, comment="重试次数")
+    # P2-1（2026-10-18 第七十八批）：死信此前**只有落库没有读取面**（跨域副作用失败=静默数据缺失，
+    # 而同样兜底性质的 TaskRunLog 有看板）。补两个"销项"字段：看板标记已处理后不再计入待处理数。
+    handled_at = Column(DateTime, nullable=True, comment="人工处理时刻（看板销项）")
+    handled_by = Column(BigInteger, nullable=True, comment="处理人（admin_users.id）")

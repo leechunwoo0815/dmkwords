@@ -12,6 +12,7 @@ import { PlayCircleOutlined, ReloadOutlined } from "@ant-design/icons";
 
 import PaintEmpty from "../components/PaintEmpty";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
+import DeadLetterPanel from "../components/DeadLetterPanel";
 import MediaHealthPanel from "../components/MediaHealthPanel";
 import PaymentReconcilePanel from "../components/PaymentReconcilePanel";
 import {
@@ -136,6 +137,7 @@ export default function TaskBoard() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <MediaHealthPanel />
+      <DeadLetterPanel />
       <PaymentReconcilePanel />
       <Card
         title="定时任务"

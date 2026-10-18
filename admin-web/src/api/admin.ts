@@ -247,6 +247,39 @@ export function apiRunTask(taskName: string): Promise<{ task: string; status: st
   return request(`/api/admin/tasks/${taskName}/run`, { method: "POST" });
 }
 
+// ---------- 死信看板（P2-1，2026-10-18 第七十八批） ----------
+// 事件处理器重试后仍失败 = 跨域副作用（积分/词数/通知/审计）静默缺失；此前**没有任何读取面**。
+
+export type DeadLetterItem = {
+  id: number;
+  event_type: string;
+  handler_name: string;
+  error: string;
+  payload: string;
+  retry_count: number;
+  create_time: string | null;
+  handled_at: string | null;
+  handled_by: number | null;
+};
+
+export type DeadLetterList = {
+  items: DeadLetterItem[];
+  total: number;
+  pending: number;
+  page: number;
+  page_size: number;
+};
+
+export function apiDeadLetters(unresolvedOnly = false): Promise<DeadLetterList> {
+  return request(`/api/admin/dead-letters?unresolved_only=${unresolvedOnly}&page_size=20`);
+}
+
+export function apiHandleDeadLetter(
+  id: number
+): Promise<{ id: number; handled: boolean; already_handled: boolean }> {
+  return request(`/api/admin/dead-letters/${id}/handle`, { method: "POST" });
+}
+
 // ---------- 媒体体检（docs/15 §二十二） ----------
 
 export type MediaHealth = components["schemas"]["MediaHealthResponse"];

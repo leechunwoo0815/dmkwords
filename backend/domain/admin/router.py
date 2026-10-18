@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from backend.common.base_schema import PaginatedResponse
 from backend.database import get_db
+from backend.domain.admin.dead_letter_service import DeadLetterService
 from backend.domain.admin.models import AdminUser
 from backend.domain.admin.schemas import (
     AdminNotificationHandleRequest,
@@ -233,6 +234,34 @@ def task_specs(
 ):
     # P2-21（2026-10-17 第六十九批）：带 admin 进去 → 每条带 `manual_allowed`（看板据此禁按钮）
     return {"items": TaskAdminService(db).specs(admin)}
+
+
+@router.get("/dead-letters")
+def dead_letters(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    unresolved_only: bool = False,
+    admin: AdminUser = Depends(require_perm("dashboard.view")),
+    db: Session = Depends(get_db),
+):
+    """死信看板（P2-1，2026-10-18）：事件处理器重试后仍失败的兜底队列。
+
+    此前**没有任何读取面**（`dead_letters` 只写不读）——跨域副作用（积分/词数/通知/审计）失败
+    等于静默数据缺失。这里给运营/超管一个"看得见 + 能销项"的入口（与任务看板同权限）。
+    """
+    return DeadLetterService(db).list(
+        page=page, page_size=page_size, unresolved_only=unresolved_only
+    )
+
+
+@router.post("/dead-letters/{dead_letter_id}/handle")
+def handle_dead_letter(
+    dead_letter_id: int,
+    admin: AdminUser = Depends(require_perm("dashboard.view")),
+    db: Session = Depends(get_db),
+):
+    """死信人工销项（幂等；留审计 `dead_letter.handle`）。"""
+    return DeadLetterService(db).handle(dead_letter_id, admin)
 
 
 @router.get("/tasks/runs")
