@@ -16,6 +16,11 @@ class Book(BaseModel):
     """书目。"""
 
     __tablename__ = "books"
+    # P2-4（2026-10-18 第七十六批）：书城/书目列表都是 `WHERE is_deleted=0 AND status=? ORDER BY id DESC`。
+    # 原先只有 PRIMARY/internal_code/isbn 三个索引 → 3 万级书目下退化为"扫全表+过滤"（造量实测见
+    # tests/unit/test_audit7_p2_indexes_20261018.py）。索引列尾用 **id**（真实排序键）而不是报告建议的
+    # create_time——默认排序是 `id DESC`（= 入库先后），用 create_time 收尾仍会 filesort。
+    __table_args__ = (Index("ix_books_deleted_status_id", "is_deleted", "status", "id"),)
 
     STATUS_ON = 1  # 上架
     STATUS_OFF = 0  # 下架

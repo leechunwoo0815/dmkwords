@@ -265,9 +265,33 @@ def collect_todo_keys() -> set[str]:
 
 
 def collect_table_names() -> set[str]:
-    out = set()
+    """真实表名集合（P3，2026-10-18 第七十六批：正则 → AST）。
+
+    原先用正则扫全部 `backend/**/*.py`，把 `common/base_model.py` **docstring 示例**里的
+    `__tablename__ = "my_table"` 当成了真表（于是"表 42 张"= 41 张真表 + 1 个幽灵），
+    同时漏掉 Alembic 自建的 `alembic_version`（它不在任何模型里，但确实在库中）。
+    现在只取**类体**里的赋值，并显式补上框架表。
+    """
+    import ast
+
+    out: set[str] = set()
     for f in (ROOT / "backend").rglob("*.py"):  # 含 common/system_models.py 等非 models.py 命名
-        out |= set(re.findall(r"""__tablename__\s*=\s*["']([a-z_]+)["']""", _read(f)))
+        try:
+            tree = ast.parse(_read(f))
+        except SyntaxError:  # pragma: no cover —— 语法错由 lint 把关
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for stmt in node.body:
+                target = value = None
+                if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1:
+                    target, value = stmt.targets[0], stmt.value
+                elif isinstance(stmt, ast.AnnAssign):
+                    target, value = stmt.target, stmt.value
+                if getattr(target, "id", "") == "__tablename__" and isinstance(value, ast.Constant):
+                    out.add(str(value.value))
+    out.add("alembic_version")  # 框架表：Alembic 自建，供文档引用（非业务模型）
     return out
 
 

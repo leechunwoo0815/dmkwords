@@ -117,13 +117,62 @@ def check_import_whitelist(errors: list[str]) -> None:
                 errors.append(f"{py.relative_to(ROOT)}: 业务域反向依赖 admin")
 
 
-def check_mutation_count_flush() -> list[str]:
+def _fn_var_models(fn) -> dict[str, str]:
+    """函数内 `变量名 → 模型名`（P3-1，2026-10-18 第七十六批）。
+
+    覆盖本项目常见的三种绑定：`x = ...query(Model)...`、`for x in ...query(Model)`、
+    `x = Model(...)`。解析不出来就不进表——调用方据此**跳过**而不是误报。
+    """
+    import ast
+
+    out: dict[str, str] = {}
+
+    def _query_model(node) -> str | None:
+        for sub in ast.walk(node):
+            if (
+                isinstance(sub, ast.Call)
+                and isinstance(sub.func, ast.Attribute)
+                and sub.func.attr == "query"
+                and sub.args
+                and isinstance(sub.args[0], ast.Name)
+            ):
+                return sub.args[0].id
+        return None
+
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target = node.targets[0]
+            if isinstance(target, ast.Name):
+                if isinstance(node.value, ast.Call):
+                    if isinstance(node.value.func, ast.Name):
+                        out.setdefault(target.id, node.value.func.id)  # x = Model(...)
+                    model = _query_model(node.value)
+                    if model:
+                        out[target.id] = model
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            if isinstance(node.annotation, ast.Name):
+                out.setdefault(node.target.id, node.annotation.id)  # x: Model = ...
+        elif isinstance(node, ast.For) and isinstance(node.target, ast.Name):
+            model = _query_model(node.iter)
+            if model:
+                out[node.target.id] = model
+    return out
+
+
+def check_mutation_count_flush(root: Path | None = None) -> list[str]:
     """T32/教训 41 防呆（E-20260901-04 第三例证）：同函数内「ORM 状态字段赋值」
     与「COUNT 聚合查询」共存且中间无 flush() → autoflush=False 下 COUNT 读旧态
     （多算/少算 1）。两批两犯（T5/WM13 回写），提示词与教训库双失效，进脚本。
 
-    输出告警清单不硬失败（启发式有误报，硬失败会逼出绕过）；清单内函数施工时
-    必须逐个自查并在简报声明。"""
+    **P3-1（2026-10-18 第七十六批）：只对"同一实体"告警。** 原实现不看模型是否同一张表，
+    于是"改 A 表状态、对 B 表 COUNT"（跨实体，读旧态与本次赋值无关）被稳定误报——三处挂账
+    会让告警失灵。现在从 AST 解析两边的模型名：**同名才告警**，解析不出来则跳过（宁缺勿滥）。
+    自证样例见 `tests/unit/test_verify_architecture_lesson41.py`（同实体告警 / 跨实体零告警 /
+    带 flush 零告警）。
+
+    仍输出**告警清单不硬失败**：启发式解析不可能覆盖全部写法（如经函数参数传入的对象），
+    硬失败会逼出绕过；清单内函数施工时必须逐个自查并在简报声明。
+    """
     import ast
 
     alerts: list[str] = []
@@ -135,14 +184,17 @@ def check_mutation_count_flush() -> list[str]:
         "operation_locked",
         "available_amount",
     }
-    for py in (ROOT / "backend" / "domain").rglob("*.py"):
+    base = root or ROOT
+    for py in (base / "backend" / "domain").rglob("*.py"):
         if "__pycache__" in py.parts:
             continue
         tree = ast.parse(py.read_text(encoding="utf-8"))
         for fn in ast.walk(tree):
             if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            events: list[tuple[int, str]] = []  # (lineno, kind) — mutation / count / flush
+            var_models = _fn_var_models(fn)
+            # (lineno, kind, model) —— model 为 None 表示解析不出实体
+            events: list[tuple[int, str, str | None]] = []
             for node in ast.walk(fn):
                 if (
                     isinstance(node, ast.Assign)
@@ -150,27 +202,46 @@ def check_mutation_count_flush() -> list[str]:
                     and isinstance(node.targets[0], ast.Attribute)
                     and node.targets[0].attr in status_attrs
                 ):
-                    events.append((node.lineno, "mutation"))
+                    recv = node.targets[0].value
+                    model = var_models.get(recv.id) if isinstance(recv, ast.Name) else None
+                    events.append((node.lineno, "mutation", model))
                 elif isinstance(node, ast.Call):
                     src = ast.unparse(node)
                     if ".query(" in src and (".count()" in src or "func.count" in src):
-                        events.append((node.lineno, "count"))
+                        events.append((node.lineno, "count", _fn_var_models_query(node)))
                     elif src.endswith(".flush()"):
-                        events.append((node.lineno, "flush"))
-            events.sort()
-            mutated = False
-            for _, kind in events:
+                        events.append((node.lineno, "flush", None))
+            events.sort(key=lambda e: e[0])
+            mutated_model: str | None = None
+            for _, kind, model in events:
                 if kind == "mutation":
-                    mutated = True
+                    mutated_model = model
                 elif kind == "flush":
-                    mutated = False
-                elif kind == "count" and mutated:
-                    rel = py.relative_to(ROOT)
+                    mutated_model = None
+                elif kind == "count" and mutated_model and model == mutated_model:
+                    rel = py.relative_to(base)
                     alerts.append(
-                        f"{rel}:{fn.name}——状态赋值后 COUNT 未 flush（教训 41 模式，自查）"
+                        f"{rel}:{fn.name}——状态赋值后 COUNT 未 flush"
+                        f"（教训 41 模式，同一实体 {mutated_model}，自查）"
                     )
                     break
     return alerts
+
+
+def _fn_var_models_query(node) -> str | None:
+    """从 `...query(Model)...count()` 调用里取模型名（取不到返回 None）。"""
+    import ast
+
+    for sub in ast.walk(node):
+        if (
+            isinstance(sub, ast.Call)
+            and isinstance(sub.func, ast.Attribute)
+            and sub.func.attr == "query"
+            and sub.args
+            and isinstance(sub.args[0], ast.Name)
+        ):
+            return sub.args[0].id
+    return None
 
 
 def check_like_escape(errors: list[str]) -> None:

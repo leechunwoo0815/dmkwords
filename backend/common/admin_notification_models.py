@@ -14,7 +14,16 @@
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Column, DateTime, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    DateTime,
+    Index,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 
 from backend.common.base_model import BaseModel
 
@@ -32,6 +41,9 @@ class AdminNotification(BaseModel):
             "is_deleted",
             name="uq_admin_notif_dedup",
         ),
+        # P2-2（2026-10-18 第七十六批）：待办墙 `WHERE is_deleted=0 ORDER BY created_at DESC, id DESC`
+        # 原先走唯一索引 + **全表扫 + filesort**（造量 3000 行实测）；本索引让排序走索引顺序。
+        Index("ix_admin_notif_deleted_created", "is_deleted", "created_at", "id"),
     )
 
     SCENE_REFUND_APPLY = "admin.refund_apply"
