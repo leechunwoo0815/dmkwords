@@ -291,9 +291,7 @@ class BookService:
             # P1-4 对偶面（2026-10-18 第七十五批）：软删书目仍占用单列唯一索引 →
             # 改号改到它头上原先同样撞 1062。此处**如实报错、不复活**："改号"不该顺手把
             # 另一本书拉回在架池；要恢复那本书，请用该 ISBN 走**新建**（新建 = 复活原行）。
-            ghost = (
-                self.book_repo.get_by_isbn_including_deleted(new_isbn) if new_isbn else None
-            )
+            ghost = self.book_repo.get_by_isbn_including_deleted(new_isbn) if new_isbn else None
             if ghost is not None and ghost.id != book.id:
                 raise ConflictError(
                     f"ISBN {new_isbn} 属于一本已删除的书目（《{ghost.title}》，id={ghost.id}）"

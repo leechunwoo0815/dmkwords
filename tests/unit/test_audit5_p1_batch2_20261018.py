@@ -35,7 +35,9 @@ def _h(client: TestClient) -> dict:
     return {"Authorization": f"Bearer {r.json()['token']}"}
 
 
-def _borrow(client: TestClient, h: dict, phone: str, child_name: str, title: str) -> tuple[int, int]:
+def _borrow(
+    client: TestClient, h: dict, phone: str, child_name: str, title: str
+) -> tuple[int, int]:
     """建档 + 缴押金 + 建书 + 借出一本，返回 (孩子 id, 借阅行 id)。"""
     _p, c, _mini = _family(client, h, phone, child_name)
     _pay_deposit(client, h, c["id"])

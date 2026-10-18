@@ -69,9 +69,7 @@ def _deposit_row(child_id: int):
 
     with _db() as db:
         return (
-            db.query(Deposit)
-            .filter(Deposit.child_id == child_id, Deposit.is_deleted == 0)
-            .first()
+            db.query(Deposit).filter(Deposit.child_id == child_id, Deposit.is_deleted == 0).first()
         )
 
 
@@ -143,7 +141,8 @@ def test_transfer_target_rejoin_resets_refunded_deposit(client: TestClient):
     dep = _deposit_row(tgt["id"])
     assert dep is not None and dep.status == "refunded", "前置：受让方退会后押金应为 refunded"
     assert (
-        client.post(f"/api/admin/deposits/children/{tgt['id']}/orders", headers=h).status_code == 422
+        client.post(f"/api/admin/deposits/children/{tgt['id']}/orders", headers=h).status_code
+        == 422
     ), "前置：refunded 状态下建押金单应被拒"
 
     applied = client.post(

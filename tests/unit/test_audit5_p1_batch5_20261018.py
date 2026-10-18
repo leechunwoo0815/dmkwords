@@ -156,12 +156,14 @@ def test_unmapped_scene_and_missing_template_degrade_with_true_reason(monkeypatc
     from backend.integrations.wechat.subscribe import push_subscribe_message
 
     # 前置：通道开关打开（否则先撞"通道未启用"，测不到映射分支）
-    monkeypatch.setattr(
-        notif.get_settings(), "WECHAT_SUBSCRIBE_ENABLED", True, raising=False
-    )
+    monkeypatch.setattr(notif.get_settings(), "WECHAT_SUBSCRIBE_ENABLED", True, raising=False)
 
-    queued, reason = push_subscribe_message("openid-stub", "阅读圈点赞", "有人赞了你", "circle.liked")
+    queued, reason = push_subscribe_message(
+        "openid-stub", "阅读圈点赞", "有人赞了你", "circle.liked"
+    )
     assert queued is False and "场景未映射" in reason and "circle.liked" in reason, reason
 
-    queued, reason = push_subscribe_message("openid-stub", "借阅到期提醒", "内容", "borrow.due_remind")
+    queued, reason = push_subscribe_message(
+        "openid-stub", "借阅到期提醒", "内容", "borrow.due_remind"
+    )
     assert queued is False and "未配置" in reason and "RETURN_REMIND" in reason, reason

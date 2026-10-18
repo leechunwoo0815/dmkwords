@@ -59,7 +59,9 @@ def test_soft_deleted_book_same_isbn_create_revives(client: TestClient):
     assert client.delete(f"/api/admin/books/{b1['id']}", headers=h).status_code == 200
 
     r2 = _create(client, h, ISBN_A, "同号复活书·重入库")
-    assert r2.status_code == 200, f"软删后同 ISBN 重建必须成功（复活），实际 {r2.status_code}: {r2.text}"
+    assert r2.status_code == 200, (
+        f"软删后同 ISBN 重建必须成功（复活），实际 {r2.status_code}: {r2.text}"
+    )
     b2 = r2.json()
     assert b2["id"] == b1["id"], "同号必须复活原行（保副本与借阅史），不得新建行"
     assert b2["title"] == "同号复活书·重入库", "复活应被当次请求的元数据覆盖"
@@ -123,6 +125,7 @@ def test_excel_import_same_isbn_of_soft_deleted_book_row_errors(client: TestClie
     assert body["failed_count"] == 1, body
     assert "已删除" in body["errors"][0], body["errors"]
     # 行级错误不得把整批回滚掉：正常那行必须真的入库
-    assert client.get("/api/admin/books", params={"keyword": "正常新书"}, headers=h).json()[
-        "total"
-    ] == 1
+    assert (
+        client.get("/api/admin/books", params={"keyword": "正常新书"}, headers=h).json()["total"]
+        == 1
+    )

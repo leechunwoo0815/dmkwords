@@ -200,9 +200,10 @@ class PaymentNotifyMixin:
             # 改法（同 `catalog/damage_ops.py` 赔偿待办先例）：业务键 = 异常类型；
             # 无对象时 `ref_id` 按**报文指纹**各自成键（同一报文重投仍幂等）；
             # `ignore_handled=True` 让"处理过之后又出事"能重新提醒。
-            digest = getattr(self, "_body_digest", "") or hashlib.sha1(
-                f"{message}|{reason}".encode()
-            ).hexdigest()[:12]
+            digest = (
+                getattr(self, "_body_digest", "")
+                or hashlib.sha1(f"{message}|{reason}".encode()).hexdigest()[:12]
+            )
             AdminNotifyService(self.db).send(
                 scene=AdminNotification.SCENE_PAYMENT_ANOMALY,
                 title="【资金异常】",
