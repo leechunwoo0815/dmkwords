@@ -123,6 +123,10 @@ def clean_db():
     from backend.middleware.rate_limit import _limiter as _rate_limiter
 
     _rate_limiter._requests.clear()
+    # 第八轮审查 P1-3：支付异常留痕的分钟预算同样是进程内状态，跨测试累积会误伤
+    from backend.domain.identity.payment_notify import reset_anomaly_budget
+
+    reset_anomaly_budget()
     with engine.begin() as conn:
         # 2026-08-24 事故加固：dev.sh 后端与 pytest 共库，后端连接持有表锁会导致
         # TRUNCATE 挂起无输出。先设短锁等待超时，让问题显式报错而非假死 15 分钟。

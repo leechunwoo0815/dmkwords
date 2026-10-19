@@ -703,13 +703,19 @@ class CirculationService:
 
         执行体在 `circulation/overdue_notify.py`（W6 压测整改 2026-10-18：`service.py` 已到
         god-file 上限，整改要加批量取数；6000 条逾期实测 104.39s → 见该模块 docstring）。
+
+        **第八轮审查 P1-1（2026-10-19）**：扫描面从 `== ACTIVE` 放宽为 `IN (ACTIVE, OVERDUE)`
+        ——借阅台 `GET /api/admin/circulation/overdue` 会**惰性**把 ACTIVE 改成 OVERDUE
+        （E-11/T20 的展示守卫），而任务原先只扫 ACTIVE，于是"馆员先看到的那批"永远漏发
+        `borrow.overdue` 通知（实测：先调列表 → `processed=0` 且零通知）。已 OVERDUE 的行
+        不再重复 CAS，但补发通知；去重键带到期日，幂等由唯一索引兜底。
         """
         now = datetime.now()
         overdue = (
             self.db.query(BorrowRecord)
             .filter(
                 BorrowRecord.is_deleted == 0,
-                BorrowRecord.status == BorrowRecord.STATUS_ACTIVE,
+                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
                 BorrowRecord.due_at < now,
             )
             .all()

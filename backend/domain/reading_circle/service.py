@@ -507,6 +507,9 @@ class CircleService:
             ref_type, ref_id = "child", str(liker_child_id)
         else:
             ref_type, ref_id = "circle_post", str(post.id)  # 兼容历史（无名义的老赞）
+        # 第八轮审查 P2-10：openid 原先漏传 → 微信通道恒 skipped；跨域取用延迟 import
+        from backend.domain.identity.wm_notify import parent_openid
+
         NotificationService(self.db).send(
             parent_id=post.parent_id,
             scene=SCENE_CIRCLE_LIKED,
@@ -517,6 +520,7 @@ class CircleService:
             ref_type=ref_type,
             ref_id=ref_id,
             dedup_key=dedup_key,
+            openid=parent_openid(self.db, post.parent_id),
         )
 
     # ---------- 删除 ----------

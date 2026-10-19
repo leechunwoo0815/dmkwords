@@ -33,12 +33,53 @@ def lock_deposit(db: Session, deposit_id: int):
 
 
 def assert_deposit_refund_executable(db: Session, req) -> None:
-    """押金退款执行前余额复核（调用点：`RefundService.execute`，提交网关之前）。"""
+    """押金退款执行前**累计**复核（调用点：`RefundService.execute`，提交网关之前）。
+
+    第八轮审查 P1-2（2026-10-19）补第二重判据。两重：
+      ① **点余额**：本次 ≤ 当前可用余额（原 P0-D 闸，保留）；
+      ② **网关在途累计**：本次 + 该押金**其它 `PROCESSING`** 退款单合计 ≤ 当前可用余额。
+
+    为什么必须有 ②（实测复现）：`available_amount` 到**终态**才扣减（`wm10_service._finalize_refund`），
+    而线上退款在 Phase 1 就把单子提交 `PROCESSING` 并交给网关——此时钱已出、余额未动。原闸只比
+    "点余额"，于是第二张同额单**原样放行**（第八轮探针：余额 1200 + 一张 PROCESSING 1200，
+    第二张 1200 过闸）→ 押金余额可被打成负数。订单侧早有同款累计闸
+    （`assert_order_refund_executable`，2026-10-12），押金侧一直缺。
+
+    **为什么只数 `PROCESSING`**：三种状态的钱在哪里不同——
+      · `PENDING` / `APPROVED` 只是**申请**，钱没动，也不占余额（两笔都批准、只执行其中一笔是
+        正常运营动作；把它们算进来会把第一笔也拦死，P0-D 老用例实测即如此）；
+      · `REFUNDED` 的金额在终态已从 `available_amount` 扣掉，再计入会**跨会员周期误伤**
+        （重新入会复位押金后，上一周期的历史退款单会把新周期正常退款判成超额——与
+        `existing_dep_rr` 的历史判重同一个坑）；
+      · `PROCESSING` 恰好是"**钱已交给网关、余额还没扣**"的唯一窗口，也正是重复出款的入口。
+    """
     dep = lock_deposit(db, req.deposit_id)
-    if dep and dep.available_amount < req.amount:
+    if dep is None:
+        return
+    if dep.available_amount < req.amount:
         raise ValidationError(
             f"押金可用余额不足（可用 {dep.available_amount}，本次申请 {req.amount}）——"
             "疑似重复退款单，请人工核对后再执行"
+        )
+    from sqlalchemy import func
+
+    from backend.domain.identity.models import RefundRequest
+
+    in_flight = (
+        db.query(func.coalesce(func.sum(RefundRequest.amount), 0))
+        .filter(
+            RefundRequest.deposit_id == req.deposit_id,
+            RefundRequest.id != req.id,
+            RefundRequest.is_deleted == 0,
+            RefundRequest.status == RefundRequest.STATUS_PROCESSING,
+        )
+        .scalar()
+    )
+    if (in_flight or 0) + req.amount > dep.available_amount:
+        raise ValidationError(
+            f"该押金退款将超额（可用 {dep.available_amount}，"
+            f"其它已提交网关的在途 {in_flight}，本次 {req.amount}）"
+            "——疑似重复退款单，请人工核对后再执行"
         )
 
 

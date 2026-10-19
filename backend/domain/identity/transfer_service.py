@@ -26,6 +26,7 @@ from backend.domain.identity.models import (
     TransferRequest,
     WithdrawalRequest,
 )
+from backend.domain.identity.wm_notify import parent_openid
 
 
 class TransferService:
@@ -382,6 +383,7 @@ class TransferService:
                     ref_type="transfer",
                     ref_id=str(r.id),
                     dedup_key="expired",
+                    openid=parent_openid(self.db, source.parent_id),
                 )
             # WM13 L2 回写：超时自动失效 → 该单管理待办审计标注来源（幂等）
             from backend.common.admin_notification_models import AdminNotification
@@ -639,6 +641,7 @@ class TransferService:
             category=Notification.CATEGORY_OTHER,
             ref_type="transfer",
             ref_id=str(req.id),
+            openid=parent_openid(self.db, source.parent_id),
         )
         # WM13 L2 回写：审核终态 → 该单管理待办审计回写（幂等；含超时预警通知）
         from backend.common.admin_notification_models import AdminNotification

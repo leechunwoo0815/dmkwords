@@ -341,6 +341,8 @@ class ReportAdminService:
         from backend.common.notifications import SCENE_REPORT_GENERATED, NotificationService
 
         period_label = svc.period_range(kind)[2]  # period_range 在 ReportService 上（本类不继承）
+        # 第八轮审查 P2-10：openid 原先漏传 → 微信通道恒 skipped；跨域取用延迟 import
+        from backend.domain.identity.wm_notify import parent_openid
 
         NotificationService(self.db).send(
             parent_id=child.parent_id,
@@ -359,6 +361,7 @@ class ReportAdminService:
             # 周报/月报通知（第二周起静默吞掉）。键里带上**报告覆盖期**（period_range 的 label，
             # 周报=上个自然周 / 月报=上个自然月），一个周期一条。
             dedup_key=f"{kind}-{period_label}",
+            openid=parent_openid(self.db, child.parent_id),
         )
         self.db.commit()
         return {"path": rel, "url": f"/api/admin/uploads/{rel}", "data": data}

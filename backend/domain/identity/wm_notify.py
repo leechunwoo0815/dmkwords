@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.common.notification_models import Notification
@@ -13,6 +14,21 @@ from backend.common.notifications import (
     SCENE_MONEY_REFUND_RESULT,
     NotificationService,
 )
+
+
+def parent_openid(db: Session, parent_id: int) -> str | None:
+    """家长微信 openid（微信订阅"尽力通道"的接收人）。**通知的 openid 一律从这里取**。
+
+    第八轮审查 P2-10（2026-10-19）：全仓 18 个 `NotificationService.send` 调用点里有 **10 个**
+    没传 `openid` → `_wechat_push` 在"无 openid"分支直接写 `skipped: 家长未授权（无 openid）`，
+    这些场景的微信通道**恒为空转**（站内信不受影响），且跳过原因是**假原因**（家长其实绑了微信、
+    模板也已配）。统一从这里取，避免各域各写一份；跨域调用方按本项目惯例**函数内延迟 import**。
+    """
+    from backend.domain.identity.models import Parent
+
+    return db.execute(
+        select(Parent.wechat_openid).where(Parent.id == parent_id, Parent.is_deleted == 0)
+    ).scalar_one_or_none()
 
 
 def notify_refund_reviewed(db: Session, child, req, approve: bool, remark: str) -> None:
@@ -30,6 +46,7 @@ def notify_refund_reviewed(db: Session, child, req, approve: bool, remark: str) 
         child_id=child.id,
         ref_type="refund_request",
         ref_id=str(req.id),
+        openid=parent_openid(db, child.parent_id),
     )
 
 
@@ -50,6 +67,7 @@ def notify_refund_executed(db: Session, child, req, success: bool, remark: str) 
         child_id=child.id,
         ref_type="refund_request",
         ref_id=str(req.id),
+        openid=parent_openid(db, child.parent_id),
     )
 
 
@@ -70,6 +88,7 @@ def notify_withdrawal_reviewed(
         child_id=child.id,
         ref_type="withdrawal_request",
         ref_id=str(request_id),
+        openid=parent_openid(db, child.parent_id),
     )
 
 

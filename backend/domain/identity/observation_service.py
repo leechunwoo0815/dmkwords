@@ -13,6 +13,7 @@ from backend.common.notifications import SCENE_OTHER_EVALUATION_UPLOADED, Notifi
 from backend.config import get_settings
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, ObservationReport
+from backend.domain.identity.wm_notify import parent_openid
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,7 @@ class ObservationReportService:
             ref_type="child",
             ref_id=str(child.id),
             dedup_key=str(report.id),
+            openid=parent_openid(self.db, child.parent_id),
         )
         publish_audit(
             self.db,

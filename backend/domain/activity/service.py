@@ -455,6 +455,9 @@ class ActivityService(ActivityCancelMixin):
         if order is not None:
             self._notify_enroll_manual(child, a, e, fee)
         # WM11：报名成功通知家长
+        # 第八轮审查 P2-10：openid 原先漏传 → 微信通道恒 skipped；跨域取用延迟 import
+        from backend.domain.identity.wm_notify import parent_openid
+
         NotificationService(self.db).send(
             parent_id=child.parent_id,
             scene=SCENE_ACTIVITY_ENROLL,
@@ -465,6 +468,7 @@ class ActivityService(ActivityCancelMixin):
             ref_type="activity",
             ref_id=str(activity_id),
             dedup_key=str(e.id),
+            openid=parent_openid(self.db, child.parent_id),
         )
         self.db.commit()
         return {"enrollment": self._enrollment_view(e), "order_id": order.id if order else None}

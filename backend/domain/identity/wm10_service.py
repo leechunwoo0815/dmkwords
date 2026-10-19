@@ -319,6 +319,14 @@ class RefundService:
                 )
                 if order and order.refund_status == Order.REFUND_STATUS_PENDING:
                     order.refund_status = Order.REFUND_STATUS_NONE
+                # 第八轮审查 P1-8：活动报名退款被拒 → 报名回退 `enrolled`（成功路径的对偶，
+                # 原先只有 deprecated 端点做，退款中心走统一端点 → 报名永久卡退款中）
+                if order and order.order_type == Order.TYPE_ACTIVITY:
+                    from backend.domain.activity.enrollment_ops import (
+                        restore_enrollment_after_refund_rejected,
+                    )
+
+                    restore_enrollment_after_refund_rejected(self.db, order)
             # 联动退会申请一并拒绝 + 解锁（R-309 联动创建的；拒绝后家长可再申请）
             if req.withdrawal_id:
                 w = (

@@ -11,12 +11,43 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import threading
+import time
+from collections import deque
 from decimal import Decimal
 
 from backend.common.async_utils import run_coro
 from backend.domain.catalog.audit_events import publish_audit
 
 logger = logging.getLogger(__name__)
+
+#: 异常留痕的落库预算（每分钟条数）。
+#: **第八轮审查 P1-3（2026-10-19）**：`/api/pay/` 按设计**免限流**（微信会重试，限流会把回调挡在
+#: 门外 = 丢单），但"验签失败也写 1 审计 + 1 待办"的副作用原先**无上限**——未认证攻击者每次换
+#: body 就能各写一行（实测：5 次请求 → audit_logs +5 / admin_notifications +5）。真实资金异常
+#: 远低于该阈值，所以给**留痕本身**加进程内滑动窗口：超出的只进进程日志，不落库。
+#: 端点响应不变（401/400 照旧），微信的重试语义不受影响。
+ANOMALY_PER_MINUTE = 60
+_anomaly_stamps: deque[float] = deque()
+_anomaly_lock = threading.Lock()
+
+
+def reset_anomaly_budget() -> None:
+    """清空滑动窗口（测试基建：每个用例独立；与 `RateLimiter` 的重置同款）。"""
+    with _anomaly_lock:
+        _anomaly_stamps.clear()
+
+
+def _anomaly_budget_ok() -> bool:
+    """本分钟是否还有落库预算（有则记账，无则不落库）。"""
+    now = time.monotonic()
+    with _anomaly_lock:
+        while _anomaly_stamps and now - _anomaly_stamps[0] > 60:
+            _anomaly_stamps.popleft()
+        if len(_anomaly_stamps) >= ANOMALY_PER_MINUTE:
+            return False
+        _anomaly_stamps.append(now)
+        return True
 
 
 class PaymentNotifyMixin:
@@ -188,6 +219,15 @@ class PaymentNotifyMixin:
         资金相关异常必须留痕，否则出问题时只能看到"钱少了"而查不到经过。
         """
         logger.warning("支付异常留痕: %s | %s", message, reason)
+        # 第八轮审查 P1-3：留痕的**落库副作用有界**（超预算只进进程日志，不写审计/待办）
+        if not _anomaly_budget_ok():
+            logger.error(
+                "资金异常留痕超频（>%s/分钟），本条只进进程日志不落库：%s | %s",
+                ANOMALY_PER_MINUTE,
+                message,
+                reason[:120],
+            )
+            return
         # 2026-10-12 拍板（P10）：**资金异常要进管理端待办**。原先只写审计行，而审计页仅超管可见
         # ——"钱收了没入账"这类事故只能靠人主动翻页面。这里同事务补一条待办（失败不影响留痕）。
         try:

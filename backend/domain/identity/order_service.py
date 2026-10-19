@@ -19,6 +19,7 @@ from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity import refund_rules
 from backend.domain.identity.models import Child, Order, Parent, RefundRequest
 from backend.domain.identity.order_guards import OrderGuardMixin
+from backend.domain.identity.wm_notify import parent_openid
 
 
 class OrderService(OrderGuardMixin):
@@ -488,6 +489,7 @@ class OrderService(OrderGuardMixin):
                             ref_type="activity",
                             ref_id=str(e.activity_id),
                             dedup_key=f"paid-{e.id}",
+                            openid=parent_openid(self.db, order.parent_id),
                         )
 
         publish_audit(
