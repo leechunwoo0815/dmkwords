@@ -224,6 +224,12 @@ class RefundService:
                 RefundRequest.child_id == child.id,
                 RefundRequest.is_deleted == 0,
             )
+            # 第八轮审查 P2-2：**撤销必须与 review/execute 抢同一把行锁**。原先这里是普通读：
+            # 家长的 SELECT 可以在审核提交前读到 `pending`，其 UPDATE 排在审核/执行的行锁之后
+            # 执行 → 把已 `approved/processing/refunded` 的单**覆盖回 cancelled**（线上退款
+            # Phase 1 已提交网关时更糟：本地显示"已撤销"而钱正在退出，押金还会被复位）。
+            .with_for_update()
+            .populate_existing()
             .first()
         )
         if not req:

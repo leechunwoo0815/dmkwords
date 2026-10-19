@@ -429,6 +429,11 @@ class TransferService:
         req = (
             self.db.query(TransferRequest)
             .filter(TransferRequest.id == transfer_id, TransferRequest.is_deleted == 0)
+            # 第八轮审查 P2-2：与 `review`（锁定读）同锁串行化——`cancel` 原先走普通读，
+            # 可把**已审核通过**（孩子已退会/受让方已转正、押金退款已发起）的转让单改成 cancelled
+            # 并解锁双方，记录与实际权益相反。
+            .with_for_update()
+            .populate_existing()
             .first()
         )
         if not req:

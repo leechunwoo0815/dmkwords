@@ -28,6 +28,28 @@ def _deposit_order(client, h, child_id: int) -> dict:
     return client.post(f"/api/admin/deposits/children/{child_id}/orders", headers=h).json()
 
 
+def _force_deposit_order(child_id: int) -> int:
+    """直落库造一笔待人工确认的押金单（构造"两笔并存"历史态；接口层已封，见用例注释）。"""
+    from backend.database import get_session
+    from backend.domain.identity.models import Child, Order
+    from backend.domain.identity.order_service import OrderService
+
+    with get_session() as db:
+        child = db.get(Child, child_id)
+        o = Order(
+            order_no=OrderService.new_order_no(),
+            order_type=Order.TYPE_DEPOSIT,
+            parent_id=child.parent_id,
+            child_id=child.id,
+            amount=Decimal("1200.00"),
+            status=Order.STATUS_PENDING_MANUAL,
+            remark="探针：旁路构造的第二笔押金单",
+        )
+        db.add(o)
+        db.commit()
+        return o.id
+
+
 def _confirm(client, h, order_id: int):
     return client.post(
         f"/api/admin/orders/{order_id}/confirm-payment", json={"pay_method": "scan"}, headers=h
@@ -54,7 +76,10 @@ def test_duplicate_deposit_order_rejected_after_deduction(client: TestClient):
     h = _h(client)
     c = _member_child(client, h, "13800008901")
     o1 = _deposit_order(client, h, c["id"])
-    o2 = _deposit_order(client, h, c["id"])  # 双击/重试建出的第二笔
+    # 第八轮审查 P2-1（2026-10-19）之后**接口层已不允许**再造出第二笔在途押金单
+    # （管理端押金单/补缴单/通用造单三入口都挂了在途单闸）——但本用例要验的是**结算侧的第二道闸**
+    # （两笔单并存时确认收款必须被拒），所以按项目惯例**直落库构造历史态**（旧数据/旁路产生的单）。
+    o2 = {"order_id": _force_deposit_order(c["id"])}
     assert o1["order_id"] != o2["order_id"]
     assert _confirm(client, h, o1["order_id"]).status_code == 200
 

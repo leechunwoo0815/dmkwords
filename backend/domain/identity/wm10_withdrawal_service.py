@@ -204,6 +204,10 @@ class WithdrawalService:
                 WithdrawalRequest.child_id == child.id,
                 WithdrawalRequest.is_deleted == 0,
             )
+            # 第八轮审查 P2-2：与 `review`/`_advance_withdrawal` 同锁串行化——原先普通读，
+            # 撤销的 UPDATE 可覆盖已 `refunding/pending_settle` 的退会单并解锁，而退款仍在执行。
+            .with_for_update()
+            .populate_existing()
             .first()
         )
         if not req:

@@ -26,6 +26,22 @@ def test_dashboard_charts_shape_and_content(client: TestClient):
         json={"child_id": c["id"], "isbn": "9780394800401"},
         headers=h,
     )
+    # 第八轮审查（2026-10-19）实证：`borrowed_at` 是 **DATETIME(0)**，MySQL 对小数秒**四舍五入**
+    # ——`23:59:59.6~59.999` 会被写成**次日 00:00:00**。用例若恰好跑在这一秒（本批全量单测实测命中
+    # 一次），按 `DATE()` 聚合的趋势桶会把"今天刚借的"算到明天 → 断言偶发假红。
+    # 这里把秒以下抹平（**不改判据**：仍是"同一秒内借的书必须出现在趋势里"）。
+    from sqlalchemy import text as _text
+
+    from backend.database import get_session as _get_session
+
+    with _get_session() as db:
+        db.execute(
+            _text(
+                "UPDATE borrow_records SET borrowed_at = "
+                "DATE_FORMAT(borrowed_at, '%Y-%m-%d %H:%i:%s')"
+            )
+        )
+        db.commit()
 
     r = client.get("/api/admin/dashboard/charts?days=14&top=5", headers=h)
     assert r.status_code == 200, r.text

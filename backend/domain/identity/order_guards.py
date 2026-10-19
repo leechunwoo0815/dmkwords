@@ -11,9 +11,40 @@
 from __future__ import annotations
 
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from backend.common.exceptions import ConflictError, ValidationError
 from backend.domain.identity.models import Child, Order, Parent
+
+
+def assert_no_inflight_deposit_order(db: Session, child_id: int) -> None:
+    """押金/补缴**在途单闸**（全系统唯一判据）：同一孩子已有待支付的押金类订单即拒。
+
+    **第八轮审查 P2-1（2026-10-19）**：这道闸原先只写在家长端在线建单
+    （`payment_service.create_online_order`），而管理端造单（`OrderService.create` 的 deposit 分支）
+    与押金/补缴两个入口（`billing.create_deposit_order` / `create_supplement_order`）都没有。
+    后果：双击 / 两个窗口就能留下两笔 pending 单，两笔都能付——第二笔在
+    `on_deposit_order_paid` 抛"押金已缴纳" → 回调兜底 200 + 资金异常待办 =
+    **钱收了、押金不动、只能人工退款**。押金是担保账户：宁可少收，不许错收。
+
+    实现要点：**先锁 Child 行**再"查在途 + 建单"。原先在线路径的检查是纯读（TOCTOU），
+    两个并发请求各自读到"无在途"照样穿透；锁序 Child → Order 与结算链路（`prepare_settle`）一致。
+    锁的是裸列 `Child.id`（不加载实体），与 `assert_first_activity_eligible` 同款，无需
+    `populate_existing`。
+    """
+    db.query(Child.id).filter(Child.id == child_id).with_for_update().first()
+    inflight = (
+        db.query(func.count(Order.id))
+        .filter(
+            Order.child_id == child_id,
+            Order.order_type.in_((Order.TYPE_DEPOSIT, Order.TYPE_DEPOSIT_SUPPLEMENT)),
+            Order.status.in_((Order.STATUS_PENDING_PAYMENT, Order.STATUS_PENDING_MANUAL)),
+            Order.is_deleted == 0,
+        )
+        .scalar()
+    )
+    if inflight:
+        raise ValidationError("该孩子已有一笔待支付的押金订单，请先完成支付或取消后再下单")
 
 
 class OrderGuardMixin:

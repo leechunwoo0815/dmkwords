@@ -224,6 +224,10 @@ class DepositService:
             raise ValidationError(
                 f"押金当前状态为 {dep.status}，无需重复缴纳（补缴请走押金补缴入口）"
             )
+        # 第八轮审查 P2-1：在途单闸（全系统唯一判据，见 order_guards）——原先只有家长端在线建单有
+        from backend.domain.identity.order_guards import assert_no_inflight_deposit_order
+
+        assert_no_inflight_deposit_order(self.db, child.id)
         amount = Decimal(ConfigService(self.db).get_value("deposit_amount"))
         import uuid
         from datetime import datetime
@@ -269,6 +273,10 @@ class DepositService:
             raise ValidationError("押金余额充足，无需补缴")
         if dep.status not in (Deposit.STATUS_PARTIALLY_DEDUCTED, Deposit.STATUS_FULLY_DEDUCTED):
             raise ValidationError("押金当前无需补缴")
+        # 第八轮审查 P2-1：补缴入口同样要有在途单闸（原先只在家长端在线建单）
+        from backend.domain.identity.order_guards import assert_no_inflight_deposit_order
+
+        assert_no_inflight_deposit_order(self.db, child.id)
         import uuid
         from datetime import datetime
 

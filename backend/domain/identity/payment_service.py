@@ -189,18 +189,11 @@ class PaymentService(PaymentNotifyMixin):
             # 账户"，而全新孩子（未缴过押金 = 没有 Deposit 行）恰恰是这道闸完全看不见的情形：
             # 双击/旧页面连建两笔都是 200，两笔都能付——第一笔把押金缴成 PAID，第二笔走回调兜底
             # （anomaly：钱收了、押金不动、只剩人工退款）。押金是担保账户：宁可少收，不许错收。
-            inflight = (
-                self.db.query(func.count(Order.id))
-                .filter(
-                    Order.child_id == child.id,
-                    Order.order_type.in_((Order.TYPE_DEPOSIT, Order.TYPE_DEPOSIT_SUPPLEMENT)),
-                    Order.status.in_((Order.STATUS_PENDING_PAYMENT, Order.STATUS_PENDING_MANUAL)),
-                    Order.is_deleted == 0,
-                )
-                .scalar()
-            )
-            if inflight:
-                raise ValidationError("该孩子已有一笔待支付的押金订单，请先完成支付或取消后再下单")
+            # 第八轮审查 P2-1：判据收口到 order_guards 单点（并补上原先缺的 Child 行锁，
+            # 纯读检查存在 TOCTOU：两个并发建单各自读到"无在途"照样穿透）
+            from backend.domain.identity.order_guards import assert_no_inflight_deposit_order
+
+            assert_no_inflight_deposit_order(self.db, child.id)
         from backend.domain.identity.order_service import OrderService
 
         amount = OrderService(self.db).price_member_order(parent, child, order_type)

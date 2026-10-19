@@ -17,6 +17,7 @@
 import threading
 import time
 from datetime import date, timedelta
+from decimal import Decimal
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func
@@ -107,6 +108,28 @@ def _order_nos(body: dict) -> set:
 
 
 # ---------- #3 退会结算不核报名状态 ----------
+
+
+def _force_deposit_order(child_id: int) -> int:
+    """直落库造一笔待人工确认的押金单（构造"两笔并存"历史态；接口层已封，见用例注释）。"""
+    from backend.database import get_session
+    from backend.domain.identity.models import Child, Order
+    from backend.domain.identity.order_service import OrderService
+
+    with get_session() as db:
+        child = db.get(Child, child_id)
+        o = Order(
+            order_no=OrderService.new_order_no(),
+            order_type=Order.TYPE_DEPOSIT,
+            parent_id=child.parent_id,
+            child_id=child.id,
+            amount=Decimal("1200.00"),
+            status=Order.STATUS_PENDING_MANUAL,
+            remark="探针：旁路构造的第二笔押金单",
+        )
+        db.add(o)
+        db.commit()
+        return o.id
 
 
 def test_settle_skips_checked_in_activity_order(client: TestClient):
@@ -702,9 +725,9 @@ def test_stale_deposit_order_cannot_be_paid_after_deposit_paid(client: TestClien
     a = client.post(
         "/api/admin/orders", json={"child_id": c["id"], "order_type": "deposit"}, headers=h
     ).json()
-    b = client.post(
-        "/api/admin/orders", json={"child_id": c["id"], "order_type": "deposit"}, headers=h
-    ).json()
+    # 第八轮审查 P2-1 之后接口层已封"第二笔在途押金单"——本用例验的是**家长端支付侧**的闸
+    # （旧单发起支付必须在调网关前被拒），故直落库构造历史态
+    b = {"id": _force_deposit_order(c["id"])}
     pa = client.post(f"/api/miniapp/orders/{a['id']}/pay", headers=mini)
     assert pa.status_code == 200 and pa.json()["instant_paid"] is True, pa.text
 
