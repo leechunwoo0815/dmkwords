@@ -92,11 +92,123 @@ def step_staff_try_update(context):
         json={"value": "20", "reason": "越权"},
         headers=context.staff_headers,
     )
+    context.forbidden_resp = context.staff_update_resp  # 供共享的「系统返回权限不足」断言取用
+
+
+@given("馆员账号尝试审核一笔退款申请")
+def step_staff_try_review_refund(context):
+    """造一笔**待审退款单**，再让 staff01 去审 → 应被 `require_super_admin()` 拦。
+
+    退款单走真实链路造：家长端申请（`POST /api/miniapp/refund-requests`）需要一笔已支付订单。
+    """
+    admin_headers = get_admin_headers(context)
+    parent = context.client.post(
+        "/api/admin/members/parents",
+        json={"name": "越权家长", "phone": "13985000003"},
+        headers=admin_headers,
+    ).json()
+    child = context.client.post(
+        f"/api/admin/members/parents/{parent['id']}/children",
+        json={"name": "越权孩"},
+        headers=admin_headers,
+    ).json()
+    order = context.client.post(
+        "/api/admin/orders",
+        json={"child_id": child["id"], "order_type": "observation_fee"},
+        headers=admin_headers,
+    ).json()
+    rc = context.client.post(
+        f"/api/admin/orders/{order['id']}/confirm-payment",
+        json={"pay_method": "scan"},
+        headers=admin_headers,
+    )
+    assert rc.status_code == 200, rc.text
+    mini = {
+        "Authorization": "Bearer "
+        + context.client.post(
+            "/api/miniapp/login", json={"phone": "13985000003", "code": "1234"}
+        ).json()["token"]
+    }
+    rr = context.client.post(
+        "/api/miniapp/refund-requests",
+        json={"child_id": child["id"], "order_id": order["id"], "reason": "越权用例：待审退款"},
+        headers=mini,
+    )
+    assert rr.status_code == 200, rr.text
+    context.forbidden_resp = context.client.post(
+        f"/api/admin/refund-requests/{rr.json()['id']}/review",
+        json={"approve": True, "remark": "馆员越权审核"},
+        headers=get_staff_headers(context),
+    )
 
 
 @then("系统返回权限不足")
 def step_forbidden(context):
-    assert context.staff_update_resp.status_code == 403
+    """共享断言：**按 `context.forbidden_resp`** 判（各越权 Given 各自设置）。
+
+    （原实现写死 `context.staff_update_resp`——只能服务"专员改配置"那一条；rbac 域解封时两条新场景
+    各有自己的越权请求，故收敛成单一取用点。）
+    """
+    resp = getattr(context, "forbidden_resp", None)
+    assert resp is not None, "该场景没有设置 forbidden_resp（越权请求未发出）"
+    assert resp.status_code == 403, f"越权应 403，实 {resp.status_code} {resp.text[:120]}"
+
+
+@given("家长 A 尝试查询家长 B 的孩子数据")  # feature 里是「假如」（Given）——首轮实测踩到
+def step_parent_cross_child(context):
+    """两个家庭各建一个孩子；家长 A 拿自己的 token 去取家长 B 的孩子数据（跨租户取数）。"""
+    admin_headers = get_admin_headers(context)
+    fams = []
+    for suffix, name in (("13985000004", "A孩"), ("13985000005", "B孩")):
+        p = context.client.post(
+            "/api/admin/members/parents",
+            json={"name": f"家长{suffix[-1]}", "phone": suffix},
+            headers=admin_headers,
+        ).json()
+        c = context.client.post(
+            f"/api/admin/members/parents/{p['id']}/children",
+            json={"name": name},
+            headers=admin_headers,
+        ).json()
+        token = context.client.post(
+            "/api/miniapp/login", json={"phone": suffix, "code": "1234"}
+        ).json()["token"]
+        fams.append({"parent": p, "child": c, "headers": {"Authorization": f"Bearer {token}"}})
+    context.fam_a, context.fam_b = fams[0], fams[1]
+    # 家长 A 用**自己**的 token 指定家长 B 的 child_id（两处代表性读/写入口）
+    context.cross_list = context.client.get(
+        "/api/miniapp/children", headers=context.fam_a["headers"]
+    )
+    context.cross_write = context.client.post(
+        "/api/miniapp/reading/progress",
+        json={
+            "child_id": context.fam_b["child"]["id"],
+            "book_id": 1,
+            "position": 1,
+            "session_start": 0,
+        },
+        headers=context.fam_a["headers"],
+    )
+
+
+@then("系统拒绝访问")
+def step_cross_tenant_denied(context):
+    """跨孩子取数必须**双证据**拒绝：① 读列表里没有别人的孩子；② 写接口非 2xx。"""
+    assert context.cross_list.status_code == 200, context.cross_list.text
+    payload = context.cross_list.json()
+    # 该端点返回 `{"children": [...]}`（与登录载荷同源）——首轮实测按裸列表取值 TypeError
+    rows = payload["children"] if isinstance(payload, dict) else payload
+    ids = [c["id"] for c in rows]
+    assert context.fam_b["child"]["id"] not in ids, f"家长 A 的列表里出现了家长 B 的孩子：{ids}"
+    assert context.fam_a["child"]["id"] in ids, f"自己的孩子在列表里（否则是空列表假绿）：{ids}"
+    # 写接口必须拒，且**必须是归属校验那一条**（422「孩子不存在」）——不能只断言"非 2xx"：
+    # 首轮实测写死 `>= 400` 时，去掉归属校验的变异**照样绿**（别的错误也满足非 2xx）= 假绿。
+    assert context.cross_write.status_code == 422, (
+        f"跨孩子写入应被归属校验拒（422），实 {context.cross_write.status_code} {context.cross_write.text[:120]}"
+    )
+    assert "孩子不存在" in context.cross_write.json().get("detail", ""), context.cross_write.text[
+        :200
+    ]
 
 
 @when("配置被修改后")
