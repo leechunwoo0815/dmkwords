@@ -232,11 +232,185 @@ def step_logs_readonly(context):
     assert resp_put.status_code in (404, 405)
 
 
-@when("资金操作留痕")
-def step_pending_wm2(context):
-    raise NotImplementedError("WM2-WM4 资金模块未交付")
+@when("馆员放行一笔异常借书并填写原因")
+def step_borrow_with_override(context):
+    """造一笔**带异常快照**的放行借书：未入会孩子 + 馆员填原因放行（`override_reason`）。
+
+    异常快照 = 借书时服务端返回的 `warnings`（未入会临时借书 / 押金未缴…）——它必须原样进审计 detail，
+    否则事后复盘看不出"当时到底异常在哪"（红线：人工放行边界）。
+    """
+    from features.steps.borrowing_steps import _book_with_copies, _borrow, _set_config
+
+    context.h = get_admin_headers(context)
+    # 未入会孩子要能借出，必须先开"未入会临时借书"开关（默认 false → 服务端直接拒）
+    _set_config(context, "allow_unpaid_offline_borrow", "true")
+    parent = context.client.post(
+        "/api/admin/members/parents",
+        json={"name": "放行家长", "phone": "13985000001"},
+        headers=context.h,
+    ).json()
+    child = context.client.post(
+        f"/api/admin/members/parents/{parent['id']}/children",
+        json={"name": "放行孩"},
+        headers=context.h,
+    ).json()
+    _book_id, copy_ids = _book_with_copies(context, "放行留痕书")
+    context.borrow_reason = "家长临时体验，明日入会"
+    r = _borrow(context, child["id"], copy_id=copy_ids[0], override=context.borrow_reason)
+    assert r.status_code == 200, r.text
+    context.borrow_resp = r.json()
+    assert context.borrow_resp.get("warnings"), (
+        f"该笔借书应有异常快照（warnings 非空）——否则用例前提不成立：{context.borrow_resp}"
+    )
 
 
-@when("人工放行留痕")
-def step_pending_wm5(context):
-    raise NotImplementedError("WM5 借阅模块未交付")
+def _audit_items(context, *, action: str) -> list[dict]:
+    resp = context.client.get(
+        "/api/admin/audit-logs", params={"action": action}, headers=get_admin_headers(context)
+    )
+    assert resp.status_code == 200, resp.text
+    items = resp.json()["items"]
+    assert items, f"没有 {action} 的审计日志"
+    return items
+
+
+@then("日志记录操作人、时间、对象、动作、原因与当时异常快照")
+def step_audit_borrow_override(context):
+    import json
+
+    entry = _audit_items(context, action="circulation.borrow")[0]
+    assert entry["actor_name"], f"缺操作人：{entry}"
+    assert entry["created_at"], f"缺时间：{entry}"
+    assert entry["target_type"] == "borrow" and entry["target_id"], f"缺对象：{entry}"
+    assert entry["reason"] == context.borrow_reason, f"原因应原样留痕：{entry['reason']}"
+    detail = json.loads(entry["detail"])
+    assert detail["warnings"] == context.borrow_resp["warnings"], (
+        f"异常快照必须与借书当时一致：日志={detail['warnings']} 当时={context.borrow_resp['warnings']}"
+    )
+    assert detail["child"] and detail["book"] and detail["copy"], f"detail 缺业务要素：{detail}"
+
+
+@when("任一退款、押金扣除、人工收款确认发生")
+def step_three_fund_actions(context):
+    """三种资金操作各真做一笔（走真实 API）：① 人工收款确认 ② 押金扣除 ③ 退款审核。
+
+    各自记录**服务端返回的金额**到 context，供断言步骤比对（不写死，防口径漂移）。
+    """
+    context.h = get_admin_headers(context)
+    parent = context.client.post(
+        "/api/admin/members/parents",
+        json={"name": "资金家长", "phone": "13985000002"},
+        headers=context.h,
+    ).json()
+    child = context.client.post(
+        f"/api/admin/members/parents/{parent['id']}/children",
+        json={"name": "资金孩"},
+        headers=context.h,
+    ).json()
+    cid = child["id"]
+
+    # ① 人工收款确认（观察期费 500 → paid）
+    order = context.client.post(
+        "/api/admin/orders",
+        json={"child_id": cid, "order_type": "observation_fee"},
+        headers=context.h,
+    ).json()
+    rc = context.client.post(
+        f"/api/admin/orders/{order['id']}/confirm-payment",
+        json={"pay_method": "scan", "remark": "审计留痕：人工收款"},
+        headers=context.h,
+    )
+    assert rc.status_code == 200, rc.text
+    context.paid_order = order
+
+    # ② 押金扣除（缴 1200 → 扣 100 作赔偿）
+    dep = context.client.post(
+        f"/api/admin/deposits/children/{cid}/orders", headers=context.h
+    ).json()
+    dep_id = dep.get("id") or dep["order_id"]
+    rc2 = context.client.post(
+        f"/api/admin/orders/{dep_id}/confirm-payment",
+        json={"pay_method": "scan"},
+        headers=context.h,
+    )
+    assert rc2.status_code == 200, rc2.text
+    ded = context.client.post(
+        f"/api/admin/deposits/children/{cid}/deduct",
+        json={"amount": "100.00", "reason": "审计留痕：赔偿扣除"},
+        headers=context.h,
+    )
+    assert ded.status_code == 200, ded.text
+    context.deposit_after = ded.json()
+
+    # ③ 退款（家长申请 → 超管审核通过）
+    mini = {
+        "Authorization": "Bearer "
+        + context.client.post(
+            "/api/miniapp/login", json={"phone": "13985000002", "code": "1234"}
+        ).json()["token"]
+    }
+    rr = context.client.post(
+        "/api/miniapp/refund-requests",
+        json={"child_id": cid, "order_id": order["id"], "reason": "审计留痕：退款"},
+        headers=mini,
+    )
+    assert rr.status_code == 200, rr.text
+    context.refund_req = rr.json()
+    rv = context.client.post(
+        f"/api/admin/refund-requests/{context.refund_req['id']}/review",
+        json={"approve": True, "remark": "审计留痕：同意退款"},
+        headers=context.h,
+    )
+    assert rv.status_code == 200, rv.text
+
+
+@then("日志记录操作人、时间、对象、动作与金额明细")
+def step_audit_fund_details(context):
+    """三类资金操作各自的留痕字段（**量化值必须与业务返回值一致**）。
+
+    「变更前后值」的落地口径（本批解封时按现行实现如实标注）：日志里记的是**量化结果**
+    （金额/实扣/待结清/入账后会员态），单据自身的前后状态流转由业务表承载（orders.status /
+    deposits.available_amount 等）；PRD §11.1 的留痕要求原文是「谁/时间/对谁/做了什么/原因」。
+    """
+    import json
+    from decimal import Decimal
+
+    def _money(a, b, what: str) -> None:
+        """金额按 **Decimal 精确比**（同一笔钱两处字符串形态可能不同：建单返回 `"500"`、
+        留痕 detail 是 `"500.00"`——首轮实测撞到；比 Decimal 既精确又不误报）。"""
+        assert Decimal(str(a)) == Decimal(str(b)), f"{what} 金额不一致：日志={a} 业务={b}"
+
+    def _entry(action: str, target_id: str | None = None) -> dict:
+        """按动作取日志；给了 target_id 就**精确取那一笔**（同一动作本场景发生两次：
+        观察期费与押金的收款确认——不按对象取会撞到押金那笔，首轮实测踩到）。"""
+        items = _audit_items(context, action=action)
+        if target_id is not None:
+            items = [e for e in items if e["target_id"] == target_id]
+            assert items, f"{action} 没有 target_id={target_id} 的日志"
+        e = items[0]
+        assert e["actor_name"], f"缺操作人：{e}"
+        assert e["created_at"], f"缺时间：{e}"
+        assert e["target_type"] and e["target_id"], f"缺对象：{e}"
+        return e
+
+    # ① 人工收款确认：金额 + 方式 + 入账后会员态（按订单号取，避开押金那笔）
+    pay = _entry("order.confirm_payment", context.paid_order["order_no"])
+    pd = json.loads(pay["detail"])
+    _money(pd["amount"], context.paid_order["amount"], "人工收款")
+    assert pd["method"] == "scan", pd
+    assert pd["member_status"] == "observation", f"入账后会员态应留痕：{pd}"
+    assert pay["target_type"] == "order" and pay["target_id"] == context.paid_order["order_no"], pay
+
+    # ② 押金扣除：索赔额 / 实扣 / 待结清
+    dd = json.loads(_entry("deposit.deduct")["detail"])
+    assert dd["amount"] == "100.00", dd
+    assert dd["deducted"] == "100.00", dd
+    assert dd["unpaid"] == "0.00", dd
+    assert dd["deducted"] == context.deposit_after["deducted_amount"], (dd, context.deposit_after)
+
+    # ③ 退款审核：结论 / 金额 / 类型
+    rv = _entry("refund.review")
+    rd = json.loads(rv["detail"])
+    assert rd["approve"] is True, rd
+    _money(rd["amount"], context.refund_req["amount"], "退款审核")
+    assert rv["reason"] == "审计留痕：同意退款", rv["reason"]
