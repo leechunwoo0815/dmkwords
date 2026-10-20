@@ -1,7 +1,17 @@
 # backend/domain/activity/models.py — 线下活动 / 报名（9 态缩减为实际 6 态）/ 入场券
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Index, Integer, Numeric, SmallInteger, String, Text
+from sqlalchemy import (
+    Column,
+    Computed,
+    DateTime,
+    Index,
+    Integer,
+    Numeric,
+    SmallInteger,
+    String,
+    Text,
+)
 
 from backend.common.base_model import BaseModel
 
@@ -40,6 +50,24 @@ class Activity(BaseModel):
     detail_blocks = Column(Text, nullable=True, comment="图文详情块（JSON 数组）")
 
 
+#: 活跃报名唯一键的**生成表达式**（条件唯一约束用）。
+#:
+#: 第八轮审查 P2-9（2026-10-20）：`uq_enroll_active_child` 名字像唯一索引，实际
+#: `unique=False`（`activity/models.py:52` 与迁移 `c9d3a6b8e2f1` 都写死了非唯一）——
+#: PRD §9.2「同一活动同一孩子只能有一个有效报名」全靠应用层"活动行锁 + 先查后插"，
+#: 漏锁的写口（管理端造单）并发即可造出两条活跃报名。
+#:
+#: MySQL 没有部分索引，故把"活跃态"编码进一个**生成列**：活跃 → `活动id-孩子id`，
+#: 其余（取消/退款/软删）→ NULL（唯一索引不比较 NULL）→ 同一孩子可**重新报名**。
+#: 状态清单必须与 `ACTIVE_STATUSES` 逐字一致：`tests/unit/test_audit8_a8_enroll_unique_20261020.py`
+#: 直接从 `information_schema` 读回真实表达式与 `ACTIVE_STATUSES` 比对，改一处忘另一处即红。
+ACTIVE_UNIQ_KEY_SQL = (
+    "IF(is_deleted = 0 AND status IN "
+    "('pending_payment','enrolled','checked_in','refund_pending'),"
+    " CONCAT(activity_id, '-', child_id), NULL)"
+)
+
+
 class ActivityEnrollment(BaseModel):
     """活动报名（FEAT-058：每孩子单独报名占名额；待支付先占名额；入场券）。
 
@@ -49,7 +77,8 @@ class ActivityEnrollment(BaseModel):
     """
 
     __tablename__ = "activity_enrollments"
-    __table_args__ = (Index("uq_enroll_active_child", "activity_id", "child_id"),)
+    # P2-9：唯一约束落在生成列 `active_uniq_key` 上（只约束活跃四态），索引名沿用旧名。
+    __table_args__ = (Index("uq_enroll_active_child", "active_uniq_key", unique=True),)
 
     STATUS_PENDING_PAYMENT = "pending_payment"
     STATUS_ENROLLED = "enrolled"
@@ -74,3 +103,10 @@ class ActivityEnrollment(BaseModel):
     checked_in_by = Column(Integer, nullable=True, comment="签到操作管理员")
     cancel_reason = Column(String(200), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.now)
+    # 条件唯一键（DB 生成，应用只读；表达式见模块级 ACTIVE_UNIQ_KEY_SQL）
+    active_uniq_key = Column(
+        String(40),
+        Computed(ACTIVE_UNIQ_KEY_SQL, persisted=True),
+        nullable=True,
+        comment="活跃报名唯一键（生成列：活跃态=活动-孩子，其余 NULL）",
+    )

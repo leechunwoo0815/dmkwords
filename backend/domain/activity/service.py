@@ -22,7 +22,7 @@ from backend.common.notifications import (
     SCENE_ACTIVITY_REMIND,
     NotificationService,
 )
-from backend.common.sql_utils import escape_like
+from backend.common.sql_utils import add_with_unique_fallback, escape_like
 from backend.domain.activity import detail_blocks
 from backend.domain.activity.cancel_flow import ActivityCancelMixin
 from backend.domain.catalog.audit_events import publish_audit
@@ -448,7 +448,11 @@ class ActivityService(ActivityCancelMixin):
             ticket_code=_ticket_code(activity_id, child.id),
             status=status,
         )
-        self.db.add(e)
+        # P2-9（2026-10-20）：库级条件唯一约束（`uq_enroll_active_child` 生成列）兜底——
+        # 上面 dup 检查已在活动行锁内，这里是纵深防御：并发漏进来时给同一句 409，
+        # 而不是把 IntegrityError 冒成 500。
+        if not add_with_unique_fallback(self.db, e):
+            raise ConflictError("该孩子已报名此活动（不能重复报名）")
         self.db.flush()
         # T6/R7（插修 13/14）：付费报名（待人工收款确认）→ 管理待办【活动报名待确认】
         # （R7 抽方法双链复用：家长端报名+管理端造单同发；免费不发，无需运营动作）
@@ -654,6 +658,13 @@ class ActivityService(ActivityCancelMixin):
         return {"enrollment_id": e.id, "status": e.status, "amount_hint": "全额待审核"}
 
     def _my_enrollment(self, child: Child, enrollment_id: int) -> ActivityEnrollment:
+        """家长侧单条报名读（**锁定读**）。
+
+        P2-9（2026-10-20）：原先不加锁——`cancel` 与 `apply_refund` 都"先读状态再改"，
+        并发下后写覆盖前写（典型：家长申请退款的同时馆员扫券签到 → 已签到者仍能拿到全额退款；
+        或重复提交退款申请）。调用方只有 `cancel` / `apply_refund` 两处，都是写路径。
+        锁序：本表行锁 → `orders` 行锁（`RefundService._paid_order`），与整场取消链一致。
+        """
         e = (
             self.db.query(ActivityEnrollment)
             .filter(
@@ -661,6 +672,8 @@ class ActivityService(ActivityCancelMixin):
                 ActivityEnrollment.child_id == child.id,
                 ActivityEnrollment.is_deleted == 0,
             )
+            .with_for_update()
+            .populate_existing()
             .first()
         )
         if not e:

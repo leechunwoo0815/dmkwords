@@ -14,7 +14,7 @@ from backend.common.events import OrderPaidEvent, event_bus
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
 from backend.common.notification_models import Notification
 from backend.common.notifications import SCENE_MEMBER_EXPIRE_REMIND, NotificationService
-from backend.common.sql_utils import escape_like
+from backend.common.sql_utils import add_with_unique_fallback, escape_like
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity import refund_rules
 from backend.domain.identity.models import Child, Order, Parent, RefundRequest
@@ -95,9 +95,14 @@ class OrderService(OrderGuardMixin):
                 raise ValidationError("活动订单必须选择活动")
             from backend.domain.activity.models import Activity
 
+            # P2-9（2026-10-20）：**锁定读**活动行——下面"名额闸 + 重复报名闸"必须在锁内，
+            # 否则与家长端 `enroll`（持活动行锁）并发时两处都读到旧计数 → 超卖 / 同一孩子
+            # 两条活跃报名。锁序与家长端一致（活动 → 订单 → 报名），不引入新的环。
             a = (
                 self.db.query(Activity)
                 .filter(Activity.id == req.activity_id, Activity.is_deleted == 0)
+                .with_for_update()
+                .populate_existing()
                 .first()
             )
             if not a:
@@ -170,7 +175,12 @@ class OrderService(OrderGuardMixin):
                 ticket_code=_ticket_code(req.activity_id, child.id),
                 status=ActivityEnrollment.STATUS_PENDING_PAYMENT,
             )
-            self.db.add(e)
+            # P2-9：库级条件唯一约束兜底（dup 检查已在活动行锁内，这是纵深防御）——
+            # 冲突走与 dup 检查同一句 422，不再把 IntegrityError 冒成 500。
+            if not add_with_unique_fallback(self.db, e):
+                raise ValidationError(
+                    "该孩子已有此活动的有效报名（待收款/已报名/退款待审），不可重复创建费用订单"
+                )
             self.db.flush()
             # R7（插修 14）：管理端造单同发【活动报名待确认】（T6 发送点抽方法双链）
             from backend.domain.activity.service import ActivityService

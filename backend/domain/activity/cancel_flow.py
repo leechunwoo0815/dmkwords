@@ -47,12 +47,19 @@ class ActivityCancelMixin:
                 raise ValidationError("活动已取消（无待处理报名）")
         else:
             a.status = Activity.STATUS_CANCELLED
+        # P2-9（2026-10-20）：**锁定读全部报名行**。原先裸读 + 循环内无条件赋值状态——
+        # 家长端并发取消/申请退款（`_my_enrollment` 现在也是锁定读）会被这里的旧快照覆盖：
+        # 典型是"家长刚申请退款"被重复建单，或"退款已被拒恢复 enrolled"被重新写成 refund_pending。
+        # 锁序：活动行 → 本表报名行 → orders 行（`RefundService._paid_order`），
+        # 与家长单笔退款链（报名行 → orders 行）同向，不引入反向环。
         enrollments = (
             self.db.query(ActivityEnrollment)
             .filter(
                 ActivityEnrollment.activity_id == activity_id,
                 ActivityEnrollment.is_deleted == 0,
             )
+            .with_for_update()
+            .populate_existing()
             .all()
         )
         refund_cnt = cancel_cnt = voided_orders = 0
