@@ -27,6 +27,12 @@ class CirclePost(BaseModel):
         # 信息流：WHERE is_deleted=0 ORDER BY created_at DESC, id DESC LIMIT n
         # （上线前审查 P1-6：演示量级全绿，上量后 filesort 线性变慢；造量 EXPLAIN 见 docs/09 第三十六轮）
         Index("ix_circle_posts_is_deleted_created_at", "is_deleted", "created_at"),
+        # P2-38（第八轮审查，2026-10-20）：置顶槽 `WHERE is_deleted=0 AND is_pinned=1
+        # ORDER BY created_at DESC` 原先只用到上面那条索引的首列 → 6 万帖实测扫 29,932 行
+        # 命中 0 条（46ms，信息流每页付一次）。补 is_pinned 后 `ref=const,const` 扫 1 行。
+        Index(
+            "ix_circle_posts_is_deleted_pinned_created_at", "is_deleted", "is_pinned", "created_at"
+        ),
     )
 
     CARD_MILESTONE = "milestone"  # 里程碑卡（ref_id=MilestoneAward.id）

@@ -3,7 +3,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Column, DateTime, String, Text
+from sqlalchemy import BigInteger, Column, DateTime, Index, String, Text
 
 from backend.common.base_model import BaseModel
 
@@ -33,6 +33,10 @@ class AuditLog(BaseModel):
     """操作审计日志。谁、何时、对谁、做了什么、原因、前后值。只增不改。"""
 
     __tablename__ = "audit_logs"
+    # P2-37（第八轮审查，2026-10-20）：审计列表 `WHERE is_deleted=0 ORDER BY created_at DESC,
+    # id DESC` 原先无索引 → `type=ALL` + **Using filesort**（6 万行实测 28.4ms，只增不减）。
+    # 二级索引隐含主键后缀 → 该 ORDER BY 走反向索引扫描，消掉 filesort（实测 0.6ms）。
+    __table_args__ = (Index("ix_audit_logs_is_deleted_created_at", "is_deleted", "created_at"),)
 
     ACTION_LOGIN = "login"
     ACTION_CONFIG_UPDATE = "config.update"

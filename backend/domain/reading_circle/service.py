@@ -155,13 +155,16 @@ class CircleService:
 
         # 置顶槽：取最新一条置顶帖（Q8 自愈——脏数据出现多条置顶时，其余置顶帖
         # 回落普通流按时间序显示，不再被 is_pinned==0 过滤静默丢帖）
-        pinned_rows = (
+        # P2-38（第八轮审查）：原先 `.all()` 把**全部**置顶帖捞进内存再取 [0]——
+        # 配合新增索引 `ix_circle_posts_is_deleted_pinned_created_at` 改成 `.first()`：
+        # 计划从"扫 29,932 行命中 0 条"变成 `ref=const,const` 扫 1 行（6 万帖实测 46ms → 0.4ms）。
+        # 语义不变：Q8 自愈仍只看"最新一条置顶"，其余置顶帖回落普通流。
+        pinned = (
             self.db.query(CirclePost)
             .filter(CirclePost.is_deleted == 0, CirclePost.is_pinned == 1)
             .order_by(CirclePost.created_at.desc(), CirclePost.id.desc())
-            .all()
+            .first()
         )
-        pinned = pinned_rows[0] if pinned_rows else None
         exclude_id = pinned.id if pinned else 0
 
         q = (

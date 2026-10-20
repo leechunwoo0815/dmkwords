@@ -15,6 +15,11 @@ class BorrowRecord(BaseModel):
         # 逾期扫描（overdue_mark / overdue_list）：WHERE status=? AND due_at < NOW()
         # （上线前审查 P1-6：原先只有 status 单列索引 → 取回全部在借行再过滤 + filesort）
         Index("ix_borrow_records_status_due_at", "status", "due_at"),
+        # P2-36（第八轮审查，2026-10-20）：借出/归还**日期**筛选原先无索引——
+        # 仪表盘趋势 `WHERE is_deleted=0 AND borrowed_at >= ?` GROUP BY DATE 实测 `type=ALL`
+        # 全表扫 59,899 行；借还记录按日期筛同理。索引后为 range 扫描 + 覆盖索引。
+        Index("ix_borrow_records_is_deleted_borrowed_at", "is_deleted", "borrowed_at"),
+        Index("ix_borrow_records_is_deleted_returned_at", "is_deleted", "returned_at"),
     )
 
     STATUS_ACTIVE = "active"  # 借出中

@@ -61,7 +61,10 @@ class ActivityService(ActivityCancelMixin):
         if activity_type:
             q = q.filter(Activity.activity_type == activity_type)
         rows = q.order_by(Activity.start_at.desc()).limit(200).all()
-        return [self._activity_view(a, with_quota=True) for a in rows]
+        quotas = self._quota_used_map([a.id for a in rows])
+        return [
+            self._activity_view(a, with_quota=True, quota_used=quotas.get(a.id, 0)) for a in rows
+        ]
 
     def list_upcoming(self, child: Child | None = None) -> list[dict]:
         rows = (
@@ -80,8 +83,9 @@ class ActivityService(ActivityCancelMixin):
             rows = [a for a in rows if not a.member_only]
         out = []
         my_map = self._my_enrollment_map(child.id) if child else {}
+        quotas = self._quota_used_map([a.id for a in rows])
         for a in rows:
-            v = self._activity_view(a, with_quota=True)
+            v = self._activity_view(a, with_quota=True, quota_used=quotas.get(a.id, 0))
             v["my_enrollment"] = my_map.get(a.id)
             out.append(v)
         return out
@@ -130,7 +134,30 @@ class ActivityService(ActivityCancelMixin):
             .scalar()
         )
 
-    def _activity_view(self, a: Activity, with_quota: bool = False) -> dict:
+    def _quota_used_map(self, activity_ids: list[int]) -> dict[int, int]:
+        """一次 GROUP BY 取**全部**活动的占名额数（P2-39：列表原先每行一次 COUNT = N+1）。
+
+        管理端 200 行原先 201 条 SQL、小程序 50 行 51 条；大屏轮询/翻页每次都付一遍。
+        判据与 `_quota_used` 同源（活跃态 + 未软删），两处必须一致——`_quota_used` 仍留给
+        单行路径（`detail`），批量路径一律走这里。
+        """
+        if not activity_ids:
+            return {}
+        rows = (
+            self.db.query(ActivityEnrollment.activity_id, func.count(ActivityEnrollment.id))
+            .filter(
+                ActivityEnrollment.activity_id.in_(activity_ids),
+                ActivityEnrollment.status.in_(ActivityEnrollment.ACTIVE_STATUSES),
+                ActivityEnrollment.is_deleted == 0,
+            )
+            .group_by(ActivityEnrollment.activity_id)
+            .all()
+        )
+        return dict(rows)
+
+    def _activity_view(
+        self, a: Activity, with_quota: bool = False, quota_used: int | None = None
+    ) -> dict:
         v = {
             "id": a.id,
             "title": a.title,
@@ -151,7 +178,8 @@ class ActivityService(ActivityCancelMixin):
             "is_past": a.start_at < datetime.now() - timedelta(hours=PAST_AFTER_HOURS),
         }
         if with_quota:
-            used = self._quota_used(a.id)
+            # P2-39：批量路径传 `quota_used`（一次 GROUP BY），单行路径（detail）不传 → 走单查
+            used = self._quota_used(a.id) if quota_used is None else quota_used
             v["quota_used"] = used
             v["quota_left"] = max(0, a.max_quota - used)
             v["max_quota"] = a.max_quota
