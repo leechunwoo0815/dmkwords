@@ -15,13 +15,13 @@
 """
 
 import threading
-import time
 from datetime import date, timedelta
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func
 
+from tests.unit.helpers import assert_locked_read, lock_wait_query
 from tests.unit.test_wm9_activity import _h, _mk_activity
 
 
@@ -310,6 +310,12 @@ def test_concurrent_settle_annual_fees_no_lost_update(client: TestClient, sessio
     order_b = s2.query(Order).filter(Order.id == ob["id"]).first()
     out: dict = {}
 
+    # 第八轮审查 P2-63：原先用 `sleep(1.5)` 猜"HTTP 侧应该到了"——对方没到时用例会
+    # 提前放锁，断言可能因为别的原因通过（并发守护退化成空跑）。改成**可判定**：
+    # 持锁线程等主线程确认"HTTP 侧真的被行锁挡住"后才提交（Event 握手，不猜时序）。
+    holding = threading.Event()
+    release = threading.Event()
+
     def _settle_b():
         try:
             OrderService(s2)._settle_paid(
@@ -322,7 +328,8 @@ def test_concurrent_settle_annual_fees_no_lost_update(client: TestClient, sessio
                 reason="并发先到者",
             )
             s2.flush()
-            time.sleep(1.5)  # 持锁期间让 HTTP 侧进入结算（无锁版本会读到旧快照）
+            holding.set()  # 我已持锁（孩子行 + 订单行）
+            release.wait(timeout=15)  # 等主线程确认 HTTP 侧被挡住再提交
             s2.commit()
             out["b"] = "ok"
         except Exception as exc:  # noqa: BLE001 —— 线程内异常要带回主线程断言
@@ -331,13 +338,25 @@ def test_concurrent_settle_annual_fees_no_lost_update(client: TestClient, sessio
 
     t = threading.Thread(target=_settle_b)
     t.start()
-    time.sleep(0.5)
-    r_a = client.post(
-        f"/api/admin/orders/{oa['id']}/confirm-payment", json={"pay_method": "scan"}, headers=h
-    )
+    assert holding.wait(timeout=15), "结算线程未进入持锁段"
+
+    r_a_box: dict = {}
+
+    def _http_settle_a():
+        r_a_box["r"] = client.post(
+            f"/api/admin/orders/{oa['id']}/confirm-payment", json={"pay_method": "scan"}, headers=h
+        )
+
+    th = threading.Thread(target=_http_settle_a)
+    th.start()
+    assert_locked_read(lock_wait_query(), "HTTP 侧结算等的 Child 锁定读")
+    release.set()
     t.join(timeout=15)
+    th.join(timeout=15)
     assert not t.is_alive(), f"结算线程 15s 未结束（疑似死锁）：{out}"
+    assert not th.is_alive(), f"HTTP 结算 15s 未结束（疑似死锁）：{r_a_box}"
     assert out.get("b") == "ok", out
+    r_a = r_a_box["r"]
     assert r_a.status_code == 200, r_a.text
 
     with _db() as db:

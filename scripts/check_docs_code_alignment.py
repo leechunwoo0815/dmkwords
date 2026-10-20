@@ -297,7 +297,15 @@ def collect_table_names() -> set[str]:
 
 def collect_symbols() -> set[str]:
     out = set()
-    for f in list((ROOT / "backend").rglob("*.py")) + list((ROOT / "scripts").glob("*.py")):
+    # 2026-10-20（第九十六批）：补 `tests/` 扫描面——文档会引用测试侧的真实符号
+    # （如 `tests/unit/helpers.lock_wait_query()`）。原先只扫 backend/scripts，
+    # 于是"引用了真实存在的测试助手"被判悬空，只能靠 docs-code-ignore 逐条豁免（那是给
+    # **刻意提及不存在的东西**用的，不该拿来糊真实符号）。
+    for f in (
+        list((ROOT / "backend").rglob("*.py"))
+        + list((ROOT / "scripts").glob("*.py"))
+        + list((ROOT / "tests").rglob("*.py"))
+    ):
         # 2026-10-08 WM12-A：原正则只认 `def/class`，**async def 一律收不到**——
         # 网关层（微信支付/短信）几乎全是 async，文档引用 `refresh_platform_cert()` 这类
         # 现成方法会被判"函数/类不存在"（假红）。补 `async` 前缀，与上方 JS 分支同口径。

@@ -12,11 +12,11 @@
 """
 
 import threading
-import time
 from datetime import date, timedelta
 
 from fastapi.testclient import TestClient
 
+from tests.unit.helpers import assert_locked_read, lock_wait_query
 from tests.unit.test_wm10_concurrency import _db, _family, _h, _pay
 
 
@@ -49,7 +49,7 @@ def test_expire_due_not_override_renewed(client: TestClient, session_pair):
 
     t = threading.Thread(target=a_expire)
     t.start()
-    time.sleep(1.0)  # 修复后 s1 阻塞在锁定读；修复前快照已读、UPDATE 阻塞在行锁
+    assert_locked_read(lock_wait_query(), "expire_due_members 的锁定读")
     locked.member_expire = date.today() + timedelta(days=365)  # 续费推远
     s2.commit()  # 续费提交，释放锁
     t.join(timeout=8)

@@ -6,11 +6,11 @@
 
 import io
 import threading
-import time
 from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
+from tests.unit.helpers import assert_blocked, lock_wait_query
 from tests.unit.test_wm10_concurrency import _db, _h
 
 # ---------- P2-6：软删家长后同手机号再建档（唯一索引是全局的） ----------
@@ -126,7 +126,7 @@ def test_transfer_apply_serialized_by_child_row_lock(client: TestClient):
 
         th = threading.Thread(target=_apply)
         th.start()
-        time.sleep(0.6)
+        assert_blocked(lock_wait_query(), "第二个转让申请等的 Child 行锁")
         assert th.is_alive(), "第二个申请必须被行锁挡住（原先会直接插单）"
         # 第一个申请"落库"：锁住的孩子进入冻结
         s1.query(Child).filter(Child.id == lock_id).update(

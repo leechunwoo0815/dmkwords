@@ -8,10 +8,10 @@ renew 阻塞在锁 → s1 完成续借提交（renew_used=1）→ s2 获锁锁�
 """
 
 import threading
-import time
 
 from fastapi.testclient import TestClient
 
+from tests.unit.helpers import assert_locked_read, lock_wait_query
 from tests.unit.test_wm10_concurrency import _book_with_copies, _db, _family, _h, _pay, _pay_deposit
 
 
@@ -58,7 +58,7 @@ def test_renew_concurrent_single_use(client: TestClient, session_pair):
 
     t = threading.Thread(target=b_renew)
     t.start()
-    time.sleep(1.0)  # 修复后 s2 阻塞在锁；修复前 s2 此窗口内已双续借成功
+    assert_locked_read(lock_wait_query(), "renew 的锁定读")
     locked.renew_used = 1  # s1 完成首次续借
     locked.due_at = locked.due_at + __import__("datetime").timedelta(days=14)
     s1.commit()  # 释放锁

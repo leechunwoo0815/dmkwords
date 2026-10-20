@@ -16,6 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.common.exceptions import ValidationError
+from tests.unit.helpers import assert_locked_read, lock_wait_query
 from tests.unit.test_wm10_concurrency import _family, _h, _pay, _pay_deposit
 
 
@@ -90,7 +91,6 @@ def test_transfer_review_double_approve_blocked(client: TestClient, session_pair
     s1 提交后 B 覆盖 approve（双处理 RED）；
     修复后：B 锁定读阻塞 → s1 提交 → B 读 approved → 422（GREEN）。"""
     import threading
-    import time
 
     from backend.domain.identity.models import TransferRequest
     from backend.domain.identity.transfer_service import TransferService
@@ -139,7 +139,7 @@ def test_transfer_review_double_approve_blocked(client: TestClient, session_pair
 
     t = threading.Thread(target=b_review)
     t.start()
-    time.sleep(1.0)  # 给 B 时间进入 review（修复后应阻塞在 TransferRequest 锁）
+    assert_locked_read(lock_wait_query(), "review 的 TransferRequest 锁定读")
     # s1 提交 A 的终态（approved）——模拟先到者已完成审批
     s1.query(TransferRequest).filter(TransferRequest.id == tid).update(
         {"status": TransferRequest.STATUS_APPROVED, "reviewed_by": 1}

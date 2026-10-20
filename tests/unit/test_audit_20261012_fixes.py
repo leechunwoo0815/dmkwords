@@ -182,14 +182,66 @@ def test_checkin_duplicate_is_not_reported_as_first(client, db):
     db.commit()
 
 
-def test_progress_row_is_locked_for_update():
-    """`report_progress` 的进度行必须是锁定读（修复前普通 SELECT → 并发丢区间）。"""
-    import inspect
+def test_progress_row_is_locked_for_update(client, session_pair):
+    """`report_progress` 的进度行必须是**锁定读**——无锁时"读快照 → 合并区间 → 整列覆盖写"
+    在并发心跳（双开播放器 / 心跳重试）下会丢区间（后到者用陈旧快照覆盖先到者）。
 
-    from backend.domain.reading import service as reading_service
+    **行为判据**（替代原先的 `inspect.getsource(...).count("with_for_update()") >= 2` 源码字符串断言
+    ——那种断言改实现就失效：把锁定读换成普通读、甚至换成别处的两处 with_for_update，它照样绿）：
+    先到者持该进度行锁 → 后来者的心跳上报必须**阻塞在 `SELECT ... FOR UPDATE`** 上。
+    RED（把锁定读换成普通读）：后来者的读直接通过、只有随后的 UPDATE 等锁 → 前缀断言红。
+    """
+    import threading
 
-    src = inspect.getsource(reading_service.ReadingService.report_progress)
-    assert src.count("with_for_update()") >= 2, "进度行的两处读取（首次 + 插入后重读）都必须加锁"
+    from backend.database import get_session
+    from backend.domain.reading.models import ReadingProgress
+    from tests.unit.helpers import assert_locked_read, lock_wait_query
+    from tests.unit.test_wm6_reading import _backdate, _report, _setup
+
+    h = _h(client)
+    c, book, mini = _setup(client, h, "13981200001")
+    assert _report(client, mini, c["id"], book["id"], 10, 0).status_code == 200
+
+    with get_session() as db:
+        pid = (
+            db.query(ReadingProgress.id)
+            .filter(
+                ReadingProgress.child_id == c["id"],
+                ReadingProgress.book_id == book["id"],
+                ReadingProgress.is_deleted == 0,
+            )
+            .scalar()
+        )
+    assert pid, "前置失败：进度行没建出来"
+
+    # 防刷协议按**服务端墙上时钟**判覆盖增速：上报前把 last_report_at 拨回（模拟真实流逝）。
+    # 必须在**取锁之前**做——`_backdate` 自身是 UPDATE，锁后再调会等锁超时。
+    _backdate(client, c["id"], book["id"], 60)
+
+    _s1, s2 = session_pair
+    locked = (
+        s2.query(ReadingProgress)
+        .filter(ReadingProgress.id == pid)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    assert locked is not None
+
+    result: dict = {}
+
+    def _heartbeat():
+        result["r"] = _report(client, mini, c["id"], book["id"], 40, 30)
+
+    t = threading.Thread(target=_heartbeat)
+    t.start()
+    try:
+        assert_locked_read(lock_wait_query(), "并发心跳等的进度行锁定读")
+    finally:
+        s2.commit()  # 释放锁
+    t.join(timeout=15)
+    assert not t.is_alive(), "心跳线程 15s 未结束（疑似死锁）"
+    assert result["r"].status_code == 200, result["r"].text
 
 
 def test_deposit_gate_requires_paid_status():
@@ -218,22 +270,73 @@ def test_deposit_gate_requires_paid_status():
         assert not ok.code, f"{status} 在账且有余额，应放行"
 
 
-def test_unpaid_balance_cents_tail_blocks_borrow():
-    """未结清赔偿款的**分**尾巴也要拦（修复前 int(Decimal) 截断：0.50 元被当 0）。"""
-    from backend.domain.circulation import service as circ
+def test_unpaid_balance_cents_tail_blocks_borrow(client):
+    """未结清赔偿款的**分**尾巴也要拦（修复前 `int(Decimal)` 截断：0.50 元被当成 0 → 放行）。
 
-    src = __import__("inspect").getsource(circ)
-    assert "yuan_to_cents" in src, "未结清余额必须按分比较（原先 int() 截断）"
+    **行为判据**（替代原先的 `"yuan_to_cents" in getsource(circ)` 源码字符串断言——那种断言
+    只要模块里出现过这个词就绿，改回 `int(...)` 照样通过）：真造一笔 **0.50 元**未结清赔偿款，
+    走**真实借书接口**，必须被拦且文案带「0.50 元」（截断成 0 时会静默放行）。
+    """
+    from decimal import Decimal
+
+    from backend.database import get_session
+    from backend.domain.billing.models import Deposit
+    from backend.domain.catalog.models import BookCopy
+    from tests.unit.test_wm10_concurrency import _book_with_copies, _pay, _pay_deposit
+
+    h = _h(client)
+    _p, c, _mini = _family(client, h, "13981200002")
+    _pay(client, h, c["id"], "observation_fee")  # 先入会（否则闸门先命中「未入会」分支）
+    _pay_deposit(client, h, c["id"])
+    book = _book_with_copies(client, h, "分尾巴书", 1)
+    with get_session() as db:
+        copy_id = db.query(BookCopy).filter(BookCopy.book_id == book).first().id
+        dep = db.query(Deposit).filter(Deposit.child_id == c["id"]).first()
+        dep.unpaid_balance = Decimal("0.50")  # 分尾巴（截断成 int 就是 0）
+        db.commit()
+
+    r = client.post(
+        "/api/admin/circulation/borrow",
+        json={"child_id": c["id"], "copy_id": copy_id},
+        headers=h,
+    )
+    assert r.status_code != 200, f"有未结清赔偿款不得借书，实 {r.status_code} {r.text[:160]}"
+    detail = r.json().get("detail", "")
+    assert "未结清赔偿款 0.50 元" in detail, (
+        f"拦截文案必须按分显示 0.50 元（int 截断会显示 0 元甚至放行），实 {detail!r}"
+    )
 
 
 def test_scheduled_reconcile_uses_yesterday_bill():
-    """定时对账必须取**昨日**账单（微信对账单 T+1 生成；修复前取当天 → 永久 NO_BILL_EXIST）。"""
-    import inspect
+    """定时对账必须取**昨日**账单（微信对账单 T+1 生成；修复前取当天 → 永久 NO_BILL_EXIST）。
 
+    **行为判据**（替代原先的 `"timedelta(days=1)" in getsource(...)` 源码字符串断言 +
+    `date.today()-1 < date.today()` 恒真式——后者与实现无关，恒成立）：把对账服务的 `run`
+    换成捕获器，断言任务**实际传下去的 `bill_date` 就是昨天**、`trigger` 是 scheduled。
+    RED（改回不传 / 传今天）：捕获到的 `bill_date` 不是昨天。
+    """
+    from backend.database import get_session
+    from backend.domain.identity.payment_models import PaymentReconciliation
+    from backend.domain.identity.payment_reconcile_service import PaymentReconcileService
     from backend.tasks import registry
 
-    src = inspect.getsource(registry._payment_reconcile)
-    assert "timedelta(days=1)" in src, "定时对账必须传昨日账单日"
-    assert "bill_date=" in src
-    # 行为断言：昨天日期确实由 date.today()-1 得出
-    assert date.today() - timedelta(days=1) < date.today()
+    captured: dict = {}
+    original = PaymentReconcileService.run
+
+    def _capture(self, bill_date=None, trigger=None):
+        captured["bill_date"] = bill_date
+        captured["trigger"] = trigger
+        return {"diff_total": 0}
+
+    PaymentReconcileService.run = _capture
+    try:
+        with get_session() as db:
+            diff = registry._payment_reconcile(db)
+    finally:
+        PaymentReconcileService.run = original
+
+    assert diff == 0
+    assert captured.get("bill_date") == date.today() - timedelta(days=1), (
+        f"定时对账必须传**昨日**账单日，实传 {captured.get('bill_date')}"
+    )
+    assert captured.get("trigger") == PaymentReconciliation.TRIGGER_SCHEDULED

@@ -15,12 +15,12 @@ T1 的 RC 也修不了：两事务同时 dup=0（未提交互不可见）→ 都
 """
 
 import threading
-import time
 from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func
 
+from tests.unit.helpers import assert_locked_read, lock_wait_query
 from tests.unit.test_wm10_concurrency import _book_with_copies, _family, _h, _pay, _pay_deposit
 
 
@@ -74,7 +74,7 @@ def test_reservation_create_concurrent_same_book_locked(client: TestClient, sess
 
     t = threading.Thread(target=b_create)
     t.start()
-    time.sleep(1.0)  # 给 B 足够时间进入 create（修复后应阻塞在 Child 锁）
+    assert_locked_read(lock_wait_query(), "reservation.create 的 Child 锁定读")
     s1.commit()  # A 提交（释放锁）
     t.join(timeout=8)
     assert not t.is_alive(), "B 线程 8s 未结束（疑似死锁）"

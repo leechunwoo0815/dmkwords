@@ -20,7 +20,6 @@ PRD §9.2「同一活动同一孩子只能有一个有效报名」于是只剩�
 
 import re
 import threading
-import time
 
 from fastapi.testclient import TestClient
 from sqlalchemy import text
@@ -29,33 +28,12 @@ from sqlalchemy.exc import IntegrityError
 from backend.database import get_session
 from backend.domain.activity.models import ACTIVE_UNIQ_KEY_SQL, ActivityEnrollment
 from backend.domain.identity.models import RefundRequest
+from tests.unit.helpers import lock_wait_query
 from tests.unit.test_audit4_p2_batch3_20261017 import _activity, _enrolled_paid, _member_child
 from tests.unit.test_wm11_tasks import _h
 
 DUP_ENROLL_MSG = "该孩子已报名此活动（不能重复报名）"
 ADMIN_DUP_MSG = "该孩子已有此活动的有效报名（待收款/已报名/退款待审），不可重复创建费用订单"
-
-
-def _lock_wait_query(timeout: float = 8.0, interval: float = 0.25) -> str:
-    """等 LOCK WAIT 出现，返回**被阻塞的那条语句**（空串 = 超时未见）。
-
-    为什么返回语句文本而不是布尔（A 批 A7 踩坑，如实记）：只判"有没有 LOCK WAIT"**不判别**
-    ——修复前写的 `UPDATE` 同样会等行锁，照样命中。真正判别的是**阻塞发生在读还是写**。
-    轮询间隔 0.25s：0.05s 的紧轮询会把被测线程挤住，导致根本看不到 LOCK WAIT（实测假红）。
-    """
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        with get_session() as db:
-            row = db.execute(
-                text(
-                    "SELECT trx_query FROM information_schema.innodb_trx "
-                    "WHERE trx_state = 'LOCK WAIT' LIMIT 1"
-                )
-            ).scalar()
-        if row:
-            return str(row)
-        time.sleep(interval)
-    return ""
 
 
 def _resp(r) -> dict:
@@ -259,7 +237,7 @@ def test_admin_activity_order_waits_for_activity_lock(client: TestClient, sessio
     t = threading.Thread(target=_create_order)
     t.start()
     try:
-        blocked_stmt = _lock_wait_query()
+        blocked_stmt = lock_wait_query()
         assert blocked_stmt, "管理端造单没有等在任何锁上（说明活动读没加锁）"
         assert blocked_stmt.lstrip().upper().startswith("SELECT"), (
             f"被阻塞的必须是**锁定读**（活动行的 SELECT ... FOR UPDATE）；实际是 "
@@ -328,7 +306,7 @@ def test_parent_refund_waits_for_enrollment_lock_and_rejects_checked_in(
     t = threading.Thread(target=_apply_refund)
     t.start()
     try:
-        blocked_stmt = _lock_wait_query()
+        blocked_stmt = lock_wait_query()
         assert blocked_stmt, "退款申请没有等在任何锁上（说明家长侧读没加锁）"
         assert blocked_stmt.lstrip().upper().startswith("SELECT"), (
             f"被阻塞的必须是**锁定读**（报名行的 SELECT ... FOR UPDATE）；实际是 "
@@ -394,7 +372,7 @@ def test_cancel_activity_waits_for_enrollment_lock(client: TestClient, session_p
     t = threading.Thread(target=_cancel_activity)
     t.start()
     try:
-        blocked_stmt = _lock_wait_query()
+        blocked_stmt = lock_wait_query()
         assert blocked_stmt, "整场取消没有等在任何锁上（说明报名列表没加锁）"
         assert blocked_stmt.lstrip().upper().startswith("SELECT"), (
             f"被阻塞的必须是**锁定读**（报名行的 SELECT ... FOR UPDATE）；实际是 "

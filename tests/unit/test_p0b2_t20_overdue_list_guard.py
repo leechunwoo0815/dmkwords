@@ -12,11 +12,11 @@
 """
 
 import threading
-import time
 from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
+from tests.unit.helpers import assert_blocked, lock_wait_query
 from tests.unit.test_wm10_concurrency import _book_with_copies, _db, _family, _h, _pay, _pay_deposit
 
 
@@ -63,7 +63,7 @@ def test_overdue_list_not_override_returned(client: TestClient, session_pair):
 
     t = threading.Thread(target=a_list)
     t.start()
-    time.sleep(1.0)  # 修复后 s1 阻塞在条件 UPDATE；修复前快照已读、commit 阻塞在行锁
+    assert_blocked(lock_wait_query(), "overdue_list 的条件 UPDATE")
     locked.status = BorrowRecord.STATUS_RETURNED  # 还书落库
     locked.returned_at = datetime.now()
     s2.commit()  # 还书提交，释放锁

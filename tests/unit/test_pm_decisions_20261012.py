@@ -370,7 +370,19 @@ def test_task_specs_expose_consecutive_failures(client, db):
 
 
 def test_refund_notify_with_stale_out_refund_no_is_ignored(client, db, monkeypatch):
-    """旧号（换号重试前那笔）的迟到通知必须被忽略，不得落到当前在途那笔上。"""
+    """旧号（换号重试前那笔）的迟到通知必须被忽略，不得落到当前在途那笔上。
+
+    **本用例重写（第八轮审查 P2-65）**：原先 POST 到 `/api/pay/wechat/refund-notify`
+    ——该端点**全仓没有路由**（真实入口是 `/api/pay/wechat/notify`，按 `event_type` 分派），
+    404 天然满足"单号没被改写"，等于 `_handle_refund_notify` 的防旧号判据**零守护**。
+    现在**直接调 `_handle_refund_notify`**（只桩掉 `_decrypt`，其余全走真实判据），
+    并断言三件事：① 旧号通知被忽略且落审计；② 当前单号未被改写；③ **对照组**——
+    当前单号的 SUCCESS 通知必须真的落终态（不许修成"一律忽略"）。
+    """
+    from backend.common.gateways.payment.types import PaymentCallbackData
+    from backend.common.system_models import AuditLog
+    from backend.domain.identity.payment_service import PaymentService
+    from backend.domain.identity.wm10_service import RefundService
     from tests.unit.test_wm12_refund_reconcile import (
         _apply_refund,
         _approve,
@@ -389,16 +401,52 @@ def test_refund_notify_with_stale_out_refund_no_is_ignored(client, db, monkeypat
     req = _refund_row(db, applied["id"])
     assert req.status == RefundRequest.STATUS_PROCESSING
     current = req.out_refund_no
+    assert current, "前置失败：执行后应有商户退款单号"
     stale = current.replace("-1-1", "-2-1") if "-1-1" in current else "RF999999-1-1"
-    client.post(
-        "/api/pay/wechat/refund-notify",
-        json={"out_refund_no": stale, "refund_status": "SUCCESS"},
-        headers={"X-Test-Skip-Signature": "1"},
-    )
-    # 无论端点是否可达，当前这笔都不该被旧号的通知改状态
+    amount = req.amount
+
+    def _notify(out_refund_no: str):
+        monkeypatch.setattr(
+            PaymentService,
+            "_decrypt",
+            staticmethod(
+                lambda gateway, envelope: PaymentCallbackData(
+                    out_trade_no=order["order_no"] if isinstance(order, dict) else order.order_no,
+                    out_refund_no=out_refund_no,
+                    refund_status="SUCCESS",
+                    refund_amount=amount,
+                )
+            ),
+        )
+        return PaymentService(db)._handle_refund_notify(
+            gateway=None, envelope={}, event_type="REFUND.SUCCESS"
+        )
+
+    # ① 旧号迟到通知：忽略（200 + 明确文案），当前单号不动
+    code, body = _notify(stale)
+    assert code == 200 and "已忽略" in body.get("message", ""), (code, body)
     db.expire_all()
-    req2 = _refund_row(db, applied["id"])
-    assert req2.out_refund_no == current, "当前提交的单号不得被改写"
+    assert _refund_row(db, applied["id"]).out_refund_no == current, "当前提交的单号不得被改写"
+    assert _refund_row(db, applied["id"]).status == RefundRequest.STATUS_PROCESSING, (
+        "在途单不得被旧号通知推进终态"
+    )
+    # 审计必须留痕（否则"被忽略了"与"根本没收到"分不清）
+    hit = (
+        db.query(AuditLog)
+        .filter(AuditLog.detail.like("%单号与当前提交不一致%"))
+        .order_by(AuditLog.id.desc())
+        .first()
+    )
+    assert hit is not None, "旧号通知被忽略必须留审计（排查时能看见）"
+
+    # ② 对照组：**当前单号**的 SUCCESS 通知必须真的落终态（防"一律忽略"式过修）
+    code2, body2 = _notify(current)
+    assert code2 == 200 and "已忽略" not in body2.get("message", ""), (code2, body2)
+    db.expire_all()
+    assert _refund_row(db, applied["id"]).status == RefundRequest.STATUS_REFUNDED, (
+        "当前提交那笔的成功回调必须落已退款"
+    )
+    assert RefundService  # 引用保留（下文若有状态机断言可复用）
 
 
 def test_prepay_does_not_revive_cancelled_order(client, db):

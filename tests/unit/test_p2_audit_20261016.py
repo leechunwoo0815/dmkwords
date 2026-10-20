@@ -24,6 +24,7 @@ from datetime import date, datetime, timedelta
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
+from tests.unit.helpers import assert_locked_read, lock_wait_query
 from tests.unit.test_p1_audit_20261015 import _db, _family
 
 
@@ -223,7 +224,6 @@ def test_borrow_does_not_overwrite_concurrently_cancelled_reservation(
     修复后：s2 的锁定读阻塞，s1 提交后当前读+状态守卫都不认这行 → 不再写。
     """
     import threading
-    import time
 
     from backend.domain.circulation.service import CirculationService
     from backend.domain.reading.models import Reservation
@@ -260,7 +260,7 @@ def test_borrow_does_not_overwrite_concurrently_cancelled_reservation(
 
     t = threading.Thread(target=_borrow)
     t.start()
-    time.sleep(0.6)  # 让借书线程走到"关预约收尾"（修复后应阻塞在预约行锁上）
+    assert_locked_read(lock_wait_query(), "借书收尾的预约行锁定读")
     s1.commit()  # 取消提交
     t.join(timeout=10)
     assert not t.is_alive(), f"借书线程未结束（疑似死锁）：{out}"

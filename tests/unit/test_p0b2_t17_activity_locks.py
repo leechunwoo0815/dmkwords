@@ -12,10 +12,10 @@
 """
 
 import threading
-import time
 
 from fastapi.testclient import TestClient
 
+from tests.unit.helpers import assert_locked_read, lock_wait_query
 from tests.unit.test_wm9_activity import _h, _mk_activity, _mk_child
 
 
@@ -68,7 +68,7 @@ def test_signin_concurrent_same_ticket(client: TestClient, session_pair):
 
     t = threading.Thread(target=b_signin)
     t.start()
-    time.sleep(1.0)  # 给 B 时间进锁（修复后应阻塞在 enrollment 锁）
+    assert_locked_read(lock_wait_query(), "signin 的 enrollment 锁定读")
     s1.commit()
     t.join(timeout=8)
     assert not t.is_alive(), "B 线程 8s 未结束（疑似死锁）"
@@ -102,7 +102,7 @@ def test_cancel_activity_serializes_enroll(client: TestClient, session_pair):
 
     t = threading.Thread(target=b_enroll)
     t.start()
-    time.sleep(1.0)  # 修复后 B 应阻塞在 Activity 锁；修复前 B 此窗口内已报名成功
+    assert_locked_read(lock_wait_query(), "enroll 的 Activity 锁定读")
     locked.status = Activity.STATUS_CANCELLED  # 持锁期间落取消态
     s1.commit()  # 释放锁 → B 获锁锁定读到 cancelled → 422
     t.join(timeout=8)

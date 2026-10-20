@@ -12,39 +12,14 @@
 """
 
 import threading
-import time
 
 from fastapi.testclient import TestClient
-from sqlalchemy import text
 
 from backend.database import get_session
 from backend.domain.identity.models import RefundRequest
+from tests.unit.helpers import lock_wait_query
 from tests.unit.test_audit4_p2_batch3_20261017 import _activity, _enrolled_paid, _member_child
 from tests.unit.test_wm11_tasks import _h
-
-
-def _lock_wait_query(timeout: float = 8.0, interval: float = 0.25) -> str:
-    """等 LOCK WAIT 出现，返回**被阻塞的那条语句**（空串 = 超时未见）。
-
-    为什么返回语句文本而不是布尔（本批踩坑，如实记）：只判"有没有 LOCK WAIT"**不判别**
-    ——修复前撤销的 `UPDATE` 同样会等审核的行锁，照样命中。真正判别的是**阻塞发生在读还是写**：
-      · 修复后：`SELECT ... FOR UPDATE` 就被挡住（trx_query 以 `SELECT` 开头）；
-      · 修复前：普通读不阻塞，轮到 `UPDATE` 才等锁（trx_query 以 `UPDATE` 开头）。
-    轮询间隔取 0.25s：0.05s 的紧轮询会把被测线程挤住，导致根本看不到 LOCK WAIT（实测假红）。
-    """
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        with get_session() as db:
-            row = db.execute(
-                text(
-                    "SELECT trx_query FROM information_schema.innodb_trx "
-                    "WHERE trx_state = 'LOCK WAIT' LIMIT 1"
-                )
-            ).scalar()
-        if row:
-            return str(row)
-        time.sleep(interval)
-    return ""
 
 
 def _pending_refund_of_activity(client: TestClient, h, c, mini, title: str) -> int:
@@ -106,7 +81,7 @@ def test_refund_cancel_blocks_on_review_lock(client: TestClient, session_pair):
     t = threading.Thread(target=_cancel)
     t.start()
     try:
-        blocked_stmt = _lock_wait_query()
+        blocked_stmt = lock_wait_query()
         assert blocked_stmt, "撤销请求没有等在任何锁上（说明读取没加锁）"
         assert blocked_stmt.lstrip().upper().startswith("SELECT"), (
             f"被阻塞的必须是**锁定读**（撤销侧的 SELECT ... FOR UPDATE）；"

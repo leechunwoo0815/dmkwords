@@ -11,11 +11,11 @@ PAID 单被覆盖回 CANCELLED（活动报名联动取消、名额释放、钱�
 """
 
 import threading
-import time
 from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
+from tests.unit.helpers import assert_blocked, lock_wait_query
 from tests.unit.test_wm10_concurrency import _db, _family, _h
 
 
@@ -51,7 +51,7 @@ def test_cancel_timeout_not_override_paid(client: TestClient, session_pair):
 
     t = threading.Thread(target=a_cleanup)
     t.start()
-    time.sleep(1.0)  # s1 应阻塞在该单行锁上（UPDATE 等待）
+    assert_blocked(lock_wait_query(), "超时取消的条件 UPDATE")
     # s2 完成收款确认：pending_manual → PAID，提交释放锁
     OrderService(s2).confirm_payment(
         admin,

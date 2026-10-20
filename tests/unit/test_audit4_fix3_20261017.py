@@ -10,7 +10,6 @@
 """
 
 import threading
-import time
 
 from fastapi.testclient import TestClient
 from sqlalchemy import text
@@ -18,6 +17,7 @@ from sqlalchemy import text
 from backend.database import SessionLocal
 from backend.domain.admin.models import AdminUser
 from backend.domain.circulation.service import CirculationService
+from tests.unit.helpers import assert_locked_read, lock_wait_query
 from tests.unit.test_wm10_concurrency import _db, _h
 
 
@@ -97,7 +97,7 @@ def test_borrow_locks_reservation_before_copy(client: TestClient):
 
         t = threading.Thread(target=run_borrow, daemon=True)
         t.start()
-        time.sleep(0.6)  # 让 A 走到"等预约行"这一步
+        assert_locked_read(lock_wait_query(), "借书收尾等的预约行锁定读")
 
         # S2：short-timeout 探针，尝试锁 copy2
         probe = SessionLocal()
