@@ -32,9 +32,11 @@ def seed() -> list[str]:
     # P1-12（2026-10-09 审查）：判据从 `DEBUG` 改为 **`APP_ENV`**——与 `validate_production`
     # 同一个开关。原先 `.env.example` 默认 `DEBUG=true`：操作员照抄模板 + 设 APP_ENV=production
     # 就能把弱口令超管播种进生产（启动校验也不拦，它只看支付/短信/CORS/SECRET_KEY）。
-    from backend.config import get_settings
+    # 第八轮审查 P2-15：判据改为 `is_production_env`（**唯一来源**）——原先写死
+    # `== "production"`，`APP_ENV=prod`（拼错）时默认弱口令超管照样播种进"生产"。
+    from backend.config import get_settings, is_production_env
 
-    if get_settings().APP_ENV.strip().lower() == "production":
+    if is_production_env(get_settings().APP_ENV):
         raise RuntimeError(
             "生产环境禁止播种默认口令（admin/dmkwords123）——请通过 .env 环境变量注入强口令"
         )

@@ -136,17 +136,28 @@ def normalize_image(
 
     from backend.common.exceptions import ValidationError
 
+    # Pillow 自带的解压炸弹阈值与本模块同源（默认约 89.5MP）：本函数之外任何
+    # `Image.open(...).load()` 路径也一并受约束（幂等赋值，全局只该有一份口径）。
+    Image.MAX_IMAGE_PIXELS = MAX_DECODE_PIXELS
+
     if max_input_bytes is not None and len(data) > max_input_bytes:
         raise ValidationError(
             f"图片体积超限（{len(data) / 1024 / 1024:.1f}MB > {max_input_bytes / 1024 / 1024:.0f}MB）"
         )
     try:
         img = Image.open(BytesIO(data))
-        img.load()
     except Exception as e:  # noqa: BLE001 — Pillow 异常类型多，统一转业务异常
         raise ValidationError("图片文件无法解析") from e
+    # 第八轮审查 P1-5：像素闸必须在 `img.load()`（**整图解码**）**之前**——`Image.open()`
+    # 是惰性的（只读 header，此时 `.size` 已可用），而 `load()` 会把整幅解码进内存
+    # （50MP ≈ 150MB，RGBA/CMYK 更高）。原实现先 load 再判上限 = 闸门在爆炸之后，
+    # 而体积闸只卡 8MB——纯色 PNG 可远低于体积闸却撑爆内存（单进程 uvicorn 整站不可用）。
     if img.width * img.height > MAX_DECODE_PIXELS:
         raise ValidationError(f"图片像素过大（{img.width}x{img.height}），请先自行压缩")
+    try:
+        img.load()
+    except Exception as e:  # noqa: BLE001
+        raise ValidationError("图片文件无法解析") from e
     try:
         img = ImageOps.exif_transpose(img) or img
         img = img.convert("RGB")

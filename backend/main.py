@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.common.exceptions import BusinessException, business_exception_handler
-from backend.config import get_settings
+from backend.config import get_settings, is_production_env
 from backend.middleware.media_cache import MediaCacheMiddleware
 from backend.middleware.rate_limit import WriteRateLimitMiddleware
 
@@ -38,8 +38,11 @@ def docs_endpoint_urls(app_env: str) -> dict[str, str | None]:
     生产恒关闭：/docs、/redoc、/openapi.json 是 FastAPI 内建端点，**不经过任何权限校验**
     （实测无 token 直打 200），等于把全部接口清单（含管理端）公开。契约的唯一来源是仓库快照
     `docs/api/openapi.json`（门禁 `export_openapi.py --check` 维护），开发/测试保持开启。
+
+    第八轮审查 P2-15：判据从"字面等于 `production`"改为 `is_production_env`（**唯一来源**）
+    ——`APP_ENV=prod` / 拼错 / 空串原先都判不出生产，接口清单直接公开。
     """
-    if (app_env or "").strip().lower() == "production":
+    if is_production_env(app_env):
         return {"docs_url": None, "redoc_url": None, "openapi_url": None}
     return {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
 
@@ -69,7 +72,20 @@ app.add_exception_handler(BusinessException, business_exception_handler)
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
+    """健康检查（容器探针用）。**恒 200**：进程活着就是 ok，不因依赖异常改状态码。
+
+    第八轮审查 P1-11：附加 `scheduler` 只读状态（**不查库**）——定时任务整体停摆原先
+    完全无声（`/health` 恒 200、看板只是 `last_run` 变旧）。字段是**加法**，探针与既有
+    用例按原有字段判断不受影响。
+    """
+    from backend.tasks.registry import scheduler_state
+
+    return {
+        "status": "ok",
+        "app": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "scheduler": scheduler_state(),
+    }
 
 
 from backend.domain.activity.miniapp_router import router as activity_miniapp_router  # noqa: E402

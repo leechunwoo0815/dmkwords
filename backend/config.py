@@ -29,6 +29,16 @@ def sms_sdk_available(provider: str) -> bool:
 _DEV_ENVS = ("dev", "development", "local", "test")
 
 
+def is_production_env(app_env: str | None) -> bool:
+    """`APP_ENV` 是否**生产态**——**判据唯一来源**（第八轮审查 P2-15）。
+
+    口径 = "不在开发/测试白名单里"（fail-closed）：`prod` / `prduction` / 拼错 / 空串
+    一律按生产处理。原先三处各写一份，其中两处写死 `== "production"`：
+    `APP_ENV=prod` 时 **`/docs` 全开**（接口清单公开）且**默认弱口令超管照样播种**。
+    """
+    return (app_env or "").strip().lower() not in _DEV_ENVS
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -134,7 +144,11 @@ class Settings(BaseSettings):
         # 原先写"不等于 production 且 DEBUG"——`APP_ENV` 拼错（prod / prduction）+ `DEBUG=true`
         # 会把整段红线**静默跳过**（支付 mock 拒启、空凭证、固定验证码、CORS localhost 全不查），
         # 正是"生产实为 mock 通道"那类事故的形状。
-        if self.APP_ENV.strip().lower() in _DEV_ENVS and self.DEBUG:
+        # 第八轮审查 P2-15：三处生产判定收敛到 `is_production_env`（唯一来源）。
+        # 本方法比它**更严**：开发/测试环境也只在 `DEBUG=true` 时才跳过校验
+        # （`APP_ENV=dev` + `DEBUG=false` 视为"声明了非调试态"，照样全量校验）——
+        # 松紧可以不一致，但只能是"更严"，不能更松。
+        if not is_production_env(self.APP_ENV) and self.DEBUG:
             return
         problems: list[str] = []
         # P2 #23：空串/弱密钥原先放行（只比一个默认字面量）——换成"长度下限"判定
@@ -163,8 +177,11 @@ class Settings(BaseSettings):
                 '（会静默走 mock 网关回"已发送"而家长收不到验证码）'
             )
         if self.SMS_ENABLED and self.SMS_PROVIDER.strip().lower() == "mock":
+            # 第八轮审查 P2-14：原文案指路 `SMS_ENABLED=false`，而上面那条硬校验正是
+            # "SMS_ENABLED=false 拒启" → 按报错改会**再次拒启**（死循环）。改成本条真实出路。
             problems.append(
-                "生产环境 SMS_PROVIDER 不能是 mock（短信发不出去；不用短信则置 SMS_ENABLED=false）"
+                "生产环境 SMS_PROVIDER 不能是 mock（短信发不出去）——请配置真实短信网关凭据"
+                "（SMS_PROVIDER=aliyun/tencent + SMS_APP_ID/SMS_APP_KEY/SMS_SIGN_NAME）"
             )
         if self.SMS_ENABLED and self.SMS_PROVIDER.strip().lower() in ("aliyun", "tencent"):
             if not (self.SMS_APP_ID and self.SMS_APP_KEY and self.SMS_SIGN_NAME):
@@ -176,6 +193,18 @@ class Settings(BaseSettings):
                     f"短信 SDK 未安装（{self.SMS_PROVIDER}）——缺 SDK 时网关 fail-closed 拒发，"
                     "请安装可选依赖：uv sync --extra sms-aliyun（或 --extra sms-tencent）"
                 )
+        # 第八轮审查 P2-13：这两个开关都能**一句话静默废掉一整条防线**，而 `/health` 恒 200
+        # （进程活着就 ok）→ 没有任何信号。生产一律拒启。
+        if self.RATE_LIMIT_WRITE_PER_MINUTE <= 0:
+            problems.append(
+                "全局写限流已关闭（RATE_LIMIT_WRITE_PER_MINUTE<=0）：生产不允许关闸"
+                "（该值只用于压测/排障）"
+            )
+        if not self.SCHEDULER_ENABLED:
+            problems.append(
+                "定时任务调度器已关闭（SCHEDULER_ENABLED=false）：生产不允许——逾期标记/超时取消/"
+                "对账/提醒/证书轮换全靠它，关掉后无任何告警"
+            )
         problems.extend(self._payment_problems())
         if problems:
             raise RuntimeError(f"生产环境配置校验失败: {'; '.join(problems)}")

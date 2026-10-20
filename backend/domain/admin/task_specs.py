@@ -12,42 +12,46 @@ from backend.common.exceptions import ForbiddenError
 from backend.common.notification_models import TaskRunLog  # noqa: F401 — 类型/常量引用
 from backend.domain.admin.models import AdminUser
 
+#: 每任务回看的运行记录条数（算"连续失败"用）。
+#: 第八轮审查 P1-12：原先取**全局最新 500 条**再按任务分组——三个 300 秒任务每天约 864 行、
+#: 全部任务约 1400 行/天 → 500 行只覆盖约 8.5 小时，`03:30/04:00/08:00` 的 cron 任务
+#: 当天下午就滑出窗口 → 看板显示"从未运行"、连续失败数失真（运营据此误判"调度器停了"）。
+#: 现在**按任务各取最新 N 条**（`task_name` 有索引，21 次单查），窗口与"全局写入量"解耦。
+_PER_TASK_HISTORY = 50
+
 
 def build_specs(db: Session) -> list[dict]:
     """任务清单 + 每任务最近一次运行 + 连续失败次数。"""
     from backend.tasks.registry import list_task_specs
 
     specs = list_task_specs()
-    # 每个任务的最新一条运行记录（Q2 裁决：last_run join；空值前端显示"从未运行"）
-    by_task: dict[str, dict] = {}
-    rows = (
-        db.query(TaskRunLog)
-        .filter(TaskRunLog.is_deleted == 0)
-        .order_by(TaskRunLog.id.desc())
-        .limit(500)
-        .all()
-    )
-    for r in rows:
-        by_task.setdefault(
-            r.task_name,
-            {
-                "status": r.status,
-                "processed": r.processed,
-                "error": r.error,
-                "started_at": r.started_at.strftime("%Y-%m-%d %H:%M:%S") if r.started_at else "",
-            },
-        )
-    # 2026-10-12 拍板（P10）：**连续失败要在看板标红**——原先只有"最后一次状态"，
-    # 一次成功就把连续失败盖掉了（失败三次最后一次碰巧成功 = 看板全绿）。
-    history: dict[str, list[str]] = {}
-    for r in rows:  # rows 已按 id desc（最新在前）
-        history.setdefault(r.task_name, []).append(r.status)
     for s in specs:
-        last = by_task.get(s["name"])
-        s["last_run"] = last or None
+        # 每个任务的最新一条运行记录（Q2 裁决：last_run join；空值前端显示"从未运行"）
+        rows = (
+            db.query(TaskRunLog)
+            .filter(TaskRunLog.is_deleted == 0, TaskRunLog.task_name == s["name"])
+            .order_by(TaskRunLog.id.desc())
+            .limit(_PER_TASK_HISTORY)
+            .all()
+        )
+        last = rows[0] if rows else None
+        s["last_run"] = (
+            {
+                "status": last.status,
+                "processed": last.processed,
+                "error": last.error,
+                "started_at": last.started_at.strftime("%Y-%m-%d %H:%M:%S")
+                if last.started_at
+                else "",
+            }
+            if last
+            else None
+        )
+        # 2026-10-12 拍板（P10）：**连续失败要在看板标红**——原先只有"最后一次状态"，
+        # 一次成功就把连续失败盖掉了（失败三次最后一次碰巧成功 = 看板全绿）。
         streak = 0
-        for st in history.get(s["name"], []):
-            if st == TaskRunLog.STATUS_FAILED:
+        for r in rows:  # 已按 id desc（最新在前）
+            if r.status == TaskRunLog.STATUS_FAILED:
                 streak += 1
             else:
                 break

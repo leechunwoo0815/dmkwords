@@ -199,21 +199,39 @@ class ParentService:
             parent.name = req.name
             changed.append("name")
         if req.phone is not None and req.phone != parent.phone:
+            # 第八轮审查 P1-9（与第七轮 P1-4 软删书目同 ISBN 同族）：
+            # `parents.phone` 是**全局唯一索引（不含 is_deleted）**，而查重只看未删行
+            # → "改成一个属于**已删除档案**的号码"会穿过服务层，落库时撞唯一索引 = **HTTP 500**。
+            # 改号是"账号换手"，目标号不能属于任何（含已删）档案：想用这个号请走建档流程
+            # （`create` 对软删同号是**复活**那一行，见上）。查重必须含软删。
+            taken = (
+                self.db.query(Parent)
+                .filter(Parent.phone == req.phone, Parent.id != parent_id)
+                .first()
+            )
+            if taken is not None:
+                if taken.is_deleted:
+                    raise ValidationError(
+                        f"手机号 {req.phone} 属于一个已删除的家长档案，不能改号占用"
+                        "（如需恢复该档案，请在建档入口用此号码新建）"
+                    )
+                raise ValidationError(f"手机号 {req.phone} 已存在家长账号")
             # 2026-10-12 拍板（P3）：手机号是登录账号，**改号 = 档案换手** → 旧登录一律立刻失效。
             # 不撤的话旧号持有人最长 30 天还能看这个家庭的孩子/会员码/订单/评估报告（实测路径）。
             # 家长重新登录一次的成本远低于泄露代价。
+            # P1-9：撤销动作内部 `commit()`（token_generation +1 = **强制下线**），
+            # 原先写在查重**之前** → 改号失败但家长已被踢下线（实测 V7：500 且 gen 0→1）。
+            # 现在只在全部校验通过后执行；并发下若仍撞唯一索引，转 422 而不是 500。
+            from sqlalchemy.exc import IntegrityError
+
             from backend.domain.identity.service import revoke_parent_tokens
 
-            revoke_parent_tokens(self.db, parent)
             parent.phone = req.phone
-            dup = (
-                self.db.query(func.count(Parent.id))
-                .filter(Parent.phone == req.phone, Parent.is_deleted == 0, Parent.id != parent_id)
-                .scalar()
-            )
-            if dup:
-                raise ValidationError(f"手机号 {req.phone} 已存在家长账号")
-            parent.phone = req.phone
+            try:
+                revoke_parent_tokens(self.db, parent)
+            except IntegrityError as e:
+                self.db.rollback()
+                raise ValidationError(f"手机号 {req.phone} 已被占用，请刷新后重试") from e
             changed.append("phone")
         if req.remark is not None:
             parent.remark = req.remark

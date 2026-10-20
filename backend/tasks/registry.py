@@ -519,23 +519,19 @@ def guarded_run(task_name: str) -> dict | None:
     return run_task(task_name)
 
 
-def start_scheduler() -> bool:
-    """main.py lifespan 调用：进程内 BackgroundScheduler 注册全部任务。
+#: 非持锁副本的**抢锁看护**重试间隔（秒）。第八轮审查 P1-11：持锁副本退出（滚动发布 /
+#: 崩溃 / 被杀）后，锁由 MySQL 自动释放，但**其它副本原先永不接管**——21 个定时任务全停，
+#: 而 `/health` 仍 200、看板只是 `last_run` 变旧 → 无人发现。现在非持锁副本起一个低频
+#: 看护线程，锁一空就注册全部任务接管。
+SCHEDULER_LOCK_RETRY_SECONDS = 60
 
-    返回是否真的启动（False = 命名锁被其它副本持有 → 本进程只提供 API，不调度）。
-    """
-    global _scheduler
-    if _scheduler is not None:
-        return True
-    if not _acquire_scheduler_lock():
-        logger.warning(
-            "调度器单实例锁 %s 被其它进程持有——本进程不注册定时任务（API 照常服务）",
-            SCHEDULER_LOCK_NAME,
-        )
-        return False
-    from apscheduler.schedulers.background import BackgroundScheduler
+#: 抢锁看护线程与其停止信号（`stop_scheduler` 负责收）
+_watchdog_thread: threading.Thread | None = None
+_watchdog_stop = threading.Event()
 
-    scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
+
+def _register_all_jobs(scheduler) -> None:
+    """把全部任务注册进给定 scheduler（首启与"接管"两条路径共用同一份注册逻辑）。"""
     for spec in TASKS.values():
         job_kwargs: dict = {
             "args": [spec.name],
@@ -555,19 +551,102 @@ def start_scheduler() -> bool:
             job_kwargs["trigger"] = "interval"
             job_kwargs["seconds"] = spec.interval_seconds
         scheduler.add_job(guarded_run, **job_kwargs)
+
+
+def _start_jobs_now() -> None:
+    """真正启动调度器（调用方须已持有单实例锁）。"""
+    global _scheduler
+    from apscheduler.schedulers.background import BackgroundScheduler
+
+    scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
+    _register_all_jobs(scheduler)
     scheduler.start()
     _scheduler = scheduler
     _schedule_cron_catchup(scheduler)
     logger.info("APScheduler started with %d tasks", len(TASKS))
+
+
+def _watchdog_loop() -> None:
+    """抢锁看护：每隔 `SCHEDULER_LOCK_RETRY_SECONDS` 试一次，拿到锁就接管调度。"""
+    while not _watchdog_stop.wait(SCHEDULER_LOCK_RETRY_SECONDS):
+        try:
+            if _scheduler is not None:
+                return  # 已被本进程接管（或本来就在调度）
+            if _acquire_scheduler_lock():
+                logger.warning(
+                    "调度器单实例锁 %s 已接管（原持锁副本已退出）——本进程开始调度全部任务",
+                    SCHEDULER_LOCK_NAME,
+                )
+                _start_jobs_now()
+                return
+        except Exception:  # noqa: BLE001 — 看护线程绝不能因异常静默死掉
+            logger.exception("调度器抢锁看护本轮异常（下一轮继续重试）")
+
+
+def _start_lock_watchdog() -> None:
+    """非持锁副本上启动抢锁看护（幂等；只起一个线程）。"""
+    global _watchdog_thread
+    if _watchdog_thread is not None and _watchdog_thread.is_alive():
+        return
+    _watchdog_stop.clear()
+    _watchdog_thread = threading.Thread(
+        target=_watchdog_loop, name="scheduler-lock-watchdog", daemon=True
+    )
+    _watchdog_thread.start()
+
+
+def _stop_lock_watchdog() -> None:
+    global _watchdog_thread
+    _watchdog_stop.set()
+    _watchdog_thread = None
+
+
+def start_scheduler() -> bool:
+    """main.py lifespan 调用：进程内 BackgroundScheduler 注册全部任务。
+
+    返回是否**立刻**启动（False = 命名锁被其它副本持有 → 本进程先只提供 API，
+    同时启动抢锁看护：持锁副本退出后最多 `SCHEDULER_LOCK_RETRY_SECONDS` 秒接管，见 P1-11）。
+    """
+    global _scheduler
+    if _scheduler is not None:
+        return True
+    if not _acquire_scheduler_lock():
+        logger.warning(
+            "调度器单实例锁 %s 被其它进程持有——本进程先不注册定时任务（API 照常服务），"
+            "已启动抢锁看护（每 %d 秒重试，持锁副本退出后自动接管）",
+            SCHEDULER_LOCK_NAME,
+            SCHEDULER_LOCK_RETRY_SECONDS,
+        )
+        _start_lock_watchdog()
+        return False
+    _start_jobs_now()
     return True
 
 
 def stop_scheduler() -> None:
     global _scheduler
+    _stop_lock_watchdog()
     if _scheduler is not None:
         _scheduler.shutdown(wait=False)
         _scheduler = None
     release_scheduler_lock()
+
+
+def scheduler_state() -> dict:
+    """调度器状态（`/health` 暴露用，**不查库**、绝不抛异常）。
+
+    第八轮审查 P1-11 的"可观测"面：定时任务整体停摆原先完全无声（`/health` 恒 200、
+    看板只是 `last_run` 变旧）。这里给出"本进程是否在调度 / 是否握着锁连接"，
+    权威判定仍在 `guarded_run` 的 `_holds_scheduler_lock()`。
+    """
+    from backend.config import get_settings
+
+    return {
+        "enabled": bool(getattr(get_settings(), "SCHEDULER_ENABLED", True)),
+        "running": _scheduler is not None,
+        "has_lock_conn": _lock_conn is not None,
+        "watchdog": _watchdog_thread is not None and _watchdog_thread.is_alive(),
+    }
 
 
 #: cron 任务的"迟到宽限"（秒）。机器休眠会把钟点任务记成 missed，
