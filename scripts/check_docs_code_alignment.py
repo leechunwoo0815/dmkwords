@@ -366,6 +366,119 @@ def check_quantity_claims(
     return out
 
 
+def scan_doc(
+    doc: pathlib.Path,
+    root: pathlib.Path,
+    *,
+    api: set[tuple[str, ...]],
+    configs: set[str],
+    tables: set[str],
+    symbols: set[str],
+) -> list[tuple[str, int, str, str]]:
+    """单份文档的反引号 token 校验（**判定只在这一处**：main 与自证共用）。
+
+    抽出来是为了自证（第八轮审查 P1-10）：原先这段内联在 `main()` 的 rglob 循环里，
+    没有入口喂样本 —— 实测把"文件存在性"判断改成 `if False and ...` 后，检查器照样打印
+    "✓ 文档引用全部落到真实文件"。现在自证样本直接喂给本函数。
+    """
+    findings: list[tuple[str, int, str, str]] = []
+    text = _read(doc)
+    rel = str(doc.relative_to(root))
+    ignored: set[str] = set()
+    for m in re.finditer(r"<!--\s*docs-code-ignore:\s*([^>]+?)\s*-->", text):
+        ignored |= {t.strip() for t in m.group(1).split(",") if t.strip()}
+    for ln, line in enumerate(text.split("\n"), 1):
+        for m in re.finditer(r"`([^`\n]{2,120})`", line):
+            tok = m.group(1).strip()
+            if not tok or tok in ignored or SKIP_TOKEN_RE.search(tok):
+                continue
+            # ① 文件路径
+            if tok.startswith(ARTIFACT_PREFIXES):
+                continue  # 产物类引用：本地生成，CI 不保证存在（见 ARTIFACT_PREFIXES 注释）
+            if PATH_RE.match(tok):
+                glob = re.sub(r"\{[^}]*\}", "*", tok)
+                if not list(root.glob(glob)):
+                    findings.append((rel, ln, "文件不存在", tok))
+            # ② 接口路径
+            elif API_RE.match(tok) and api:
+                segs = tuple(
+                    "{}" if s.startswith("{") else s for s in tok.split("?")[0].split("/") if s
+                )
+                if len(segs) == 0 or segs not in api:
+                    findings.append((rel, ln, "接口路径不存在", tok))
+            # ③ 配置键（仅"语境词紧邻"时判定，避免把字段名/模块名误判）
+            elif CONFIG_CTX_RE.search(line[: m.start()]) and re.fullmatch(
+                r"[a-z][a-z0-9]*(?:_[a-z0-9]+){1,4}", tok
+            ):
+                if tok not in configs and tok not in symbols and tok not in tables:
+                    findings.append((rel, ln, "配置键不在目录", tok))
+            # ④ 表名
+            elif tok.endswith(TABLE_SUFFIX) and re.fullmatch(r"[a-z][a-z0-9_]+", tok):
+                if tok not in tables and tok not in configs and tok not in symbols:
+                    findings.append((rel, ln, "表名不存在", tok))
+            # ⑤ 函数/类名
+            elif tok.endswith("()") and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*\(\)", tok):
+                name = tok[:-2]
+                if name not in symbols and name not in EXTERNAL_SYMBOLS:
+                    findings.append((rel, ln, "函数/类不存在", tok))
+    return findings
+
+
+def self_test() -> int:
+    """S1 注入自检：五类悬空引用必须**各命中一条**，合法引用与豁免标记不得误报。"""
+    import tempfile
+
+    bad = 0
+    with tempfile.TemporaryDirectory(prefix="docs-code-selftest-") as d:
+        root = pathlib.Path(d)
+        (root / "docs").mkdir(parents=True)
+        (root / "docs/api").mkdir(parents=True)
+        (root / "docs/api/openapi.json").write_text('{"paths": {}}', encoding="utf-8")
+        doc = root / "docs" / "probe.md"
+        doc.write_text(
+            "`docs/no_such_file.md`\n"  # ① 文件不存在（须带白名单前缀，见 PATH_RE）
+            "`/api/ghost/endpoint`\n"  # ② 接口路径不存在
+            "配置键 `ghost_config_key` 说明\n"  # ③ 配置键不在目录（语境词须紧邻）
+            "`ghost_records` 表\n"  # ④ 表名不存在（须命中 TABLE_SUFFIX 后缀表）
+            "`ghost_symbol()` 函数\n"  # ⑤ 函数/类不存在
+            "`real_symbol()` 真实函数\n"  # 合法：符号表里有
+            # 合法：豁免标记（**注意它是文件级**——同文件里同名 token 一并豁免，故换名做样本）
+            "`exempted_symbol()`<!-- docs-code-ignore: exempted_symbol() -->\n"
+            "`/api/real/endpoint`\n",  # 合法：接口在契约里
+            encoding="utf-8",
+        )
+        findings = scan_doc(
+            doc,
+            root,
+            api={("api", "real", "endpoint")},
+            configs={"real_config_key"},
+            tables={"real_table_name"},
+            symbols={"real_symbol"},
+        )
+        kinds = sorted(f[2] for f in findings)
+        want = sorted(
+            ["文件不存在", "接口路径不存在", "配置键不在目录", "表名不存在", "函数/类不存在"]
+        )
+        if kinds != want:
+            print(f"✗ S1 五类悬空引用未各命中一条：期望 {want}，实得 {kinds}")
+            bad += 1
+        # 反向样本：合法引用 + 豁免标记被误报 = 检查器过严（会逼出无意义的豁免注释）
+        leaked = [f for f in findings if "real" in f[3]]
+        if leaked:
+            print(f"✗ S1 合法引用被误报: {leaked}")
+            bad += 1
+        # S2 空扫自检：文档为空 → 必须零发现（而不是"看不出扫没扫到"）
+        (doc).write_text("", encoding="utf-8")
+        if scan_doc(doc, root, api=set(), configs=set(), tables=set(), symbols=set()):
+            print("✗ S2 空文档样本产生了发现（判定逻辑异常）")
+            bad += 1
+    if bad:
+        print(f"✗ S1 注入自检失败 {bad} 项")
+        return 1
+    print("✓ S1 注入自检通过（五类悬空各命中 / 合法引用与豁免零误报 / 空文档零发现）")
+    return 0
+
+
 def main() -> int:
     api = collect_api_paths()
     configs = collect_config_keys()
@@ -374,45 +487,9 @@ def main() -> int:
 
     findings: list[tuple[str, int, str, str]] = []
     for doc in collect_docs():
-        text = _read(doc)
-        ignored: set[str] = set()
-        for m in re.finditer(r"<!--\s*docs-code-ignore:\s*([^>]+?)\s*-->", text):
-            ignored |= {t.strip() for t in m.group(1).split(",") if t.strip()}
-        for ln, line in enumerate(text.split("\n"), 1):
-            for m in re.finditer(r"`([^`\n]{2,120})`", line):
-                tok = m.group(1).strip()
-                if not tok or tok in ignored or SKIP_TOKEN_RE.search(tok):
-                    continue
-                rel = str(doc.relative_to(ROOT))
-                # ① 文件路径
-                if tok.startswith(ARTIFACT_PREFIXES):
-                    continue  # 产物类引用：本地生成，CI 不保证存在（见 ARTIFACT_PREFIXES 注释）
-                if PATH_RE.match(tok):
-                    glob = re.sub(r"\{[^}]*\}", "*", tok)
-                    if not list(ROOT.glob(glob)):
-                        findings.append((rel, ln, "文件不存在", tok))
-                # ② 接口路径
-                elif API_RE.match(tok) and api:
-                    segs = tuple(
-                        "{}" if s.startswith("{") else s for s in tok.split("?")[0].split("/") if s
-                    )
-                    if len(segs) == 0 or segs not in api:
-                        findings.append((rel, ln, "接口路径不存在", tok))
-                # ③ 配置键（仅"语境词紧邻"时判定，避免把字段名/模块名误判）
-                elif CONFIG_CTX_RE.search(line[: m.start()]) and re.fullmatch(
-                    r"[a-z][a-z0-9]*(?:_[a-z0-9]+){1,4}", tok
-                ):
-                    if tok not in configs and tok not in symbols and tok not in tables:
-                        findings.append((rel, ln, "配置键不在目录", tok))
-                # ④ 表名
-                elif tok.endswith(TABLE_SUFFIX) and re.fullmatch(r"[a-z][a-z0-9_]+", tok):
-                    if tok not in tables and tok not in configs and tok not in symbols:
-                        findings.append((rel, ln, "表名不存在", tok))
-                # ⑤ 函数/类名
-                elif tok.endswith("()") and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*\(\)", tok):
-                    name = tok[:-2]
-                    if name not in symbols and name not in EXTERNAL_SYMBOLS:
-                        findings.append((rel, ln, "函数/类不存在", tok))
+        findings.extend(
+            scan_doc(doc, ROOT, api=api, configs=configs, tables=tables, symbols=symbols)
+        )
 
     actual = {
         "任务": len(collect_task_keys()),
@@ -443,4 +520,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if "--self-test" in sys.argv:
+        sys.exit(self_test())
     sys.exit(main())

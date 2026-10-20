@@ -40,19 +40,21 @@ def _read(p: pathlib.Path) -> str:
     return p.read_text(encoding="utf-8", errors="replace")
 
 
-def backend_used() -> dict[str, set[str]]:
+def backend_used(root: pathlib.Path | None = None) -> dict[str, set[str]]:
+    base = root or ROOT
     out: dict[str, set[str]] = {}
-    for f in (ROOT / "backend").rglob("*.py"):
+    for f in (base / "backend").rglob("*.py"):
         for m in re.finditer(r"require_perm\(\s*([^)]*)\)", _read(f)):
             for code in re.findall(r"""["']([A-Za-z_][A-Za-z_.]*)["']""", m.group(1)):
-                out.setdefault(code, set()).add(str(f.relative_to(ROOT)))
+                out.setdefault(code, set()).add(str(f.relative_to(base)))
     return out
 
 
-def frontend_used() -> dict[str, set[str]]:
+def frontend_used(root: pathlib.Path | None = None) -> dict[str, set[str]]:
+    base = root or ROOT
     out: dict[str, set[str]] = {}
-    files = list((ROOT / "admin-web/src").rglob("*.tsx")) + list(
-        (ROOT / "admin-web/src").rglob("*.ts")
+    files = list((base / "admin-web/src").rglob("*.tsx")) + list(
+        (base / "admin-web/src").rglob("*.ts")
     )
     for f in files:
         if f.name == "schema.d.ts":
@@ -63,8 +65,58 @@ def frontend_used() -> dict[str, set[str]]:
             r"""perm(?:ission)?s?\s*[:=]\s*["']([A-Za-z_][A-Za-z_.]*)["']""",
         ):
             for m in re.finditer(pat, txt):
-                out.setdefault(m.group(1), set()).add(str(f.relative_to(ROOT)))
+                out.setdefault(m.group(1), set()).add(str(f.relative_to(base)))
     return out
+
+
+def self_test() -> int:
+    """S1 注入自检：两侧引用都要**真能抽出来**（抽不出来 = 对账永远绿）。
+
+    第八轮审查 P1-10 的实测形状：把"未声明码硬失败"关掉后检查器照样打印"三方一致"。
+    自证样本钉住的是**抽取能力**本身（正则被改坏 → 抽取为空 → 对账恒绿）。
+    """
+    import tempfile
+
+    bad = 0
+    with tempfile.TemporaryDirectory(prefix="rbac-selftest-") as d:
+        root = pathlib.Path(d)
+        (root / "backend/domain").mkdir(parents=True)
+        (root / "admin-web/src").mkdir(parents=True)
+        (root / "backend/domain/router.py").write_text(
+            "@router.get('/x', dependencies=[Depends(require_perm('member.manage'))])\n"
+            "def x(): ...\n"
+            "@router.get('/y')\ndef y(admin=Depends(require_perm('ghost.code'))): ...\n",
+            encoding="utf-8",
+        )
+        (root / "admin-web/src/pages.tsx").write_text(
+            'if (hasPermission(role, "member.manage")) {}\nconst meta = { perm: "ghost.front" };\n',
+            encoding="utf-8",
+        )
+        # 合法形状不得误报：schema.d.ts 必须被跳过
+        (root / "admin-web/src/schema.d.ts").write_text(
+            'export type P = "member.manage";\n', encoding="utf-8"
+        )
+
+        be, fe = backend_used(root), frontend_used(root)
+        if set(be) != {"member.manage", "ghost.code"}:
+            print(f"✗ S1 后端引用抽取失败（期望 2 个码，实得 {sorted(be)}）")
+            bad += 1
+        if set(fe) != {"member.manage", "ghost.front"}:
+            print(f"✗ S1 前端引用抽取失败（期望 2 个码，实得 {sorted(fe)}）")
+            bad += 1
+        if "schema.d.ts" in {p.split("/")[-1] for v in fe.values() for p in v}:
+            print("✗ S1 schema.d.ts 未被跳过（类型产物不是权限声明）")
+            bad += 1
+        # 抽取为空 = 对账恒绿（盲区形状）——必须显式判死
+        (root / "backend/domain/router.py").write_text("pass\n", encoding="utf-8")
+        if backend_used(root):
+            print("✗ S2 空扫描自检失败（清空样本后仍抽出引用）")
+            bad += 1
+    if bad:
+        print(f"✗ S1 注入自检失败 {bad} 项")
+        return 1
+    print("✓ S1 注入自检通过（两侧引用均抽出 / schema.d.ts 跳过 / 空样本归零）")
+    return 0
 
 
 def main() -> int:
@@ -115,4 +167,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if "--self-test" in sys.argv:
+        sys.exit(self_test())
     sys.exit(main())

@@ -180,4 +180,12 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # `--self-test`：只跑 S1 注入自检（gate 会先跑它，再跑主流程——第八轮审查 P1-10）
+    if "--self-test" in sys.argv:
+        _fails = selftest()
+        if _fails:
+            print("FAIL(S1): " + "；".join(_fails))
+            sys.exit(1)
+        print("✓ S1 注入自检通过（W1/W2 违例命中 + 正例零误报）")
+        sys.exit(0)
     sys.exit(main())

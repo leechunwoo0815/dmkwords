@@ -55,10 +55,13 @@ run python -m pytest tests/ -q --tb=short --cov=backend --cov-fail-under=25 --co
 step 3 "BDD (behave)"
 run python -m behave features/ --no-capture -q
 
-step 4 "架构关"
+step 4 "架构关（含自证）"
+# 第八轮审查 P1-10：先跑 `--self-test`（注入违例必须报得出来）再跑主流程——
+# 原先只跑主流程，实测把 sqlite 禁令关掉后照样打印 `架构关 PASS`。
+run python -m scripts.verify_architecture --self-test
 run python -m scripts.verify_architecture
 
-step 5 "契约与反假绿"
+step 5 "契约与反假绿（**含检查器自证**）"
 # verify_api_contract / check_model_consistency 为旧项目工具，F0 按新代码结构重写后启用
 if [ -f "scripts/verify_api_contract.py" ] && grep -q "dmkwords" scripts/verify_api_contract.py 2>/dev/null; then
   run python -m scripts.verify_api_contract
@@ -70,43 +73,56 @@ if [ -f "scripts/check_model_consistency.py" ] && grep -q "dmkwords" scripts/che
 else
   skip "check_model_consistency 旧结构工具待 F0 重写"
 fi
+# ---------------------------------------------------------------------------
+# 检查器清单（**唯一来源**）：每个检查器都先跑 `--self-test` 再跑主流程。
+# 第八轮审查 P1-10：原先只跑主流程，注释里写着"含 S1 注入自检"而**实际没传 --self-test**——
+# 实测把 `?v=` 改坏 / 关掉 sqlite 禁令 / 让 R14 永远返回 [] / 把文档"文件存在性"改成
+# `if False and ...`，gate 全部照样 PASS（"改了检查器没人知道"是本项目最贵的失败模式）。
+# 本清单由 `scripts/check_gate_selftest.py` 机械校验：仓库里的检查器**要么在清单里、
+# 要么在它的 NOT_IN_GATE 白名单里写明理由**——新增检查器忘了接进 gate 同样判红。
+# ---------------------------------------------------------------------------
 # 测试卫生两条：A 假绿断言（assert True/False 必须带注释）/ B 时间炸弹（测试里写死的近期未来绝对时间——
 # 2026-09-20 实测 4 连红「开始时间必须在未来」，测试自己到期了；改相对时间或 ≥2050 远期哨兵）
-run python -m scripts.check_fake_assertions
 # E-20260912-01 防复发：小程序数据面断链（wxml 读的顶层变量必须真的进过 data）
-run python scripts/check_miniapp_bindings.py
 # A1-11（2026-10-09）：小程序**接线**两条——W1 `bind*/catch*` 指向的 handler 必须存在
 # （P0-2 退款死按钮的漏网形状：wxml 有 bindtap、js 无该方法 → 点了毫无反应）；
 # W2 插值类名必须能解析到样式（`banner-{{index % 3}}` 三变体从未定义 → 底色静默失效）。
-# 含 S1 注入自检（正反例）+ S2 空扫描自检。
-run python scripts/check_miniapp_wiring.py
 # E-20260912-05 防复发：文档引用悬空（文件路径/接口/配置键/表名/函数名必须真实存在）
-run python scripts/check_docs_code_alignment.py
 # E-20260912-09：RBAC 三方一致对账（宪法 §五.2 承诺项——声明/后端引用/前端引用）
-run python scripts/check_rbac_consistency.py
 # P1 #10（2026-10-15 大审查）：仪表盘待办卡的行**必须覆盖后端 admin_total 全部求和项**——
 # 两侧各改各的就会假绿：卡片绿色「全部处理完毕」而同屏侧边栏徽标 >0（被掩盖的常是资金异常）。
-run python scripts/check_admin_todo_rows.py
-# E-20260913：小程序风格基准（**R1–R14** 规则 + S1–S3 自证；含 R12 悬空类名 / R13 图标槽位 emoji/资产 /
-# R14 WXML 注释与标签结构——2026-09-20 补：注释写成 */ 会吞掉半页模板且报错行指向别处，IDE 才看得见。
-# 2026-09-20 修正：旧注释写"R1–R7"是陈旧的，规则实际已到 R16（见 docs/08 TD-11/TD-12）。不能替代目视截图）
-run python scripts/check_miniapp_style.py
+# E-20260913：小程序风格基准（**R1–R16** 规则 + S1–S3 自证；含 R12 悬空类名 / R13 图标槽位 emoji/资产 /
+# R14 WXML 注释与标签结构——注释写成 */ 会吞掉半页模板且报错行指向别处，IDE 才看得见。不能替代目视截图）
 # fix44 R4（Q8 机化）：媒体纪律三条——M1 落盘单出口（只有 file_storage / Canvas.finish / save_jpeg
 # 可写媒体文件）/ M2 破缓存单出口（`?v=` 只许出现在 file_utils.media_version）/ M3 清理脚本默认 dry-run。
-# 含 S1 注入自证（--self-test 可单跑）。
-run python scripts/check_media_discipline.py
-# G6（docs/09）+ docs/15 §21.3：**文案 emoji 口径扩到管理端与后端导出**（R13d；2026-09-23）
+# G6（docs/09）+ docs/15 §21.3：**文案 emoji 口径扩到管理端与后端导出**（R13d）——
 # ① admin-web/src/**/*.{ts,tsx} 去注释后零 emoji；② backend/**/*.py 字符串字面量零 emoji
-# （AST 判定、docstring 跳过）。排版字形（✓ ✕ ★ ☆ 等）白名单放行；含 S1–S3 三重自证。
-run python scripts/check_copy_emoji.py
+# （AST 判定、docstring 跳过）。排版字形（✓ ✕ ★ ☆ 等）白名单放行。
+CHECKER_CMDS=(
+  "python -m scripts.check_fake_assertions"
+  "python scripts/check_miniapp_bindings.py"
+  "python scripts/check_miniapp_wiring.py"
+  "python -m scripts.check_docs_code_alignment"
+  "python -m scripts.check_rbac_consistency"
+  "python scripts/check_admin_todo_rows.py"
+  "python scripts/check_miniapp_style.py"
+  "python scripts/check_media_discipline.py"
+  "python scripts/check_copy_emoji.py"
+  "python -m scripts.check_gate_selftest"
+)
+for checker_cmd in "${CHECKER_CMDS[@]}"; do
+  run $checker_cmd --self-test
+  run $checker_cmd
+done
 
 step 6 "数据库迁移一致性"
-# 首个迁移文件创建后启用：
 if ls alembic/versions/*.py >/dev/null 2>&1; then
   run alembic upgrade head
   run alembic check
 else
-  skip "alembic versions 为空，F0 起启用"
+  # 第八轮审查 P1-10 ④：**空目录判红**。原先是静默 skip——删掉迁移文件就能让
+  # "迁移一致性"这条红线无声消失（本项目已有 37 个迁移，空目录只可能是事故）。
+  fail "alembic/versions 为空——迁移目录缺失或被清空（不许静默跳过）"
 fi
 
 step 7 "前端类型检查（tsc）"

@@ -21,6 +21,7 @@ import datetime
 import pathlib
 import re
 import sys
+import tempfile
 
 SCAN_DIRS = ("features/steps", "tests")
 
@@ -40,47 +41,106 @@ TIME_BOMB_RE = re.compile(
 #: 年份 ≥ 该值视为"远期哨兵"（永不到期），放行
 FAR_FUTURE_YEAR = 2050
 
-violations: list[str] = []
-bombs: list[str] = []
-now_year = datetime.date.today().year
 
-for scan_dir in SCAN_DIRS:
-    for py_file in pathlib.Path(scan_dir).rglob("*.py"):
-        text = py_file.read_text(encoding="utf-8")
-        for i, line in enumerate(text.splitlines(), 1):
-            stripped = line.strip()
-            if stripped.startswith("#"):
-                continue
-            # 规则 A：assert True/False 必须有注释说明原因
-            if stripped in ("assert True", "assert False"):
-                violations.append(f"{py_file}:{i}: bare {stripped} (no comment)")
-            elif (
-                (stripped.startswith("assert True") or stripped.startswith("assert False"))
-                and "#" not in stripped
-                and '"' not in stripped
-                and "'" not in stripped
-            ):
-                violations.append(f"{py_file}:{i}: {stripped.split('(')[0]} without explanation")
-            # 规则 B：时间炸弹
-            for m in TIME_BOMB_RE.finditer(line):
-                year = int(m.group("date")[:4])
-                if now_year <= year < FAR_FUTURE_YEAR:
-                    bombs.append(
-                        f"{py_file}:{i}: {m.group('key')} 写死 {m.group('date')}…"
-                        f"（{year} 年会到期；改相对时间或 ≥{FAR_FUTURE_YEAR} 的远期哨兵）"
+def scan(root: pathlib.Path, now_year: int | None = None) -> tuple[list[str], list[str]]:
+    """扫描 `root/{features/steps,tests}`，返回 (假绿断言, 时间炸弹)。
+
+    **参数化 root 是为了自证**（第八轮审查 P1-10）：原实现是模块级 for 循环直接扫仓库，
+    没有任何办法给它喂样本 → 检测器改坏了也没人知道。
+    """
+    year_now = datetime.date.today().year if now_year is None else now_year
+    violations: list[str] = []
+    bombs: list[str] = []
+    for scan_dir in SCAN_DIRS:
+        for py_file in (root / scan_dir).rglob("*.py"):
+            text = py_file.read_text(encoding="utf-8")
+            for i, line in enumerate(text.splitlines(), 1):
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    continue
+                # 规则 A：assert True/False 必须有注释说明原因
+                if stripped in ("assert True", "assert False"):
+                    violations.append(f"{py_file}:{i}: bare {stripped} (no comment)")
+                elif (
+                    (stripped.startswith("assert True") or stripped.startswith("assert False"))
+                    and "#" not in stripped
+                    and '"' not in stripped
+                    and "'" not in stripped
+                ):
+                    violations.append(
+                        f"{py_file}:{i}: {stripped.split('(')[0]} without explanation"
                     )
+                # 规则 B：时间炸弹
+                for m in TIME_BOMB_RE.finditer(line):
+                    year = int(m.group("date")[:4])
+                    if year_now <= year < FAR_FUTURE_YEAR:
+                        bombs.append(
+                            f"{py_file}:{i}: {m.group('key')} 写死 {m.group('date')}…"
+                            f"（{year} 年会到期；改相对时间或 ≥{FAR_FUTURE_YEAR} 的远期哨兵）"
+                        )
+    return violations, bombs
 
-failed = False
-if violations:
-    print(f"FOUND {len(violations)} unexplained assert True/False:")
-    for v in violations:
-        print(f"  {v}")
-    failed = True
-if bombs:
-    print(f"FOUND {len(bombs)} 会过期的时间字面量（时间炸弹）：")
-    for b in bombs:
-        print(f"  {b}")
-    failed = True
-if failed:
-    sys.exit(1)
-print("OK: 假绿断言 0 处；时间炸弹 0 处（相对时间或远期哨兵 ≥2050）")
+
+def self_test() -> int:
+    """S1 注入自检：两类违例必须命中，两种合法写法不得误报。
+
+    防的是什么（第八轮审查 P1-10）：检查器"看起来在跑"但检测逻辑被改坏时，
+    门禁照样打印 OK —— 自证样本是唯一能发现这件事的机制。
+    """
+    bad = 0
+    with tempfile.TemporaryDirectory(prefix="fake-assert-selftest-") as d:
+        root = pathlib.Path(d)
+        (root / "tests").mkdir(parents=True)
+        (root / "features/steps").mkdir(parents=True)
+        (root / "tests/probe.py").write_text(
+            "assert True\n"  # 违例：裸 assert True
+            "assert False\n"  # 违例：裸 assert False
+            "assert x == 1, '业务说明'\n"  # 合法：正常断言
+            "assert True  # 前端交互步骤无服务端断言\n"  # 合法：带注释
+            '{"start_at": "2026-11-01T10:00:00"}\n'  # 违例：近期未来时间炸弹
+            '{"start_at": "2099-01-01T10:00:00"}\n'  # 合法：远期哨兵
+            '{"deadline": datetime.now() + timedelta(days=7)}\n',  # 合法：相对时间
+            encoding="utf-8",
+        )
+        (root / "features/steps/s.py").write_text("assert True\n", encoding="utf-8")
+        violations, bombs = scan(root, now_year=2026)
+        if len(violations) != 3:
+            print(f"✗ S1 假绿断言注入未全命中（期望 3，实得 {len(violations)}）: {violations}")
+            bad += 1
+        if len(bombs) != 1:
+            print(f"✗ S1 时间炸弹注入未命中（期望 1，实得 {len(bombs)}）: {bombs}")
+            bad += 1
+        # S2 空扫自检：扫描面塌缩（目录改名）时必须能看出来——样本在就该扫到
+        if not violations or not bombs:
+            print("✗ S2 扫描面异常（注入样本一个都没扫到）")
+            bad += 1
+    if bad:
+        print(f"✗ S1 注入自检失败 {bad} 项")
+        return 1
+    print("✓ S1 注入自检通过（裸 assert ×3 全命中 / 时间炸弹命中 / 合法写法零误报）")
+    return 0
+
+
+def main() -> int:
+    violations, bombs = scan(pathlib.Path.cwd())
+    failed = False
+    if violations:
+        print(f"FOUND {len(violations)} unexplained assert True/False:")
+        for v in violations:
+            print(f"  {v}")
+        failed = True
+    if bombs:
+        print(f"FOUND {len(bombs)} 会过期的时间字面量（时间炸弹）：")
+        for b in bombs:
+            print(f"  {b}")
+        failed = True
+    if failed:
+        return 1
+    print("OK: 假绿断言 0 处；时间炸弹 0 处（相对时间或远期哨兵 ≥2050）")
+    return 0
+
+
+if __name__ == "__main__":
+    if "--self-test" in sys.argv:
+        raise SystemExit(self_test())
+    raise SystemExit(main())

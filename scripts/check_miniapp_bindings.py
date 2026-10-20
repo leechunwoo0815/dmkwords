@@ -75,6 +75,69 @@ def written_names(js: str) -> set[str]:
     return names
 
 
+#: 组件/页面通用属性与框架注入名放行（不参与断链判定）
+FRAMEWORK_NAMES = frozenset({"item", "index", "true", "false"})
+
+
+def missing_for(wxml_text: str, js_text: str) -> list[str]:
+    """一份 wxml 读了、但同名 js 从未写入 data 的顶层变量（**判定只在这一处**）。
+
+    抽出来是为了自证（第八轮审查 P1-10）：原判定内联在 `main()` 的 rglob 循环里，
+    没有入口喂样本 → 判据被改坏也没人知道。
+    """
+    used = consumed_names(wxml_text)
+    if not used:
+        return []
+    return sorted(m for m in (used - written_names(js_text)) if m not in FRAMEWORK_NAMES)
+
+
+def self_test() -> int:
+    """S1 注入自检：断链必须命中；别名/忽略标记/简写属性不得误报。"""
+    bad = 0
+    cases: list[tuple[str, str, str, list[str]]] = [
+        (
+            "断链",
+            "<view>{{ ghostVar }}</view>\n",
+            "Page({ data: { real: 1 } })\n",
+            ["ghostVar"],
+        ),
+        (
+            "合规",
+            '<view wx:for="{{list}}" wx:for-item="row">{{ row.name }}</view>\n',
+            "Page({ data: { list: [], row: {} } })\n",
+            [],
+        ),
+        (
+            "忽略标记",
+            "<!-- bindings-ignore: later --><view>{{ later }}</view>\n",
+            "Page({ data: {} })\n",
+            [],
+        ),
+        (
+            "ES6 简写属性单占一行（首版误报过）",
+            "<view>{{ expireLine }}</view>\n",
+            "Page({ data: {\n  expireLine,\n} })\n",
+            [],
+        ),
+        (
+            "框架注入名放行",
+            '<view wx:for="{{rows}}">{{ index }}{{ item }}</view>\n',
+            "Page({ data: { rows: [] } })\n",
+            [],
+        ),
+    ]
+    for name, wxml, js, expect in cases:
+        got = missing_for(wxml, js)
+        if got != expect:
+            print(f"✗ S1 [{name}] 期望 {expect}，实得 {got}")
+            bad += 1
+    if bad:
+        print(f"✗ S1 注入自检失败 {bad} 项")
+        return 1
+    print("✓ S1 注入自检通过（断链命中 + 别名/忽略/简写/框架名零误报）")
+    return 0
+
+
 def main() -> int:
     problems: list[str] = []
     scanned = 0
@@ -86,13 +149,7 @@ def main() -> int:
             js = wxml.with_suffix(".js")
             if not js.is_file():
                 continue
-            used = consumed_names(wxml.read_text(encoding="utf-8"))
-            if not used:
-                continue
-            have = written_names(js.read_text(encoding="utf-8"))
-            missing = sorted(used - have)
-            # 组件/页面通用属性与框架注入名放行
-            missing = [m for m in missing if m not in {"item", "index", "true", "false"}]
+            missing = missing_for(wxml.read_text(encoding="utf-8"), js.read_text(encoding="utf-8"))
             if missing:
                 problems.append(f"{wxml.relative_to(ROOT)} 读了但 js 从未写入 data: {missing}")
     # S2 空扫自检（2026-10-12 审查 P2）：扫到 0 个 wxml 时"全绿"是盲区形状——
@@ -110,4 +167,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if "--self-test" in sys.argv:
+        sys.exit(self_test())
     sys.exit(main())

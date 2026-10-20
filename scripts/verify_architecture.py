@@ -292,6 +292,106 @@ def check_like_escape(errors: list[str]) -> None:
                     )
 
 
+def self_test() -> int:
+    """S1 注入自检：**每条规则各喂一个违例样本，必须全命中**。
+
+    为什么必须有（第八轮审查 P1-10）：实测把 sqlite 禁令关掉后本检查器仍打印 `架构关 PASS`
+    —— 架构关是宪法第三节的机械执法，它自己失效等于"执法者无人监督"。
+    做法：把模块级扫描根（`BACKEND` / `ROOT` / `DOMAINS`）临时指向夹具树，逐条调规则函数。
+    """
+    import tempfile
+
+    global BACKEND, ROOT, DOMAINS
+    saved = (BACKEND, ROOT, DOMAINS)
+    bad = 0
+    try:
+        with tempfile.TemporaryDirectory(prefix="arch-selftest-") as d:
+            root = Path(d)
+            backend = root / "backend"
+            (backend / "domain/identity").mkdir(parents=True)
+            (backend / "common").mkdir(parents=True)
+            (backend / "domain/identity/models.py").write_text("", encoding="utf-8")
+            (backend / "domain/identity/schemas.py").write_text("", encoding="utf-8")
+            # repository.py 故意不建 → 四件套缺件样本
+            # ① 四件套：故意缺 service.py；router.py 同时注入 ORM 调用 + 未链 populate_existing
+            (backend / "domain/identity/router.py").write_text(
+                "def x(db):\n    return db.query(1)\n", encoding="utf-8"
+            )
+            (backend / "domain/identity/miniapp_router.py").write_text("", encoding="utf-8")
+            (backend / "domain/identity/service.py").write_text(
+                "def f(db):\n    return db.query(X).with_for_update().first()\n", encoding="utf-8"
+            )
+            # ② sqlite 禁令
+            (backend / "common/bad.py").write_text("import sqlite3\n", encoding="utf-8")
+            # ③ import 白名单：common 依赖业务域
+            (backend / "common/rogue.py").write_text(
+                "from backend.domain.identity.models import Parent\n", encoding="utf-8"
+            )
+            # ④ LIKE 转义：内联模式未经 escape_like
+            (backend / "common/like_bad.py").write_text('q = X.like(f"%{kw}%")\n', encoding="utf-8")
+            # ⑤ 行数上限
+            (backend / "common/huge.py").write_text(
+                "x = 1\n" * (MAX_FILE_LINES + 5), encoding="utf-8"
+            )
+
+            BACKEND, ROOT, DOMAINS = backend, root, ["identity"]
+            errs: list[str] = []
+            check_four_pieces(errs)
+            check_router_violations(errs)
+            check_lock_populate(errs)
+            check_file_length(errs)
+            check_sqlite_ban(errs)
+            check_import_whitelist(errs)
+            check_like_escape(errs)
+            joined = "\n".join(errs)
+            for label, needle in (
+                ("四件套缺 repository.py", "identity/repository.py 缺失"),
+                ("Router 出现 ORM", "Router 层出现 ORM 操作"),
+                ("with_for_update 未链 populate_existing", "未链 populate_existing"),
+                ("文件行数超限", "god file 禁止"),
+                ("sqlite 禁令", "检测到 sqlite"),
+                ("common 依赖业务域", "common 依赖了业务域"),
+                ("LIKE 未经 escape_like", "未经 escape_like 转义"),
+            ):
+                if needle not in joined:
+                    print(f"✗ S1 [{label}] 未命中（期望输出含 {needle!r}）")
+                    bad += 1
+
+            # 反向样本：把违例全修好 → 必须零违规（检查器过严会逼出无意义的绕过）
+            (backend / "domain/identity/service.py").write_text(
+                "def f(db):\n    return db.query(X).with_for_update().populate_existing().first()\n",
+                encoding="utf-8",
+            )
+            (backend / "domain/identity/router.py").write_text(
+                "def x():\n    return 1\n", encoding="utf-8"
+            )
+            (backend / "domain/identity/repository.py").write_text("", encoding="utf-8")
+            (backend / "common/bad.py").write_text("import os\n", encoding="utf-8")
+            (backend / "common/rogue.py").write_text("import os\n", encoding="utf-8")
+            (backend / "common/like_bad.py").write_text(
+                'q = X.like(f"%{escape_like(kw)}%", escape="\\\\")\n', encoding="utf-8"
+            )
+            (backend / "common/huge.py").write_text("x = 1\n", encoding="utf-8")
+            clean: list[str] = []
+            check_four_pieces(clean)
+            check_router_violations(clean)
+            check_lock_populate(clean)
+            check_file_length(clean)
+            check_sqlite_ban(clean)
+            check_import_whitelist(clean)
+            check_like_escape(clean)
+            if clean:
+                print(f"✗ S1 合法样本被误报（检查器过严）: {clean}")
+                bad += 1
+    finally:
+        BACKEND, ROOT, DOMAINS = saved
+    if bad:
+        print(f"✗ S1 注入自检失败 {bad} 项")
+        return 1
+    print("✓ S1 注入自检通过（7 类违例全命中 + 合法样本零误报）")
+    return 0
+
+
 def main() -> int:
     errors: list[str] = []
     check_four_pieces(errors)
@@ -324,4 +424,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if "--self-test" in sys.argv:
+        sys.exit(self_test())
     sys.exit(main())

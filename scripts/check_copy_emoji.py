@@ -203,4 +203,12 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # `--self-test`：只跑 S1–S3 自证（gate 会先跑它，再跑主流程——第八轮审查 P1-10）
+    if "--self-test" in sys.argv:
+        _fails = self_test()
+        if _fails:
+            print("FAIL(S1): " + "；".join(_fails))
+            raise SystemExit(1)
+        print("✓ S1 注入自检通过（管理端/后端违例命中 + docstring 与排版字形零误报）")
+        raise SystemExit(0)
     raise SystemExit(main())

@@ -139,6 +139,99 @@ def find_missing(root: pathlib.Path | None = None) -> tuple[list[str], list[str]
     )
 
 
+#: 自证夹具（**结构必须与真实文件同形**：两个角色锚点 + sum 求和块 + return counts）
+_FIXTURE_SERVICE = """
+def todo_counts(self, admin):
+    counts = {}
+    if admin.role == AdminUser.ROLE_SUPER_ADMIN:
+        counts["admin_total"] = sum(
+            counts[k]
+            for k in (
+                "refund_pending",
+                "withdrawal_pending",
+            )
+        )
+        counts["admin_total"] += counts["member_follow_up"]
+    if role_has_permission(admin.role, "member.manage"):
+        counts["order_pending_manual"] = 1
+        counts["admin_total"] += counts["order_pending_manual"]
+    return counts
+"""
+
+_FIXTURE_DASHBOARD = """
+const TODO_ROWS: Row[] = [
+  { key: "refund_pending", label: "待审退款" },
+  { key: "withdrawal_pending", label: "待审退会" },
+  { key: "member_follow_up", label: "会员跟进" },
+];
+const STAFF_TODO_ROWS: Row[] = [
+  { key: "order_pending_manual", label: "待确认收款" },
+];
+"""
+
+
+def self_test() -> int:
+    """S1 注入自检：**缺行必须被检出**，两侧齐全时零误报。
+
+    为什么必须有（第八轮审查 P1-10 + 第七轮 P2-19 的教训）：本检查器第一版用"并集判超集"，
+    可以被构造通过——自证样本正是防这种"判据本身假绿"。
+    """
+    import tempfile
+
+    bad = 0
+    with tempfile.TemporaryDirectory(prefix="todo-rows-selftest-") as d:
+        root = pathlib.Path(d)
+        (root / SERVICE).parent.mkdir(parents=True)
+        (root / DASHBOARD).parent.mkdir(parents=True)
+
+        # ① 两侧齐全 → 零缺行
+        (root / SERVICE).write_text(_FIXTURE_SERVICE, encoding="utf-8")
+        (root / DASHBOARD).write_text(_FIXTURE_DASHBOARD, encoding="utf-8")
+        sup, staff = find_missing(root)
+        if sup or staff:
+            print(f"✗ S1 齐全样本误报: 超管缺 {sup} / 专员缺 {staff}")
+            bad += 1
+
+        # ② 超管视角缺一行（member_follow_up 从 TODO_ROWS 拿掉）→ 只该报超管缺
+        (root / DASHBOARD).write_text(
+            _FIXTURE_DASHBOARD.replace('  { key: "member_follow_up", label: "会员跟进" },\n', ""),
+            encoding="utf-8",
+        )
+        sup, staff = find_missing(root)
+        if sup != ["member_follow_up"] or staff:
+            print(f"✗ S1 超管缺行未按视角检出: 超管 {sup} / 专员 {staff}")
+            bad += 1
+
+        # ③ 专员视角缺一行 → 只该报专员缺（**"从专员表挪进超管表"这一幕**）
+        (root / DASHBOARD).write_text(
+            _FIXTURE_DASHBOARD.replace(
+                '  { key: "order_pending_manual", label: "待确认收款" },\n', ""
+            ),
+            encoding="utf-8",
+        )
+        sup, staff = find_missing(root)
+        if sup or staff != ["order_pending_manual"]:
+            print(f"✗ S1 专员缺行未按视角检出: 超管 {sup} / 专员 {staff}")
+            bad += 1
+
+        # ④ 锚点被改写 → 必须显式红（不允许静默降级成并集判法）
+        (root / SERVICE).write_text(
+            _FIXTURE_SERVICE.replace(SUPER_GATE, "if True:"), encoding="utf-8"
+        )
+        try:
+            find_missing(root)
+        except SystemExit:
+            pass
+        else:
+            print("✗ S1 锚点被改写时未显式失败（静默降级 = P2-19 的假绿形状）")
+            bad += 1
+    if bad:
+        print(f"✗ S1 注入自检失败 {bad} 项")
+        return 1
+    print("✓ S1 注入自检通过（两侧齐全零误报 / 两视角缺行各自命中 / 锚点丢失显式红）")
+    return 0
+
+
 def main_against(root: pathlib.Path | None = None) -> int:
     """对指定根目录跑一次检查（`main()` 的 root 参数化版本——回归用例直接调它）。"""
     super_keys, staff_keys = admin_total_keys_by_viewpoint(root)
@@ -172,4 +265,6 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    if "--self-test" in sys.argv:
+        sys.exit(self_test())
     sys.exit(main())

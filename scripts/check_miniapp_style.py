@@ -1228,12 +1228,16 @@ def self_test(tokens: set[str]) -> list[str]:
             failures.append(f"S1 图标资产缺失漏检: {r13a}")
         if any(n == "calendar" for _f, _l, n in r13a):
             failures.append("S1 图标资产误报（calendar 存在）")
+        # R14（WXML 注释与标签结构）自证：**必须无条件跑**。
+        # 第八轮审查 P1-10 实测：这两条原先被嵌在下面 `if not sv:` 里，而夹具确实注入了
+        # 非法选择器（`selvar.wxss`）→ `sv` 非空 → 整个 if 块**从不执行**——
+        # R14 自证与 R11 自证一起成了死代码（"自证只在检测器已经坏掉时才跑"）。
+        if not any("R14" not in d and "注释" in d for _f, _l, d in scan_wxml_structure(tmp)):
+            failures.append("S1 WXML 注释违规漏检")
+        r14_good = [d for f, _l, d in scan_wxml_structure(tmp) if f.endswith("demo.wxml")]
+        if r14_good:
+            failures.append(f"S1 WXML 结构误报（好样本）: {r14_good}")
         if not sv:
-            if not any("R14" not in d and "注释" in d for _f, _l, d in scan_wxml_structure(tmp)):
-                failures.append("S1 WXML 注释违规漏检")
-            r14_good = [d for f, _l, d in scan_wxml_structure(tmp) if f.endswith("demo.wxml")]
-            if r14_good:
-                failures.append(f"S1 WXML 结构误报（好样本）: {r14_good}")
             failures.append("S1 非法选择器漏检")
         if not br:
             failures.append("S1 花括号结构失衡漏检")
@@ -1420,4 +1424,15 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # `--self-test`：只跑 S1 注入自检（gate 会先跑它，再跑主流程——第八轮审查 P1-10）
+    if "--self-test" in sys.argv:
+        _tokens, _ = load_tokens()
+        _fails = self_test(_tokens)
+        if _fails:
+            print("FAIL(S1): " + "；".join(_fails))
+            sys.exit(1)
+        print(
+            "✓ S1 注入自检通过（色值/内联/同义/孤儿/禁项/悬空类名/语法/花括号/选择器/WXML 结构全命中）"
+        )
+        sys.exit(0)
     sys.exit(main())
