@@ -35,9 +35,12 @@ import {
 import { GRADE_OPTIONS } from "../constants/grade";
 import { AR_LEVEL_RULE } from "../constants/book";
 import { usePaintPagination } from "../hooks/usePaintPagination";
+import { cfgNum, useConfigs } from "../hooks/useConfigs";
 import PageTitle from "../components/PageTitle";
 
 export default function BookManage() {
+  // 第八轮 E 批剩余：测验口径读后端配置（原先文案写死"5 道/3 次"）
+  const { configs } = useConfigs();
   const { message } = AntdApp.useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   // P2-6：挂载时从 URL 恢复筛选/页码/关键词（URL 为写后镜像，replace 不堆栈）
@@ -254,7 +257,7 @@ export default function BookManage() {
           { key: "ar", label: `AR 待配置（${tabCounts.ar ?? 0}）` },
           { key: "no_cover", label: `未传封面（${tabCounts.no_cover ?? 0}）` },
           { key: "no_audio", label: `未传音频（${tabCounts.no_audio ?? 0}）` },
-          { key: "quiz_incomplete", label: `测验未满 5 道（${tabCounts.quiz_incomplete ?? 0}）` },
+          { key: "quiz_incomplete", label: `测验未满 ${cfgNum(configs, "quiz_questions_per_book", 5)} 道（${tabCounts.quiz_incomplete ?? 0}）` },
         ]}
       />
       <div ref={tableWrapRef} style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>

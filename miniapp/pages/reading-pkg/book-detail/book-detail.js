@@ -1,6 +1,6 @@
 // pages/reading-pkg/book-detail/book-detail.js — 详情 v5：决策页（真实借阅状态 + 简介 + 状态化按钮）
 const api = require('../../../utils/api')
-const { loadConfigs, getConfigs } = require('../../../utils/configs')
+const { loadConfigs, getConfigs, configsFailed } = require('../../../utils/configs')
 const media = require('../../../utils/media')
 
 // 插修8/U1（FEAT-081）：通过测验的鼓励语，每次进详情随机一条
@@ -213,7 +213,9 @@ Page({
     try {
       await api.createReservation(childId, book.id)
       wx.showToast({
-        title: `预约成功，${this.data.cfg.reservation_hours} 小时内到店取书`,
+        // 口径取不到时如实说明（P2-45 同族：不许把"没取到"当"就是这么多"）
+        title: `预约成功，${this.data.cfg.reservation_hours} 小时内到店取书${
+          configsFailed() ? '（时长暂未取到，以馆内公示为准）' : ''}`,
         icon: 'none',
         duration: 2500,
       })

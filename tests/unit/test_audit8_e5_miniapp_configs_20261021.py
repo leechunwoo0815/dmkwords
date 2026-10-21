@@ -218,3 +218,46 @@ def test_docs_symbol_index_includes_bdd_steps():
     symbols = mod.collect_symbols()
     assert "_ensure_dictionary" in symbols, "BDD 步骤助手不在符号索引里（文档引用会被判悬空）"
     assert "seed" in symbols, "seeds 的 seed() 不在符号索引里"
+
+
+# ---------------------------------------------------------------- 管理端侧（本批同族）
+
+#: 管理端被下发的口径在源码里不该再出现的字面量（第八轮 §3.2 列的三处）
+ADMIN_FORBIDDEN = (
+    (r"锁定 72 小时", '预约锁定时长（改读 cfgNum(configs, "reservation_hours")）'),
+    (r"恢复 3 次机会", '测验机会（改读 cfgNum(configs, "quiz_max_attempts")）'),
+    (r"测验未满 5 道", '测验题量（改读 cfgNum(configs, "quiz_questions_per_book")）'),
+    (r"取前 \$\{Math\.min\(5,", '正式题量（改读 cfgNum(configs, "quiz_questions_per_book")）'),
+)
+
+
+def test_admin_web_has_no_hardcoded_business_numbers():
+    """管理端源码里不得再有那三处硬编码口径（注释除外）。
+
+    RED（还原修复前）：`Reservations.tsx` 的「副本锁定 72 小时」、`GrowthManage.tsx` 的
+    「恢复 3 次机会」、`BookManage.tsx`/`BookDetail.tsx` 的「5 道」→ 本用例红。
+    """
+    offenders: list[str] = []
+    for path in sorted((ROOT / "admin-web/src").rglob("*.tsx")):
+        rel = path.relative_to(ROOT).as_posix()
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            stripped = line.strip()
+            if stripped.startswith("//") or stripped.startswith("*"):
+                continue
+            for pattern, why in ADMIN_FORBIDDEN:
+                if re.search(pattern, line):
+                    offenders.append(f"{rel}:{lineno}: {why} → {stripped[:70]}")
+    assert offenders == [], "管理端仍有硬编码口径：\n" + "\n".join(offenders)
+
+
+def test_admin_web_consumers_read_configs():
+    """四处管理端消费点必须真的读配置（引 `useConfigs` + 用 `cfgNum`）。"""
+    for rel in (
+        "admin-web/src/pages/Reservations.tsx",
+        "admin-web/src/pages/GrowthManage.tsx",
+        "admin-web/src/pages/BookManage.tsx",
+        "admin-web/src/pages/BookDetail.tsx",
+    ):
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        assert "useConfigs" in text, f"{rel} 没引 useConfigs"
+        assert "cfgNum(configs," in text, f"{rel} 没读配置值（cfgNum）"

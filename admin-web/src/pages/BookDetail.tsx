@@ -45,6 +45,7 @@ import {
 import { GRADE_OPTIONS } from "../constants/grade";
 import { AR_LEVEL_RULE } from "../constants/book";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
+import { cfgNum, useConfigs } from "../hooks/useConfigs";
 
 const COPY_STATUS_LABEL: Record<string, string> = {
   available: "在馆", reserved: "预约锁定", borrowed: "已借出",
@@ -78,6 +79,8 @@ const COPY_STATUS_TRANSITIONS: Record<string, { value: string; label: string }[]
 };
 
 export default function BookDetail() {
+  // 第八轮 E 批剩余：正式题量读后端配置（原先写死"取前 5 道"）
+  const { configs } = useConfigs();
   const { id } = useParams<{ id: string }>();
   const bookId = Number(id);
   const navigate = useNavigate();
@@ -392,7 +395,7 @@ export default function BookDetail() {
 
       {/* 测验题目 */}
       <Card
-        title={`测验题目（取前 ${Math.min(5, questions.filter((q) => q.is_active === 1).length)} 道作为正式题；多余备用）`}
+        title={`测验题目（取前 ${Math.min(cfgNum(configs, "quiz_questions_per_book", 5), questions.filter((q) => q.is_active === 1).length)} 道作为正式题；多余备用）`}
         size="small"
         extra={<Button size="small" icon={<PlusOutlined />} onClick={() => {
           qForm.resetFields();

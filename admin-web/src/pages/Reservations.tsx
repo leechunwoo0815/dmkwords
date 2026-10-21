@@ -11,6 +11,7 @@ import {
   type ReservationItem,
 } from "../api/reservations";
 import { usePaintPagination } from "../hooks/usePaintPagination";
+import { cfgNum, useConfigs } from "../hooks/useConfigs";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -23,6 +24,8 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function Reservations() {
+  // 第八轮 E 批剩余：锁定时长读后端配置（原先文案写死 72 小时，改配置不跟随）
+  const { configs } = useConfigs();
   const { message, modal } = AntdApp.useApp();
   const [searchParams] = useSearchParams();
   const [items, setItems] = useState<ReservationItem[]>([]);
@@ -80,7 +83,7 @@ export default function Reservations() {
             ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))]}
         />
         <Typography.Text type="secondary">
-          家长在小程序发起预约后，副本锁定 72 小时；到店取书时在此核销转借阅。
+          家长在小程序发起预约后，副本锁定 {cfgNum(configs, "reservation_hours", 72)} 小时；到店取书时在此核销转借阅。
         </Typography.Text>
       </Space>
       <Table<ReservationItem> locale={{ emptyText: <PaintEmpty character="bear" /> }}

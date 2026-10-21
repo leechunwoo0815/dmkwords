@@ -16,6 +16,7 @@ import { getToken } from "../api/client";
 import { apiListChildren, type Child } from "../api/members";
 import { useAuth } from "../auth";
 import { usePaintPagination } from "../hooks/usePaintPagination";
+import { cfgNum, useConfigs } from "../hooks/useConfigs";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
 
 const REASON_LABEL: Record<string, string> = {
@@ -25,6 +26,8 @@ const REASON_LABEL: Record<string, string> = {
 };
 
 export default function GrowthManage() {
+  // 第八轮 E 批剩余：测验口径读后端配置（原先文案写死"5 道/3 次"）
+  const { configs } = useConfigs();
   const { message, modal } = AntdApp.useApp();
   // P1-15（2026-10-09 审查）：本页三个按钮（等级阈值重算 / 里程碑核对补发 / 重置测验次数）
   // 后端都是 `require_super_admin()`，前端原先无门 → 专员点了必 403（体验与"职责分离"冲突）。
@@ -339,7 +342,7 @@ export default function GrowthManage() {
         onOk={onReset} onCancel={() => setResetTarget(null)}
       >
         <Typography.Paragraph type="secondary">
-          将清除该书历史提交记录并恢复 3 次机会（成绩不可代标，只能孩子重测）；词数与已发积分不受影响。
+          将清除该书历史提交记录并恢复 {cfgNum(configs, "quiz_max_attempts", 3)} 次机会（成绩不可代标，只能孩子重测）；词数与已发积分不受影响。
         </Typography.Paragraph>
         <Form form={resetForm} layout="vertical">
           <Form.Item name="reason" label="重置原因（必填，留痕）" rules={[{ required: true }]}>

@@ -1,6 +1,6 @@
 // pages/activity-pkg/activity-detail/activity-detail.js — 活动详情与报名（WM9）
 const api = require('../../../utils/api')
-const { loadConfigs, getConfigs } = require('../../../utils/configs')
+const { loadConfigs, getConfigs, configsFailed } = require('../../../utils/configs')
 const media = require('../../../utils/media')
 
 const STATUS_TEXT = {
@@ -186,7 +186,8 @@ Page({
     const cutoffHours = this.data.cfg.activity_refund_cutoff_hours
     const res = await wx.showModal({
       title: '申请退款',
-      content: `未签到且距开始超过 ${cutoffHours} 小时可申请全额退款（管理员审核后到账）。`,
+      content: `未签到且距开始超过 ${cutoffHours} 小时可申请全额退款（管理员审核后到账）。`
+        + (configsFailed() ? '\n（时限暂未取到，以馆内公示为准）' : ''),
       confirmText: '申请退款',
     })
     if (!res.confirm) return
