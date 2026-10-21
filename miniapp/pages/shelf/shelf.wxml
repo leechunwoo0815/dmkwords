@@ -16,8 +16,17 @@
     </view>
   </view>
 
+  <!-- P2-45：**请求失败必须显式呈现**（原先四个请求各自吞错 → 失败被渲染成"还没有在借的书"） -->
+  <error-view wx:if="{{loadError}}" type="network" title="书架加载失败"
+    desc="{{loadError}}（列表未加载，不代表没有数据）" bind:onRetry="onRetryLoad" />
+
+  <!-- 角标单独降级：如实说明"角标可能不准"，不让"没角标"看起来像"没通过测验" -->
+  <view wx:if="{{badgeError && !loadError}}" class="badge-warn">
+    测验状态加载失败，奖杯角标可能不准（下拉刷新可重试）
+  </view>
+
   <!-- 在借中 -->
-  <block wx:if="{{tab === 'borrows'}}">
+  <block wx:if="{{!loadError && tab === 'borrows'}}">
     <view wx:for="{{borrows}}" wx:key="record_id" class="asset-card">
       <view class="asset-cover-wrap">
         <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
@@ -38,14 +47,12 @@
         <view class="btn-mini" data-book="{{item}}" catchtap="goDetail">详情</view>
       </view>
     </view>
-    <empty-state wx:if="{{!loading && !borrows.length}}" icon-name="book" title="还没有在借的书"
-      desc="去图书馆选一本，让馆员帮你借回家" >
-      <view class="empty-btn" bindtap="goBooks">去图书馆</view>
-    </empty-state>
+    <empty-state wx:if="{{!loading && !loadError && !borrows.length}}" icon-name="book" title="还没有在借的书"
+      desc="去图书馆选一本，让馆员帮你借回家" btn-text="去图书馆" bind:action="goBooks" />
   </block>
 
   <!-- 收藏 -->
-  <block wx:if="{{tab === 'favorites'}}">
+  <block wx:if="{{!loadError && tab === 'favorites'}}">
     <view wx:for="{{favorites}}" wx:key="id" class="asset-card">
       <view class="asset-cover-wrap">
         <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
@@ -68,14 +75,12 @@
         <view class="btn-mini btn-main" data-book="{{item}}" catchtap="goDetail">去详情</view>
       </view>
     </view>
-    <empty-state wx:if="{{!loading && !favorites.length}}" icon-name="star" title="还没有收藏"
-      desc="在书籍详情页点「收藏想读」的书会出现在这里" >
-      <view class="empty-btn" bindtap="goBooks">去图书馆逛逛</view>
-    </empty-state>
+    <empty-state wx:if="{{!loading && !loadError && !favorites.length}}" icon-name="star" title="还没有收藏"
+      desc="在书籍详情页点「收藏想读」的书会出现在这里" btn-text="去图书馆逛逛" bind:action="goBooks" />
   </block>
 
   <!-- 预约中 -->
-  <block wx:if="{{tab === 'reservations'}}">
+  <block wx:if="{{!loadError && tab === 'reservations'}}">
     <view wx:for="{{reservations}}" wx:key="id" class="asset-card">
       <view class="asset-cover-wrap">
         <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
@@ -93,14 +98,12 @@
         <view class="btn-mini" data-book="{{item}}" catchtap="goDetail">详情</view>
       </view>
     </view>
-    <empty-state wx:if="{{!loading && !reservations.length}}" icon-name="bookmark" title="没有预约记录"
-      desc="馆藏被借完的书可以先预约，72 小时内保留" >
-      <view class="empty-btn" bindtap="goBooks">去图书馆看看</view>
-    </empty-state>
+    <empty-state wx:if="{{!loading && !loadError && !reservations.length}}" icon-name="bookmark" title="没有预约记录"
+      desc="馆藏被借完的书可以先预约，72 小时内保留" btn-text="去图书馆看看" bind:action="goBooks" />
   </block>
 
   <!-- 已通过（成绩单式：让孩子看到自己的战果） -->
-  <block wx:if="{{tab === 'passed'}}">
+  <block wx:if="{{!loadError && tab === 'passed'}}">
     <view wx:for="{{passedBooks}}" wx:key="book_id" class="asset-card">
       <view class="asset-cover-wrap">
         <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
@@ -120,10 +123,8 @@
         <view class="btn-mini btn-main" data-book="{{item}}" catchtap="goDetail">看详情</view>
       </view>
     </view>
-    <empty-state wx:if="{{!loading && !passedBooks.length}}" icon-name="trophy" title="还没有通过测验的书"
-      desc="听完一本音频就能挑战测验，通过后这里会收集你的战果" >
-      <view class="empty-btn" bindtap="goBooks">去图书馆选一本</view>
-    </empty-state>
+    <empty-state wx:if="{{!loading && !loadError && !passedBooks.length}}" icon-name="trophy" title="还没有通过测验的书"
+      desc="听完一本音频就能挑战测验，通过后这里会收集你的战果" btn-text="去图书馆选一本" bind:action="goBooks" />
   </block>
 
   <view wx:if="{{loading}}" class="loading-tip">加载中…</view>

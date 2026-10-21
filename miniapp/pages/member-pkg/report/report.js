@@ -8,6 +8,7 @@ Page({
     kindLabel: '周报',
     report: null,
     imageUrl: '',
+    loadError: '',  // P2-45：失败态（原先失败静默 → 永久"生成中"）
   },
 
   onLoad(options) {
@@ -16,6 +17,8 @@ Page({
   },
 
   onShow() { this.load() },
+
+  onRetryLoad() { this.load() },
 
   switchKind(e) {
     const kind = e.currentTarget.dataset.kind
@@ -32,10 +35,15 @@ Page({
 
   async load() {
     if (!this._childId) return
+    // P2-45：切换周/月报失败时**清空旧数据**（否则月报 tab 挂着周报的数字与图）
+    this.setData({ loadError: '', report: null, imageUrl: '' })
     try {
       const r = await api.report(this.data.kind, this._childId)
       const imgUrl = api.reportImageUrl(this.data.kind, this._childId)
       this.setData({ report: r, imageUrl: imgUrl })
-    } catch (e) { /* request.js 已 toast */ }
+    } catch (e) {
+      // 原先 catch 空转 → 页面永久显示"生成中，请稍后……"（家长以为系统在算）
+      this.setData({ loadError: (e && e.message) || '加载失败' })
+    }
   },
 })

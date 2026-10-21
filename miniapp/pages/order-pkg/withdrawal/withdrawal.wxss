@@ -243,3 +243,13 @@
 }
 
 .tip-icon { width: 36rpx; height: 36rpx; flex-shrink: 0; }
+
+/* P2-45：结算明细失败的行内标注 */
+.wd-settle-warn {
+  margin: 12rpx 0 0;
+  padding: 10rpx 16rpx;
+  background: var(--warning-soft);
+  border-radius: 10rpx;
+  font-size: 24rpx;
+  color: var(--warn, #b26a00);
+}

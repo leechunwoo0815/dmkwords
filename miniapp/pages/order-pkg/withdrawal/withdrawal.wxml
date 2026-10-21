@@ -28,6 +28,10 @@
       <view class="wd-remark" wx:if="{{item.review_remark}}">审核意见：{{item.review_remark}}</view>
 
       <!-- 审核通过后展示「能退哪些费用」（后端自动排查结果） -->
+      <!-- P2-45：明细加载失败如实标注（原先静默 → 看起来"没有可退费用"） -->
+      <view class="wd-settle-warn" wx:if="{{item.settlementError}}">
+        结算明细加载失败（下拉刷新可重试）
+      </view>
       <view class="wd-settle" wx:if="{{item.settlement && item.settlement.settled}}">
         <view class="wd-settle-title">本次可退费用</view>
         <view class="wd-settle-row" wx:for="{{item.settlement.items}}" wx:for-item="fee" wx:key="order_no">
@@ -53,7 +57,11 @@
     </view>
   </view>
 
-  <empty-state wx:if="{{!loading && !list.length}}" icon-name="clipboard" title="还没有退会申请"
+  <!-- P2-45：失败态显式呈现（原先失败静默 → "还没有退会申请"） -->
+  <error-view wx:if="{{!loading && loadError}}" type="network" title="退会申请加载失败"
+    desc="{{loadError}}（申请未加载，不代表没有申请）" bind:onRetry="onRetryLoad" />
+
+  <empty-state wx:if="{{!loading && !loadError && !list.length}}" icon-name="clipboard" title="还没有退会申请"
     desc="提交后馆里会人工审核，审核期间借书与预约会冻结" />
 
   <view wx:if="{{loading}}" class="loading-tip">加载中…</view>

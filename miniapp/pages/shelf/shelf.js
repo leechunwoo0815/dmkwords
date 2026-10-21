@@ -25,6 +25,10 @@ Page({
     childId: null,
     childName: '',
     loading: true,
+    // P2-45（第八轮）：**失败态**与空态必须分开——原先四个请求各自 `.catch(() => [])`，
+    // 请求失败时页面渲染成"还没有在借的书"（家长以为孩子没数据、客服被误导）
+    loadError: '',
+    badgeError: false,  // 测验状态（奖杯角标）单独降级：列表照常显示，但如实说明角标可能不准
   },
 
   onShow() {
@@ -43,25 +47,32 @@ Page({
     this.setData({ tab: e.currentTarget.dataset.tab })
   },
 
+  onRetryLoad() { this.load() },
+
   async load() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, loadError: '' })
     try {
+      // P2-45：**不许吞错**（原先是 `.catch(() => [])` ×4 → 失败伪装成空书架）
       const [borrows, favorites, reservations, passedBooks] = await Promise.all([
-        api.currentBorrows(this.data.childId).catch(() => []),
-        api.listFavorites(this.data.childId).catch(() => []),
-        api.listReservations(this.data.childId).catch(() => []),
+        api.currentBorrows(this.data.childId),
+        api.listFavorites(this.data.childId),
+        api.listReservations(this.data.childId),
         // 已通过清单（2026-09-15）：独立接口按词账枚举，不受「当前是否在架」限制
-        api.passedBooks(this.data.childId).catch(() => []),
+        api.passedBooks(this.data.childId),
       ])
       // T43（U2）：在借+收藏书批量拉测验状态——passed 挂金色 🏆 角标
       let passedIds = []
+      let badgeError = false
       const shelfBooks = [...(borrows || []), ...(favorites || [])]
       const bidList = [...new Set(shelfBooks.map((b) => b.book_id).filter(Boolean))]
       if (bidList.length) {
-        const batch = await api
-          .quizStatusBatch(this.data.childId, bidList)
-          .catch(() => ({ items: [] }))
-        passedIds = (batch.items || []).filter((x) => x.status === 'passed').map((x) => x.book_id)
+        // 角标是"装饰"，失败不该让整页失败——但**必须如实说明**（否则"没角标"看起来像"没通过"）
+        try {
+          const batch = await api.quizStatusBatch(this.data.childId, bidList)
+          passedIds = (batch.items || []).filter((x) => x.status === 'passed').map((x) => x.book_id)
+        } catch (e) {
+          badgeError = true
+        }
       }
       this.setData({
         borrows: (borrows || []).map((b) => ({
@@ -89,6 +100,14 @@ Page({
         resCount: (reservations || []).length,
         passedBooks: media.formatBooks(passedBooks || []),
         passedCount: (passedBooks || []).length,
+        badgeError,
+      })
+    } catch (e) {
+      // P2-45：失败进**失败态**（error-view + 重试），并清空列表防"上一个孩子的数据挂在屏幕上"
+      this.setData({
+        loadError: (e && e.message) || '加载失败',
+        borrows: [], favorites: [], reservations: [], passedBooks: [],
+        borrowCount: 0, favCount: 0, resCount: 0, passedCount: 0, badgeError: false,
       })
     } finally {
       this.setData({ loading: false })

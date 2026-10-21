@@ -14,6 +14,7 @@ function durText(sec) {
 
 Page({
   data: {
+    borrowStateError: '',  // P2-54：借阅状态查询失败原因（unknown 态展示）
     book: null,
     childId: null,
     childName: '',
@@ -173,8 +174,18 @@ Page({
         return
       }
       this.setData({ borrowState: 'none' })
-    } catch (e) { /* 静默：按可预约处理 */ }
+    } catch (e) {
+      // P2-54（第八轮）：**不许把查询失败当成"可预约"**——在借中的书会显示可预约，
+      // 家长点下去才失败（"能点不能用"）。失败如实进 unknown 态 + 提供重试。
+      this.setData({
+        borrowState: 'unknown',
+        borrowStateText: '借阅状态未知',
+        borrowStateError: (e && e.message) || '加载失败',
+      })
+    }
   },
+
+  onRetryBorrowState() { this.loadBorrowState() },
 
   async onReserve() {
     const { book, childId, reserving, borrowState } = this.data

@@ -8,6 +8,8 @@
   <view class="login-form">
     <!-- ① 微信一键登录（主通道） -->
     <block wx:if="{{mode === 'wechat'}}">
+  <!-- P2-52：登录失败在页面内留痕（toast 会消失，家长回来能看到原因） -->
+  <view class="login-error" wx:if="{{loginError}}">{{loginError}}</view>
       <button class="wechat-login-btn" bindtap="onWechatLogin" disabled="{{submitting}}">
         {{submitting ? '登录中…' : '微信一键登录'}}
       </button>

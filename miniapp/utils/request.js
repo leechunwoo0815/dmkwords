@@ -109,7 +109,12 @@ function doRequest(app, method, url, data, options, showLoading, resolve, reject
         if (showError) {
           wx.showToast({ title: msg, icon: 'none', duration: 2000 })
         }
-        reject(new Error(msg))
+        // P2-45（2026-10-20 第八轮）：**错误对象必须带状态码**。原先非 2xx 一律
+        // `new Error(msg)`（不带 statusCode）→ 页面分不清"业务空/未入会（422）"与
+        // "请求真失败（5xx）"，只能一律按空/0 渲染（"失败态伪装成空"的根因）。
+        const httpErr = new Error(msg)
+        httpErr.statusCode = res.statusCode
+        reject(httpErr)
       }
     },
     fail(err) {
@@ -117,6 +122,11 @@ function doRequest(app, method, url, data, options, showLoading, resolve, reject
       // MP-020: 网络异常区分
       if (showError) {
         wx.showToast({ title: '网络异常，请检查网络连接', icon: 'none', duration: 3000 })
+      }
+      // P2-45：网络层失败标记 statusCode=0（页面据此走"失败态 + 重试"，不按空/0 渲染）
+      if (err && typeof err === 'object') {
+        err.statusCode = 0
+        err.isNetwork = true
       }
       reject(err)
     }

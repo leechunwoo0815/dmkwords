@@ -41,7 +41,10 @@
     <view class="rp-note">累计：{{report.total_words}} 词 · {{report.points_total}} 积分</view>
   </view>
 
-  <view class="section-card x-c92966">
+  <error-view wx:if="{{loadError}}" type="network" title="报告加载失败"
+    desc="{{loadError}}（不是「正在生成」，请重试）" bind:onRetry="onRetryLoad" />
+
+  <view class="section-card x-c92966" wx:if="{{!loadError}}">
     <view class="section-title">报告图片</view>
     <image wx:if="{{imageUrl}}" class="rp-image" src="{{imageUrl}}" mode="widthFix"
       show-menu-by-longpress="true" bindtap="onPreviewReport" />

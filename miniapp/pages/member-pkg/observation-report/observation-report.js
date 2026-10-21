@@ -18,6 +18,7 @@ Page({
     history: [], // 往期（默认收起）
     historyOpen: false,
     loading: true,
+    loadError: '',  // P2-45：失败态（原先失败静默 → 渲染成"还没有报告"）
   },
 
   onLoad(options) {
@@ -26,8 +27,10 @@ Page({
     this.load()
   },
 
+  onRetryLoad() { this.load() },
+
   async load() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, loadError: '' })
     try {
       const rows = await api.observationReports(this._childId)
       const list = (rows || []).map((r) => ({
@@ -43,7 +46,13 @@ Page({
         latest: withIssue[0] || null,
         history: withIssue.slice(1),
       })
-    } catch (e) { /* request.js 已 toast */ }
+    } catch (e) {
+      // P2-45：失败**不许**渲染成"还没有报告"（家长会以为馆里没上传）
+      this.setData({
+        loadError: (e && e.message) || '加载失败',
+        reports: [], latest: null, history: [],
+      })
+    }
     finally { this.setData({ loading: false }) }
   },
 

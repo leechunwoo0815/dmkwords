@@ -14,6 +14,7 @@ Page({
     todayChecked: false,
     currentStreak: 0,
     checkinDates: [],
+    loadError: '',  // P2-45：失败态（原先失败静默 → 渲染成"连续 0 天"）
   },
 
   onLoad(options) {
@@ -40,8 +41,11 @@ Page({
     this.setData({ year: y, month: m, monthText: `${y} 年 ${m} 月`, days })
   },
 
+  onRetryLoad() { this.load() },
+
   async load() {
     if (!this._childId) return
+    this.setData({ loadError: '' })
     try {
       const res = await api.getCheckins(this._childId, 90)
       const dates = res.dates || []
@@ -55,7 +59,10 @@ Page({
         todayChecked: !!res.today_checked,
         currentStreak: res.current_streak || 0,
       })
-    } catch (e) { /* request.js 已 toast */ }
+    } catch (e) {
+      // P2-45：失败**不许**渲染成"连续 0 天 / 本月没打卡"（家长以为记录丢了）
+      this.setData({ loadError: (e && e.message) || '加载失败', checkinDates: [] })
+    }
   },
 
   onPrevMonth() {

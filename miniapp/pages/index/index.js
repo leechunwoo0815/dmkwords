@@ -21,7 +21,9 @@ Page({
     // 今日数据条（null = 未知/不可见 → 「—」）
     totalWords: null,
     points: null,
-    growthBlocked: false, // 未入会等被守卫挡下：数字不可得，页面要说清原因
+    growthBlocked: false, // 未入会等被守卫挡下（业务态）：数字不可得，页面要说清原因
+    growthError: '', // P2-45：**失败态**（非 422）——与「未入会」必须分开，不能冒充业务态
+    continueError: false, // P2-45：续听信息加载失败（不许看起来像「没有可续听的书」）
     // 提醒条（unreadCount 是家长级，不随孩子切换清空）
     unreadCount: 0,
     borrowCount: null,
@@ -125,22 +127,49 @@ Page({
         totalWords: g.words_total || 0,
         points: g.points_total || 0,
         growthBlocked: false,
+        growthError: '',
       })
     } catch (e) {
-      // 未入会的孩子取不到成长数据（后端 422「入会后可查看」）→ 显示「—」并把原因讲清楚；
-      // 关键：这里必须**清空**而不是静默保留，否则屏幕上会挂着上一个孩子的词数/积分
-      this.setData({ totalWords: null, points: null, growthBlocked: true })
+      // P2-45（第八轮）：**必须区分两种"拿不到"**——
+      //  · 422 = 未入会（业务态）→ 显示「—」并讲清原因（"入会后可查看"）；
+      //  · 其它（网络/5xx）= 失败态 → 如实说"加载失败，可重试"。
+      // 原先一律按"入会后可查看"渲染：网络抖动时，已入会的家长被告知"入会后可查看"（误导）。
+      // 关键：两种都要**清空**而不是静默保留，否则屏幕上会挂着上一个孩子的词数/积分。
+      if (e && e.statusCode === 422) {
+        this.setData({ totalWords: null, points: null, growthBlocked: true, growthError: '' })
+      } else {
+        this.setData({
+          totalWords: null,
+          points: null,
+          growthBlocked: false,
+          growthError: (e && e.message) || '加载失败',
+        })
+      }
     }
   },
 
   // 续听卡：最近一本"有进度未读完"（finish=0 的最近一本；读完/无进度不显示）
   async loadContinue(childId) {
-    // 两个请求各自兜底：都失败也只是「未知」（null），不会把上一个孩子的数字留在屏幕上
-    const [cont, borrows] = await Promise.all([
-      api.continueListening(childId).catch(() => null),
-      api.currentBorrows(childId).catch(() => null),
-    ])
-    this.setData({ borrowCount: borrows ? borrows.length : null })
+    // P2-45：**失败与"没有在听的书"必须分开**。原先两个请求各自 `.catch(() => null)`：
+    // 失败时卡片消失 = 看起来"没有可续听的书"（家长以为进度丢了）。
+    // 现在失败进 `continueError`（如实提示"信息未加载"），只有真无进度才不显示卡片。
+    let cont = null
+    let borrows = null
+    let failed = false
+    try {
+      cont = await api.continueListening(childId)
+    } catch (e) {
+      failed = true
+    }
+    try {
+      borrows = await api.currentBorrows(childId)
+    } catch (e) {
+      failed = true
+    }
+    this.setData({
+      borrowCount: borrows ? borrows.length : null,
+      continueError: failed && !cont,
+    })
     if (!cont || !cont.book) {
       this.setData({ continueBook: null })
       return

@@ -51,6 +51,12 @@
     </view>
   </view>
 
+  <!-- P2-45：续听信息失败**不许**看起来像"没有可续听的书" -->
+  <view class="section-hint" wx:if="{{currentChild && continueError}}">
+    <image class="stat-hint-icon" src="/icons/ui/warning.png" mode="aspectFit" />
+    <text>继续听信息加载失败（下拉刷新可重试）</text>
+  </view>
+
   <!-- 续听卡：在借第一本 + 真实进度 -->
   <view class="section" wx:if="{{currentChild && continueBook}}">
     <view class="section-title h-section">
@@ -90,6 +96,11 @@
   <view class="stat-hint" wx:if="{{currentChild && growthBlocked}}">
     <image class="stat-hint-icon" src="/icons/ui/lock.png" mode="aspectFit" />
     <text>累计词数 / 积分：入会后可查看（请到店咨询）</text>
+  </view>
+  <!-- P2-45：非 422 的失败是**故障**，不能冒充"入会后可查看" -->
+  <view class="stat-hint" wx:if="{{currentChild && growthError}}">
+    <image class="stat-hint-icon" src="/icons/ui/warning.png" mode="aspectFit" />
+    <text>成长数据加载失败：{{growthError}}（下拉刷新可重试）</text>
   </view>
 
   <!-- 今日推荐：真实书目横滑 -->

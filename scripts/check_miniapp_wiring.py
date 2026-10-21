@@ -19,6 +19,13 @@
   **续听整条链路哑火**（没声音、进度不上报）——书架与首页两个主入口都踩了。
   规则：`reader/reader?` 之后**不得出现 `book=` 整对象参数**（只许 `book_id=`）。
 
+  **W4 请求失败不得伪装成空/0**（2026-10-20 第八轮 P2-45）：
+  `.catch(() => [])` / `.catch(() => null)` 这类"失败即当成空数据"的写法，会让页面把
+  **网络/服务故障**渲染成"还没有在借的书 / 暂无订单 / 连续 0 天 / 入会后可查看"——
+  家长把故障理解成"孩子没数据"，客服被误导（违反"错误不许伪装成 0/空"明线）。
+  规则：`pages/**` 与 `components/**` 里**不得**出现这两种吞错写法；失败必须进
+  **失败态**（`error-view` + 重试）或至少留一个显式的降级提示。
+
 判据与自证：
   · 两类违例都必须为 0（新规则不设基线）；
   · S1 注入自检：内置违例样本必须被检出（防检查器自身假绿）；
@@ -42,6 +49,13 @@ CLASS_DEF_RE = re.compile(r"\.([A-Za-z][\w-]*)")
 IMPORT_RE = re.compile(r"@import\s+\"([^\"]+)\";")
 #: W3：reader 入口传整对象（`?book={...}`）——`/borrows` 等接口不下发 audio_url，必哑火
 READER_OBJ_PARAM_RE = re.compile("reader/reader\\?[^\"'`\n]*\\bbook=")
+#: W4：把"请求失败"吞成空数据（`[]` / `null`）——失败会被渲染成"没有数据/0"
+#: 覆盖两种写法：`() => []` / `() => null` / `function () { return [] }`。
+#: 注意**不要**在 `[]` 后面加 `\b`——`]` 是非单词字符，`\b` 会永远匹配不上（自检当场抓到）。
+SILENT_EMPTY_CATCH_RE = re.compile(
+    r"\.catch\(\s*(?:\(\s*\)|function\s*\(\s*\))\s*=>\s*(?:\{\s*return\s+)?(?:\[\s*\]|null)"
+    r"|\.catch\(\s*function\s*\(\s*\)\s*\{\s*return\s+(?:\[\s*\]|null)\s*;?\s*\}\s*\)"
+)
 
 
 def js_defines(js_text: str, name: str) -> bool:
@@ -157,6 +171,44 @@ def scan_reader_entry(js_files: list[Path]) -> list[str]:
     return problems
 
 
+def scan_silent_empty_catch(js_files: list[Path]) -> list[str]:
+    """W4：页面里不得把请求失败吞成空数组/ null（失败会被渲染成"没有数据"）。
+
+    为什么是"必违例"而不是"风格问题"：这类写法让**故障**与**业务空**在屏幕上长得一样
+    （书架"还没有在借的书"、订单"暂无订单"、打卡"连续 0 天"、首页"入会后可查看"）——
+    家长据此以为孩子没数据，客服据此误判。失败要显式进失败态（`error-view` + 重试）。
+    """
+    problems: list[str] = []
+    for js in js_files:
+        text = js.read_text(encoding="utf-8", errors="ignore")
+        for m in SILENT_EMPTY_CATCH_RE.finditer(text):
+            if in_comment(text, m.start()):
+                continue  # 注释里的"举例"（如本规则的说明）不算违例
+            try:
+                rel = js.relative_to(ROOT)
+            except ValueError:
+                rel = js
+            line = text[: m.start()].count("\n") + 1
+            problems.append(
+                f"W4 {rel}:{line}: 把请求失败吞成空数据（`{m.group(0)}`）——"
+                f'失败会被渲染成"没有数据/0"；请改走失败态（error-view + 重试）'
+            )
+            break  # 每个文件报一处即可（同类问题看第一处就够定位）
+    return problems
+
+
+def in_comment(text: str, pos: int) -> bool:
+    """`pos` 是否落在注释里（行注释 `//` 或块注释 `/* */`）。
+
+    为什么需要：本规则的说明与页面的"改动原因注释"里会出现 `.catch(() => [])` 这类**举例**——
+    它们是文档而不是代码；检查器把注释当代码，会把"解释这件事"本身判成违例（自检当场抓到）。
+    """
+    line_start = text.rfind("\n", 0, pos) + 1
+    if "//" in text[line_start:pos]:
+        return True
+    return text.rfind("/*", 0, pos) > text.rfind("*/", 0, pos)
+
+
 def selftest() -> list[str]:
     """S1 注入自检：违例样本必须命中（两条规则各一）。"""
     import tempfile
@@ -203,6 +255,23 @@ def selftest() -> list[str]:
         w3_good = scan_reader_entry([good_js])
         if w3_good:
             fails.append(f"S1: W3 正例被误报：{w3_good}")
+
+        # W4：吞成空数据必须命中；显式失败态（catch 里 setData loadError）必须零命中
+        bad_catch = base / "bad_catch.js"
+        bad_catch.write_text("api.list().catch(() => [])\n", encoding="utf-8")
+        w4_hits = scan_silent_empty_catch([bad_catch])
+        if not any(p.startswith("W4") for p in w4_hits):
+            fails.append("S1: W4 未命中注入样本")
+        good_catch = base / "ok_catch.js"
+        good_catch.write_text(
+            "api.list().then((r) => this.setData({ rows: r })).catch((e) => {\n"
+            "  this.setData({ loadError: e.message })\n"
+            "})\n",
+            encoding="utf-8",
+        )
+        w4_good = scan_silent_empty_catch([good_catch])
+        if w4_good:
+            fails.append(f"S1: W4 正例被误报：{w4_good}")
     return fails
 
 
@@ -219,18 +288,21 @@ def main() -> int:
     if self_fails:
         print("FAIL(S1): " + "；".join(self_fails))
         return 1
-    problems = scan(wxml_files) + scan_reader_entry(js_files)
+    problems = scan(wxml_files) + scan_reader_entry(js_files) + scan_silent_empty_catch(js_files)
     print(f"扫描面: {len(wxml_files)} 个 wxml（pages + components）+ {len(js_files)} 个 js")
     print(f"W1 bind*/catch* handler 缺失: {sum(1 for p in problems if p.startswith('W1'))}")
     print(f"W2 插值类名无样式定义: {sum(1 for p in problems if p.startswith('W2'))}")
     print(f"W3 reader 入口传整对象: {sum(1 for p in problems if p.startswith('W3'))}")
+    print(f"W4 失败吞成空数据: {sum(1 for p in problems if p.startswith('W4'))}")
     if problems:
         print("\n违例明细：")
         for p in problems:
             print("  ✗", p)
-        print("\nFAIL: 接线检查不通过（W1/W2 必须为 0）")
+        print("\nFAIL: 接线检查不通过（W1~W4 必须为 0）")
         return 1
-    print("PASS: 小程序接线三条规则全零（handler 存在 / 插值类名可解析 / reader 入口传 id）✓")
+    print(
+        "PASS: 小程序接线四条规则全零（handler 存在 / 插值类名可解析 / reader 入口传 id / 失败不吞成空）✓"
+    )
     return 0
 
 

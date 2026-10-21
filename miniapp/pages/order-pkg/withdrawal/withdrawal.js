@@ -11,6 +11,7 @@ Page({
   data: {
     childName: '',
     list: [],
+    loadError: '',  // P2-45：失败态（原先失败静默 → 渲染成"还没有退会申请"）
     reason: '',
     loading: true,
     hasActive: false, // 有进行中的申请 → 隐藏表单
@@ -26,8 +27,10 @@ Page({
     this.load()
   },
 
+  onRetryLoad() { this.load() },
+
   async load() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, loadError: '' })
     try {
       const raw = (await api.myWithdrawals(this._childId)) || []
       // 审核通过后的单子才有结算明细（审核前后端不罗列费用）
@@ -36,15 +39,24 @@ Page({
           if (w.status === 'applying' || w.status === 'rejected' || w.status === 'cancelled') {
             return { ...w, settlement: null }
           }
-          const settlement = await api
-            .withdrawalSettlement(w.id, this._childId)
-            .catch(() => null)
-          return { ...w, settlement }
+          // P2-45：明细失败**不许**静默成"没有明细"——行内如实标注（下拉刷新可重试）
+          let settlement = null
+          let settlementError = false
+          try {
+            settlement = await api.withdrawalSettlement(w.id, this._childId)
+          } catch (e) {
+            settlementError = true
+          }
+          return { ...w, settlement, settlementError }
         })
       )
       this.setData({ list, hasActive: raw.some((w) => w.can_cancel) })
     } catch (e) {
-      /* toast 已弹 */
+      // P2-45：主列表失败**不许**渲染成"还没有退会申请"
+      this.setData({
+        loadError: (e && e.message) || '加载失败',
+        list: [], hasActive: false,
+      })
     } finally {
       this.setData({ loading: false })
     }

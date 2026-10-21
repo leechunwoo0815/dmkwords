@@ -48,6 +48,7 @@ Page({
     showPay: false,   // 非 iOS + 家长已绑微信（WM12-C：登录口径见下）→ 待支付行出现「去支付」
     payHint: '',      // WM12-C（审查 P0-3）：不能支付时说明原因，不留"点了没反应"的死按钮
     paying: false,    // WM12-C（审查 P2-10）：请求期间禁止重复点击
+    loadError: '',    // P2-45：失败态（原先失败静默 → 渲染成"暂无订单"）
   },
 
   onLoad(options) {
@@ -90,8 +91,11 @@ Page({
 
   onShow() { this.load() },
 
+  onRetryLoad() { this.load() },
+
   async load() {
     wx.showLoading({ title: '加载中' })
+    this.setData({ loadError: '' })
     try {
       const rows = await api.myOrders(this._childId)
       const orders = (rows || []).map((o) => ({
@@ -106,7 +110,13 @@ Page({
         payable: o.status === 'pending_payment' || o.status === 'pending_manual_confirm',
       }))
       this.setData({ orders, filtered: this._filter(orders, this.data.activeTab) })
-    } catch (e) { /* toast 已弹 */ }
+    } catch (e) {
+      // P2-45：失败**不许**渲染成"暂无订单"（家长会以为订单丢了）
+      this.setData({
+        loadError: (e && e.message) || '加载失败',
+        orders: [], filtered: [],
+      })
+    }
     finally { wx.hideLoading() }
   },
 

@@ -14,7 +14,11 @@
 
   <view class="obs-loading" wx:if="{{loading}}">加载中…</view>
 
-  <empty-state wx:if="{{!loading && !reports.length}}"
+  <!-- P2-45：失败态显式呈现（原先失败静默 → "还没有报告"） -->
+  <error-view wx:if="{{!loading && loadError}}" type="network" title="观察报告加载失败"
+    desc="{{loadError}}（报告未加载，不代表没有报告）" bind:onRetry="onRetryLoad" />
+
+  <empty-state wx:if="{{!loading && !loadError && !reports.length}}"
     icon-name="clipboard" title="还没有评估报告" desc="老师上传后这里会展示" />
 
   <!-- 最新一期：整页展开（家长第一眼要看清的就是它） -->

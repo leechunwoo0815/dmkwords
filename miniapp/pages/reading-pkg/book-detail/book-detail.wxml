@@ -24,6 +24,15 @@
   </view>
 
   <!-- 真实借阅状态卡 -->
+  <!-- P2-54：借阅状态查询失败 → 如实告知 + 重试（原先失败被当成"可预约"） -->
+  <view class="state-card state-unknown" wx:if="{{borrowState === 'unknown'}}" bindtap="onRetryBorrowState">
+    <image class="state-emoji" src="/icons/ui/warning.png" mode="aspectFit" />
+    <view class="state-texts">
+      <view class="state-title">借阅状态暂时取不到</view>
+      <view class="state-sub">{{borrowStateError}} · 点这里重试（别急着预约，先确认书在不在手上）</view>
+    </view>
+  </view>
+
   <view class="state-card state-borrowing" wx:if="{{borrowState === 'borrowing'}}" bindtap="goShelf">
     <image class="state-emoji" src="/icons/ui/book.png" mode="aspectFit" />
     <view class="state-texts">

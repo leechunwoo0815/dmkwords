@@ -549,3 +549,6 @@
 .hero-cover-empty { padding: 40rpx; }
 .state-emoji { width: 72rpx; height: 72rpx; }
 .action-icon-emoji { width: 36rpx; height: 36rpx; }
+
+/* P2-54：借阅状态未知（查询失败）——用警示色，与"可预约"的绿色明确区分 */
+.state-card.state-unknown { background: var(--warning-soft); }

@@ -215,3 +215,14 @@
   color: var(--accent);
   text-decoration: underline;
 }
+
+/* P2-52：登录失败提示（页面内留痕，不只靠 2 秒 toast） */
+.login-error {
+  margin: 24rpx 48rpx 0;
+  padding: 16rpx 24rpx;
+  background: var(--error-soft);
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  color: var(--danger, #cf1322);
+  text-align: center;
+}

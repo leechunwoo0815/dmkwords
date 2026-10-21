@@ -335,3 +335,16 @@
 
 /* 快捷入口圆贴纸里的自家图标（2026-09-16 替换 emoji） */
 .entry-icon-img { width: 56rpx; height: 56rpx; }
+
+/* P2-45：续听信息失败提示（与"没有可续听的书"区分开） */
+.section-hint {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin: 16rpx 24rpx 0;
+  padding: 12rpx 20rpx;
+  background: var(--warning-soft);
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  color: var(--warn, #b26a00);
+}

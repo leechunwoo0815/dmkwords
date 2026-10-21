@@ -17,6 +17,7 @@ Page({
     // 2026-10-12 拍板（P1）：短信通道开关由服务端下发——关闭时**隐藏手机号入口**
     // （不允许出现"页面能点、验证码永远收不到"的假入口）
     smsEnabled: true,
+    loginError: '',  // P2-52：登录失败在页面内也留痕（toast 会消失，家长回来能看到原因）
   },
 
   onLoad() {
@@ -34,6 +35,7 @@ Page({
   // 微信一键登录（主通道）
   async onWechatLogin() {
     if (this.data.submitting) return
+    this.setData({ loginError: '' })
     if (!this.data.agreed) {
       wx.showToast({ title: '请先同意隐私政策', icon: 'none' }); return
     }
@@ -49,7 +51,11 @@ Page({
       }
       this._enterApp(res)
     } catch (e) {
-      // request.js 已 toast 错误详情
+      // P2-52（第八轮）：**取 code 失败原先完全静默**（"点了没反应"型入口故障）。
+      // request.js 只覆盖 HTTP 失败；wx.login 自身失败/无 code 在这里必须自己讲清楚。
+      const msg = (e && e.message) || '微信登录失败，请重试'
+      wx.showToast({ title: msg, icon: 'none', duration: 2500 })
+      this.setData({ loginError: msg })
     } finally {
       this.setData({ submitting: false })
     }
