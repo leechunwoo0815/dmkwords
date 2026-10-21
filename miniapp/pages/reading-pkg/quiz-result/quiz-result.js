@@ -32,9 +32,11 @@ Page({
           book_id: bookId,
           book_title: decodeURIComponent(options.book_title || '') || q.book_title,
           score: q.best_score || 0,
-          total: (q.questions && q.questions.length) || 5,
+          // P2-51：分母取**该次作答**的题量（服务端 best_total）；缺失才退回当前题量
+          total: q.best_total || (q.questions && q.questions.length) || 5,
           attempts_left: q.attempts_left || 0,
           best_score: q.best_score || 0,
+          percent: typeof q.best_percent === 'number' ? q.best_percent : null,
           words_added: q.words_added || 0,
           points_detail: q.points_added ? [{ points: q.points_added }] : [],
           wrong: [],
@@ -50,8 +52,11 @@ Page({
       result,
       childId,
       childName: decodeURIComponent(options.child_name || ''),
-      // F-L6/T34：除零守卫
-      percent: result.total ? Math.round((result.score * 100) / result.total) : 0,
+      // P2-51：正确率优先用服务端算好的 best_percent（与"最佳成绩"同一口径）；
+      // 兜底自算时也已被 best_total 修正（不再出现 >100%）
+      percent: typeof result.percent === 'number'
+        ? result.percent
+        : (result.total ? Math.round((result.score * 100) / result.total) : 0),
     })
     // WM14-A（Q5 裁决）：事件触发点接线——本次提交若产生了"可晒且未晒"的成就
     // 才显示「晒成就」按钮（满分优先满分卡，否则完读卡）；拉取失败则静默不显示
@@ -75,10 +80,11 @@ Page({
     const avail = (res && res.available) || []
     // 完读卡 ref_id=book_id（Q10 口径，精确匹配）
     const finish = avail.find((c) => c.card_type === 'finish_book' && c.ref_id === bookId)
-    // 满分卡 ref_id=测验提交 id（本页拿不到提交 id）——取该书最新一张未晒满分卡
+    // P2-50：满分卡的 ref_id 是"测验提交 id"（本页拿不到），原先只按 ref_id 取最新一张
+    // → 会晒出**别的书**的满分卡。现在后端下发 book_id，按**本书**精确匹配（唯一判据）。
     const perfect = this._isPerfect()
       ? avail
-          .filter((c) => c.card_type === 'perfect_quiz')
+          .filter((c) => c.card_type === 'perfect_quiz' && c.book_id === bookId)
           .sort((a, b) => b.ref_id - a.ref_id)[0]
       : null
     const shareTarget = perfect || finish || null

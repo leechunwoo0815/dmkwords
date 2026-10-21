@@ -94,7 +94,8 @@ Page({
   async onBuy(e) {
     // 2026-10-12 审查 P1：建单阶段也要挡重复点击（`_creating` 与 `_payOrder` 的 `paying` 分开，
     // 否则置位 paying 会让 _payOrder 直接 return 跳过支付）
-    if (this.data.paying || this._creating) return
+    // P2-46：支付结果确认期间**锁住购买入口**（确认中再建单 = 再扣一次款）
+    if (this.data.paying || this._creating || this._confirming) return
     const orderType = e.currentTarget.dataset.type
     const plan = (this.data.plans || []).filter((p) => p.order_type === orderType)[0]
     if (!plan || !plan.available) {
@@ -145,14 +146,58 @@ Page({
       signType: p.signType,
       paySign: p.paySign,
       success: () => {
-        wx.showToast({ title: '支付成功', icon: 'success' })
-        this.loadPlans()
+        // P2-46（第八轮）：**wx.requestPayment 的 success 只代表"支付动作完成"，
+        // 不代表后端已入账**——真通道是异步通知，回调可能晚几秒。
+        // 原先这里直接 toast「支付成功」+ 刷新方案列表：回调未到时方案仍显示可买，
+        // 家长再点一次 → 建第二笔并**再扣一次款**（formal_fee 提前续费还会 +365 天）。
+        // 现在改为**查单确认**：轮询订单状态直到 paid（或超时如实告知"确认中"），
+        // 期间锁住购买入口，确认后再刷会员态。
+        this._confirmPaid(orderId)
       },
       fail: (err) => {
         // 用户主动取消不是错误：只在真失败时提示
         if (err && err.errMsg && err.errMsg.indexOf('cancel') >= 0) return
         wx.showToast({ title: '支付未完成，可在「我的订单」继续', icon: 'none' })
       },
+    })
+  },
+
+  /** P2-46：支付后**查单确认**（轮询订单状态）→ 刷新会员态与方案列表；超时如实说"确认中"。 */
+  async _confirmPaid(orderId) {
+    this._confirming = true
+    wx.showLoading({ title: '确认支付结果', mask: true })
+    const deadline = Date.now() + 15000
+    let paid = false
+    while (Date.now() < deadline) {
+      try {
+        const rows = await api.myOrders(this.data.childId)
+        const mine = (rows || []).filter((o) => o.id === orderId)[0]
+        if (mine && mine.status === 'paid') {
+          paid = true
+          break
+        }
+      } catch (e) {
+        // 单次查询失败不致命：继续轮询到超时
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+    }
+    wx.hideLoading()
+    this._confirming = false
+    if (paid) {
+      wx.showToast({ title: '支付成功', icon: 'success' })
+      // 刷会员态（会员到期日/状态变了）+ 方案列表（已购方案应由服务端判为不可再买）
+      const session = require('../../../utils/session')
+      await session.refreshChildren(true)
+      this.loadPlans()
+      return
+    }
+    // 超时：**不许**说"支付成功"（可能还在回调路上），如实告知去哪儿看结果
+    wx.showModal({
+      title: '支付结果确认中',
+      content: '银行/微信回执可能稍有延迟。请稍后到「我的订单」查看结果；若已扣款但订单未更新，请联系馆员处理。',
+      showCancel: false,
+      confirmText: '我知道了',
+      success: () => this.loadPlans(),
     })
   },
 

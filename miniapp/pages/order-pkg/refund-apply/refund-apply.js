@@ -37,7 +37,7 @@ Page({
             o.status === 'paid' ? '可申请'
             : o.status === 'refunded' ? '已退款'
             : o.status === 'pending_payment' ? '待支付'
-            : o.status === 'pending_manual' ? '待确认'
+            : o.status === 'pending_manual_confirm' ? '待确认'
             : o.status === 'cancelled' ? '已取消'
             : '状态更新中',
         })),
@@ -54,11 +54,16 @@ Page({
       wx.showToast({ title: '只有已支付订单可申请退款', icon: 'none' })
       return
     }
-    this.setData({ selected: order, reason: '' })
+    // P2-48：**换单必须先清 preview**——否则新订单会挂着上一单的"可退金额"，
+    // 而金额是资金动作的唯一判据（家长按旧金额理解、提交的却是新单）。
+    this.setData({ selected: order, reason: '', preview: null, previewError: '' })
     try {
       const pv = await api.refundPreview(this._childId, order.id)
       this.setData({ preview: pv })
-    } catch (e) { /* toast 已弹 */ }
+    } catch (e) {
+      // 失败**不许**留旧值：如实标注"可退金额取不到"，别让家长按空/旧金额提交
+      this.setData({ previewError: (e && e.message) || '可退金额取不到' })
+    }
   },
 
   onReason(e) { this.setData({ reason: e.detail.value }) },

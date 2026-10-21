@@ -585,6 +585,10 @@ class QuizService:
             "attempts_used": used,
             "attempts_left": max(0, max_attempts - used),
             "best_score": best,
+            # P2-51（第八轮）：**下发该次作答的题量**。前端原先用"当前题量"
+            # （`q.questions.length`）当分母——题量配置改小后，历史 best_score 除当前题量
+            # 会算出 >100% 的正确率（星级/文案全错）。分母必须来自**那次作答**。
+            "best_total": best_attempt.total_questions if best_attempt else 0,
             "best_percent": best_percent,
             "words_added": int(words_added),
             "points_added": int(points_added),

@@ -21,6 +21,12 @@
 
   <include src="refund-calc.wxml"/>
 
+  <!-- P2-48：可退金额取不到时**如实告知**（不留空、更不留上一单的旧值） -->
+  <view class="tip-card" wx:if="{{selected && previewError}}">
+    <view class="card-h3">可退金额取不到</view>
+    <view class="zero-tip">{{previewError}} · 请返回重选订单或稍后重试（不要按记忆里的金额提交）</view>
+  </view>
+
   <view class="reason-card" wx:if="{{preview}}">
     <view class="card-h3">退款原因（必填）</view>
     <textarea class="reason-textarea" placeholder="如：孩子时间安排变化…" value="{{reason}}"

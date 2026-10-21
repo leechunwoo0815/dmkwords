@@ -88,7 +88,14 @@ function logout() {
   // 旧 token（含媒体 URL 里带的）继续可用 30 天——注释里承诺的"真撤销"实际上从未发生。
   // 现在：**先发撤销请求**，等它落定（成功/失败/超时）再清本地；请求失败照常清（离线也能退出）。
   // 页面随后 reLaunch 不受影响：wx.request 不随页面销毁而中断。
-  const done = () => { try { _clearLocalSession() } catch (e) { /* 清理失败不阻断退出 */ } }
+  // P2-53（第八轮）：**记住本次要撤销的那个会话**。撤销请求是异步的——若家长在回调回来之前
+  // 重新登录（新 token 已写入），旧的 `done()` 会把**新会话**清掉（"刚登录又被踢回登录页"）。
+  // 判据：只有"当前存的 token 仍是本次要撤销的那个"才清本地。
+  const tokenAtCall = wx.getStorageSync('token')
+  const done = () => {
+    if (wx.getStorageSync('token') !== tokenAtCall) return // 已换会话 → 本次回调不再动本地
+    try { _clearLocalSession() } catch (e) { /* 清理失败不阻断退出 */ }
+  }
   try {
     const api = require('./api')
     if (api.logout) {

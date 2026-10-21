@@ -531,6 +531,10 @@ def enumerate_cards(db: Session, child: Child) -> list[dict]:
             {
                 "card_type": CirclePost.CARD_PERFECT_QUIZ,
                 "ref_id": row.id,
+                # P2-50（第八轮）：**必须下发 book_id**——满分卡的 ref_id 是"测验提交 id"，
+                # 前端在"成绩单页晒成就"时拿不到本次提交 id，只能按 ref_id 取最新一张
+                # → 会晒出**别的书**的满分卡。有了 book_id，前端才能按本书精确匹配。
+                "book_id": row.book_id,
                 "title": f"测验满分 · 《{_book_title(row.book_id)}》 {row.score}/{row.total_questions}",
             }
         )
