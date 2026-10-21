@@ -65,7 +65,7 @@ def list_deposits(
 ):
     rows, total = DepositService(db).list_deposits(page, page_size, status, keyword)
     items = []
-    for dep, child, _order in rows:
+    for dep, child in rows:  # 第八轮 P2-12：查询不再带 Order（详见 service 注释）
         item = DepositResponse(
             id=dep.id,
             child_id=dep.child_id,

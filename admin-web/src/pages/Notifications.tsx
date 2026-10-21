@@ -35,7 +35,7 @@ const SCENE_OPTIONS: { value: string; label: string }[] = [
   { value: "money.refund_result", label: "退款审核结果" },
   { value: "money.refund_received", label: "退款到账" },
   { value: "money.refund_failed", label: "退款失败" },
-  { value: "money.deposit_paid", label: "押金补缴" },
+  { value: "money.deposit_paid", label: "押金缴纳/补缴" },
   { value: "borrow.success", label: "借书成功" },
   { value: "borrow.returned", label: "还书成功" },
   { value: "borrow.due_remind", label: "借阅到期提醒" },

@@ -11,7 +11,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Activities */
+        /**
+         * List Activities
+         * @description 管理端活动列表（P2-44：硬上限经响应头如实告知）。
+         */
         get: operations["list_activities_api_admin_activities_get"];
         put?: never;
         /** Create Activity */
@@ -1948,6 +1951,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/refund-center/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin Refund Center Counts
+         * @description 退款中心三个台账的按状态计数（P1-7：服务端分页后徽标必须来自后端，不能只数本页）。
+         */
+        get: operations["admin_refund_center_counts_api_admin_refund_center_counts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/refund-requests": {
         parameters: {
             query?: never;
@@ -1958,6 +1981,9 @@ export interface paths {
         /**
          * Admin Refund List
          * @description 退款申请列表（订单类 + 押金类统一，超管逐单审）。
+         *
+         *     P2-44：响应头如实告知硬上限与"是否已达上限"（`X-List-Limit` / `X-List-Truncated`），
+         *     管理端据此提示"可能还有更多"——不再让 200 条上限看起来像"这就是全部"。
          */
         get: operations["admin_refund_list_api_admin_refund_requests_get"];
         put?: never;
@@ -2037,6 +2063,8 @@ export interface paths {
         /**
          * List Reservations
          * @description 预约管理列表（默认全部；status=active 看锁定中；keyword 模糊搜索）。
+         *
+         *     P2-44：硬上限经响应头如实告知（`X-List-Limit` / `X-List-Truncated`）。
          */
         get: operations["list_reservations_api_admin_reservations_get"];
         put?: never;
@@ -2214,7 +2242,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Admin Transfer List */
+        /**
+         * Admin Transfer List
+         * @description 转让台账（P1-7 服务端分页 + P2-44 上限经响应头如实告知）。
+         */
         get: operations["admin_transfer_list_api_admin_transfers_get"];
         put?: never;
         post?: never;
@@ -2276,7 +2307,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Admin Withdrawal List */
+        /**
+         * Admin Withdrawal List
+         * @description 退会台账（P1-7 服务端分页 + P2-44 上限经响应头如实告知）。
+         */
         get: operations["admin_withdrawal_list_api_admin_withdrawals_get"];
         put?: never;
         post?: never;
@@ -2330,7 +2364,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Activities */
+        /**
+         * List Activities
+         * @description 家长端近期活动（P2-44：50 条硬上限经响应头如实告知）。
+         */
         get: operations["list_activities_api_miniapp_activities_get"];
         put?: never;
         post?: never;
@@ -2837,6 +2874,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/miniapp/configs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Miniapp Configs
+         * @description 业务口径下发（**公开端点**：登录页倒计时要用，不能要求先登录）。
+         *
+         *     为什么要有（第八轮审查 E 批剩余）：小程序里 13 处硬编码业务数字（预约保留 72 小时、
+         *     完播阈值 95%、观察期 30 天、续借 1 次…）与配置中心各写一份——运营改配置后文案不跟随；
+         *     P2-73 更是三方不一致（种子/服务端 **90 秒**、小程序倒计时写 **60 秒**）：家长 60 秒后
+         *     点发送必被服务端拒。本端点把**展示口径**集中下发（读的是配置中心同一份值，60 秒 TTL 缓存），
+         *     前端不再自持副本；改配置 → 文案跟随。
+         *
+         *     只下发**展示用**口径：不放服务端校验规则（那些仍由服务端在动作发生时判定，
+         *     前端拿到的数字只是文案依据，不能当判据）。
+         */
+        get: operations["miniapp_configs_api_miniapp_configs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/miniapp/continue-listening": {
         parameters: {
             query?: never;
@@ -3255,6 +3321,8 @@ export interface paths {
         /**
          * My Orders
          * @description 家长视角订单列表（A-1/T6 下沉：逻辑在 OrderService.my_orders）。
+         *
+         *     P2-44：50 条硬上限经响应头如实告知（`X-List-Limit` / `X-List-Truncated`）。
          */
         get: operations["my_orders_api_miniapp_orders_get"];
         put?: never;
@@ -3814,7 +3882,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Health */
+        /**
+         * Health
+         * @description 健康检查（容器探针用）。**恒 200**：进程活着就是 ok，不因依赖异常改状态码。
+         *
+         *     第八轮审查 P1-11：附加 `scheduler` 只读状态（**不查库**）——定时任务整体停摆原先
+         *     完全无声（`/health` 恒 200、看板只是 `last_run` 变旧）。字段是**加法**，探针与既有
+         *     用例按原有字段判断不受影响。
+         */
         get: operations["health_health_get"];
         put?: never;
         post?: never;
@@ -4987,6 +5062,62 @@ export interface components {
             count: number;
             /** Status */
             status: string;
+        };
+        /**
+         * MiniappConfigsResponse
+         * @description 小程序展示口径（第八轮 E 批剩余：前端口径改后端下发）。
+         */
+        MiniappConfigsResponse: {
+            /**
+             * Activity Refund Cutoff Hours
+             * @description 活动退款时限（距开始小时）
+             */
+            activity_refund_cutoff_hours: number;
+            /**
+             * Audio Finish Threshold Percent
+             * @description 音频完播阈值（%）
+             */
+            audio_finish_threshold_percent: number;
+            /**
+             * Observation Period Days
+             * @description 观察期天数
+             */
+            observation_period_days: number;
+            /**
+             * Quiz Max Attempts
+             * @description 每本书测验机会（次）
+             */
+            quiz_max_attempts: number;
+            /**
+             * Quiz Questions Per Book
+             * @description 每本书测验题量
+             */
+            quiz_questions_per_book: number;
+            /**
+             * Renew Days
+             * @description 续借延长天数
+             */
+            renew_days: number;
+            /**
+             * Renew Limit
+             * @description 每本书可续借次数
+             */
+            renew_limit: number;
+            /**
+             * Reservation Hours
+             * @description 预约锁定时长（小时）
+             */
+            reservation_hours: number;
+            /**
+             * Sms Send Interval Seconds
+             * @description 同号短信重发间隔（秒）
+             */
+            sms_send_interval_seconds: number;
+            /**
+             * Transfer Review Timeout Hours
+             * @description 转让审核时限（小时）
+             */
+            transfer_review_timeout_hours: number;
         };
         /** NotificationReadStatusRequest */
         NotificationReadStatusRequest: {
@@ -9645,10 +9776,34 @@ export interface operations {
             };
         };
     };
+    admin_refund_center_counts_api_admin_refund_center_counts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     admin_refund_list_api_admin_refund_requests_get: {
         parameters: {
             query?: {
                 status?: string | null;
+                /** @description 页码（服务端分页，P1-7） */
+                page?: number;
+                /** @description 每页条数（上限 200） */
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -10106,6 +10261,10 @@ export interface operations {
         parameters: {
             query?: {
                 status?: string | null;
+                /** @description 页码（服务端分页，P1-7） */
+                page?: number;
+                /** @description 每页条数（上限 200） */
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -10203,6 +10362,10 @@ export interface operations {
         parameters: {
             query?: {
                 status?: string | null;
+                /** @description 页码（服务端分页，P1-7） */
+                page?: number;
+                /** @description 每页条数（上限 200） */
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -11214,6 +11377,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    miniapp_configs_api_miniapp_configs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiniappConfigsResponse"];
                 };
             };
         };

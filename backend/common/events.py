@@ -206,15 +206,20 @@ class CheckInEvent(DomainEvent):
 class DepositPaidEvent(DomainEvent):
     """押金支付成功事件
 
-    发布者：DepositService.pay()
+    发布者：DepositService.on_deposit_order_paid()（管理端确认收款 / 线上回调）
     订阅者：
       - child: 更新 deposit_status
+      - notify: 押金到账通知（去重键取 `order_id`，文案取 `is_supplement`）
     """
 
     event_type: str = "deposit.paid"
     child_id: int = 0
     deposit_id: int = 0
     amount: Decimal = Decimal("0")
+    # 第八轮 P2-11：付款订单号 + 首缴/补缴标记。`deposit_id` 在**补缴**时不变
+    # （`deposits.child_id` 单列唯一），拿它当通知身份会让第二次缴款被唯一索引吞掉。
+    order_id: int = 0
+    is_supplement: bool = False
 
 
 @dataclass

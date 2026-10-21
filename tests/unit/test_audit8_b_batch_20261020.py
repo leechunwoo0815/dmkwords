@@ -283,7 +283,15 @@ def test_scheduler_takes_over_after_holder_exits(client: TestClient):
         got = holder.execute(
             text("SELECT GET_LOCK(:n, 0)"), {"n": reg.SCHEDULER_LOCK_NAME}
         ).scalar()
-        assert got == 1, "用例前置失败：外部连接没拿到命名锁"
+        # 前置失败的可诊断化（2026-10-21 第一百零九批实测踩到）：本机**已有持锁者**时
+        # GET_LOCK 返回 0，最常见原因是"跑 pytest 时 dev 后端还开着"（它的调度器持着这把锁，
+        # `/health` 的 `scheduler.has_lock_conn=true` 可见）——宪法 §八 不变纪律要求先
+        # `bash scripts/dev.sh stop`。原断言只说"没拿到命名锁"，看不出该去停谁。
+        assert got == 1, (
+            "用例前置失败：外部连接没拿到命名锁 = 本机已有持锁者。最常见：**dev 后端在跑**"
+            "（其调度器持锁；`curl :8002/health` 看 scheduler.has_lock_conn）。"
+            "跑 pytest 前必须 `bash scripts/dev.sh stop`（CLAUDE.md §八 不变纪律）。"
+        )
         holder.commit()
         try:
             reg.stop_scheduler()

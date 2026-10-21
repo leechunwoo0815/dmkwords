@@ -204,22 +204,43 @@ def _on_book_returned(event: BookReturnedEvent, db: Session) -> None:
     )
 
 
+def _deposit_dedup_key(event: object) -> str:
+    """押金到账通知的去重键（第八轮 P2-11，2026-10-21）。
+
+    键 = **付款订单 id**：一笔订单一条通知（同一笔重复确认/回调重放被唯一索引吞掉 = 幂等），
+    而**补缴是另一笔订单** → 键不同 → 不再被当成重复吞。此前不传键（默认 "1"）且
+    `ref_id=deposit_id`——补缴时 `deposit_id` 不变（`deposits.child_id` 单列唯一），
+    第二次缴款的五元组与首缴完全相同 → **补缴到账通知永远发不出**（钱收了、家长无凭证）。
+    极端情况下事件没带订单号（外部发布方/历史代码）时退化为发生时刻——
+    **宁可多发一条，也不要把补缴通知永久吞掉**（与 `_quiz_dedup_key` 同款口径）。
+    """
+    order_id = getattr(event, "order_id", 0)
+    if order_id:
+        return f"pay-order-{order_id}"
+    occurred_at = getattr(event, "occurred_at", None)
+    stamp = occurred_at.strftime("%Y%m%d%H%M%S%f") if occurred_at else "unknown"
+    return f"pay-at-{stamp}"
+
+
 def _on_deposit_paid(event: DepositPaidEvent, db: Session) -> None:
     from backend.domain.identity.models import Child
 
     child = db.get(Child, event.child_id)
     if not child:
         return
+    # 首缴 vs 补缴（R-312）文案分开：此前两者都写"押金补缴成功"，首次缴纳也这么说。
+    label = "押金补缴" if getattr(event, "is_supplement", False) else "押金缴纳"
     NotificationService(db).send_event(
         event,
         parent_id=child.parent_id,
         scene=SCENE_MONEY_DEPOSIT_PAID,
-        title="押金补缴成功",
-        content=f"押金补缴成功，金额 {event.amount}。",
+        title=f"{label}成功",
+        content=f"{label}成功，金额 {event.amount}。",
         category=Notification.CATEGORY_MONEY,
         child_id=child.id,
         ref_type="deposit",
         ref_id=str(event.deposit_id),
+        dedup_key=_deposit_dedup_key(event),
         openid=_parent_openid(db, child.parent_id),
     )
 

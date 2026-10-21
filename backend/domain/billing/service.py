@@ -131,6 +131,10 @@ class DepositService:
                 child_id=child.id,
                 deposit_id=dep.id,
                 amount=order.amount,
+                # 第八轮 P2-11：带上"这一笔缴款"的业务身份。补缴时 dep.id 与首缴相同，
+                # 通知侧只用 deposit_id 会把第二次缴款当重复吞掉（详见事件字段注释）。
+                order_id=order.id,
+                is_supplement=order.order_type == Order.TYPE_DEPOSIT_SUPPLEMENT,
             ),
             db=self.db,
         )
@@ -455,15 +459,13 @@ class DepositService:
 
     def list_deposits(self, page: int, page_size: int, status: str | None, keyword: str | None):
 
+        # 第八轮 P2-12：这里原先 `outerjoin(Order, child_id + TYPE_DEPOSIT + STATUS_PAID)`——
+        # 孩子**重新入会**后会有第二笔已付押金单，join 产出多行 → 管理端列表同一孩子
+        # 重复出现、`total` 虚高（分页错位）。那个 Order 调用方从未使用（响应体只有押金与
+        # 孩子）→ 直接去掉 join：`deposits.child_id` 唯一 + `children.id` 是主键 = 每孩子恒一行。
         q = (
-            self.db.query(Deposit, Child, Order)
+            self.db.query(Deposit, Child)
             .join(Child, Deposit.child_id == Child.id)
-            .outerjoin(
-                Order,
-                (Order.child_id == Child.id)
-                & (Order.order_type == Order.TYPE_DEPOSIT)
-                & (Order.status == Order.STATUS_PAID),
-            )
             .filter(Deposit.is_deleted == 0)
         )
         if status:

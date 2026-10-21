@@ -5,7 +5,9 @@
 - 通知要被各业务域（事件订阅器）写入、被 admin 域查询、被 miniapp 读——归 common 层
   （同 AuditLog/SystemConfig 先例，架构关零违规）；
 - 幂等：唯一索引 (parent_id, scene, ref_type, ref_id, dedup_key, is_deleted)，
-  定时提醒场景 dedup_key=提醒节点值（如 "30"），事件场景 dedup_key="1"；
+  定时提醒场景 dedup_key=提醒节点值（如 "30"），事件场景 dedup_key=**业务对象键**
+  （订单号/提交号/跃迁/覆盖期……见 `tasks/notify_handlers.py` 各处理器；默认 "1" 只适用于
+  "同一对象终身一条"的知会类场景，重复事件用它会被吞——P1 #2 / P2-11）；
 - 软删除后允许重建（唯一索引含 is_deleted，同 orders 模式）。
 """
 
