@@ -359,6 +359,8 @@ class ReviewRequest(BaseSchema):
 def admin_refund_list(
     response: Response,
     status: str | None = None,
+    page: int = Query(1, ge=1, description="页码（服务端分页，P1-7）"),
+    page_size: int = Query(200, ge=1, le=200, description="每页条数（上限 200）"),
     admin: Any = Depends(require_super_admin()),
     db: Session = Depends(get_db),
 ):
@@ -367,8 +369,14 @@ def admin_refund_list(
     P2-44：响应头如实告知硬上限与"是否已达上限"（`X-List-Limit` / `X-List-Truncated`），
     管理端据此提示"可能还有更多"——不再让 200 条上限看起来像"这就是全部"。
     """
-    rows = refund_queries.admin_list(db, status)
-    stamp_list_meta(response, loaded=len(rows), limit=refund_queries.ADMIN_LIST_LIMIT)
+    rows, total = refund_queries.admin_list(db, status, page, page_size)
+    stamp_list_meta(
+        response,
+        loaded=len(rows),
+        limit=refund_queries.ADMIN_LIST_LIMIT,
+        total=total,
+        offset=(page - 1) * page_size,
+    )
     return rows
 
 
@@ -413,17 +421,34 @@ def admin_refund_query_gateway(
     return RefundService(db).query_gateway(admin, request_id)
 
 
+@router.get("/refund-center/counts")
+def admin_refund_center_counts(
+    admin: Any = Depends(require_super_admin()),
+    db: Session = Depends(get_db),
+):
+    """退款中心三个台账的按状态计数（P1-7：服务端分页后徽标必须来自后端，不能只数本页）。"""
+    return refund_queries.refund_center_counts(db)
+
+
 @router.get("/withdrawals")
 def admin_withdrawal_list(
     response: Response,
     status: str | None = None,
+    page: int = Query(1, ge=1, description="页码（服务端分页，P1-7）"),
+    page_size: int = Query(200, ge=1, le=200, description="每页条数（上限 200）"),
     admin: Any = Depends(require_super_admin()),
     db: Session = Depends(get_db),
 ):
-    """退会台账（P2-44：硬上限经响应头如实告知）。"""
+    """退会台账（P1-7 服务端分页 + P2-44 上限经响应头如实告知）。"""
     svc = WithdrawalService(db)
-    rows = svc.admin_list(status)
-    stamp_list_meta(response, loaded=len(rows), limit=svc.ADMIN_LIST_LIMIT)
+    rows, total = svc.admin_list(status, page, page_size)
+    stamp_list_meta(
+        response,
+        loaded=len(rows),
+        limit=svc.ADMIN_LIST_LIMIT,
+        total=total,
+        offset=(page - 1) * page_size,
+    )
     return rows
 
 
@@ -451,13 +476,21 @@ def admin_withdrawal_review(
 def admin_transfer_list(
     response: Response,
     status: str | None = None,
+    page: int = Query(1, ge=1, description="页码（服务端分页，P1-7）"),
+    page_size: int = Query(200, ge=1, le=200, description="每页条数（上限 200）"),
     admin: Any = Depends(require_super_admin()),
     db: Session = Depends(get_db),
 ):
-    """转让台账（P2-44：硬上限经响应头如实告知）。"""
+    """转让台账（P1-7 服务端分页 + P2-44 上限经响应头如实告知）。"""
     svc = TransferService(db)
-    rows = svc.admin_list(status)
-    stamp_list_meta(response, loaded=len(rows), limit=svc.ADMIN_LIST_LIMIT)
+    rows, total = svc.admin_list(status, page, page_size)
+    stamp_list_meta(
+        response,
+        loaded=len(rows),
+        limit=svc.ADMIN_LIST_LIMIT,
+        total=total,
+        offset=(page - 1) * page_size,
+    )
     return rows
 
 

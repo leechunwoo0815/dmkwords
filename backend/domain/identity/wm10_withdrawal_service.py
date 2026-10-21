@@ -314,11 +314,17 @@ class WithdrawalService:
     #: 管理端退会台账硬上限（P2-44：上限与是否已达上限经响应头告知）
     ADMIN_LIST_LIMIT = 200
 
-    def admin_list(self, status: str | None = None) -> list[dict]:
+    def admin_list(
+        self, status: str | None = None, page: int = 1, page_size: int = ADMIN_LIST_LIMIT
+    ) -> tuple[list[dict], int]:
+        """管理端退会台账（**服务端分页**，P1-7）：返回 `(rows, total)`。"""
         q = self.db.query(WithdrawalRequest).filter(WithdrawalRequest.is_deleted == 0)
         if status:
             q = q.filter(WithdrawalRequest.status == status)
-        rows = q.order_by(WithdrawalRequest.id.desc()).limit(self.ADMIN_LIST_LIMIT).all()
+        total = q.count()
+        size = max(1, min(int(page_size), self.ADMIN_LIST_LIMIT))
+        offset = max(0, (max(1, int(page)) - 1) * size)
+        rows = q.order_by(WithdrawalRequest.id.desc()).offset(offset).limit(size).all()
         out = []
         for r in rows:
             child = self.db.query(Child).filter(Child.id == r.child_id).first()
@@ -335,7 +341,7 @@ class WithdrawalService:
                     "created_at": str(r.created_at),
                 }
             )
-        return out
+        return out, total
 
     def _settle_items(self, child: Child) -> list[dict]:
         """结算明细（X2 共享）：preview 与 review 调同一份代码，防两套公式漂移。

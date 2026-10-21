@@ -20,7 +20,8 @@ import {
 } from "antd";
 
 import {
-  apiListRefunds, apiListTransfers, apiListWithdrawals,
+  apiListRefunds, apiListTransfers, apiListWithdrawals, apiRefundCenterCounts,
+  type RefundCenterCounts,
   apiReviewRefund, apiReviewTransfer, apiReviewWithdrawal, apiExecuteRefund,
   apiQueryRefundGateway,
   apiSettlePreview, type SettlePreview,
@@ -83,6 +84,12 @@ export default function RefundCenter() {
   const [refundLimit, setRefundLimit] = useState<number | null>(null);
   const [withdrawalLimit, setWithdrawalLimit] = useState<number | null>(null);
   const [transferLimit, setTransferLimit] = useState<number | null>(null);
+  // P1-7：服务端分页——总数来自 `X-Total-Count`（当前筛选下的**全部**行数，
+  // 不再是"本页行数"）；徽标来自后端 counts 端点（分页后不能再用本页行数算，那是"假 0"）。
+  const [refundTotal, setRefundTotal] = useState<number | null>(null);
+  const [withdrawalTotal, setWithdrawalTotal] = useState<number | null>(null);
+  const [transferTotal, setTransferTotal] = useState<number | null>(null);
+  const [counts, setCounts] = useState<RefundCenterCounts | null>(null);
   // R5（#3）时序加固：3 秒清除窗口从列表数据到达起算——原实现挂载即起算，
   // 接口返回前窗口已烧掉，行渲染时 highlightId 已被清（高亮不出现真凶嫌疑）
   const [hlArmed, setHlArmed] = useState(false);
@@ -125,18 +132,29 @@ export default function RefundCenter() {
   const transferPg = usePaintPagination();
 
   const load = useCallback(() => {
-    // P2-44：列表接口带"硬上限"元信息（X-List-Limit）——存下来交给分页条提示
-    apiListRefunds()
-      .then((r) => { setRefunds(r.items); setRefundLimit(r.limit); })
+    // P1-7：三个台账都走**服务端分页**（页码/页大小来自各自的 PaintPagination 状态），
+    // 总数取响应头 X-Total-Count；P2-44 的上限元信息（X-List-Limit）一并存下来给提示条。
+    apiListRefunds(undefined, refundPg.page, refundPg.pageSize)
+      .then((r) => {
+        setRefunds(r.items); setRefundLimit(r.limit); setRefundTotal(r.total);
+      })
       .catch((e: Error) => message.error(e.message));
     // F-H4/T26：资金域列表 fetch 失败必须报错——静默置空=管理员误判无待审（最高危）
-    apiListWithdrawals()
-      .then((r) => { setWithdrawals(r.items); setWithdrawalLimit(r.limit); })
+    apiListWithdrawals(undefined, withdrawalPg.page, withdrawalPg.pageSize)
+      .then((r) => {
+        setWithdrawals(r.items); setWithdrawalLimit(r.limit); setWithdrawalTotal(r.total);
+      })
       .catch((e: Error) => { message.error(e.message); setWithdrawals([]); });
-    apiListTransfers()
-      .then((r) => { setTransfers(r.items); setTransferLimit(r.limit); })
+    apiListTransfers(undefined, transferPg.page, transferPg.pageSize)
+      .then((r) => {
+        setTransfers(r.items); setTransferLimit(r.limit); setTransferTotal(r.total);
+      })
       .catch((e: Error) => { message.error(e.message); setTransfers([]); });
-  }, [message]);
+    // P1-7：徽标计数来自后端（分页后本页行数算不出"待审 N"，那会变成"假 0"）
+    apiRefundCenterCounts()
+      .then(setCounts)
+      .catch(() => setCounts(null));
+  }, [message, refundPg.page, refundPg.pageSize, withdrawalPg.page, withdrawalPg.pageSize, transferPg.page, transferPg.pageSize]);
 
   useEffect(() => {
     if (!isSuper) return; // R3：无权限不发请求
@@ -180,15 +198,30 @@ export default function RefundCenter() {
     }
   };
 
-  const pendingRefunds = refunds.filter((r) => r.status === "pending");
-  const pendingWithdrawals = withdrawals.filter((w) => w.status === "applying");
-  const pendingTransfers = transfers.filter((t) => t.status === "pending");
+  // P1-7：**徽标全部来自后端计数**（服务端分页后只数本页 = "侧边栏说有待审、页面显示 0"）。
+  // 后端不可用时退回本页统计（如实标"本页"），不假装是全量。
+  const refundCounts = counts?.refund ?? null;
+  const pendingRefunds = {
+    length: refundCounts ? (refundCounts.pending ?? 0) : refunds.filter((r) => r.status === "pending").length,
+  };
+  const pendingWithdrawals = {
+    length: counts?.withdrawal
+      ? (counts.withdrawal.applying ?? 0)
+      : withdrawals.filter((w) => w.status === "applying").length,
+  };
+  const pendingTransfers = {
+    length: counts?.transfer
+      ? (counts.transfer.pending ?? 0)
+      : transfers.filter((t) => t.status === "pending").length,
+  };
   // W1 tab 标签双计数：表格显示全量记录（含 approved 待执行等），单数 pending 会
   // 造成「待审 0 却有活干」观感矛盾——待执行/退款中单列（M>0 红字）
-  const refundExecutable = refunds.filter(
-    (r) => r.status === "approved" || r.status === "failed",
-  ).length;
-  const withdrawalRefunding = withdrawals.filter((w) => w.status === "refunding").length;
+  const refundExecutable = refundCounts
+    ? (refundCounts.approved ?? 0) + (refundCounts.failed ?? 0)
+    : refunds.filter((r) => r.status === "approved" || r.status === "failed").length;
+  const withdrawalRefunding = counts?.withdrawal
+    ? (counts.withdrawal.refunding ?? 0)
+    : withdrawals.filter((w) => w.status === "refunding").length;
 
   const askExecute = (r: RefundRequestItem) => {
     setExecSuccess(true);
@@ -252,6 +285,12 @@ export default function RefundCenter() {
       <Typography.Text type="secondary" style={{ display: "block", marginBottom: 12 }}>
         资金安全关口：仅超级管理员可审；拒绝必填原因（家长端可见）；押金退款随退会/转让通过自动发起。
       </Typography.Text>
+      {/* P1-7：后端计数不可用时如实降级——徽标数字将只反映**本页**，不能假装是全量 */}
+      {counts === null && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 12 }}>
+          后端计数暂不可用：下方徽标数字为本页统计（非全量），请以侧边栏待办徽标为准。
+        </Typography.Text>
+      )}
 
       <Tabs
         activeKey={activeTab}
@@ -282,7 +321,7 @@ export default function RefundCenter() {
               <Table<RefundRequestItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
                 rowKey="id"
                 rowClassName={(r) => (r.id === highlightId ? "wm13-highlight-row" : "")}
-                dataSource={refunds.slice((refundPg.page - 1) * refundPg.pageSize, refundPg.page * refundPg.pageSize)} size="middle"
+                dataSource={refunds} size="middle"
                 pagination={false}
                 columns={[
                   { title: "类型", dataIndex: "kind", width: 100, render: (k) => KIND_LABEL[k] ?? k },
@@ -345,7 +384,7 @@ export default function RefundCenter() {
                 ]}
                scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
-              <PaintPagination current={refundPg.page} pageSize={refundPg.pageSize} total={refunds.length} onChange={refundPg.onChange} listLimit={refundLimit} />
+              <PaintPagination current={refundPg.page} pageSize={refundPg.pageSize} total={refundTotal ?? refunds.length} onChange={refundPg.onChange} listLimit={refundLimit} />
             </>),
 
           },
@@ -367,7 +406,7 @@ export default function RefundCenter() {
               <Table<WithdrawalItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
                 rowKey="id"
                 rowClassName={(r) => (r.id === highlightId ? "wm13-highlight-row" : "")}
-                dataSource={withdrawals.slice((withdrawalPg.page - 1) * withdrawalPg.pageSize, withdrawalPg.page * withdrawalPg.pageSize)} size="middle"
+                dataSource={withdrawals} size="middle"
                 pagination={false}
                 columns={[
                   { title: "孩子", dataIndex: "child_name", width: 100 },
@@ -417,7 +456,7 @@ export default function RefundCenter() {
                 ]}
                scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
-              <PaintPagination current={withdrawalPg.page} pageSize={withdrawalPg.pageSize} total={withdrawals.length} onChange={withdrawalPg.onChange} listLimit={withdrawalLimit} />
+              <PaintPagination current={withdrawalPg.page} pageSize={withdrawalPg.pageSize} total={withdrawalTotal ?? withdrawals.length} onChange={withdrawalPg.onChange} listLimit={withdrawalLimit} />
             </>),
 
           },
@@ -440,7 +479,7 @@ export default function RefundCenter() {
               <Table<TransferItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
                 rowKey="id"
                 rowClassName={(r) => (r.id === highlightId ? "wm13-highlight-row" : "")}
-                dataSource={transfers.slice((transferPg.page - 1) * transferPg.pageSize, transferPg.page * transferPg.pageSize)} size="middle"
+                dataSource={transfers} size="middle"
                 pagination={false}
                 columns={[
                   { title: "转出方", dataIndex: "source_name", width: 100 },
@@ -466,7 +505,7 @@ export default function RefundCenter() {
                 ]}
                scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
-              <PaintPagination current={transferPg.page} pageSize={transferPg.pageSize} total={transfers.length} onChange={transferPg.onChange} listLimit={transferLimit} />
+              <PaintPagination current={transferPg.page} pageSize={transferPg.pageSize} total={transferTotal ?? transfers.length} onChange={transferPg.onChange} listLimit={transferLimit} />
             </>),
 
           },

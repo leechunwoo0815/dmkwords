@@ -12,6 +12,13 @@
   必须在**同页作用域** wxss 里有对应类定义（如 `.cat-english`），否则状态配色**静默失效**；
   R12（悬空类名）/R16（两端对账）只看静态类名，未加引号的插值片段两处都测不到。
 
+  **W3 reader 入口必须传 id（禁整对象进 URL）**（2026-10-20 第八轮 P1-6）：
+  `/api/miniapp/borrows` 与 `/continue-listening` 下发的字段**没有 `audio_url`**
+  （前者连 `id` 都没有），而 reader 靠 `audio_url` 决定是否拉详情补全音频。
+  把整对象塞进 `?book=` 的入口一旦 title 非空，reader 就判不出"要补详情"→
+  **续听整条链路哑火**（没声音、进度不上报）——书架与首页两个主入口都踩了。
+  规则：`reader/reader?` 之后**不得出现 `book=` 整对象参数**（只许 `book_id=`）。
+
 判据与自证：
   · 两类违例都必须为 0（新规则不设基线）；
   · S1 注入自检：内置违例样本必须被检出（防检查器自身假绿）；
@@ -33,6 +40,8 @@ CLASS_ATTR_RE = re.compile(r"class\s*=\s*\"([^\"]*)\"")
 INTERP_RE = re.compile(r"\{\{(.*?)\}\}", re.S)
 CLASS_DEF_RE = re.compile(r"\.([A-Za-z][\w-]*)")
 IMPORT_RE = re.compile(r"@import\s+\"([^\"]+)\";")
+#: W3：reader 入口传整对象（`?book={...}`）——`/borrows` 等接口不下发 audio_url，必哑火
+READER_OBJ_PARAM_RE = re.compile("reader/reader\\?[^\"'`\n]*\\bbook=")
 
 
 def js_defines(js_text: str, name: str) -> bool:
@@ -126,6 +135,28 @@ def scan(wxml_files: list[Path], app_wxss: Path | None = None) -> list[str]:
     return problems
 
 
+def scan_reader_entry(js_files: list[Path]) -> list[str]:
+    """W3：reader 入口不得把整对象塞进 URL（只许传 `book_id`）。
+
+    为什么是"必哑火"而不是"风格问题"：reader 以 `audio_url` 为唯一判据决定是否拉详情补全，
+    而借阅/继续听接口**不下发 audio_url**——整对象入口一旦带 title，补详情的分支就永不触发
+    → 音频实例不初始化（没声音、进度不上报）。2026-10-20 第八轮 P1-6 实测两处主入口。
+    """
+    problems: list[str] = []
+    for js in js_files:
+        text = js.read_text(encoding="utf-8", errors="ignore")
+        if READER_OBJ_PARAM_RE.search(text):
+            try:
+                rel = js.relative_to(ROOT)
+            except ValueError:
+                rel = js
+            problems.append(
+                f"W3 {rel}: reader 入口传了整对象（`?book=`）——借阅/继续听接口不下发 "
+                f"audio_url，reader 判不出要补详情 ⇒ 续听哑火；改传 `book_id=`"
+            )
+    return problems
+
+
 def selftest() -> list[str]:
     """S1 注入自检：违例样本必须命中（两条规则各一）。"""
     import tempfile
@@ -153,6 +184,25 @@ def selftest() -> list[str]:
         good_hits = scan([good], app_wxss=base / "app.wxss")
         if good_hits:
             fails.append(f"S1: 正例被误报：{good_hits}")
+
+        # W3：整对象进 URL 必须命中；只传 id 必须零命中
+        bad_js = base / "bad_nav.js"
+        bad_js.write_text(
+            "wx.navigateTo({ url: `/pages/reading-pkg/reader/reader?book=${encodeURIComponent("
+            "JSON.stringify(b))}&child_id=1` })\n",
+            encoding="utf-8",
+        )
+        w3_hits = scan_reader_entry([bad_js])
+        if not any(p.startswith("W3") for p in w3_hits):
+            fails.append("S1: W3 未命中注入样本")
+        good_js = base / "ok_nav.js"
+        good_js.write_text(
+            "wx.navigateTo({ url: `/pages/reading-pkg/reader/reader?book_id=${id}&child_id=1` })\n",
+            encoding="utf-8",
+        )
+        w3_good = scan_reader_entry([good_js])
+        if w3_good:
+            fails.append(f"S1: W3 正例被误报：{w3_good}")
     return fails
 
 
@@ -161,21 +211,26 @@ def main() -> int:
     if len(wxml_files) < 10:  # S2：盲区形状（路径写错 / 扫描面塌缩）
         print(f"FAIL(S2): 只扫到 {len(wxml_files)} 个 wxml——扫描面异常，检查 SCAN_DIRS")
         return 1
+    js_files = sorted(MINIAPP.rglob("*.js"))
+    if len(js_files) < 10:  # S2 同款：W3 的扫描面也得有东西
+        print(f"FAIL(S2): 只扫到 {len(js_files)} 个 js——扫描面异常")
+        return 1
     self_fails = selftest()
     if self_fails:
         print("FAIL(S1): " + "；".join(self_fails))
         return 1
-    problems = scan(wxml_files)
-    print(f"扫描面: {len(wxml_files)} 个 wxml（pages + components）")
+    problems = scan(wxml_files) + scan_reader_entry(js_files)
+    print(f"扫描面: {len(wxml_files)} 个 wxml（pages + components）+ {len(js_files)} 个 js")
     print(f"W1 bind*/catch* handler 缺失: {sum(1 for p in problems if p.startswith('W1'))}")
     print(f"W2 插值类名无样式定义: {sum(1 for p in problems if p.startswith('W2'))}")
+    print(f"W3 reader 入口传整对象: {sum(1 for p in problems if p.startswith('W3'))}")
     if problems:
         print("\n违例明细：")
         for p in problems:
             print("  ✗", p)
         print("\nFAIL: 接线检查不通过（W1/W2 必须为 0）")
         return 1
-    print("PASS: 小程序接线两条规则全零（handler 存在 / 插值类名可解析）✓")
+    print("PASS: 小程序接线三条规则全零（handler 存在 / 插值类名可解析 / reader 入口传 id）✓")
     return 0
 
 

@@ -47,6 +47,9 @@ Page({
     try { book = JSON.parse(decodeURIComponent(options.book || '{}')) } catch (e) { /* ignore */ }
     // C52 同款兜底：reLaunch/分享进入只有 URL 参数，补齐 id/title
     if (!book.id && options.book_id) book.id = Number(options.book_id)
+    // P1-6（第八轮大审查）：兼容"借阅行形态"的对象（字段是 book_id 而非 id）——
+    // 两个入口（书架/首页）已改传 id，这里兜底防再次传入对象时静默无 id。
+    if (!book.id && book.book_id) book.id = Number(book.book_id)
     if (!book.title && options.book_title) book.title = decodeURIComponent(options.book_title)
     book = media.formatBook(book)
     const duration = book.audio_duration || 0
@@ -66,10 +69,13 @@ Page({
     this._resumeApplied = false
     this._initAudio()
     this.loadProgress()
-    // R3/F-L19：id-only 进入（book_id 传参收口）时 title/封面为空——拉详情补全；
+    // P1-6（第八轮大审查）：**判据归一为"缺 audio_url 就补详情"**。
+    // 原判据是 `!book.title`，于是"有 title 但没有 audio_url"的入口（书架/首页传整对象）
+    // 永不补详情 → 音频永不初始化（P1-6 的根因）。**能播的判断标准只有 audio_url**，
+    // 与有没有 title 无关——判据只留这一个。
     // E-20260909-02：补全后必须重建音频实例（首轮 audio_url 为空已跳过 init，
     // 不重建则 src 永远无效——book-detail 主入口全量哑火根因之一）
-    if (!book.title && book.id) {
+    if (!book.audio_url && book.id) {
       api.getBookDetail(book.id).then((fresh) => {
         this.setData({ book: media.formatBook({ ...this.data.book, ...fresh }) })
         this._initAudio()

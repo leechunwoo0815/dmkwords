@@ -164,8 +164,15 @@ Page({
     const b = e.currentTarget.dataset.book
     const c = session.getCurrentChild()
     if (!b || !c) return
+    // P1-6（第八轮大审查）：**只传 book_id**（原先整对象进 URL）。`/api/miniapp/borrows`
+    // 下发的字段是 record_id/book_id/title/cover_url/has_audio/…——**没有 id、没有 audio_url**，
+    // 而 reader 原判据是"没有 title 才补详情"：对象里有 title → 永不补详情 → `_initAudio()`
+    // 在 `if (!book.audio_url) return` 处退出 ⇒ **续听主入口整条链路哑火**（没声音、进度不上报）。
+    // 与 goDetail / book-detail（F-L19）同款收口：只传 id，由 reader 拉详情补 audio_url。
+    const bookId = b.book_id || b.id
+    if (!bookId) return
     wx.navigateTo({
-      url: `/pages/reading-pkg/reader/reader?book=${encodeURIComponent(JSON.stringify(b))}&child_id=${c.id}`,
+      url: `/pages/reading-pkg/reader/reader?book_id=${bookId}&child_id=${c.id}`,
     })
   },
 

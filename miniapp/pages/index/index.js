@@ -198,8 +198,12 @@ Page({
     const b = this.data.continueBook
     const c = this.data.currentChild
     if (!b || !c) return
+    // P1-6（第八轮大审查）：同书架——`/continue-listening` 返回的 book 是 ORM 实体
+    // （只有 audio_path，**没有 audio_url**），整对象进 URL 一样会让 reader 判不出"要补详情"。
+    const bookId = b.book_id || b.id
+    if (!bookId) return
     wx.navigateTo({
-      url: `/pages/reading-pkg/reader/reader?book=${encodeURIComponent(JSON.stringify(b))}&child_id=${c.id}`,
+      url: `/pages/reading-pkg/reader/reader?book_id=${bookId}&child_id=${c.id}`,
     })
   },
   goRecommend(e) {

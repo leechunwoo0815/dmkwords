@@ -49,9 +49,32 @@ export interface TransferItem {
 
 // P2-44：三个台账都是"最近 N 条"硬上限（200）——返回上限元信息，页面据此提示
 // "可能还有更多未显示"（原先 200 条看起来就是全部，待审单会被漏看）。
-export function apiListRefunds(status?: string): Promise<ListResult<RefundRequestItem[]>> {
-  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-  return requestList(`/api/admin/refund-requests${qs}`);
+export interface RefundCenterCounts {
+  refund: Record<string, number>;
+  withdrawal: Record<string, number>;
+  transfer: Record<string, number>;
+}
+
+/** P1-7：退款中心三个台账的按状态计数（服务端分页后徽标必须来自后端，不能只数本页）。 */
+export function apiRefundCenterCounts(): Promise<RefundCenterCounts> {
+  return request("/api/admin/refund-center/counts");
+}
+
+function pageQs(page?: number, pageSize?: number): string {
+  const ps = new URLSearchParams();
+  if (page) ps.set("page", String(page));
+  if (pageSize) ps.set("page_size", String(pageSize));
+  return ps.toString();
+}
+
+export function apiListRefunds(
+  status?: string, page?: number, pageSize?: number,
+): Promise<ListResult<RefundRequestItem[]>> {
+  const ps = new URLSearchParams();
+  if (status) ps.set("status", status);
+  const q = pageQs(page, pageSize);
+  const qs = [ps.toString(), q].filter(Boolean).join("&");
+  return requestList(`/api/admin/refund-requests${qs ? `?${qs}` : ""}`);
 }
 
 export function apiReviewRefund(
@@ -77,9 +100,14 @@ export function apiQueryRefundGateway(id: number): Promise<{
   return request(`/api/admin/refund-requests/${id}/query-gateway`, { method: "POST" });
 }
 
-export function apiListWithdrawals(status?: string): Promise<ListResult<WithdrawalItem[]>> {
-  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-  return requestList(`/api/admin/withdrawals${qs}`);
+export function apiListWithdrawals(
+  status?: string, page?: number, pageSize?: number,
+): Promise<ListResult<WithdrawalItem[]>> {
+  const ps = new URLSearchParams();
+  if (status) ps.set("status", status);
+  const q = pageQs(page, pageSize);
+  const qs = [ps.toString(), q].filter(Boolean).join("&");
+  return requestList(`/api/admin/withdrawals${qs ? `?${qs}` : ""}`);
 }
 
 export function apiReviewWithdrawal(
@@ -107,9 +135,14 @@ export function apiSettlePreview(id: number): Promise<SettlePreview> {
   return request(`/api/admin/withdrawals/${id}/settle-preview`);
 }
 
-export function apiListTransfers(status?: string): Promise<ListResult<TransferItem[]>> {
-  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-  return requestList(`/api/admin/transfers${qs}`);
+export function apiListTransfers(
+  status?: string, page?: number, pageSize?: number,
+): Promise<ListResult<TransferItem[]>> {
+  const ps = new URLSearchParams();
+  if (status) ps.set("status", status);
+  const q = pageQs(page, pageSize);
+  const qs = [ps.toString(), q].filter(Boolean).join("&");
+  return requestList(`/api/admin/transfers${qs ? `?${qs}` : ""}`);
 }
 
 export function apiReviewTransfer(

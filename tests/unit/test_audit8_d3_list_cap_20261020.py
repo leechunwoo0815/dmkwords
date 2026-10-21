@@ -57,19 +57,42 @@ def test_refund_list_reports_cap_headers(client: TestClient, monkeypatch):
 
 
 def test_withdrawal_and_transfer_lists_report_cap_headers(client: TestClient, monkeypatch):
-    """退会 / 转让台账同样自报上限（同族三处，不能只修一处）。"""
-    from backend.domain.identity.transfer_service import TransferService
+    """退会 / 转让台账同样自报上限 + **精确总数**（同族三处，不能只修一处）。
+
+    P1-7 起这三个接口走**服务端分页**：给了 `X-Total-Count` 之后，
+    `X-List-Truncated` 的判据从"可能还有更多"（`loaded >= limit`）升级为**精确**
+    （`offset + loaded < total`）——空台账必须是 `false`，有下一页才是 `true`。
+    """
     from backend.domain.identity.wm10_withdrawal_service import WithdrawalService
 
     h = _h(client)
-    monkeypatch.setattr(WithdrawalService, "ADMIN_LIST_LIMIT", 0)  # 0 = 任何返回都算"已达上限"
-    monkeypatch.setattr(TransferService, "ADMIN_LIST_LIMIT", 0)
-
+    # 空台账：总数 0 + 未截断（精确判据下不得误报）
     for path in ("/api/admin/withdrawals", "/api/admin/transfers"):
         r = client.get(path, headers=h)
         assert r.status_code == 200, r.text
-        assert r.headers.get("X-List-Limit") == "0", f"{path} 缺上限头"
-        assert r.headers.get("X-List-Truncated") == "true", f"{path} 缺截断头"
+        assert r.headers.get("X-List-Limit") == "200", f"{path} 缺上限头"
+        assert r.headers.get("X-Total-Count") == "0", f"{path} 空台账总数必须是 0（精确计数）"
+        assert r.headers.get("X-List-Truncated") == "false", f"{path} 空列表不得标截断"
+
+    # 有下一页：2 张退会单 + 单页上限 1 → 第 1 页 1 条、总数 2、截断 true
+    for i in range(2):
+        _p, c, mini = _family(client, h, f"13994{i:06d}", f"上限孩{i}")
+        _pay(client, h, c["id"], "formal_fee")
+        assert (
+            client.post(
+                "/api/miniapp/withdrawals",
+                json={"child_id": c["id"], "reason": "上限测试"},
+                headers=mini,
+            ).status_code
+            == 200
+        )
+    monkeypatch.setattr(WithdrawalService, "ADMIN_LIST_LIMIT", 1)
+    r = client.get("/api/admin/withdrawals", headers=h)
+    assert r.headers.get("X-Total-Count") == "2", r.headers.get("X-Total-Count")
+    assert len(r.json()) == 1, "单页上限 1 → 只回 1 条"
+    assert r.headers.get("X-List-Truncated") == "true", "还有第 2 页 → 必须标 true"
+    r2 = client.get("/api/admin/withdrawals?page=2", headers=h)
+    assert r2.headers.get("X-List-Truncated") == "false", "最后一页不得标 true"
 
 
 def test_reservation_and_activity_lists_report_cap_headers(client: TestClient, monkeypatch):

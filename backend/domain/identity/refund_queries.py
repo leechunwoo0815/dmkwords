@@ -44,18 +44,28 @@ def my_list(db: Session, child: Child) -> list[dict]:
 ADMIN_LIST_LIMIT = 200
 
 
-def admin_list(db: Session, status: str | None = None) -> list[dict]:
-    """管理端退款台账（最多 200 条）：补齐孩子名/订单信息 + 退款渠道（WM12-B）。
+def admin_list(
+    db: Session, status: str | None = None, page: int = 1, page_size: int = ADMIN_LIST_LIMIT
+) -> tuple[list[dict], int]:
+    """管理端退款台账（**服务端分页**）：补齐孩子名/订单信息 + 退款渠道（WM12-B）。
 
-    WM12-C（审查 P2-8）：孩子 / 订单 / 押金候选三条 `IN` 批量预载，每请求 SQL **与行数无关**
-    （原先逐行查询是 `1+2N`，200 行上限约 401 条 SQL/请求）。
+    P1-7（2026-10-20 第八轮）：原先"只给最近 200 条"——积压超 200 条后**最老的 pending 被挤出
+    窗口**，而侧边栏徽标仍显示待审 N（"徽标说有、页面看不到"，资金待办被藏）。现在按页取 +
+    返回**当前筛选下的总数**（路由写进 `X-Total-Count`），前端按服务端分页翻得动。
+    `page_size` 上限仍锁 `ADMIN_LIST_LIMIT`（单页最多 200，防一次拉爆）。
+
+    WM12-C（审查 P2-8）：孩子 / 订单 / 押金候选三条 `IN` 批量预载，每请求 SQL **与行数无关**。
+    返回 `(rows, total)`——`total` 与列表**同一个查询对象**算出来（口径必然一致）。
     """
     q = db.query(RefundRequest).filter(RefundRequest.is_deleted == 0)
     if status:
         q = q.filter(RefundRequest.status == status)
-    rows = q.order_by(RefundRequest.id.desc()).limit(ADMIN_LIST_LIMIT).all()
+    total = q.count()
+    size = max(1, min(int(page_size), ADMIN_LIST_LIMIT))
+    offset = max(0, (max(1, int(page)) - 1) * size)
+    rows = q.order_by(RefundRequest.id.desc()).offset(offset).limit(size).all()
     if not rows:
-        return []
+        return [], total
     child_ids = {r.child_id for r in rows}
     order_ids = {r.order_id for r in rows if r.order_id}
     deposit_child_ids = {
@@ -86,4 +96,33 @@ def admin_list(db: Session, status: str | None = None) -> list[dict]:
         v["out_refund_no"] = r.out_refund_no or ""
         v["gateway_unknown_at"] = str(r.gateway_unknown_at or "")
         out.append(v)
+    return out, total
+
+
+def refund_center_counts(db: Session) -> dict:
+    """退款中心三个台账的**按状态计数**（P1-7，2026-10-20 第八轮）。
+
+    为什么必须有它：三个列表改成服务端分页后，前端只拿得到"本页那几行"——用本页行数算
+    徽标就会出现「侧边栏说有待审 N、页面显示 0」（本轮 P2-45 同族的"假 0"）。
+    计数口径与列表**同表同过滤**（`is_deleted = 0`），一次 `GROUP BY status` 拿全。
+
+    返回 `{"refund": {status: n}, "withdrawal": {...}, "transfer": {...}}`。
+    """
+    from sqlalchemy import func
+
+    from backend.domain.identity.models import TransferRequest, WithdrawalRequest
+
+    out: dict[str, dict[str, int]] = {}
+    for key, model in (
+        ("refund", RefundRequest),
+        ("withdrawal", WithdrawalRequest),
+        ("transfer", TransferRequest),
+    ):
+        rows = (
+            db.query(model.status, func.count(model.id))
+            .filter(model.is_deleted == 0)
+            .group_by(model.status)
+            .all()
+        )
+        out[key] = {str(s): int(c) for s, c in rows}
     return out

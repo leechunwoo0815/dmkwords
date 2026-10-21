@@ -456,13 +456,19 @@ class TransferService:
     #: 管理端转让台账硬上限（P2-44：上限与是否已达上限经响应头告知）
     ADMIN_LIST_LIMIT = 200
 
-    def admin_list(self, status: str | None = None) -> list[dict]:
+    def admin_list(
+        self, status: str | None = None, page: int = 1, page_size: int = ADMIN_LIST_LIMIT
+    ) -> tuple[list[dict], int]:
+        """管理端转让台账（**服务端分页**，P1-7）：返回 `(rows, total)`。"""
         self.expire_overdue()
         q = self.db.query(TransferRequest).filter(TransferRequest.is_deleted == 0)
         if status:
             q = q.filter(TransferRequest.status == status)
-        rows = q.order_by(TransferRequest.id.desc()).limit(self.ADMIN_LIST_LIMIT).all()
-        return [self._view(r) for r in rows]
+        total = q.count()
+        size = max(1, min(int(page_size), self.ADMIN_LIST_LIMIT))
+        offset = max(0, (max(1, int(page)) - 1) * size)
+        rows = q.order_by(TransferRequest.id.desc()).offset(offset).limit(size).all()
+        return [self._view(r) for r in rows], total
 
     def review(self, admin, transfer_id: int, approve: bool, remark: str) -> dict:
         req = (

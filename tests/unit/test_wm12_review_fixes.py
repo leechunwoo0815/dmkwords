@@ -616,7 +616,8 @@ def test_refund_admin_list_sql_count_is_constant(client, db):
 
         event.listen(engine, "before_cursor_execute", _rec)
         try:
-            rows = refund_queries.admin_list(session)
+            # P1-7：admin_list 现在返回 (rows, total)——解包后断言行存在（口径不变）
+            rows, _total = refund_queries.admin_list(session)
             assert rows
         finally:
             event.remove(engine, "before_cursor_execute", _rec)

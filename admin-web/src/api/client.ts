@@ -61,7 +61,9 @@ export interface ListResult<T> {
   items: T;
   /** 该接口生效的行数上限（响应头 `X-List-Limit`）；缺失为 null */
   limit: number | null;
-  /** 已达上限（响应头 `X-List-Truncated`）——**可能**还有更多未返回，页面须提示 */
+  /** 当前筛选下的**总行数**（响应头 `X-Total-Count`，服务端分页接口才有）；缺失为 null */
+  total: number | null;
+  /** 还有更多未返回（响应头 `X-List-Truncated`）——页面须提示，不能当成"这就是全部" */
   truncated: boolean;
 }
 
@@ -101,9 +103,12 @@ export async function requestList<T>(
 
   const limitRaw = res.headers.get("X-List-Limit");
   const limit = limitRaw === null ? null : Number(limitRaw);
+  const totalRaw = res.headers.get("X-Total-Count");
+  const total = totalRaw === null ? null : Number(totalRaw);
   return {
     items: (await res.json()) as T,
     limit: limit !== null && Number.isFinite(limit) ? limit : null,
+    total: total !== null && Number.isFinite(total) ? total : null,
     truncated: res.headers.get("X-List-Truncated") === "true",
   };
 }
