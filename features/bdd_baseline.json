@@ -1,0 +1,110 @@
+{
+  "note": "BDD 挂起基线（@draft/@wip/@future 的集合 + 理由）。改动必须走 `python -m scripts.check_bdd_baseline --update` 并在 LEDGER 留痕——本文件是「哪些场景没进门禁」的唯一事实源。",
+  "active": {
+    "features": 27,
+    "scenarios": 249,
+    "steps": 950
+  },
+  "draft_files": {
+    "features/dashboard.feature": {
+      "tags": [
+        "draft"
+      ],
+      "reason": "管理端仪表盘已实现（admin-web Dashboard + /api/admin/dashboard/*）；本文件是规格留痕，缺 behave step 实现，回归由单测覆盖"
+    },
+    "features/level.feature": {
+      "tags": [
+        "draft"
+      ],
+      "reason": "阅读等级计算已实现（backend/domain/growth/service.py）；缺 behave step 实现，回归由单测覆盖"
+    },
+    "features/notification.feature": {
+      "tags": [
+        "draft"
+      ],
+      "reason": "通知中心已实现（backend/common/notifications.py + 小程序消息中心）；缺 behave step 实现"
+    },
+    "features/observation_report.feature": {
+      "tags": [
+        "draft"
+      ],
+      "reason": "观察期报告已实现（identity/observation_service.py + 小程序报告页）；缺 behave step 实现"
+    },
+    "features/order.feature": {
+      "tags": [
+        "draft"
+      ],
+      "reason": "订单模型与状态机已实现（identity/order_service.py + ALLOWED_TRANSITIONS）；缺 behave step 实现"
+    },
+    "features/passport.feature": {
+      "tags": [
+        "draft"
+      ],
+      "reason": "护照/成就总览已实现（growth/board_service.py + reading_circle/card_engine.py）；缺 behave step 实现"
+    },
+    "features/payment.feature": {
+      "tags": [
+        "draft"
+      ],
+      "reason": "支付链路已实现（identity/payment_service.py：微信支付回调 + 人工收款确认）；缺 behave step 实现"
+    },
+    "features/permission_matrix.feature": {
+      "tags": [
+        "draft"
+      ],
+      "reason": "R-313 权限矩阵已实现（identity/guards.py：unpaid/active/expired/withdrawn 四态）；缺 behave step 实现"
+    },
+    "features/reading_circle.feature": {
+      "tags": [
+        "draft"
+      ],
+      "reason": "阅读圈已实现（reading_circle/service.py + card_engine.py）；缺 behave step 实现"
+    },
+    "features/report.feature": {
+      "tags": [
+        "draft"
+      ],
+      "reason": "周报月报生成已实现（growth/report_service.py）；缺 behave step 实现"
+    },
+    "features/scheduler.feature": {
+      "tags": [
+        "draft"
+      ],
+      "reason": "定时任务已实现（admin/router.py /tasks/{task_name}/run，幂等）；缺 behave step 实现"
+    }
+  },
+  "draft_scenarios": [
+    {
+      "file": "features/account.feature",
+      "name": "隐私协议同意留痕",
+      "tags": [
+        "draft"
+      ],
+      "reason": "FEAT-006 后端零实现（无版本化同意留痕/撤回端点，docs/03 = DRAFTED）——做之前先按模式手册 P17 定「撤回触发数据清理」边界"
+    },
+    {
+      "file": "features/refund.feature",
+      "name": "前端不自行计算金额",
+      "tags": [
+        "draft"
+      ],
+      "reason": "前端只展示服务端返回值（order-pkg/refund-apply 页面）；缺 behave step 实现"
+    },
+    {
+      "file": "features/refund.feature",
+      "name": "可退金额为零禁止提交",
+      "tags": [
+        "draft"
+      ],
+      "reason": "服务端已实现零金额拒绝（identity/wm10_service.py:137）；缺 behave step 实现，回归由单测覆盖"
+    },
+    {
+      "file": "features/refund.feature",
+      "name": "线下收款订单人工退款登记",
+      "tags": [
+        "draft"
+      ],
+      "reason": "线下登记链路已实现（WM10 退款执行 success=false 分支）；缺 behave step 实现"
+    }
+  ]
+}

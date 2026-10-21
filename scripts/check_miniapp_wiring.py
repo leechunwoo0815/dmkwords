@@ -26,9 +26,20 @@
   规则：`pages/**` 与 `components/**` 里**不得**出现这两种吞错写法；失败必须进
   **失败态**（`error-view` + 重试）或至少留一个显式的降级提示。
 
+扫描面与判据的**假阴性补面**（2026-10-21 第八轮 P2-70，逐条实测取证）：
+  · **事件绑定的三种写法都要认**：`bindtap="x"`（旧式）/ `bind:tap="x"`（冒号式，
+    现行 WXML 语法）/ `bind:onRetry="x"`（自定义组件事件，事件名**驼峰**）。
+    原正则只认 `bind` + 全小写 + 双引号，于是仓库里 **17 处 `bind:` 冒号式**
+    （`bind:onRetry` / `bind:action` / `bind:pay`）**一处都没进检查**——handler 拼错
+    同样静默失效（P0-2 退款死按钮的同族形状）。单引号绑定同理漏检。
+  · **`custom-tab-bar/` 必须在扫描面内**：自定义 tabBar 是独立目录（不在 `pages/`
+    也不在 `components/`），原扫描面把它的 wxml 整份漏掉——底部导航 5 个 tab 的
+    `bindtap="switchTab"` 与 `{{list}}/{{selected}}/{{circleDot}}` 全在盲区里。
+
 判据与自证：
-  · 两类违例都必须为 0（新规则不设基线）；
-  · S1 注入自检：内置违例样本必须被检出（防检查器自身假绿）；
+  · 四类违例都必须为 0（新规则不设基线）；
+  · S1 注入自检：内置违例样本必须被检出（防检查器自身假绿）——含 P2-70 新增的
+    冒号式/单引号样本，正例（旧式绑定 + handler 存在）不得误报；
   · S2 空扫描自检：扫到 0 个 wxml = FAIL（防"路径写错→全绿"的盲区形状）。
 """
 
@@ -40,9 +51,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MINIAPP = ROOT / "miniapp"
-SCAN_DIRS = (MINIAPP / "pages", MINIAPP / "components")
+SCAN_DIRS = (
+    MINIAPP / "pages",
+    MINIAPP / "components",
+    MINIAPP / "custom-tab-bar",  # P2-70：自定义 tabBar 独立目录，原扫描面整份漏掉
+)
 
-BIND_RE = re.compile(r"\b(?:bind|catch)([a-z]+)\s*=\s*\"([^\"]*)\"")
+#: 事件绑定三种写法：`bindtap` / `bind:tap` / `bind:onRetry`（自定义组件驼峰事件名），
+#: 单双引号都认。`catch` 同款。P2-70 实测：原正则（`bind` + `[a-z]+` + 双引号）
+#: 对仓库里 17 处 `bind:...` 全部漏检。
+BIND_RE = re.compile(r"\b(?:bind|catch):?([A-Za-z][\w-]*)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')")
 CLASS_ATTR_RE = re.compile(r"class\s*=\s*\"([^\"]*)\"")
 INTERP_RE = re.compile(r"\{\{(.*?)\}\}", re.S)
 CLASS_DEF_RE = re.compile(r"\.([A-Za-z][\w-]*)")
@@ -110,8 +128,9 @@ def scan(wxml_files: list[Path], app_wxss: Path | None = None) -> list[str]:
         js_path = wxml.with_suffix(".js")
         js_text = js_path.read_text(encoding="utf-8", errors="ignore") if js_path.is_file() else ""
         # W1：bind*/catch* 指向的方法必须存在（插值形式无法静态判定，跳过）
-        for _event, raw in BIND_RE.findall(text):
-            name = raw.strip()
+        # 三组捕获：事件名 / 双引号值 / 单引号值（P2-70：冒号式与单引号原先整类漏检）
+        for _event, dq, sq in BIND_RE.findall(text):
+            name = (dq or sq).strip()
             if not name or "{{" in name:
                 continue
             if not js_text:
@@ -210,7 +229,7 @@ def in_comment(text: str, pos: int) -> bool:
 
 
 def selftest() -> list[str]:
-    """S1 注入自检：违例样本必须命中（两条规则各一）。"""
+    """S1 注入自检：违例样本必须命中（每条规则各一 + P2-70 新增的三种绑定写法）。"""
     import tempfile
 
     fails: list[str] = []
@@ -228,6 +247,34 @@ def selftest() -> list[str]:
             fails.append("S1: W1 未命中注入样本")
         if not any(p.startswith("W2") for p in hits):
             fails.append("S1: W2 未命中注入样本")
+        # P2-70 ①：冒号式（含自定义组件驼峰事件名）与单引号绑定必须同样命中——
+        # 原正则对这两类整类漏检（仓库里 17 处 `bind:` 一处都没进检查）
+        colon = base / "colon.wxml"
+        colon.write_text(
+            '<error-view bind:onRetry="onMissingColon" />\n'
+            "<view bind:action='onMissingSingle'>x</view>\n"
+            '<view catch:tap="onMissingCatch">y</view>\n',
+            encoding="utf-8",
+        )
+        (base / "colon.js").write_text("Page({\n  onLoad() {},\n})\n", encoding="utf-8")
+        colon_hits = [p for p in scan([colon], app_wxss=base / "app.wxss") if p.startswith("W1")]
+        for want in ("onMissingColon", "onMissingSingle", "onMissingCatch"):
+            if not any(want in p for p in colon_hits):
+                fails.append(f"S1: P2-70 冒号式/单引号绑定 {want} 未命中（假阴性回归）")
+        # 正例：三种写法的 handler 都存在 → 必须零命中
+        colon_ok = base / "colon_ok.wxml"
+        colon_ok.write_text(
+            '<error-view bind:onRetry="onRetryLoad" />\n'
+            "<view bind:action='goBooks'>x</view>\n"
+            '<view catch:tap="onTap">y</view>\n',
+            encoding="utf-8",
+        )
+        (base / "colon_ok.js").write_text(
+            "Page({\n  onRetryLoad() {},\n  goBooks() {},\n  onTap() {},\n})\n", encoding="utf-8"
+        )
+        colon_good = scan([colon_ok], app_wxss=base / "app.wxss")
+        if colon_good:
+            fails.append(f"S1: P2-70 三种绑定写法正例被误报：{colon_good}")
         # 正例：handler 存在 + 前缀有定义 → 必须零命中
         good = base / "ok.wxml"
         good.write_text('<view bindtap="onTap" class="cat-{{c}}">x</view>\n', encoding="utf-8")
@@ -313,6 +360,6 @@ if __name__ == "__main__":
         if _fails:
             print("FAIL(S1): " + "；".join(_fails))
             sys.exit(1)
-        print("✓ S1 注入自检通过（W1/W2 违例命中 + 正例零误报）")
+        print("✓ S1 注入自检通过（W1~W4 违例命中 + 冒号式/单引号绑定命中 + 正例零误报）")
         sys.exit(0)
     sys.exit(main())

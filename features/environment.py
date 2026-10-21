@@ -27,9 +27,17 @@ def before_scenario(context, scenario):
             conn.execute(text(f"TRUNCATE TABLE {table}"))
     from backend.seeds.seed_admin import seed as seed_admin
     from backend.seeds.seed_configs import seed as seed_configs
+    from backend.seeds.seed_dictionary import seed as seed_dictionary
 
     seed_admin()
     seed_configs()
+    # 第八轮审查 P2-68（2026-10-21 复核补）：**BDD 环境与 conftest 同口径**——原先只播
+    # admin/config 两支，词典靠 `vocabulary_steps` 的用点自愈（`_ensure_dictionary()`）兜住。
+    # 复核结论：报告所述"BDD 单独运行会失败"**未复现**（生词本 feature 的背景步会播词典，
+    # 且全仓只有它依赖词典内容）；但环境级差异是真的——将来新场景直接查词而不走那个背景步
+    # 就会踩到。这里补一行消除陷阱：词典表**不在每场景清表清单内**（conftest 有意不清），
+    # 所以 seed 幂等且只有 1 次 `IN` 查询/场景（表内 ~310 行，非 340 万全量）。
+    seed_dictionary()
     invalidate_config_cache()
     context.client = TestClient(app)
     context.admin_token = None

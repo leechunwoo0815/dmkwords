@@ -28,6 +28,7 @@ SCRIPTS = ROOT / "scripts"
 #: 清单一致性由 `check_gate_selftest` 机械校验，这里只跑"自证真的过"）
 SELF_TESTED = [
     "check_fake_assertions",
+    "check_bdd_baseline",  # 第八轮 P2-69（2026-10-21 补）：BDD 挂起基线守卫
     "check_miniapp_bindings",
     "check_miniapp_wiring",
     "check_docs_code_alignment",
@@ -180,6 +181,22 @@ def test_fake_assertions_selftest_is_live():
     finally:
         mod.scan = original
     assert rc == 1, "扫描函数被改坏后自证必须失败"
+
+
+def test_bdd_baseline_selftest_is_live():
+    """BDD 挂起基线守卫的自证必须能证伪：`find_problems` 改成永远返回空 → 自证报失败。
+
+    RED（还原 P2-69 原形状：无基线守卫）：没有这个检查器，本条无从谈起；
+    检查器在但判定被改坏时，自证必须报「静默新增挂起」未命中。
+    """
+    mod = _load("check_bdd_baseline")
+    original = mod.find_problems
+    try:
+        mod.find_problems = lambda *a, **k: []
+        rc = mod.self_test()
+    finally:
+        mod.find_problems = original
+    assert rc == 1, "挂起基线判定被改坏后自证必须失败（否则自证是死的）"
 
 
 def test_miniapp_bindings_selftest_is_live():

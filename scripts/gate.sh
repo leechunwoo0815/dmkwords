@@ -98,8 +98,12 @@ fi
 # G6（docs/09）+ docs/15 §21.3：**文案 emoji 口径扩到管理端与后端导出**（R13d）——
 # ① admin-web/src/**/*.{ts,tsx} 去注释后零 emoji；② backend/**/*.py 字符串字面量零 emoji
 # （AST 判定、docstring 跳过）。排版字形（✓ ✕ ★ ☆ 等）白名单放行。
+# 第八轮审查 P2-69（2026-10-21）：**BDD 挂起基线守卫**——behave.ini 的 `~@draft` 让一行标签
+# 就能把场景摘出门禁；本检查器把"哪些文件/场景被挂起 + 为什么"钉成基线（features/bdd_baseline.json），
+# 挂起集合或活动面（features/scenarios/steps）与基线不一致即判红。
 CHECKER_CMDS=(
   "python -m scripts.check_fake_assertions"
+  "python -m scripts.check_bdd_baseline"
   "python scripts/check_miniapp_bindings.py"
   "python scripts/check_miniapp_wiring.py"
   "python -m scripts.check_docs_code_alignment"

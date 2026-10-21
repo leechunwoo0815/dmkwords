@@ -36,9 +36,7 @@ def test_admin_scene_whitelist_covers_backend_scenes():
     frontend = set(re.findall(r'value:\s*"(admin\.[a-z_]+)"', block.group(0)))
     # 白名单里有以**常量**形式写的场景（`{ value: MILESTONE_SCENE, ... }`）——
     # 把该常量的字面值解析出来，否则会误报"缺 admin.milestone_achieved"（本用例首跑即踩）。
-    for const_name, const_val in re.findall(
-        r'const\s+([A-Z_]+)\s*=\s*"(admin\.[a-z_]+)"', text
-    ):
+    for const_name, const_val in re.findall(r'const\s+([A-Z_]+)\s*=\s*"(admin\.[a-z_]+)"', text):
         if re.search(rf"value:\s*{const_name}\b", block.group(0)):
             frontend.add(const_val)
 
