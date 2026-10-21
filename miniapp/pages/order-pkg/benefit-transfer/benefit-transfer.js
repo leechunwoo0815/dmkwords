@@ -1,10 +1,12 @@
 // pages/order-pkg/benefit-transfer/benefit-transfer.js — 权益转让（WM10）
 const api = require('../../../utils/api')
+const { loadConfigs, getConfigs } = require('../../../utils/configs')
 const session = require('../../../utils/session')
 const { memberStatusText } = require('../../../utils/labels')
 
 Page({
   data: {
+    cfg: getConfigs(),  // 业务口径（后端下发；见 utils/configs.js）
     children: [],
     sourceId: null,
     targetId: null,
@@ -14,7 +16,9 @@ Page({
     loading: true,
   },
 
-  onShow() {
+  async onShow() {
+    const { configs } = await loadConfigs()
+    this.setData({ cfg: configs })
     if (!session.ensureLogin()) return
     this.load()
   },
@@ -72,7 +76,7 @@ Page({
     }
     const res = await wx.showModal({
       title: '发起转让',
-      content: '提交后两个孩子相关操作冻结，管理员 72 小时内审核；通过后立即生效。',
+      content: `提交后两个孩子相关操作冻结，管理员 ${this.data.cfg.transfer_review_timeout_hours} 小时内审核；通过后立即生效。`,
       confirmText: '提交申请',
     })
     if (!res.confirm) return

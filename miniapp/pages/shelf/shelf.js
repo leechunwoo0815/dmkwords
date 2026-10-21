@@ -2,13 +2,17 @@
 const api = require('../../utils/api')
 const session = require('../../utils/session')
 const media = require('../../utils/media')
+const { loadConfigs, getConfigs } = require('../../utils/configs')
 
-const RES_STATUS_TEXT = {
-  active: '锁定中 · 72h 内到店取书',
-  expired: '已超时释放',
-  cancelled: '已取消',
-  checked_out: '已核销转借阅',
-  exception: '副本异常，请联系馆员',
+// 预约状态文案（第八轮 E 批剩余：预约保留时长由后端下发，前端不再写死 72h）
+function resStatusText(cfg) {
+  return {
+    active: `锁定中 · ${cfg.reservation_hours}h 内到店取书`,
+    expired: '已超时释放',
+    cancelled: '已取消',
+    checked_out: '已核销转借阅',
+    exception: '副本异常，请联系馆员',
+  }
 }
 
 Page({
@@ -29,6 +33,7 @@ Page({
     // 请求失败时页面渲染成"还没有在借的书"（家长以为孩子没数据、客服被误导）
     loadError: '',
     badgeError: false,  // 测验状态（奖杯角标）单独降级：列表照常显示，但如实说明角标可能不准
+    cfg: getConfigs(),  // 业务口径（后端下发；未取到时是兜底值，见 utils/configs.js）
   },
 
   onShow() {
@@ -52,6 +57,7 @@ Page({
   async load() {
     this.setData({ loading: true, loadError: '' })
     try {
+      const { configs } = await loadConfigs()
       // P2-45：**不许吞错**（原先是 `.catch(() => [])` ×4 → 失败伪装成空书架）
       const [borrows, favorites, reservations, passedBooks] = await Promise.all([
         api.currentBorrows(this.data.childId),
@@ -92,9 +98,10 @@ Page({
           passed: passedIds.includes(b.book_id),
         })),
         favCount: (favorites || []).length,
+        cfg: configs,
         reservations: (reservations || []).map((r) => ({
           ...media.formatBook(r),
-          statusText: RES_STATUS_TEXT[r.status] || r.status,
+          statusText: resStatusText(configs)[r.status] || r.status,
           active: r.status === 'active',
         })),
         resCount: (reservations || []).length,
@@ -129,7 +136,7 @@ Page({
     if (!item || !item.canRenew) return
     wx.showModal({
       title: '续借这本书',
-      content: `将从原到期日延长 ${item.renewDays} 天，每本书限续借 1 次。确认续借吗？`,
+      content: `将从原到期日延长 ${item.renewDays} 天，每本书限续借 ${this.data.cfg.renew_limit} 次。确认续借吗？`,
       confirmColor: '#FF6B35',
       success(res) {
         if (!res.confirm) return

@@ -16,6 +16,7 @@ function fmt(sec) {
 
 Page({
   data: {
+    cfg: getConfigs(),  // 业务口径（后端下发；见 utils/configs.js）
     book: null,
     dictWord: '',
     dictResult: null,
@@ -42,7 +43,9 @@ Page({
     anomalyMsg: '',
   },
 
-  onLoad(options) {
+  async onLoad(options) {
+    const { configs } = await loadConfigs()
+    this.setData({ cfg: configs })
     let book = {}
     try { book = JSON.parse(decodeURIComponent(options.book || '{}')) } catch (e) { /* ignore */ }
     // C52 同款兜底：reLaunch/分享进入只有 URL 参数，补齐 id/title

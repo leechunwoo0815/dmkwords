@@ -14,7 +14,7 @@
 
   <view wx:if="{{status === 'locked'}}" class="feedback">
     <image class="feedback-icon" src="/icons/ui/lock.png" mode="aspectFit" />
-    <text class="feedback-text">先去把这本书听完（95%），测验就会解锁啦</text>
+    <text class="feedback-text">先去把这本书听完（{{cfg.audio_finish_threshold_percent}}%），测验就会解锁啦</text>
     <view class="feedback-btn" bindtap="goBack">去听书</view>
   </view>
   <view wx:elif="{{status === 'passed'}}" class="feedback">

@@ -126,6 +126,14 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
   判定）；`GET /api/miniapp/quiz/status-batch`（书架角标批量，IN 查询禁 N+1）；
   `GET /api/miniapp/activities/carousel`（首页轮播，有封面优先）；
   admin 活动 CRUD 扩展（detail/update/cover 上传——activity_type 禁改、名额下限 422）。
+- **2026-10-21 增补（业务口径下发）**：`GET /api/miniapp/configs`（**公开端点**，无鉴权——
+  登录页验证码倒计时要用）下发小程序**展示口径**：`reservation_hours` / `audio_finish_threshold_percent` /
+  `observation_period_days` / `transfer_review_timeout_hours` / `renew_limit` / `renew_days` /
+  `sms_send_interval_seconds` / `quiz_questions_per_book` / `quiz_max_attempts` /
+  `activity_refund_cutoff_hours`（值来自配置中心同一份数据，60 秒 TTL 缓存）。
+  纪律：**只下发展示口径，不下发服务端判据**——前端拿到的数字只是文案依据，
+  动作发生时仍由服务端判定（口径清单唯一来源：`identity/miniapp_router.py` 的
+  `MINIAPP_CONFIG_KEYS`，加口径只改那一处 + schema）。
 - **2026-09-20 增补（活动图文详情 + 往期回顾）**：
   `PUT /api/admin/activities/{id}/detail-blocks`（图文全量覆盖写；**活动开始后/结束后仍可编辑**——纯展示字段，
   与 `PUT /activities/{id}` 的守卫刻意分开）·

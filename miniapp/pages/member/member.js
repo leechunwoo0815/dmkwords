@@ -1,10 +1,12 @@
 // pages/member/member.js — 我的（WM6：家长信息 + 孩子切换 + 入口 + 退出）
 const api = require('../../utils/api')
+const { loadConfigs, getConfigs } = require('../../utils/configs')
 const session = require('../../utils/session')
 const { MEMBER_STATUS_TEXT } = require('../../utils/labels')
 
 Page({
   data: {
+    cfg: getConfigs(),  // 业务口径（后端下发；见 utils/configs.js）
     parent: null,
     children: [],
     currentChild: null,
@@ -14,7 +16,9 @@ Page({
     showAvatarPicker: false,
   },
 
-  onShow() {
+  async onShow() {
+    const { configs } = await loadConfigs()
+    this.setData({ cfg: configs })
     if (!session.ensureLogin()) return
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 4 })
@@ -70,7 +74,7 @@ Page({
     const today = new Date()
     if (c.member_status === 'observation' && !c.member_expire) {
       const d = new Date(today.getTime() + 30 * 24 * 3600 * 1000)
-      return `会员到期(观察期 30 天) ${fmt(d)}`
+      return `会员到期(观察期 ${cfg.observation_period_days} 天) ${fmt(d)}`
     }
     if (!c.member_expire) return ''
     const diff = Math.ceil((new Date(String(c.member_expire).replace(/-/g, '/')).getTime() - today.getTime()) / 86400000)

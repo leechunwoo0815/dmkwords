@@ -305,6 +305,10 @@ def collect_symbols() -> set[str]:
         list((ROOT / "backend").rglob("*.py"))
         + list((ROOT / "scripts").glob("*.py"))
         + list((ROOT / "tests").rglob("*.py"))
+        # 2026-10-21（第一百零六批）：补 `features/` 扫描面——与 tests/ 同款理由。
+        # 文档会引用 BDD 步骤助手的**真实符号**（如 `vocabulary_steps._ensure_dictionary()`），
+        # 原先只扫 backend/scripts/tests → 引用真函数被判悬空（本批实测 4 处假红）。
+        + list((ROOT / "features").rglob("*.py"))
     ):
         # 2026-10-08 WM12-A：原正则只认 `def/class`，**async def 一律收不到**——
         # 网关层（微信支付/短信）几乎全是 async，文档引用 `refresh_platform_cert()` 这类

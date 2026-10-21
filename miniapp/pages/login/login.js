@@ -3,6 +3,7 @@
 //   ① 主通道：wx.login → /login/wechat → 已绑 → 直接进首页；未绑 → 绑定面板（手机号 + 短信码）
 //   ② 兜底：手机号 + 短信验证码（/sms/send + /login），开发期固定码 1234 仍可用
 const api = require('../../utils/api')
+const { loadConfigs, getConfigs } = require('../../utils/configs')
 
 Page({
   data: {
@@ -18,9 +19,13 @@ Page({
     // （不允许出现"页面能点、验证码永远收不到"的假入口）
     smsEnabled: true,
     loginError: '',  // P2-52：登录失败在页面内也留痕（toast 会消失，家长回来能看到原因）
+    cfg: getConfigs(),  // 业务口径（后端下发；倒计时秒数 P2-73）
   },
 
-  onLoad() {
+  async onLoad() {
+    // 口径先落地（登录前就要用：验证码倒计时），再取登录通道开关
+    const { configs } = await loadConfigs()
+    this.setData({ cfg: configs })
     api.getLoginOptions().then((res) => {
       if (res && typeof res.sms_enabled === 'boolean') {
         this.setData({ smsEnabled: res.sms_enabled })
@@ -109,7 +114,7 @@ Page({
     }
   },
 
-  // 发送验证码（绑定/登录共用；服务端有同号 60 秒与每日上限）
+  // 发送验证码（绑定/登录共用；同号重发间隔与每日上限都在服务端，倒计时读下发口径）
   async onSendCode() {
     const { phone, sending, mode } = this.data
     if (sending || this.data.countdown > 0) return
@@ -158,7 +163,10 @@ Page({
   },
 
   _startCountdown() {
-    this.setData({ countdown: 60 })
+    // P2-73（第八轮）：倒计时必须与服务端同号重发间隔**同一份值**（配置中心
+    // `sms_send_interval_seconds`，种子 90 秒）——原先写死 60：家长 60 秒后点发送
+    // 必被服务端拒（"发送太频繁"），看起来像 bug。口径由 /api/miniapp/configs 下发。
+    this.setData({ countdown: this.data.cfg.sms_send_interval_seconds })
     const timer = setInterval(() => {
       const next = this.data.countdown - 1
       if (next <= 0) { clearInterval(timer); this.setData({ countdown: 0 }); return }

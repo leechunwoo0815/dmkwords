@@ -100,7 +100,7 @@
   <!-- 预约说明（可预约态才显示） -->
   <view class="section-card" wx:if="{{borrowState === 'none'}}">
     <view class="section-card-title">借阅与预约</view>
-    <view class="muted-line">这套书在馆内借阅。如果已被借完，可以预约排队——预约成功后保留 72 小时，到店由馆员核销取书。</view>
+    <view class="muted-line">这套书在馆内借阅。如果已被借完，可以预约排队——预约成功后保留 {{cfg.reservation_hours}} 小时，到店由馆员核销取书。</view>
   </view>
 
   <!-- 底部操作 -->

@@ -8,6 +8,11 @@ module.exports = {
   getLoginOptions() {
     return req.get('/api/miniapp/login/options', { auth: false })
   },
+  // 业务口径下发（第八轮 E 批剩余）：预约保留小时/完播阈值/观察期/短信重发间隔等**展示口径**
+  // 一律读这里，前端不再自持数字副本（改配置 → 文案跟随）。公开端点：登录页倒计时也要用。
+  getConfigs() {
+    return req.get('/api/miniapp/configs', { auth: false })
+  },
   loginByWechat(wxCode) {
     return req.post('/api/miniapp/login/wechat', { code: wxCode }, { auth: false })
   },
@@ -15,7 +20,8 @@ module.exports = {
   bindByWechat(bindTicket, phone, code) {
     return req.post('/api/miniapp/login/bind', { bind_ticket: bindTicket, phone, code }, { auth: false })
   },
-  // ③ 短信兜底 / 绑定共用：发验证码（同号 60 秒一次、每日上限在服务端）
+  // ③ 短信兜底 / 绑定共用：发验证码（同号重发间隔由配置 sms_send_interval_seconds 定、
+  //    每日上限在服务端；倒计时读 getConfigs() 下发值，见 utils/configs.js）
   sendSms(phone, purpose) {
     return req.post('/api/miniapp/sms/send', { phone, purpose: purpose || 'login' }, { auth: false })
   },

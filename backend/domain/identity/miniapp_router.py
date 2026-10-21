@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request, Response
+from pydantic import Field
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
@@ -373,6 +374,57 @@ def login_options():
     from backend.config import get_settings
 
     return {"sms_enabled": bool(get_settings().SMS_ENABLED), "wechat_enabled": True}
+
+
+class MiniappConfigsResponse(BaseSchema):
+    """小程序展示口径（第八轮 E 批剩余：前端口径改后端下发）。"""
+
+    reservation_hours: int = Field(..., description="预约锁定时长（小时）")
+    audio_finish_threshold_percent: int = Field(..., description="音频完播阈值（%）")
+    observation_period_days: int = Field(..., description="观察期天数")
+    transfer_review_timeout_hours: int = Field(..., description="转让审核时限（小时）")
+    renew_limit: int = Field(..., description="每本书可续借次数")
+    renew_days: int = Field(..., description="续借延长天数")
+    sms_send_interval_seconds: int = Field(..., description="同号短信重发间隔（秒）")
+    quiz_questions_per_book: int = Field(..., description="每本书测验题量")
+    quiz_max_attempts: int = Field(..., description="每本书测验机会（次）")
+    activity_refund_cutoff_hours: int = Field(..., description="活动退款时限（距开始小时）")
+
+
+#: 下发的键 → 字段名（**唯一清单**：加一处口径只改这里 + 上面 schema）
+MINIAPP_CONFIG_KEYS = {
+    "reservation_hours": "reservation_hours",
+    "audio_finish_threshold_percent": "audio_finish_threshold_percent",
+    "observation_period_days": "observation_period_days",
+    "transfer_review_timeout_hours": "transfer_review_timeout_hours",
+    "renew_limit": "renew_limit",
+    "renew_days": "renew_days",
+    "sms_send_interval_seconds": "sms_send_interval_seconds",
+    "quiz_questions_per_book": "quiz_questions_per_book",
+    "quiz_max_attempts": "quiz_max_attempts",
+    "activity_refund_cutoff_hours": "activity_refund_cutoff_hours",
+}
+
+
+@router.get("/configs", response_model=MiniappConfigsResponse)
+def miniapp_configs(db: Session = Depends(get_db)) -> MiniappConfigsResponse:
+    """业务口径下发（**公开端点**：登录页倒计时要用，不能要求先登录）。
+
+    为什么要有（第八轮审查 E 批剩余）：小程序里 13 处硬编码业务数字（预约保留 72 小时、
+    完播阈值 95%、观察期 30 天、续借 1 次…）与配置中心各写一份——运营改配置后文案不跟随；
+    P2-73 更是三方不一致（种子/服务端 **90 秒**、小程序倒计时写 **60 秒**）：家长 60 秒后
+    点发送必被服务端拒。本端点把**展示口径**集中下发（读的是配置中心同一份值，60 秒 TTL 缓存），
+    前端不再自持副本；改配置 → 文案跟随。
+
+    只下发**展示用**口径：不放服务端校验规则（那些仍由服务端在动作发生时判定，
+    前端拿到的数字只是文案依据，不能当判据）。
+    """
+    from backend.common.config_service import ConfigService
+
+    svc = ConfigService(db)
+    return MiniappConfigsResponse(
+        **{field: svc.get_int(key) for key, field in MINIAPP_CONFIG_KEYS.items()}
+    )
 
 
 @router.post("/sms/send", dependencies=[Depends(rate_limit(5, 60))])

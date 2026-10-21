@@ -99,7 +99,7 @@
       </view>
     </view>
     <empty-state wx:if="{{!loading && !loadError && !reservations.length}}" icon-name="bookmark" title="没有预约记录"
-      desc="馆藏被借完的书可以先预约，72 小时内保留" btn-text="去图书馆看看" bind:action="goBooks" />
+      desc="馆藏被借完的书可以先预约，{{cfg.reservation_hours}} 小时内保留" btn-text="去图书馆看看" bind:action="goBooks" />
   </block>
 
   <!-- 已通过（成绩单式：让孩子看到自己的战果） -->

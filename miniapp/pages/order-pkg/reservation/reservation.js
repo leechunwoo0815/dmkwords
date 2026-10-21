@@ -1,5 +1,6 @@
 // pages/order-pkg/reservation/reservation.js — 我的预约（WM6）
 const api = require('../../../utils/api')
+const { loadConfigs, getConfigs } = require('../../../utils/configs')
 
 const STATUS_TEXT = {
   active: '锁定中',
@@ -11,13 +12,16 @@ const STATUS_TEXT = {
 
 Page({
   data: {
+    cfg: getConfigs(),  // 业务口径（后端下发：预约保留小时）
     childName: '',
     items: [],
     loading: true,
     now: 0,
   },
 
-  onLoad(options) {
+  async onLoad(options) {
+    const { configs } = await loadConfigs()
+    this.setData({ cfg: configs })
     this.setData({ childName: options.child_name ? decodeURIComponent(options.child_name) : '' })
     this._childId = options.child_id ? Number(options.child_id) : null
   },

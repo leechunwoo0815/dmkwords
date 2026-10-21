@@ -1,5 +1,6 @@
 // pages/reading-pkg/book-detail/book-detail.js — 详情 v5：决策页（真实借阅状态 + 简介 + 状态化按钮）
 const api = require('../../../utils/api')
+const { loadConfigs, getConfigs } = require('../../../utils/configs')
 const media = require('../../../utils/media')
 
 // 插修8/U1（FEAT-081）：通过测验的鼓励语，每次进详情随机一条
@@ -36,9 +37,13 @@ Page({
     quizHasScore: false,
     quizUnlocked: false,
     cheerText: '',
+    cfg: getConfigs(),  // 业务口径（后端下发；预约保留时长/完播阈值）
   },
 
-  onLoad(options) {
+  async onLoad(options) {
+    // 第八轮 E 批剩余：口径先落地（预约保留时长/完播阈值文案用），失败用兜底值
+    const { configs } = await loadConfigs()
+    this.setData({ cfg: configs })
     // F-L19：入口改传 book_id（整对象进 URL 长描述白屏风险）——旧 ?book= 对象
     // 参数保留兼容（渐进：无本地数据时骨架态，loadDetail 拉到即渲染）
     let book = {}
@@ -93,7 +98,8 @@ Page({
     if (!childId) return
     try {
       const p = await api.getProgress(book.id, childId)
-      // B3（插修5）：coverage 是防刷口径（95% 阈值即判 finished），显示层以
+      // B3（插修5）：coverage 是防刷口径（完播阈值即判 finished，见配置
+      // audio_finish_threshold_percent），显示层以
       // finished 为权威态——读完的书进度条满格 100%（后端防刷口径不动）
       p.displayPercent = p.finished ? 100 : p.coverage_percent
       this.setData({ progress: p })
@@ -170,7 +176,11 @@ Page({
       const rs = await api.listReservations(childId)
       const resv = (rs || []).find((r) => r.book_id === book.id && r.status === 'active')
       if (resv) {
-        this.setData({ borrowState: 'reserved', borrowStateText: '已预约成功', dueText: '72 小时内到店取书' })
+        this.setData({
+          borrowState: 'reserved',
+          borrowStateText: '已预约成功',
+          dueText: `${this.data.cfg.reservation_hours} 小时内到店取书`,
+        })
         return
       }
       this.setData({ borrowState: 'none' })
@@ -194,13 +204,24 @@ Page({
       wx.showToast({ title: '这本书已经在手上了哦', icon: 'none' }); return
     }
     if (borrowState === 'reserved') {
-      wx.showToast({ title: '已预约过啦，72 小时内到店取书', icon: 'none' }); return
+      wx.showToast({
+        title: `已预约过啦，${this.data.cfg.reservation_hours} 小时内到店取书`,
+        icon: 'none',
+      }); return
     }
     this.setData({ reserving: true })
     try {
       await api.createReservation(childId, book.id)
-      wx.showToast({ title: '预约成功，72 小时内到店取书', icon: 'none', duration: 2500 })
-      this.setData({ borrowState: 'reserved', borrowStateText: '已预约成功', dueText: '72 小时内到店取书' })
+      wx.showToast({
+        title: `预约成功，${this.data.cfg.reservation_hours} 小时内到店取书`,
+        icon: 'none',
+        duration: 2500,
+      })
+      this.setData({
+        borrowState: 'reserved',
+        borrowStateText: '已预约成功',
+        dueText: `${this.data.cfg.reservation_hours} 小时内到店取书`,
+      })
     } catch (e) { /* request.js 已 toast */ }
     finally { this.setData({ reserving: false }) }
   },
@@ -232,7 +253,10 @@ Page({
       this.onQuizCard(); return
     }
     if (!progress || !progress.finished) {
-      wx.showToast({ title: '需先听完音频（95%）才解锁测验', icon: 'none' }); return
+      wx.showToast({
+        title: `需先听完音频（${this.data.cfg.audio_finish_threshold_percent}%）才解锁测验`,
+        icon: 'none',
+      }); return
     }
     wx.navigateTo({
       // R1 同族 sweep：此入口原也漏 child_id（quiz 页解析 NaN → 422）

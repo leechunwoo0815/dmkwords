@@ -1,11 +1,13 @@
 // pages/reading-pkg/quiz/quiz.js — 线上测验（WM7：3 次终身机会；未提交退出不占次）
 const api = require('../../../utils/api')
+const { loadConfigs, getConfigs } = require('../../../utils/configs')
 const session = require('../../../utils/session')
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F']
 
 Page({
   data: {
+    cfg: getConfigs(),  // 业务口径（后端下发；见 utils/configs.js）
     bookId: null,
     bookTitle: '',
     childId: null,
@@ -21,7 +23,9 @@ Page({
     submitting: false,
   },
 
-  onLoad(options) {
+  async onLoad(options) {
+    const { configs } = await loadConfigs()
+    this.setData({ cfg: configs })
     this.setData({
       bookId: Number(options.book_id),
       bookTitle: decodeURIComponent(options.book_title || ''),

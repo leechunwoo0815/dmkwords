@@ -2774,6 +2774,76 @@
         "title": "MemberStatusItem",
         "type": "object"
       },
+      "MiniappConfigsResponse": {
+        "additionalProperties": false,
+        "description": "小程序展示口径（第八轮 E 批剩余：前端口径改后端下发）。",
+        "properties": {
+          "activity_refund_cutoff_hours": {
+            "description": "活动退款时限（距开始小时）",
+            "title": "Activity Refund Cutoff Hours",
+            "type": "integer"
+          },
+          "audio_finish_threshold_percent": {
+            "description": "音频完播阈值（%）",
+            "title": "Audio Finish Threshold Percent",
+            "type": "integer"
+          },
+          "observation_period_days": {
+            "description": "观察期天数",
+            "title": "Observation Period Days",
+            "type": "integer"
+          },
+          "quiz_max_attempts": {
+            "description": "每本书测验机会（次）",
+            "title": "Quiz Max Attempts",
+            "type": "integer"
+          },
+          "quiz_questions_per_book": {
+            "description": "每本书测验题量",
+            "title": "Quiz Questions Per Book",
+            "type": "integer"
+          },
+          "renew_days": {
+            "description": "续借延长天数",
+            "title": "Renew Days",
+            "type": "integer"
+          },
+          "renew_limit": {
+            "description": "每本书可续借次数",
+            "title": "Renew Limit",
+            "type": "integer"
+          },
+          "reservation_hours": {
+            "description": "预约锁定时长（小时）",
+            "title": "Reservation Hours",
+            "type": "integer"
+          },
+          "sms_send_interval_seconds": {
+            "description": "同号短信重发间隔（秒）",
+            "title": "Sms Send Interval Seconds",
+            "type": "integer"
+          },
+          "transfer_review_timeout_hours": {
+            "description": "转让审核时限（小时）",
+            "title": "Transfer Review Timeout Hours",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reservation_hours",
+          "audio_finish_threshold_percent",
+          "observation_period_days",
+          "transfer_review_timeout_hours",
+          "renew_limit",
+          "renew_days",
+          "sms_send_interval_seconds",
+          "quiz_questions_per_book",
+          "quiz_max_attempts",
+          "activity_refund_cutoff_hours"
+        ],
+        "title": "MiniappConfigsResponse",
+        "type": "object"
+      },
       "NotificationReadStatusRequest": {
         "additionalProperties": false,
         "properties": {
@@ -4888,6 +4958,7 @@
   "paths": {
     "/api/admin/activities": {
       "get": {
+        "description": "管理端活动列表（P2-44：硬上限经响应头如实告知）。",
         "operationId": "list_activities_api_admin_activities_get",
         "parameters": [
           {
@@ -11075,9 +11146,34 @@
         ]
       }
     },
+    "/api/admin/refund-center/counts": {
+      "get": {
+        "description": "退款中心三个台账的按状态计数（P1-7：服务端分页后徽标必须来自后端，不能只数本页）。",
+        "operationId": "admin_refund_center_counts_api_admin_refund_center_counts_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Admin Refund Center Counts",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
     "/api/admin/refund-requests": {
       "get": {
-        "description": "退款申请列表（订单类 + 押金类统一，超管逐单审）。",
+        "description": "退款申请列表（订单类 + 押金类统一，超管逐单审）。\n\nP2-44：响应头如实告知硬上限与\"是否已达上限\"（`X-List-Limit` / `X-List-Truncated`），\n管理端据此提示\"可能还有更多\"——不再让 200 条上限看起来像\"这就是全部\"。",
         "operationId": "admin_refund_list_api_admin_refund_requests_get",
         "parameters": [
           {
@@ -11094,6 +11190,33 @@
                 }
               ],
               "title": "Status"
+            }
+          },
+          {
+            "description": "页码（服务端分页，P1-7）",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "页码（服务端分页，P1-7）",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "每页条数（上限 200）",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "description": "每页条数（上限 200）",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
             }
           }
         ],
@@ -11287,7 +11410,7 @@
     },
     "/api/admin/reservations": {
       "get": {
-        "description": "预约管理列表（默认全部；status=active 看锁定中；keyword 模糊搜索）。",
+        "description": "预约管理列表（默认全部；status=active 看锁定中；keyword 模糊搜索）。\n\nP2-44：硬上限经响应头如实告知（`X-List-Limit` / `X-List-Truncated`）。",
         "operationId": "list_reservations_api_admin_reservations_get",
         "parameters": [
           {
@@ -11799,6 +11922,7 @@
     },
     "/api/admin/transfers": {
       "get": {
+        "description": "转让台账（P1-7 服务端分页 + P2-44 上限经响应头如实告知）。",
         "operationId": "admin_transfer_list_api_admin_transfers_get",
         "parameters": [
           {
@@ -11815,6 +11939,33 @@
                 }
               ],
               "title": "Status"
+            }
+          },
+          {
+            "description": "页码（服务端分页，P1-7）",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "页码（服务端分页，P1-7）",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "每页条数（上限 200）",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "description": "每页条数（上限 200）",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
             }
           }
         ],
@@ -11952,6 +12103,7 @@
     },
     "/api/admin/withdrawals": {
       "get": {
+        "description": "退会台账（P1-7 服务端分页 + P2-44 上限经响应头如实告知）。",
         "operationId": "admin_withdrawal_list_api_admin_withdrawals_get",
         "parameters": [
           {
@@ -11968,6 +12120,33 @@
                 }
               ],
               "title": "Status"
+            }
+          },
+          {
+            "description": "页码（服务端分页，P1-7）",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "页码（服务端分页，P1-7）",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "每页条数（上限 200）",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "description": "每页条数（上限 200）",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
             }
           }
         ],
@@ -12105,6 +12284,7 @@
     },
     "/api/miniapp/activities": {
       "get": {
+        "description": "家长端近期活动（P2-44：50 条硬上限经响应头如实告知）。",
         "operationId": "list_activities_api_miniapp_activities_get",
         "parameters": [
           {
@@ -13749,6 +13929,28 @@
         ]
       }
     },
+    "/api/miniapp/configs": {
+      "get": {
+        "description": "业务口径下发（**公开端点**：登录页倒计时要用，不能要求先登录）。\n\n为什么要有（第八轮审查 E 批剩余）：小程序里 13 处硬编码业务数字（预约保留 72 小时、\n完播阈值 95%、观察期 30 天、续借 1 次…）与配置中心各写一份——运营改配置后文案不跟随；\nP2-73 更是三方不一致（种子/服务端 **90 秒**、小程序倒计时写 **60 秒**）：家长 60 秒后\n点发送必被服务端拒。本端点把**展示口径**集中下发（读的是配置中心同一份值，60 秒 TTL 缓存），\n前端不再自持副本；改配置 → 文案跟随。\n\n只下发**展示用**口径：不放服务端校验规则（那些仍由服务端在动作发生时判定，\n前端拿到的数字只是文案依据，不能当判据）。",
+        "operationId": "miniapp_configs_api_miniapp_configs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MiniappConfigsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Miniapp Configs",
+        "tags": [
+          "identity-miniapp"
+        ]
+      }
+    },
     "/api/miniapp/continue-listening": {
       "get": {
         "description": "首页\"继续听\"卡：最近一次有进度但未读完（finished=0）的上一本。\n读完的/无进度的不返回；无续听对象返回 null（前端隐藏卡片）。",
@@ -14899,7 +15101,7 @@
     },
     "/api/miniapp/orders": {
       "get": {
-        "description": "家长视角订单列表（A-1/T6 下沉：逻辑在 OrderService.my_orders）。",
+        "description": "家长视角订单列表（A-1/T6 下沉：逻辑在 OrderService.my_orders）。\n\nP2-44：50 条硬上限经响应头如实告知（`X-List-Limit` / `X-List-Truncated`）。",
         "operationId": "my_orders_api_miniapp_orders_get",
         "parameters": [
           {
@@ -16740,6 +16942,7 @@
     },
     "/health": {
       "get": {
+        "description": "健康检查（容器探针用）。**恒 200**：进程活着就是 ok，不因依赖异常改状态码。\n\n第八轮审查 P1-11：附加 `scheduler` 只读状态（**不查库**）——定时任务整体停摆原先\n完全无声（`/health` 恒 200、看板只是 `last_run` 变旧）。字段是**加法**，探针与既有\n用例按原有字段判断不受影响。",
         "operationId": "health_health_get",
         "responses": {
           "200": {

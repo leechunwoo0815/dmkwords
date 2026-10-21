@@ -1,5 +1,6 @@
 // pages/activity-pkg/activity-detail/activity-detail.js — 活动详情与报名（WM9）
 const api = require('../../../utils/api')
+const { loadConfigs, getConfigs } = require('../../../utils/configs')
 const media = require('../../../utils/media')
 
 const STATUS_TEXT = {
@@ -9,6 +10,7 @@ const STATUS_TEXT = {
 
 Page({
   data: {
+    cfg: getConfigs(),  // 业务口径（后端下发；见 utils/configs.js）
     activity: null,
     childName: '',
     loading: true,
@@ -22,7 +24,9 @@ Page({
     detailBlocks: [],
   },
 
-  onLoad(options) {
+  async onLoad(options) {
+    const { configs } = await loadConfigs()
+    this.setData({ cfg: configs })
     this._activityId = Number(options.id)
     this._childId = Number(options.child_id)
     this.setData({ childName: decodeURIComponent(options.child_name || '') })
@@ -177,13 +181,12 @@ Page({
 
   async onRefund() {
     const mine = this.data.activity.my_enrollment
-    // F-M16 挂账：退款时限文案本应从配置下发（后端键 activity_refund_cutoff_hours
-    // 已存在且服务端已接线），但小程序侧无公开配置端点——本任不动后端，
-    // 此处仅保留默认值常量并标注，待 /api/miniapp/configs 端点落地后接线。
-    const CUTOFF_HOURS_DEFAULT = 2
+    // F-M16 已闭环（第八轮 E 批剩余）：退款时限由 `/api/miniapp/configs` 下发
+    // （后端键 activity_refund_cutoff_hours，与活动域退款判定同一份值）——不再写死 2 小时。
+    const cutoffHours = this.data.cfg.activity_refund_cutoff_hours
     const res = await wx.showModal({
       title: '申请退款',
-      content: `未签到且距开始超过 ${CUTOFF_HOURS_DEFAULT} 小时可申请全额退款（管理员审核后到账）。`,
+      content: `未签到且距开始超过 ${cutoffHours} 小时可申请全额退款（管理员审核后到账）。`,
       confirmText: '申请退款',
     })
     if (!res.confirm) return
