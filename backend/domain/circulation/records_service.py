@@ -169,24 +169,29 @@ class BorrowRecordsService:
         ws.append(headers)
         for c in ws[1]:
             c.font = Font(bold=True)
+        from backend.common.sheet_safety import safe_row
+
         for r in rows:
+            # P2-18：姓名/书名/副本码都是可写文本 → 写行统一净化（`=cmd|...` 族注入）
             ws.append(
-                [
-                    r["record_id"],
-                    r["child_name"],
-                    r["parent_phone"],
-                    r["book_title"],
-                    r["copy_code"],
-                    r["status"],
-                    r["borrowed_at"].strftime("%Y-%m-%d %H:%M") if r["borrowed_at"] else "",
-                    r["due_at"].strftime("%Y-%m-%d %H:%M") if r["due_at"] else "",
-                    r["returned_at"].strftime("%Y-%m-%d %H:%M") if r["returned_at"] else "",
-                    r["returned_condition"] or "",
-                    r["renew_used"],
-                    r["days_overdue"],
-                    r["borrowed_by_name"],
-                    r["returned_by_name"],
-                ]
+                safe_row(
+                    [
+                        r["record_id"],
+                        r["child_name"],
+                        r["parent_phone"],
+                        r["book_title"],
+                        r["copy_code"],
+                        r["status"],
+                        r["borrowed_at"].strftime("%Y-%m-%d %H:%M") if r["borrowed_at"] else "",
+                        r["due_at"].strftime("%Y-%m-%d %H:%M") if r["due_at"] else "",
+                        r["returned_at"].strftime("%Y-%m-%d %H:%M") if r["returned_at"] else "",
+                        r["returned_condition"] or "",
+                        r["renew_used"],
+                        r["days_overdue"],
+                        r["borrowed_by_name"],
+                        r["returned_by_name"],
+                    ]
+                )
             )
         if total > len(rows):
             ws.append([])

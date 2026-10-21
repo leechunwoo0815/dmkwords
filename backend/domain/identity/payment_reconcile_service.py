@@ -560,9 +560,15 @@ class PaymentReconcileService:
         _checked, diffs = self._local_audit()
         buf = io.StringIO()
         writer = csv.writer(buf)
+        from backend.common.sheet_safety import safe_row
+
         writer.writerow(["bill_date", "kind", "ref", "message"])
         for d in diffs:
-            writer.writerow([str(day), d.get("kind", ""), d.get("ref", ""), d.get("message", "")])
+            # P2-18 同族：CSV 被 Excel 打开时 `= + - @` 开头的单元格同样会被当公式，
+            # 而 `message` 里嵌着**对账单原文**（微信侧商品名/订单号，非本项目可控）→ 一并净化
+            writer.writerow(
+                safe_row([str(day), d.get("kind", ""), d.get("ref", ""), d.get("message", "")])
+            )
         return buf.getvalue()
 
     @staticmethod

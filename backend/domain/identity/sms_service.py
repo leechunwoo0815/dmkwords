@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import random
 from datetime import datetime, timedelta
 
 from sqlalchemy import func
@@ -230,8 +229,14 @@ class SmsCodeService:
 
 
 def random_code() -> str:
-    """6 位数字验证码（网关未回传时的兜底生成，仅供测试用）。"""
-    return f"{random.randint(100000, 999999)}"
+    """6 位数字验证码（网关未回传时的兜底生成，仅供测试用）。
+
+    第八轮审查 P2-21：**生成口径收敛到 `common/security.random_digit_code`**——原先这里
+    自带一份弱随机实现（与网关三处同款缺陷），全项目验证码只该有一处 CSPRNG 实现。
+    """
+    from backend.common.security import random_digit_code
+
+    return random_digit_code()
 
 
 def parent_by_openid(db: Session, openid: str) -> Parent | None:

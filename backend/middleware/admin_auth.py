@@ -43,14 +43,17 @@ def _load_active_admin(db: Session, payload: dict) -> AdminUser:
     return admin
 
 
-def validate_admin_payload(db: Session, payload: dict) -> None:
+def validate_admin_payload(db: Session, payload: dict) -> AdminUser:
     """P0-F3：媒体端点完整凭证校验（type 401 + 公共加载/撤销）。
 
     媒体走独立入口（query token），type 错误按未登录处理（401 语义）。
+
+    **返回值 = 数据库里的当前账号**（第八轮审查 P2-23）：调用方判权限必须用它，
+    不能读 token 载荷里的 `role`——载荷是**签发时刻的快照**（详见 voucher_auth）。
     """
     if payload.get("type") != "admin":
         raise UnauthorizedError("非管理端凭证")
-    _load_active_admin(db, payload)
+    return _load_active_admin(db, payload)
 
 
 async def get_current_admin(

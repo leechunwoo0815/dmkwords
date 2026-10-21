@@ -550,19 +550,24 @@ class NotifyAdminService:
         ws.append(headers)
         for c in ws[1]:
             c.font = Font(bold=True)
+        from backend.common.sheet_safety import safe_row
+
         for r in rows:
+            # P2-18：家长昵称/通知标题正文都可能带 `=` 开头的内容 → 写行统一净化
             ws.append(
-                [
-                    r["id"],
-                    r["parent_name"],
-                    r["category"],
-                    r["scene"],
-                    r["title"],
-                    r["content"],
-                    r["wechat_status"],
-                    "是" if r["read"] else "否",
-                    r["created_at"],
-                ]
+                safe_row(
+                    [
+                        r["id"],
+                        r["parent_name"],
+                        r["category"],
+                        r["scene"],
+                        r["title"],
+                        r["content"],
+                        r["wechat_status"],
+                        "是" if r["read"] else "否",
+                        r["created_at"],
+                    ]
+                )
             )
         buf = BytesIO()
         wb.save(buf)
@@ -604,18 +609,24 @@ class AuditExportService:
         ws.append(headers)
         for c in ws[1]:
             c.font = Font(bold=True)
+        from backend.common.sheet_safety import safe_row
+
         for r in rows:
+            # P2-18（审查点名处）：审计 `reason` 是**专员可写**的自由文本，原样落进超管导出的
+            # Excel 就是"低权限对高权限工作站的公式注入"——统一净化后再写。
             ws.append(
-                [
-                    r.id,
-                    r.actor_name,
-                    r.action,
-                    r.target_type,
-                    r.target_id,
-                    r.detail or "",
-                    r.reason,
-                    r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
-                ]
+                safe_row(
+                    [
+                        r.id,
+                        r.actor_name,
+                        r.action,
+                        r.target_type,
+                        r.target_id,
+                        r.detail or "",
+                        r.reason,
+                        r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
+                    ]
+                )
             )
         buf = BytesIO()
         wb.save(buf)
@@ -750,15 +761,22 @@ class StaffService:
         user = self._get(admin, user_id)
         if user.id == admin.id:
             raise ValidationError("不能禁用自己（防自杀锁）")
-        user.status = AdminUser.STATUS_ACTIVE if status else AdminUser.STATUS_DISABLED
+        new_status = AdminUser.STATUS_ACTIVE if status else AdminUser.STATUS_DISABLED
+        changed = user.status != new_status
+        user.status = new_status
+        # P2-22：状态变更 = 撤销点，必须 bump（原先只改 status → 重新启用时旧 token 原样复活，
+        # "临时禁用"当不成撤销手段；详见 admin_auth 的 gen 校验与 error_list §一百二十八）
+        if changed:
+            user.token_generation = (user.token_generation or 0) + 1
         publish_audit(
             self.db,
             admin=admin,
             action="staff.status",
             target_type="admin_user",
             target_id=str(user.id),
-            detail={"status": status},
-            reason=f"{'启用' if status else '禁用'}员工账号（{user.username}）",
+            detail={"status": status, "token_generation_bumped": changed},
+            reason=f"{'启用' if status else '禁用'}员工账号（{user.username}）"
+            + ("，旧登录态作废" if changed else ""),
         )
         self.db.commit()
         return user

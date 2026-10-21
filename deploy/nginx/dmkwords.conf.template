@@ -17,6 +17,15 @@
 #
 # 媒体缓存（内容寻址长缓存）由后端中间件下发（backend/middleware/media_cache.py，docs/15 §22.5），
 # 本文件**不得**覆写 /api/ 的 Cache-Control，否则会把 immutable 长缓存打回协商缓存。
+#
+# ── 第八轮审查 P2-16：访问日志**抹掉 query string** ──
+# 媒体端点靠 `?token=` 鉴权（`<img>`/`<audio>` 带不了 Authorization 头），nginx 默认的
+# `combined` 格式打 `$request`（含 query）→ **30 天有效的管理员/家长凭证进日志文件**，
+# 能读日志者可在撤销前完整冒充。这里用 `$uri`（不含 query）另起一个格式；
+# 后端 uvicorn 侧同款脱敏见 `backend/main.py` 的 `_RedactQueryString`。
+# （`log_format` 只能在 http 上下文定义——本文件装进 conf.d 后即在 http 上下文，
+#  但**不要**放到 `server {}` 里面，nginx -t 会报错。）
+log_format dmkwords_noquery '$remote_addr - $remote_user [$time_local] "$request_method $uri $server_protocol" $status $body_bytes_sent "$http_referer" "$http_user_agent" rt=$request_time uct=$upstream_connect_time';
 
 server {
     listen 443 ssl;
@@ -34,6 +43,28 @@ server {
     client_max_body_size 200m;
     proxy_read_timeout   300s;
     proxy_send_timeout   300s;
+
+    access_log /var/log/nginx/dmkwords.access.log dmkwords_noquery;
+
+    # ── 安全响应头（第八轮审查 P2-17）──
+    # 后端 API 响应也带同一组头（backend/middleware/security_headers.py），这里补的是
+    # **SPA 的 HTML/静态资源**那一半（HTML 不经后端，只有 nginx 能给它戴帽子）。
+    # 注意 nginx 的 `add_header` 继承规则：**子 location 里只要有一条 add_header，
+    # 服务器级的全部失效**——所以下面每个 location 都显式 `include` 这份片段，
+    # 而不是靠继承（否则将来有人给某个 location 加一条 add_header，安全头会静默全丢）。
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Permissions-Policy "geolocation=(), camera=(), microphone=()" always;
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    # SPA 的 CSP：**比 API 宽**（API 侧是 `default-src 'none'`）——SPA 要加载打包脚本、
+    # 内联样式（React style 属性）与两个外链字体域（admin-web/index.html 的 Google Fonts
+    # + jsdelivr 字体预载）。`frame-ancestors 'none'` 是**点击劫持**那道闸（管理端 token 在
+    # localStorage，被嵌进第三方 iframe 就能被诱导点「禁用员工/导出全量」）。
+    # 尚未收紧 script-src（仍是 'self'）：收紧后需对**打包产物**做一次浏览器实测
+    # （确认无 eval/new Function 与内联脚本），该验证动作登记在 docs/09 第一百零五批。
+    add_header Content-Security-Policy "default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" always;
 
     # 管理端 SPA（pnpm --dir admin-web build 的产物；与 /api 同源 = 免 CORS，
     # media.fullUrl 拼 token 依赖同源）

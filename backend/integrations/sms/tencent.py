@@ -2,11 +2,11 @@
 # （2026-09-16 时本文件"无人 import"、生产只能走 Mock——那条技术债已由选择器关闭。）
 import asyncio
 import logging
-import random
 import time
 
 from backend.common.gateways.sms.base import SmsGateway
 from backend.common.gateways.sms.types import SmsSendRequest, SmsSendResponse
+from backend.common.security import random_digit_code
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,9 @@ class TencentSmsGateway(SmsGateway):
             return SmsSendResponse(
                 success=False, error_message="短信通道不可用（SDK 未安装或凭据缺失）"
             )
-        code = f"{random.randint(100000, 999999)}"
+        # 第八轮审查 P2-21：验证码一律走 `secrets`（CSPRNG）——`random` 是可预测的
+        # Mersenne Twister，同进程连续签发多枚码时能被反推（详见 common/security.py）
+        code = random_digit_code()
 
         req = models.SendSmsRequest()
         req.SmsSdkAppId = self.app_id

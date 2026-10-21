@@ -18,6 +18,55 @@ from backend.domain.catalog.schemas import AR_LEVEL_MAX, AR_LEVEL_RE
 # 与 build_import_template 表头保持一致；程序按列索引解析，不依赖字面量。
 HEADER = ["ISBN", "书名*", "作者", "AR值", "词数*", "主题", "适读阶段", "副本数"]
 
+# ---- 解压炸弹闸（第八轮审查 P2-20）----
+# .xlsx 是 zip 容器：**上传体积闸（10MB）拦不住解压后的体量**——10MB 的 xlsx 可以解压出
+# GB 级（zip bomb 族），而 openpyxl 要在内存里解析它 → 单进程 uvicorn OOM = 整站不可用。
+# 判据三条（元数据先看 + 真解压一遍带计数，后者才防得住"中央目录里谎报尺寸"的构造包）。
+MAX_ZIP_ENTRIES = 2000  # 正常 xlsx 是 10~30 个条目（sheet/样式/共享字符串）
+MAX_ZIP_TOTAL_BYTES = 200 * 1024 * 1024  # 解压后总字节上限
+MAX_ZIP_ENTRY_BYTES = 100 * 1024 * 1024  # 单条目上限
+MAX_ZIP_RATIO = 200  # 单条目压缩比上限（正常 xlsx 是 5~20 倍）
+MAX_IMPORT_ROWS = 20000  # 数据行上限（一本一行；全馆藏书量级远小于它）
+
+
+def assert_safe_xlsx(file_bytes: bytes) -> None:
+    """解压前/中验"这个 zip 会不会撑爆内存"（P2-20）。
+
+    为什么不是只看 `ZipInfo.file_size`：那读的是**中央目录里的自报尺寸**，构造包可以谎报小、
+    实际解压大。所以这里**真的解压一遍**（1MB 一块流式读），边解压边计数，超限立即中断——
+    内存峰值只有 1MB，不管压缩包怎么构造。
+    """
+    from zipfile import BadZipFile, ZipFile
+
+    from backend.common.exceptions import ValidationError
+
+    try:
+        with ZipFile(io.BytesIO(file_bytes)) as zf:
+            infos = zf.infolist()
+            if len(infos) > MAX_ZIP_ENTRIES:
+                raise ValidationError(
+                    f"文件内部条目过多（{len(infos)} > {MAX_ZIP_ENTRIES}），不是正常的 Excel"
+                )
+            total = 0
+            for info in infos:
+                if info.compress_size and info.file_size > info.compress_size * MAX_ZIP_RATIO:
+                    raise ValidationError(
+                        f"文件内部压缩比异常（{info.filename}：{info.file_size}B 来自 "
+                        f"{info.compress_size}B）——疑似解压炸弹，拒绝处理"
+                    )
+                read = 0
+                with zf.open(info) as fh:
+                    while True:
+                        chunk = fh.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        read += len(chunk)
+                        total += len(chunk)
+                        if read > MAX_ZIP_ENTRY_BYTES or total > MAX_ZIP_TOTAL_BYTES:
+                            raise ValidationError("文件解压后体积超限（疑似解压炸弹），拒绝处理")
+    except BadZipFile as e:
+        raise ValidationError("文件不是有效的 Excel（.xlsx）") from e
+
 
 def _cell_str(v) -> str:
     if v is None:
@@ -43,6 +92,7 @@ def _max_copy_seq(copy_repo: BookCopyRepository, book: Book) -> int:
 
 def import_books(db: Session, admin, file_bytes: bytes) -> dict:
     """返回 {total, success, failed, errors: ["第N行: 原因"]}。"""
+    assert_safe_xlsx(file_bytes)  # P2-20：解压炸弹闸（在 openpyxl 解析之前）
     wb = load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
     ws = wb.active
     book_repo = BookRepository(db)
@@ -56,6 +106,15 @@ def import_books(db: Session, admin, file_bytes: bytes) -> dict:
 
     for row in ws.iter_rows(min_row=2, values_only=True):
         row_num += 1
+        # P2-20：行数上限（解压闸之外的第二道）——行数无上限时，一份"合法尺寸但几十万行"
+        # 的表会把导入拖成小时级（每行一次 ISBN 查重 + 落库），期间占着管理员请求与连接。
+        # 到限**如实报**（已导入的部分保留、明确告知从第几行起没导），不静默截断。
+        if row_num > MAX_IMPORT_ROWS:
+            errors.append(
+                f"第{row_num}行起：超出行数上限（{MAX_IMPORT_ROWS} 行），已停止导入"
+                f"——请拆分文件后分批导入"
+            )
+            break
         if not any(_cell_str(c) for c in row):
             continue  # 跳过空行
         isbn, title, author, ar, word_count, topic, grade, copies = (

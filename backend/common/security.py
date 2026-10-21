@@ -86,3 +86,23 @@ def dummy_password_hash() -> str:
     if _DUMMY_HASH is None:
         _DUMMY_HASH = hash_password("dummy-password-for-timing-only")
     return _DUMMY_HASH
+
+
+# ---------- 验证码（第八轮审查 P2-21） ----------
+
+#: 短信验证码位数（6 位数字 = 10^6 空间，配服务端"同一手机号 5 次尝试上限"）
+SMS_CODE_DIGITS = 6
+
+
+def random_digit_code(digits: int = SMS_CODE_DIGITS) -> str:
+    """**密码学安全**的数字验证码（全项目唯一生成口径）。
+
+    为什么不能用 `random.randint`（P2-21 实测三处 + 一处死代码都在用）：
+    `random` 是 Mersenne Twister，624 个 32 位输出即可**反推内部状态**并预测后续全部输出。
+    验证码是家长登录主通道（免密登录），同一进程连续签发多枚码时，攻击者拿几枚自己手机收到的码
+    就可能推出**别人**正在等的码——"服务端 5 次尝试上限"只挡暴力枚举，挡不住预测。
+    生成一律走 `secrets`（操作系统 CSPRNG）。
+    """
+    if digits < 1:
+        raise ValueError("digits 必须 ≥ 1")
+    return f"{secrets.randbelow(10**digits):0{digits}d}"

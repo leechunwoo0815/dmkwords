@@ -7,10 +7,39 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.common.exceptions import BusinessException, business_exception_handler
 from backend.config import get_settings, is_production_env
+from backend.middleware.body_limit import BodySizeLimitMiddleware
 from backend.middleware.media_cache import MediaCacheMiddleware
 from backend.middleware.rate_limit import WriteRateLimitMiddleware
+from backend.middleware.security_headers import SecurityHeadersMiddleware
+
+
+class _RedactQueryString(logging.Filter):
+    """访问日志抹掉 query string（第八轮审查 P2-16）。
+
+    为什么必须有：媒体端点靠 `?token=` 鉴权（`<img>`/`<audio>` 带不了 Authorization 头），
+    而 uvicorn 的访问日志会把**完整路径含 query** 打出来——`/api/miniapp/covers/3?token=<30天管理员凭证>`
+    原样进日志文件。能读日志的人（运维/日志采集平台/误提交的日志附件）就能在 token 到期前
+    **完整冒充家长或管理员**。nginx 侧同款处理见 `deploy/nginx/dmkwords.conf.template`
+    的 `log_format dmkwords_noquery`（用 `$uri` 而非 `$request`）。
+
+    做法是**脱敏而不是关日志**：`/path?token=xxx` → `/path?[REDACTED]`，路径与状态码照旧可查。
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple):
+            record.args = tuple(
+                a.split("?", 1)[0] + "?[REDACTED]"
+                if isinstance(a, str) and a.startswith("/") and "?" in a
+                else a
+                for a in args
+            )
+        return True
+
 
 logging.basicConfig(level=logging.INFO)
+# uvicorn 的 access logger 由 uvicorn 自己配置（basicConfig 管不到），单独挂过滤器
+logging.getLogger("uvicorn.access").addFilter(_RedactQueryString())
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
@@ -67,6 +96,15 @@ app.add_middleware(
 )
 
 app.add_middleware(MediaCacheMiddleware)  # 媒体缓存头单一口径（docs/15 §22.5）
+
+# 安全响应头（第八轮审查 P2-17）：**最后加 = 最外层**——限流 429、CORS 预检、业务异常
+# 的响应同样带上 nosniff/frame-ancestors 等（错误页也一样会被塞进 iframe）。
+# 与 media_cache 相反，这里是**覆盖**语义：安全头是下限，端点自己漏写也必须补上。
+app.add_middleware(SecurityHeadersMiddleware)
+
+# 请求体上限（第八轮审查 P2-19）：**在限流内侧、CORS 外侧**——先挡超大包再谈业务。
+# 回环直连（无 nginx）与无凭证回调（/api/pay/**，必须 await request.body()）都靠它兜底。
+app.add_middleware(BodySizeLimitMiddleware)
 app.add_exception_handler(BusinessException, business_exception_handler)
 
 

@@ -1169,6 +1169,8 @@ viewer.open(objectUrl, () => URL.revokeObjectURL(objectUrl));
 | 口径 | 规定 | 落地 |
 |---|---|---|
 | **uploads 内路径判定** | 一律 `is_within(root, full)`（= `abspath` 后 `root + os.sep` 前缀），**禁止裸 `startswith(root)`**——同前缀兄弟目录（`uploads-evil/`）能骗过裸前缀；`full == root` 也算"不在内"（不是文件） | `backend/common/media_paths.py` 的 `is_within()`（单一口径）；6 个文件的 10 处媒体/删除端点统一改它 |
-| **媒体响应 Cache-Control** | 文件名含**内容指纹**（`_<hex>` 结尾）→ `public, max-age=31536000, immutable`（内容变才换名，长缓存安全）；其余媒体（人工上传、按 id 定名）→ `no-cache`（协商缓存，靠 ETag 复验）。**CDN 要生效必须先有这一层**（审查 P2-7） | `backend/middleware/media_cache.py`（按响应 content-type + URL 指纹统一加，不再逐端点写） |
+| **媒体响应 Cache-Control** | 文件名含**内容指纹**（`_<hex>` 结尾）→ `max-age=31536000, immutable`（内容变才换名，长缓存安全）；其余媒体（人工上传、按 id 定名）→ `no-cache`（协商缓存，靠 ETag 复验）。**再按请求是否带凭证分 `public`/`private`**（第八轮 P2-24）：**带凭证（Authorization 头或 `?token=`）一律 `private`**——家长周报图这类私有儿童数据被标 `public` 后，反代/CDN 能把它存成公共缓存（撤 token、撤孩子都撤不回）；**匿名素材才 `public`**（长缓存留给 CDN）。**CDN 要生效必须先有这一层**（审查 P2-7） | `backend/middleware/media_cache.py`（按响应 content-type + URL 指纹 + 请求凭证统一加，不再逐端点写）；四档取值：`public, …immutable` / `private, …immutable` / `no-cache` / `private, no-cache` |
 
 > 背景：上线前深度大审查（`docs/专家审查-上线前-2026-09-24.md`）P3-1 / P2-7；两条都属"改一处、收益全站"的加固。
+> 2026-10-21（第八轮 P2-24）**口径修订**：`public` 只给匿名可取的素材；带凭证的媒体全部 `private`。
+> 同批还补了 `docs/20 §四` 的 nginx 侧安全响应头与访问日志脱敏（`log_format dmkwords_noquery` 用 `$uri`）。

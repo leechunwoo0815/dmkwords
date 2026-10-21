@@ -14,10 +14,12 @@ from backend.common.exceptions import UnauthorizedError
 from backend.common.security import decode_admin_token
 
 
-def authorize_media(request, token: str = "", db: Session | None = None) -> None:
+def authorize_media(request, token: str = "", db: Session | None = None):
     """校验 admin JWT（header 或 query）；失败抛 UnauthorizedError（→401）。
 
-    db 提供时执行完整校验（type + 账号状态 + token_generation 撤销）。
+    db 提供时执行完整校验（type + 账号状态 + token_generation 撤销），
+    **并返回数据库里的当前账号**（第八轮审查 P2-23：调用方判权限必须用库里的当前角色，
+    不能读 token 载荷里的 `role`——载荷是签发时刻的快照）。
     """
     header = request.headers.get("authorization", "")
     auth_token = header[len("Bearer ") :] if header.startswith("Bearer ") else token
@@ -33,4 +35,4 @@ def authorize_media(request, token: str = "", db: Session | None = None) -> None
     # P0-F3：完整校验（type + 账号状态 + gen 撤销）委托 middleware（域不依赖 admin）
     from backend.middleware.admin_auth import validate_admin_payload
 
-    validate_admin_payload(db, payload)
+    return validate_admin_payload(db, payload)

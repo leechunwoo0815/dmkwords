@@ -9,12 +9,12 @@
 """
 
 import logging
-import random
 import threading
 import time
 
 from backend.common.gateways.sms.base import SmsGateway
 from backend.common.gateways.sms.types import SmsSendRequest, SmsSendResponse
+from backend.common.security import random_digit_code
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class MockSmsGateway(SmsGateway):
     _lock = threading.Lock()
 
     async def send_code(self, phone: str) -> SmsSendResponse:
-        code = f"{random.randint(100000, 999999)}"
+        code = random_digit_code()  # P2-21：与真实网关同一生成口径（secrets）
         with self._lock:
             self._codes[phone] = (code, time.time())
 

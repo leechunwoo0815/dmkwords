@@ -173,14 +173,21 @@ def _admin_row(db):
 
 
 def test_media_cache_control_headers(client: TestClient, admin_headers: dict):
-    """机器生成名（内容指纹/随机 token）长缓存；就地覆盖的（posters）协商缓存。"""
+    """机器生成名（内容指纹/随机 token）长缓存；就地覆盖的（posters）协商缓存。
+
+    第八轮审查 P2-24（2026-10-21）**口径变更**：带凭证的请求一律 `private`——
+    家长周报图 `/api/miniapp/reports/{kind}/image?child_id=N&token=…` 文件名同样带内容摘要，
+    原先被判成 `public, immutable` **一年**：一旦前面挂 CDN/反代，孩子的成长报告
+    （姓名/书目/统计）就被公共缓存持有，撤 token、撤孩子都撤不回它。
+    现在：**带凭证 → private**（浏览器/端上仍长缓存，共享缓存不得存）；**匿名 → public**。
+    """
     root = os.path.abspath(get_settings().UPLOADS_DIR)
     cases = {
         # 生成图/音频 = `{stem}_{内容指纹或随机token}` → 写完不再变 → 长缓存
-        "cover/9999/9780439064873_abcdef123456.jpg": "public, max-age=31536000, immutable",
-        "circle/post_1_abcdef123456.jpg": "public, max-age=31536000, immutable",
+        "cover/9999/9780439064873_abcdef123456.jpg": "private, max-age=31536000, immutable",
+        "circle/post_1_abcdef123456.jpg": "private, max-age=31536000, immutable",
         # 就该回源复验的：无可判机器指纹的（就地覆盖类已随受保护目录一起挪走）
-        "reports/weekly_1.jpg": "no-cache",
+        "reports/weekly_1.jpg": "private, no-cache",
     }
     for rel, expected in cases.items():
         full = os.path.join(root, rel)
@@ -190,6 +197,13 @@ def test_media_cache_control_headers(client: TestClient, admin_headers: dict):
         resp = client.get(f"/api/admin/uploads/{rel}", headers=admin_headers)
         assert resp.status_code == 200, resp.text
         assert resp.headers.get("cache-control") == expected, f"{rel}: {dict(resp.headers)}"
+    # P2-24 对照组：**匿名**拿到的公开素材仍是 public（长缓存是给 CDN 用的，不能被一刀切掉）
+    public_rel = "cover/9999/9780439064873_abcdef123456.jpg"
+    anon = client.get(f"/api/miniapp/covers/9999/{os.path.basename(public_rel)}")
+    if anon.status_code == 200:
+        assert anon.headers.get("cache-control") == "public, max-age=31536000, immutable", dict(
+            anon.headers
+        )
     # A2-2（2026-10-09）：受保护目录（人工上传、不可再生）不再从通用上传端点下发——
     # 凭证/评估图各有带归属校验的专用端点；这里断言"通用口一律 404"。
     for rel in ("voucher/ORD1_abcdef123456.jpg", "observation/child_1/abcdef1234567890.jpg"):
