@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
+from backend.common.list_meta import stamp_list_meta
 from backend.database import get_db
 from backend.domain.identity import refund_queries
 from backend.domain.identity.auth import child_of_parent, get_current_parent
@@ -103,13 +104,19 @@ def update_parent_profile(
 
 # ---------- 订单（家长视角，退款申请用） ----------
 @router.get("/orders")
-def my_orders(child_id: int, auth: Any = Depends(get_current_parent)):
-    """家长视角订单列表（A-1/T6 下沉：逻辑在 OrderService.my_orders）。"""
+def my_orders(response: Response, child_id: int, auth: Any = Depends(get_current_parent)):
+    """家长视角订单列表（A-1/T6 下沉：逻辑在 OrderService.my_orders）。
+
+    P2-44：50 条硬上限经响应头如实告知（`X-List-Limit` / `X-List-Truncated`）。
+    """
     from backend.domain.identity.order_service import OrderService
 
     parent, db = auth
     child_of_parent(db, parent.id, child_id)
-    return OrderService(db).my_orders(child_id, parent.id)
+    svc = OrderService(db)
+    rows = svc.my_orders(child_id, parent.id)
+    stamp_list_meta(response, loaded=len(rows), limit=svc.MY_ORDERS_LIMIT)
+    return rows
 
 
 # ---------- 线上支付（WM12-A：下单 / 价格 / 发起支付） ----------

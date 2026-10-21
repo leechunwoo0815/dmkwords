@@ -6,12 +6,13 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from pydantic import Field, field_validator
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
 from backend.common.exceptions import NotFoundError
+from backend.common.list_meta import stamp_list_meta
 from backend.common.media_paths import is_within
 from backend.database import get_db
 from backend.domain.activity.admin_service import AdminActivityService
@@ -77,13 +78,18 @@ class RefundReviewRequest(BaseSchema):
 
 @router.get("/activities")
 def list_activities(
+    response: Response,
     status: str | None = None,
     keyword: str | None = Query(None, max_length=50),
     activity_type: str | None = None,
     admin: Any = Depends(require_perm("member.manage")),
     db: Session = Depends(get_db),
 ):
-    return ActivityService(db).list_admin(status, keyword, activity_type)
+    """管理端活动列表（P2-44：硬上限经响应头如实告知）。"""
+    svc = ActivityService(db)
+    rows = svc.list_admin(status, keyword, activity_type)
+    stamp_list_meta(response, loaded=len(rows), limit=svc.ADMIN_LIST_LIMIT)
+    return rows
 
 
 @router.get("/activities/{activity_id}")

@@ -2,11 +2,12 @@
 import os
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile
 from pydantic import Field
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema, PaginatedResponse
+from backend.common.list_meta import stamp_list_meta
 from backend.common.media_paths import is_within
 from backend.database import get_db
 from backend.domain.identity import refund_queries
@@ -356,12 +357,19 @@ class ReviewRequest(BaseSchema):
 
 @router.get("/refund-requests")
 def admin_refund_list(
+    response: Response,
     status: str | None = None,
     admin: Any = Depends(require_super_admin()),
     db: Session = Depends(get_db),
 ):
-    """退款申请列表（订单类 + 押金类统一，超管逐单审）。"""
-    return refund_queries.admin_list(db, status)
+    """退款申请列表（订单类 + 押金类统一，超管逐单审）。
+
+    P2-44：响应头如实告知硬上限与"是否已达上限"（`X-List-Limit` / `X-List-Truncated`），
+    管理端据此提示"可能还有更多"——不再让 200 条上限看起来像"这就是全部"。
+    """
+    rows = refund_queries.admin_list(db, status)
+    stamp_list_meta(response, loaded=len(rows), limit=refund_queries.ADMIN_LIST_LIMIT)
+    return rows
 
 
 @router.post("/refund-requests/{request_id}/review")
@@ -407,11 +415,16 @@ def admin_refund_query_gateway(
 
 @router.get("/withdrawals")
 def admin_withdrawal_list(
+    response: Response,
     status: str | None = None,
     admin: Any = Depends(require_super_admin()),
     db: Session = Depends(get_db),
 ):
-    return WithdrawalService(db).admin_list(status)
+    """退会台账（P2-44：硬上限经响应头如实告知）。"""
+    svc = WithdrawalService(db)
+    rows = svc.admin_list(status)
+    stamp_list_meta(response, loaded=len(rows), limit=svc.ADMIN_LIST_LIMIT)
+    return rows
 
 
 @router.get("/withdrawals/{request_id}/settle-preview")
@@ -436,11 +449,16 @@ def admin_withdrawal_review(
 
 @router.get("/transfers")
 def admin_transfer_list(
+    response: Response,
     status: str | None = None,
     admin: Any = Depends(require_super_admin()),
     db: Session = Depends(get_db),
 ):
-    return TransferService(db).admin_list(status)
+    """转让台账（P2-44：硬上限经响应头如实告知）。"""
+    svc = TransferService(db)
+    rows = svc.admin_list(status)
+    stamp_list_meta(response, loaded=len(rows), limit=svc.ADMIN_LIST_LIMIT)
+    return rows
 
 
 @router.post("/transfers/{request_id}/review")

@@ -1,4 +1,4 @@
-# scripts/load_test.py — 第七轮 W6 缺口补做：**5 组压测**（真实 HTTP + 真实 MySQL）
+# scripts/load_test.py — **容量压测 5 组**（真实 HTTP + 真实 MySQL）
 """用法（**必须跑在一次性实例上，绝不动演示库**）：
 
     # 1) 建独立压测库 + 迁表 + 播种管理员
@@ -9,18 +9,30 @@
     DB_NAME=dmkwords_loadtest SCHEDULER_ENABLED=false RATE_LIMIT_WRITE_PER_MINUTE=0 \
       .venv/bin/uvicorn backend.main:app --port 8003
 
-    # 3) 压测
-    .venv/bin/python -m scripts.load_test --base-url http://127.0.0.1:8003 --json /tmp/load.json
+    # 3) 压测（DB_NAME 必须一起给：脚本据此**拒绝**打到演示库）
+    DB_NAME=dmkwords_loadtest .venv/bin/python -m scripts.load_test \
+      --base-url http://127.0.0.1:8003 --json /tmp/load.json
 
 五组（对齐 `docs/审查任务书-第七轮…` W6）：
   G1 借还并发    —— ①同一副本被 10 个孩子并发借（**恰好 1 成功**）
                     ②同一孩子并发借 10 本、额度只剩 5（**恰好 5 成功，不超卖**）
   G2 报名并发    —— 名额 5、20 个家庭并发报名（**恰好 5 成功**）
   G3 支付回调风暴 —— 同一订单 20 次并发回调（**恰好入账 1 次**，幂等）
-  G4 批量导入    —— 1000 行 xlsx 单请求（耗时 + 后端 RSS 增量）
-  G5 定时任务    —— 造量（2000 书目 / 1 万副本 / 6000 借阅）后逐个任务计时
+  G4 批量导入    —— 1000 行 xlsx 单请求（耗时 + 后端 RSS 增量 + **回库核对**）
+  G5 定时任务    —— 造量（书目/孩子/借阅/订单/退款/词账）后**全部任务**逐个计时
 
-输出：每组 `请求数 / 成功 / 失败 / p50 / p95 / p99 / max` + 不变量结论；`--json` 落盘。
+**P2-43（2026-10-20 第八轮大审查）补强**——原先它"不能支撑『容量已验』"：
+  · G5 只跑 9/21 个任务 → 改为**从 `tasks.registry` 枚举全部任务**（新增任务自动纳入）；
+  · 造量只有书目/孩子/借阅 → 补**订单 / 退款台账 / 词账**（对账、退款审核、榜单聚合
+    这些"随流水线性增长"的任务原先根本压不到）；
+  · 没有阈值 → 每个任务加**耗时上限判定**（超限即 FAIL），报告末尾给结构化汇总；
+  · G4 只看接口自报的 `success_count` → 补**回库核对**（真查一遍导入落库行数）；
+  · 不可重跑 → 造量按**每次运行唯一 tag** 生成手机号/副本码/书名，第二次跑不再撞唯一键；
+  · `--base-url` 不校验 → `guard_target()` 先拒绝：库名须自报压测/演练库、端口不得是
+    dev.sh 的端口（原先指到 :8002 就会把演示库灌成 2000 书目 / 6000 借阅）。
+
+输出：每组 `请求数 / 成功 / 失败 / p50 / p95 / p99 / max` + `判定`（PASS/FAIL）；`--json` 落盘。
+退出码：任一 `判定=FAIL` 即非 0（可进 CI）。
 """
 
 from __future__ import annotations
@@ -33,6 +45,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 
@@ -44,6 +57,35 @@ sys.path.insert(0, ROOT)
 ADMIN = ("admin", "dmkwords123")
 DEV_CODE = "1234"
 CONC = 20  # 并发度
+
+#: 压测目标端口黑名单（P2-43）：8002 = dev.sh 后端、8443 = dev.sh https、5173 = 管理端。
+DEMO_PORTS = {8002, 8443, 5173}
+#: 允许压测的库名特征（与 `_scratch_db` / `_seed_volume` 同一条纪律）
+LOADTEST_DB_MARKERS = ("loadtest", "drill")
+#: 单个定时任务的耗时上限（秒）——超限即 FAIL（"容量已验"的判据，P2-43）。
+#: 依据：调度器最小间隔 300 秒（`overdue_mark`），任务必须**远快于**间隔，
+#: 否则下一轮触发会被 `max_instances=1` 跳过（任务实际停摆）。
+TASK_DURATION_LIMIT_S = 60.0
+
+
+def guard_target(base: str) -> None:
+    """压测目标自检（P2-43）：**先拒绝再跑**，别把演示库灌成压测数据。
+
+    两道闸：① 库名必须自报是压测/演练库（`DB_NAME` 由调用方给出）；
+    ② 端口不得是 dev.sh 的端口（`--base-url` 指到 :8002 就是演示后端）。
+    """
+    db_name = os.environ.get("DB_NAME", "")
+    if not any(m in db_name for m in LOADTEST_DB_MARKERS):
+        raise SystemExit(
+            f"拒绝压测：DB_NAME={db_name!r} 不是压测/演练库（须含 {'/'.join(LOADTEST_DB_MARKERS)}）。\n"
+            "  正确姿势：DB_NAME=dmkwords_loadtest .venv/bin/python -m scripts.load_test ..."
+        )
+    parsed = urllib.parse.urlparse(base)
+    if parsed.port in DEMO_PORTS:
+        raise SystemExit(
+            f"拒绝压测：{base} 用的是演示/开发端口 {sorted(DEMO_PORTS)}"
+            "（dev.sh 的后端/管理端）——压测必须打在**一次性实例**上（文档示例用 :8003）。"
+        )
 
 
 # ---------- 基础设施 ----------
@@ -478,12 +520,18 @@ def g4_import(base: str, h: dict, rows: int = 1000) -> dict:
     ms = (time.perf_counter() - t0) * 1000
     rss1 = backend_rss_kb(base)
     body = r.json() if r.status_code == 200 else {"error": r.text[:200]}
-    ok = r.status_code == 200 and body.get("success_count") == rows
+    # P2-43：**回库核对**——原先只信接口自报的 success_count（自证绿：接口说成功就算成功，
+    # 真没落库也看不出来）。这里按本次号段真查一遍库里落了几个书目。
+    from backend.domain.catalog.models import Book
+
+    landed = _count(Book, Book.title.like(f"压测导入书{offset}%"))
+    ok = r.status_code == 200 and body.get("success_count") == rows and landed >= rows
     return {
         f"导入{rows}行": {
             "http": r.status_code,
             "成功行": body.get("success_count"),
             "失败行": body.get("failed_count"),
+            "回库核对行": landed,
             "耗时_s": round(ms / 1000, 2),
             "行每秒": round(rows / (ms / 1000), 1) if ms else 0,
             "后端RSS_增量_MB": (round((rss1 - rss0) / 1024, 1) if rss0 and rss1 else None),
@@ -495,39 +543,60 @@ def g4_import(base: str, h: dict, rows: int = 1000) -> dict:
 # ---------- G5 定时任务在数据量增长下的耗时 ----------
 
 
-def _seed_volume(books: int = 2000, children: int = 2000, borrows: int = 6000) -> dict:
-    """造量：直连**压测库**（`DB_NAME` 由环境给出，脚本只认 env，绝不默认演示库）。"""
+def _seed_volume(
+    books: int = 2000,
+    children: int = 2000,
+    borrows: int = 6000,
+    orders: int = 2000,
+    refunds: int = 800,
+    words: int = 60_000,
+) -> dict:
+    """造量：直连**压测库**（`DB_NAME` 由环境给出，脚本只认 env，绝不默认演示库）。
+
+    P2-43（2026-10-20 第八轮）两处补强：
+    · **补 orders / refund_requests / words_ledgers**——原先只造书目/孩子/借阅，
+      于是"支付对账、退款审核队列、榜单/横幅聚合"这些**随流水线性增长**的任务在压测里
+      根本压不到（它们在真实库里的耗时才是容量风险）；
+    · **可重跑**：所有唯一键（手机号 / 副本码 / 书名 / 订单号）带**本次运行 tag**，
+      第二次跑不再撞唯一约束（原先第二次跑必然报重复键）。
+    """
     db_name = os.environ.get("DB_NAME", "")
-    if "loadtest" not in db_name and "drill" not in db_name:
+    if not any(m in db_name for m in LOADTEST_DB_MARKERS):
         raise SystemExit(
-            f"拒绝造量：DB_NAME={db_name!r} 不是压测/演练库（必须含 loadtest 或 drill）"
+            f"拒绝造量：DB_NAME={db_name!r} 不是压测/演练库"
+            f"（必须含 {'/'.join(LOADTEST_DB_MARKERS)}）"
         )
     from datetime import datetime, timedelta
+    from decimal import Decimal
 
     from sqlalchemy import insert
 
     from backend.database import get_session
     from backend.domain.catalog.models import Book, BookCopy
     from backend.domain.circulation.models import BorrowRecord
-    from backend.domain.identity.models import Child, Parent
+    from backend.domain.growth.models import WordsLedger
+    from backend.domain.identity.models import Child, Order, Parent, RefundRequest
 
+    tag = os.environ.get("LOAD_RUN_TAG") or time.strftime("%m%d%H%M%S")
     now = datetime.now()
     db = get_session()
     try:
         db.execute(
             insert(Parent),
             [
-                {"name": f"压量家长{i}", "phone": f"1398{i:07d}", "is_deleted": 0}
+                {"name": f"压量家长{tag}-{i}", "phone": f"1398{tag[-6:]}{i:04d}", "is_deleted": 0}
                 for i in range(children)
             ],
         )
         db.commit()
-        pids = [r[0] for r in db.query(Parent.id).all()]
+        pids = [
+            r[0] for r in db.query(Parent.id).filter(Parent.name.like(f"压量家长{tag}-%")).all()
+        ]
         db.execute(
             insert(Child),
             [
                 {
-                    "name": f"压量孩{i}",
+                    "name": f"压量孩{tag}-{i}",
                     "parent_id": pids[i % len(pids)],
                     "member_status": Child.MEMBER_FORMAL,
                     "member_expire": now + timedelta(days=(i % 40) - 5),
@@ -540,7 +609,7 @@ def _seed_volume(books: int = 2000, children: int = 2000, borrows: int = 6000) -
             insert(Book),
             [
                 {
-                    "title": f"压量书{i}",
+                    "title": f"压量书{tag}-{i}",
                     "author": "load",
                     "word_count": 1000,
                     "status": Book.STATUS_ON,
@@ -552,20 +621,28 @@ def _seed_volume(books: int = 2000, children: int = 2000, borrows: int = 6000) -
             ],
         )
         db.commit()
-        bids = [r[0] for r in db.query(Book.id).all()]
+        bids = [r[0] for r in db.query(Book.id).filter(Book.title.like(f"压量书{tag}-%")).all()]
         db.execute(
             insert(BookCopy),
             [
-                {"book_id": b, "copy_code": f"LOAD-{b}-{k}", "status": BookCopy.STATUS_AVAILABLE}
+                {
+                    "book_id": b,
+                    "copy_code": f"LOAD-{tag}-{b}-{k}",
+                    "status": BookCopy.STATUS_AVAILABLE,
+                }
                 for b in bids
                 for k in range(5)
             ],
         )
         db.commit()
-        cids = [r[0] for r in db.query(Child.id).all()]
+        cids = [r[0] for r in db.query(Child.id).filter(Child.name.like(f"压量孩{tag}-%")).all()]
         # 副本 → 书目（每本书 5 个副本）——`borrow_records.book_id` 是 NOT NULL 无默认值
         copy_rows = (
-            db.query(BookCopy.id, BookCopy.book_id).order_by(BookCopy.id).limit(borrows).all()
+            db.query(BookCopy.id, BookCopy.book_id)
+            .filter(BookCopy.copy_code.like(f"LOAD-{tag}-%"))
+            .order_by(BookCopy.id)
+            .limit(borrows)
+            .all()
         )
         db.execute(
             insert(BorrowRecord),
@@ -582,42 +659,128 @@ def _seed_volume(books: int = 2000, children: int = 2000, borrows: int = 6000) -
                 for i, (copy_id, book_id) in enumerate(copy_rows)
             ],
         )
+        # 已支付订单（对账/导出/列表类任务的输入）
+        db.execute(
+            insert(Order),
+            [
+                {
+                    "order_no": f"LOAD{tag}{i:06d}",
+                    "order_type": Order.TYPE_OBSERVATION,
+                    "parent_id": pids[i % len(pids)],
+                    "child_id": cids[i % len(cids)],
+                    "amount": Decimal("99.00"),
+                    "status": Order.STATUS_PAID,
+                    "paid_at": now - timedelta(days=i % 60),
+                    "pay_method": "scan",
+                    "is_deleted": 0,
+                }
+                for i in range(orders)
+            ],
+        )
+        # 退款台账（退款审核队列/汇总的输入）
+        db.execute(
+            insert(RefundRequest),
+            [
+                {
+                    "kind": RefundRequest.KIND_ORDER,
+                    "child_id": cids[i % len(cids)],
+                    "amount": Decimal("99.00"),
+                    "reason": f"压测退款{tag}-{i}",
+                    "status": RefundRequest.STATUS_PENDING,
+                    "is_deleted": 0,
+                }
+                for i in range(refunds)
+            ],
+        )
+        # 词账（榜单/横幅聚合的输入；分布到近 30 天，覆盖周/月榜窗口）
+        db.execute(
+            insert(WordsLedger),
+            [
+                {
+                    "child_id": cids[i % len(cids)],
+                    "book_id": bids[i % len(bids)],
+                    "word_count": 100 + (i % 400),
+                    "source": "load",
+                    "created_at": now - timedelta(days=i % 30),
+                    "is_deleted": 0,
+                }
+                for i in range(words)
+            ],
+        )
         db.commit()
-        return {"书目": books, "孩子": children, "借阅": borrows}
+        return {
+            "运行tag": tag,
+            "书目": books,
+            "孩子": children,
+            "借阅": borrows,
+            "订单": orders,
+            "退款": refunds,
+            "词账": words,
+        }
     finally:
         db.close()
 
 
-TASKS_TO_TIME = (
-    "overdue_mark",
-    "book_due_remind",
-    "member_expire_check",
-    "member_expire_remind",
-    "reservation_expire_check",
-    "order_timeout_cancel",
-    "transfer_expire_check",
-    "pending_evaluation_weekly",
-    "media_census",
-)
+def all_task_names() -> list[str]:
+    """**全部**定时任务（P2-43：从注册表枚举，不再手抄 9 个）。
+
+    原先手抄的 9 个任务漏掉了 12 个（含"随流水线性增长"的榜单快照/对账/清理类），
+    而"容量已验"的前提是**每个任务都在目标数据量下跑过**。这里读 `tasks.registry.TASKS`
+    ——以后新增任务自动纳入压测（不会再次漂移）。
+    """
+    from backend.tasks.registry import TASKS
+
+    return sorted(TASKS)
 
 
 def g5_tasks(base: str, h: dict, volume: dict) -> dict:
-    out: dict = {"造量": volume, "任务": {}}
-    for name in TASKS_TO_TIME:
+    """逐个任务计时 + **耗时上限判定**（P2-43：原先只报数，没有 PASS/FAIL）。"""
+    out: dict = {"造量": volume, "耗时上限_s": TASK_DURATION_LIMIT_S, "任务": {}}
+    names = all_task_names()
+    out["任务数"] = len(names)
+    for name in names:
         t0 = time.perf_counter()
-        r = httpx.post(f"{base}/api/admin/tasks/{name}/run", headers=h, timeout=600)
+        try:
+            r = httpx.post(f"{base}/api/admin/tasks/{name}/run", headers=h, timeout=600)
+            body = r.json() if r.status_code == 200 else {"error": r.text[:200]}
+            code = r.status_code
+        except Exception as exc:  # noqa: BLE001 — 单任务异常不该中断整轮压测
+            body, code = {"error": f"{type(exc).__name__}: {str(exc)[:160]}"}, 0
         ms = (time.perf_counter() - t0) * 1000
-        body = r.json() if r.status_code == 200 else {"error": r.text[:200]}
+        secs = ms / 1000
+        ok = code == 200 and body.get("status") == "success" and secs <= TASK_DURATION_LIMIT_S
         out["任务"][name] = {
-            "http": r.status_code,
-            "耗时_s": round(ms / 1000, 2),
+            "http": code,
+            "耗时_s": round(secs, 2),
             "处理数": body.get("processed"),
             "状态": body.get("status"),
+            "错误": body.get("error"),
+            "判定": "PASS" if ok else "FAIL",
         }
+    failed = [k for k, v in out["任务"].items() if v["判定"] == "FAIL"]
+    out["判定"] = "PASS" if not failed else "FAIL"
+    out["未通过任务"] = failed
     return out
 
 
 # ---------- main ----------
+
+
+def collect_verdicts(node, path: str = "") -> list[tuple[str, str]]:
+    """递归收集报告里所有 `判定` 字段（P2-43：原先靠 `text.count('"判定": "FAIL"')` 数失败——
+    字符串口径脆弱（格式化/换行一变就数不到），且只在**最终 JSON 文本**上判）。"""
+    out: list[tuple[str, str]] = []
+    if isinstance(node, dict):
+        if "判定" in node:
+            out.append((path or "根", str(node["判定"])))
+        for k, v in node.items():
+            if k == "判定":
+                continue
+            out.extend(collect_verdicts(v, f"{path}/{k}" if path else str(k)))
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            out.extend(collect_verdicts(v, f"{path}[{i}]"))
+    return out
 
 
 def main() -> int:
@@ -628,6 +791,7 @@ def main() -> int:
     args = ap.parse_args()
     base = args.base_url.rstrip("/")
 
+    guard_target(base)  # P2-43：先拒绝演示库/演示端口，再开始任何压测动作
     h = login_admin(base)
     report: dict = {
         "base_url": base,
@@ -648,14 +812,27 @@ def main() -> int:
         report["G5_定时任务"] = g5_tasks(base, h, _seed_volume())
 
     report["finished_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    verdicts = collect_verdicts(report)
+    failed = [p for p, v in verdicts if v == "FAIL"]
+    report["判定汇总"] = {
+        "项数": len(verdicts),
+        "PASS": len(verdicts) - len(failed),
+        "FAIL": len(failed),
+        "未通过": failed,
+        "结论": "PASS" if not failed else "FAIL",
+    }
     text = json.dumps(report, ensure_ascii=False, indent=2)
     print(text)
     if args.json:
         with open(args.json, "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
-    fails = text.count('"判定": "FAIL"')
-    print(f"\n[load] 不变量 FAIL 数 = {fails}")
-    return 1 if fails else 0
+    print(
+        f"\n[load] 判定 {report['判定汇总']['PASS']}/{len(verdicts)} PASS"
+        f"；FAIL={report['判定汇总']['FAIL']}"
+    )
+    for p in failed:
+        print(f"  · FAIL {p}")
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

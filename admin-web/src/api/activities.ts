@@ -1,5 +1,5 @@
 // activities API（WM9：发布/取消/报名/签到/退款审核）
-import { getToken, request } from "./client";
+import { getToken, ListResult, request, requestList } from "./client";
 
 export interface ActivityItem {
   cover_url?: string | null;
@@ -58,17 +58,18 @@ export interface ActivityDetail extends ActivityItem {
   detail_blocks?: DetailBlock[]; // 图文详情（编辑器可写形态：image 块只有相对路径）
 }
 
+// P2-44：管理端活动列表后端硬上限 200——返回上限元信息，页面据此提示"可能还有更多"。
 export function apiListActivities(params?: {
   status?: string;
   keyword?: string;
   activity_type?: string;
-}): Promise<ActivityItem[]> {
+}): Promise<ListResult<ActivityItem[]>> {
   const ps = new URLSearchParams();
   if (params?.status) ps.set("status", params.status);
   if (params?.keyword) ps.set("keyword", params.keyword);
   if (params?.activity_type) ps.set("activity_type", params.activity_type);
   const qs = ps.toString();
-  return request(`/api/admin/activities${qs ? `?${qs}` : ""}`);
+  return requestList(`/api/admin/activities${qs ? `?${qs}` : ""}`);
 }
 
 export function apiCreateActivity(body: CreateActivityBody): Promise<{ id: number }> {

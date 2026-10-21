@@ -311,11 +311,14 @@ class WithdrawalService:
             "settled": bool(items),
         }
 
+    #: 管理端退会台账硬上限（P2-44：上限与是否已达上限经响应头告知）
+    ADMIN_LIST_LIMIT = 200
+
     def admin_list(self, status: str | None = None) -> list[dict]:
         q = self.db.query(WithdrawalRequest).filter(WithdrawalRequest.is_deleted == 0)
         if status:
             q = q.filter(WithdrawalRequest.status == status)
-        rows = q.order_by(WithdrawalRequest.id.desc()).limit(200).all()
+        rows = q.order_by(WithdrawalRequest.id.desc()).limit(self.ADMIN_LIST_LIMIT).all()
         out = []
         for r in rows:
             child = self.db.query(Child).filter(Child.id == r.child_id).first()

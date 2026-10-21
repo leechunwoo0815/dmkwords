@@ -142,6 +142,11 @@ def clean_db():
     seed_configs()
     seed_dictionary()
     invalidate_config_cache()
+    # P2-40（2026-10-20 第八轮）：社区横幅是**进程内 TTL 缓存**（60 秒）——与配置缓存同理，
+    # 数据被 TRUNCATE 后必须清掉，否则下个用例读到上个用例的横幅数字（跨用例串台）。
+    from backend.domain.reading_circle.service import invalidate_banner_cache
+
+    invalidate_banner_cache()
     # 2026-10-12（P6 下架禁借落地后）：测试里**新建的书默认上架**——否则所有"建书即借"的
     # 历史用例都会撞上"已下架，不能借出"。需要测下架行为的用例自行 toggle 即可。
     _force_books_on_shelf()

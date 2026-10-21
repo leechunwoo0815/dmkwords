@@ -78,6 +78,11 @@ export default function RefundCenter() {
   const [refunds, setRefunds] = useState<RefundRequestItem[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalItem[]>([]);
   const [transfers, setTransfers] = useState<TransferItem[]>([]);
+  // P2-44：三个台账的后端硬上限（200）——已达上限时列表底部提示"可能还有更多"，
+  // 否则 200 条看起来就是全部，**待审单会被漏看**（资金域，最高危）。
+  const [refundLimit, setRefundLimit] = useState<number | null>(null);
+  const [withdrawalLimit, setWithdrawalLimit] = useState<number | null>(null);
+  const [transferLimit, setTransferLimit] = useState<number | null>(null);
   // R5（#3）时序加固：3 秒清除窗口从列表数据到达起算——原实现挂载即起算，
   // 接口返回前窗口已烧掉，行渲染时 highlightId 已被清（高亮不出现真凶嫌疑）
   const [hlArmed, setHlArmed] = useState(false);
@@ -120,10 +125,17 @@ export default function RefundCenter() {
   const transferPg = usePaintPagination();
 
   const load = useCallback(() => {
-    apiListRefunds().then(setRefunds).catch((e: Error) => message.error(e.message));
+    // P2-44：列表接口带"硬上限"元信息（X-List-Limit）——存下来交给分页条提示
+    apiListRefunds()
+      .then((r) => { setRefunds(r.items); setRefundLimit(r.limit); })
+      .catch((e: Error) => message.error(e.message));
     // F-H4/T26：资金域列表 fetch 失败必须报错——静默置空=管理员误判无待审（最高危）
-    apiListWithdrawals().then(setWithdrawals).catch((e: Error) => { message.error(e.message); setWithdrawals([]); });
-    apiListTransfers().then(setTransfers).catch((e: Error) => { message.error(e.message); setTransfers([]); });
+    apiListWithdrawals()
+      .then((r) => { setWithdrawals(r.items); setWithdrawalLimit(r.limit); })
+      .catch((e: Error) => { message.error(e.message); setWithdrawals([]); });
+    apiListTransfers()
+      .then((r) => { setTransfers(r.items); setTransferLimit(r.limit); })
+      .catch((e: Error) => { message.error(e.message); setTransfers([]); });
   }, [message]);
 
   useEffect(() => {
@@ -333,7 +345,7 @@ export default function RefundCenter() {
                 ]}
                scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
-              <PaintPagination current={refundPg.page} pageSize={refundPg.pageSize} total={refunds.length} onChange={refundPg.onChange} />
+              <PaintPagination current={refundPg.page} pageSize={refundPg.pageSize} total={refunds.length} onChange={refundPg.onChange} listLimit={refundLimit} />
             </>),
 
           },
@@ -405,7 +417,7 @@ export default function RefundCenter() {
                 ]}
                scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
-              <PaintPagination current={withdrawalPg.page} pageSize={withdrawalPg.pageSize} total={withdrawals.length} onChange={withdrawalPg.onChange} />
+              <PaintPagination current={withdrawalPg.page} pageSize={withdrawalPg.pageSize} total={withdrawals.length} onChange={withdrawalPg.onChange} listLimit={withdrawalLimit} />
             </>),
 
           },
@@ -454,7 +466,7 @@ export default function RefundCenter() {
                 ]}
                scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
-              <PaintPagination current={transferPg.page} pageSize={transferPg.pageSize} total={transfers.length} onChange={transferPg.onChange} />
+              <PaintPagination current={transferPg.page} pageSize={transferPg.pageSize} total={transfers.length} onChange={transferPg.onChange} listLimit={transferLimit} />
             </>),
 
           },

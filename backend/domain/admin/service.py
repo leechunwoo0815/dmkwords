@@ -39,6 +39,10 @@ from backend.domain.admin.repository import (
 )
 from backend.domain.catalog.audit_events import publish_audit
 
+#: 导出上限（P2-44：上限在导出文件里如实写明，不再静默截断）
+NOTIFICATION_EXPORT_LIMIT = 10000
+AUDIT_EXPORT_LIMIT = 10000
+
 # ---------- 权限目录（声明式 RBAC 的单一事实源） ----------
 # superadmin = 全量；staff = 日常运营（借还/图书/活动/会员办理/放行留痕），不含资金审核与系统管理
 STAFF_PERMISSIONS = [
@@ -521,17 +525,28 @@ class NotifyAdminService:
         }
 
     def export_excel(self) -> bytes:
-        """通知记录导出 Excel（与审计导出同用 openpyxl）。"""
+        """通知记录导出 Excel（与审计导出同用 openpyxl）。
+
+        P2-44（2026-10-20 第八轮）：导出上限**在文件里如实写明**。原先超过 10000 条时静默截断，
+        导出的 Excel 看起来是"全部记录"（拿去做台账/对账就会漏）。
+        """
         from io import BytesIO
 
         from openpyxl import Workbook
         from openpyxl.styles import Font
 
-        rows, _, _, _ = self.list_notifications(1, 10000)
+        rows, total, _, _ = self.list_notifications(1, NOTIFICATION_EXPORT_LIMIT)
         wb = Workbook()
         ws = wb.active
         ws.title = "通知记录"
         headers = ["ID", "家长", "分类", "场景", "标题", "内容", "微信状态", "已读", "时间"]
+        if total > len(rows):
+            ws.append(
+                [
+                    f"注意：符合条件的记录共 {total} 条，本表仅导出最新 {len(rows)} 条"
+                    f"（上限 {NOTIFICATION_EXPORT_LIMIT}）——请缩小筛选范围后分批导出。"
+                ]
+            )
         ws.append(headers)
         for c in ws[1]:
             c.font = Font(bold=True)
@@ -566,22 +581,26 @@ class AuditExportService:
         self.db = db
 
     def export_excel(self) -> bytes:
+        """审计日志导出（P2-44：上限在文件里如实写明，不再静默截断）。"""
         from io import BytesIO
 
         from openpyxl import Workbook
         from openpyxl.styles import Font
 
-        rows = (
-            self.db.query(AuditLog)
-            .filter(AuditLog.is_deleted == 0)
-            .order_by(AuditLog.id.desc())
-            .limit(10000)
-            .all()
-        )
+        q = self.db.query(AuditLog).filter(AuditLog.is_deleted == 0)
+        total = q.count()
+        rows = q.order_by(AuditLog.id.desc()).limit(AUDIT_EXPORT_LIMIT).all()
         wb = Workbook()
         ws = wb.active
         ws.title = "操作审计"
         headers = ["ID", "操作人", "动作", "对象类型", "对象ID", "详情", "原因", "时间"]
+        if total > len(rows):
+            ws.append(
+                [
+                    f"注意：符合条件的记录共 {total} 条，本表仅导出最新 {len(rows)} 条"
+                    f"（上限 {AUDIT_EXPORT_LIMIT}）——请缩小筛选范围后分批导出。"
+                ]
+            )
         ws.append(headers)
         for c in ws[1]:
             c.font = Font(bold=True)

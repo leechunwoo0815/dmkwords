@@ -8,11 +8,21 @@ interface PaintPaginationProps {
   pageSize: number;
   total: number;
   onChange: (page: number, pageSize: number) => void;
+  /**
+   * P2-44：后端硬上限提示。传后端返回的 `X-List-Limit`（当前生效的上限）即可——
+   * 组件在"已加载行数已达上限"时显示提示条：**当前列表可能不是全部**。
+   * 不传则不显示（后端未提供元信息的列表保持原样）。
+   */
+  listLimit?: number | null;
 }
 
-export default function PaintPagination({ current, pageSize, total, onChange }: PaintPaginationProps) {
+export default function PaintPagination({
+  current, pageSize, total, onChange, listLimit = null,
+}: PaintPaginationProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const lastJumpRef = useRef<number | null>(null);
+  // 已达上限 = 后端可能还有没返回的行（不猜总数，只如实说"可能还有更多"）
+  const capped = listLimit !== null && total >= listLimit;
 
   return (
     <Row justify="space-between" align="middle" style={{ marginTop: 16 }}>
@@ -43,6 +53,11 @@ export default function PaintPagination({ current, pageSize, total, onChange }: 
       </Col>
       <Col>
         <Space>
+          {capped && (
+            <Typography.Text type="warning" data-testid="list-capped-hint">
+              已达后端上限 {listLimit} 条，可能还有更多未显示——请用筛选条件缩小范围
+            </Typography.Text>
+          )}
           <Pagination
             current={current}
             pageSize={pageSize}

@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from sqlalchemy import func, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
@@ -17,9 +18,19 @@ from sqlalchemy.orm import Session
 
 from backend.common.events import DomainEvent
 from backend.common.notification_models import Notification
-from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+#: 回写等待"通知行可见"的上限与轮询间隔（P2-42，2026-10-20 第八轮大审查）。
+#:
+#: **实测根因**（不是静态推断）：通知行由**发起方事务**插入，而微信回执往往在几百毫秒内就
+#: 回来——此时发起方事务可能还没提交。对**未提交行**发 UPDATE 不是"匹配 0 行"，而是
+#: InnoDB **等锁**：探针实测 `1205 Lock wait timeout exceeded` 要等满 50.15 秒才返回，
+#: 期间白占一条连接池连接；回写线程随后只记一条 warning → `wechat_status` **永久停在
+#: `queued`**（管理端一直显示"等待回执"）。千条提醒就是千条这样的线程/连接。
+#: 现在改成**轮询可见性**：快照读（不阻塞、不加锁）确认行已提交后再 UPDATE。
+WRITEBACK_VISIBLE_TIMEOUT_SECONDS = 30.0
+WRITEBACK_POLL_SECONDS = 0.25
 
 # 场景常量（与 notification_models.Notification.scene 一一对应）
 SCENE_MONEY_ORDER_PAID = "money.order_paid"
@@ -72,24 +83,20 @@ class NotificationService:
         （`push_subscribe_message` 起线程后立刻 `return True` → 管理端渲染绿色「微信已送达」
         并进 Excel 导出，真实结果只在进程日志里）；反方向则把"标题未命中模板映射"写成
         `failed` + 假原因"额度不足/用户拒收"。现在三态如实：
-        - **跳过**（通道未启用/无 openid/模板未配）→ `skipped` + **真实**原因；
-        - **已提交**（线程已起、结果未知）→ `queued` + "等待微信回执"，线程拿到真实结果后
-          **回写** sent/failed（见 `_writeback`，独立 session：请求事务早已结束）；
-        - **异常** → `failed` + 真实异常文案。
+        - **跳过**（通道未启用/无 openid/模板未配/场景未映射）→ `skipped` + **真实**原因；
+        - **已提交**（线程池已受理、结果未知）→ `queued` + "等待微信回执"，worker 拿到真实
+          结果后**回写** sent/failed/skipped（见 `_writeback`，独立 session）；
+        - **异常/队列满** → `failed` + 真实原因。
+
+        P2-42（2026-10-20 第八轮）：判定与并发都在订阅模块（`precheck_subscribe` 单一事实源
+        + 有界线程池）；本方法只负责把订阅模块给出的**状态与原因如实落库**——第三项返回值
+        就是"该记什么状态"，不再由本方法二次判断（原先这里另抄了一份"通道未启用/无 openid"
+        的判定，同一口径两处实现）。
         """
-        settings = get_settings()
-        if not getattr(settings, "WECHAT_SUBSCRIBE_ENABLED", False):
-            self._set_wechat(notification_id, Notification.WECHAT_SKIPPED, "通道未启用")
-            return
-        if not openid:
-            self._set_wechat(
-                notification_id, Notification.WECHAT_SKIPPED, "家长未授权（无 openid）"
-            )
-            return
         try:
             from backend.integrations.wechat.subscribe import push_subscribe_message
 
-            queued, reason = push_subscribe_message(
+            queued, reason, hint = push_subscribe_message(
                 openid,
                 title,
                 content,
@@ -105,8 +112,8 @@ class NotificationService:
             )
             return
         if not queued:
-            # 未入队 = **主动跳过**（模板未命中/未配置等），原因如实记录——不许伪装成"发送失败"
-            self._set_wechat(notification_id, Notification.WECHAT_SKIPPED, reason)
+            # 未入队：状态与原因都来自订阅模块（skipped=主动跳过；failed=本该发没发成）
+            self._set_wechat(notification_id, hint or Notification.WECHAT_SKIPPED, reason)
             return
         self._set_wechat(notification_id, Notification.WECHAT_QUEUED, "已提交微信，等待回执")
 
@@ -124,11 +131,48 @@ class NotificationService:
         )
 
     @staticmethod
-    def _writeback(notification_id: int, ok: bool, error: str, status: str | None = None) -> None:
-        """后台线程拿到微信真实结果后回写（**独立 session**：发起时的请求事务早已结束）。
+    def existing_keys(
+        db: Session, *, scene: str, ref_type: str, ref_ids: list[int]
+    ) -> set[tuple[str, str, int]]:
+        """预取"已发过"的 `(ref_id, dedup_key, parent_id)` 三元组（**一次 IN 查询**，P2-41）。
 
-        `status`（P1-5，2026-10-18）：43101（用户未订阅/已拒收）由发送线程显式传 `"skipped"`——
+        为什么要有它（2026-10-20 第八轮）：批量提醒任务每轮都会重新扫到**同一批存量记录**
+        （窗口是"未来 N 天内到期"，不是"新记录"）。若不做预取，每条都要走 `send()` 内部的
+        存在性 SELECT——6000 条存量 × 每小时一轮 = 每小时 6000 条无用查询（逾期链路 300 秒
+        一轮，更密）。预取让稳态开销回到"一次 IN 查询 + 只对新记录写通知"。
+
+        **为什么必须带 `parent_id`**（不是 `(ref_id, dedup_key)` 两元组）：唯一索引是
+        `(parent_id, scene, ref_type, ref_id, dedup_key, is_deleted)`，而 `ref_id` 并不总是
+        "一对一"——活动提醒的 `ref_id` 是**活动 id**，一场活动有多个家长。只按两元组预取会把
+        "别的家长已发过"误判成"这个家长已发过"→ **漏发**（假绿）。三元组才与唯一索引同口径。
+        """
+        ids = [str(i) for i in set(ref_ids)]
+        if not ids:
+            return set()
+        rows = (
+            db.query(Notification.ref_id, Notification.dedup_key, Notification.parent_id)
+            .filter(
+                Notification.scene == scene,
+                Notification.ref_type == ref_type,
+                Notification.ref_id.in_(ids),
+                Notification.is_deleted == 0,
+            )
+            .all()
+        )
+        return {(r[0], r[1], r[2]) for r in rows}
+
+    @staticmethod
+    def _writeback(notification_id: int, ok: bool, error: str, status: str | None = None) -> None:
+        """后台 worker 拿到微信真实结果后回写（**独立 session**：发起时的请求事务早已结束）。
+
+        `status`（P1-5，2026-10-18）：43101（用户未订阅/已拒收）由发送 worker 显式传 `"skipped"`——
         它是"没送出去但也不是故障"，原先被当成功写成 `sent`（管理端显示绿色"已送达"）。
+
+        P2-42（2026-10-20 第八轮）：**先等行可见，再 UPDATE**。通知行由发起方事务插入，
+        回执常在提交前就回来；对未提交行直接 UPDATE 会**等锁 50 秒**（实测 1205）并白占连接，
+        最终状态永久停在 `queued`。这里用快照读轮询（不加锁、不阻塞），
+        每次轮询后 `rollback()` 把连接**还回池里**（不占着连接睡觉）。
+        超时（事务始终未提交/已回滚）如实记 warning，绝不无限等。
         """
         from backend.database import get_session
 
@@ -138,6 +182,26 @@ class NotificationService:
             logger.warning("wechat writeback 建会话失败：%s", exc)
             return
         try:
+            deadline = time.monotonic() + WRITEBACK_VISIBLE_TIMEOUT_SECONDS
+            while True:
+                visible = (
+                    session.query(Notification.id)
+                    .filter(Notification.id == notification_id)
+                    .first()
+                    is not None
+                )
+                session.rollback()  # 结束只读事务：连接回池，轮询期间不占连接
+                if visible:
+                    break
+                if time.monotonic() >= deadline:
+                    logger.warning(
+                        "wechat writeback 放弃：通知行 #%s 在 %.0f 秒内未提交"
+                        "（发起方事务未提交或已回滚），状态维持 queued/none",
+                        notification_id,
+                        WRITEBACK_VISIBLE_TIMEOUT_SECONDS,
+                    )
+                    return
+                time.sleep(WRITEBACK_POLL_SECONDS)
             session.execute(
                 update(Notification)
                 .where(Notification.id == notification_id)

@@ -515,7 +515,7 @@ export default function MemberManage() {
                       // R3：活动单下拉数据源（打开弹窗时拉一次；失败静默降级）
                       apiListActivities()
                         .then((acts) => setActivityOptions(
-                          acts.filter((a) => a.status === "published")
+                          acts.items.filter((a) => a.status === "published")
                             .map((a) => ({ value: a.id, label: `${a.title}（￥${a.fee}）` }))
                         ))
                         .catch(() => setActivityOptions([]));

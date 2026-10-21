@@ -10,6 +10,7 @@ from decimal import Decimal
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from backend.common.batch import commit_every
 from backend.common.events import OrderPaidEvent, event_bus
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
 from backend.common.notification_models import Notification
@@ -36,6 +37,8 @@ class OrderService(OrderGuardMixin):
 
         return int(ConfigService(self.db).get_value(key, str(default)))
 
+    MY_ORDERS_LIMIT = 50  # 家长端订单列表硬上限（P2-44：上限经响应头告知）
+
     def my_orders(self, child_id: int, parent_id: int) -> list[dict]:
         """家长视角订单列表（A-1/T6 下沉）：孩子名下单 ∪ 家长级单（child_id NULL）。"""
         rows = (
@@ -48,7 +51,7 @@ class OrderService(OrderGuardMixin):
                 Order.is_deleted == 0,
             )
             .order_by(Order.id.desc())
-            .limit(50)
+            .limit(self.MY_ORDERS_LIMIT)
             .all()
         )
         return [
@@ -707,7 +710,7 @@ class OrderService(OrderGuardMixin):
         marked = 0
         from sqlalchemy import update as sa_update
 
-        for order in orders:
+        for done, order in enumerate(orders, 1):
             # E-6/T18：条件 UPDATE 守卫（对齐 overdue_mark 先例）——管理员并发
             # confirm_payment 的 PAID 单不被覆盖回 CANCELLED（钱收了单没了）
             # W6 压测（2026-10-18）：`synchronize_session=False`——ORM 版 UPDATE 默认在 session
@@ -731,6 +734,7 @@ class OrderService(OrderGuardMixin):
 
                 ActivityService(self.db).cancel_enrollment_by_order(order)
             marked += 1
+            commit_every(self.db, done)  # P2-41：分块提交（原先整批一个事务，持锁数十秒）
         self.db.commit()
         return marked
 

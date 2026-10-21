@@ -41,6 +41,11 @@ PAST_AFTER_HOURS = 24
 
 
 class ActivityService(ActivityCancelMixin):
+    #: 管理端活动列表硬上限（P2-44：上限与"是否已达上限"经响应头如实告知，见 `common/list_meta.py`）
+    ADMIN_LIST_LIMIT = 200
+    #: 家长端"近期活动"列表硬上限（同上）
+    UPCOMING_LIMIT = 50
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -60,7 +65,7 @@ class ActivityService(ActivityCancelMixin):
             q = q.filter(Activity.title.like(f"%{escape_like(keyword)}%", escape="\\"))
         if activity_type:
             q = q.filter(Activity.activity_type == activity_type)
-        rows = q.order_by(Activity.start_at.desc()).limit(200).all()
+        rows = q.order_by(Activity.start_at.desc()).limit(self.ADMIN_LIST_LIMIT).all()
         quotas = self._quota_used_map([a.id for a in rows])
         return [
             self._activity_view(a, with_quota=True, quota_used=quotas.get(a.id, 0)) for a in rows
@@ -75,7 +80,7 @@ class ActivityService(ActivityCancelMixin):
                 Activity.start_at >= datetime.now() - timedelta(hours=2),
             )
             .order_by(Activity.start_at)
-            .limit(50)
+            .limit(self.UPCOMING_LIMIT)
             .all()
         )
         # R-313 活动列表行：退会不可见"会员专属"（C20）
@@ -530,7 +535,14 @@ class ActivityService(ActivityCancelMixin):
             e.cancel_reason = "订单超时未支付，自动取消"
 
     def activity_remind(self) -> int:
-        """活动开始前 3/2/1/当天 提醒已报名家长（PRD §9.4；每节点一次）。"""
+        """活动开始前 3/2/1/当天 提醒已报名家长（PRD §9.4；每节点一次）。
+
+        P2-41（2026-10-20 第八轮）：**同族扫描命中**——与借阅到期提醒/会员到期提醒同款
+        N+1（每个报名各查 `Child`/`Parent` + 一次通知存在性 SELECT）且整批一个事务。
+        现在按节点一次 `IN` 取全部报名、孩子、家长 + 一次已发键预取，每 `BATCH_COMMIT_CHUNK`
+        条提交一次。
+        """
+        from backend.common.batch import commit_every, fetch_by_ids
         from backend.common.config_service import ConfigService
 
         remind_days = [
@@ -542,6 +554,7 @@ class ActivityService(ActivityCancelMixin):
             return 0
         now = datetime.now()
         sent = 0
+        done = 0
         for days in sorted(set(remind_days)):
             target_day = (now + timedelta(days=days)).date()
             start = datetime.combine(target_day, datetime.min.time())
@@ -555,21 +568,43 @@ class ActivityService(ActivityCancelMixin):
                 )
                 .all()
             )
-            for a in acts:
-                enrolls = (
-                    self.db.query(ActivityEnrollment)
-                    .filter(
-                        ActivityEnrollment.activity_id == a.id,
-                        ActivityEnrollment.status == ActivityEnrollment.STATUS_ENROLLED,
-                        ActivityEnrollment.is_deleted == 0,
-                    )
-                    .all()
+            if not acts:
+                continue
+            act_ids = [a.id for a in acts]
+            # 一次取全部报名（原先"每场活动一次"），再按活动分组
+            all_enrolls = (
+                self.db.query(ActivityEnrollment)
+                .filter(
+                    ActivityEnrollment.activity_id.in_(act_ids),
+                    ActivityEnrollment.status == ActivityEnrollment.STATUS_ENROLLED,
+                    ActivityEnrollment.is_deleted == 0,
                 )
-                for e in enrolls:
-                    c = self.db.query(Child).filter(Child.id == e.child_id).first()
+                .all()
+            )
+            kids = {
+                c.id: c for c in fetch_by_ids(self.db, Child, [e.child_id for e in all_enrolls])
+            }
+            parents = {
+                p.id: p for p in fetch_by_ids(self.db, Parent, [c.parent_id for c in kids.values()])
+            }
+            already = NotificationService.existing_keys(
+                self.db,
+                scene=SCENE_ACTIVITY_REMIND,
+                ref_type="activity",
+                ref_ids=act_ids,
+            )
+            by_act: dict[int, list] = {}
+            for e in all_enrolls:
+                by_act.setdefault(e.activity_id, []).append(e)
+            for a in acts:
+                for e in by_act.get(a.id, []):
+                    done += 1
+                    c = kids.get(e.child_id)
                     if not c:
                         continue
-                    parent = self.db.query(Parent).filter(Parent.id == c.parent_id).first()
+                    if (str(a.id), str(days), c.parent_id) in already:
+                        continue  # 该活动该节点已提醒过这个家长
+                    parent = parents.get(c.parent_id)
                     label = "今天" if days == 0 else f"{days} 天后"
                     if NotificationService(self.db).send(
                         parent_id=c.parent_id,
@@ -587,6 +622,7 @@ class ActivityService(ActivityCancelMixin):
                         openid=parent.wechat_openid if parent else None,
                     ):
                         sent += 1
+                    commit_every(self.db, done)
         if sent:
             self.db.commit()
         return sent

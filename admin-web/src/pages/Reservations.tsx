@@ -32,11 +32,13 @@ export default function Reservations() {
   );
   const [loading, setLoading] = useState(true);
   const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination();
+  // P2-44：后端硬上限（200）——已达上限时提示"可能还有更多未显示"
+  const [listLimit, setListLimit] = useState<number | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
     apiListReservations(status || undefined, keyword || undefined)
-      .then((r) => setItems(r ?? []))
+      .then((r) => { setItems(r.items ?? []); setListLimit(r.limit); })
       .catch((e: Error) => message.error(e.message))
       .finally(() => setLoading(false));
   }, [status, keyword, message]);
@@ -115,7 +117,7 @@ export default function Reservations() {
         ]}
        scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
-      <PaintPagination current={page} pageSize={pageSize} total={items.length} onChange={onPageChange} />
+      <PaintPagination current={page} pageSize={pageSize} total={items.length} onChange={onPageChange} listLimit={listLimit} />
     </div>
   );
 }

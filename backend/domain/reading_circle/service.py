@@ -22,9 +22,24 @@ from backend.common.config_service import ConfigService
 from backend.common.exceptions import NotFoundError, ValidationError
 from backend.common.notification_models import Notification
 from backend.common.notifications import SCENE_CIRCLE_LIKED, NotificationService
+from backend.common.ttl_cache import TtlCache
 from backend.domain.identity.models import Child, Parent
 from backend.domain.reading_circle import card_engine
 from backend.domain.reading_circle.models import CircleLike, CirclePost
+
+#: 社区横幅（本周全馆共读词数 / 在坚持的孩子数）的缓存 TTL（P2-40，2026-10-20 第八轮）。
+#:
+#: 为什么能缓存（三条判据都满足，见 `common/ttl_cache.py`）：① 它是**全馆周聚合**，
+#: 随词账流水线性增长（12 万流水实测单次 8~20ms，且是全表级聚合）；② 它在
+#: **信息流每个请求**上都会重算（`list_posts` → `_banner()`）；③ 它是展示型统计，
+#: 60 秒陈旧对用户无感（口径仍与周榜同源，见 `_banner` docstring）。
+BANNER_TTL_SECONDS = 60.0
+_banner_cache = TtlCache(BANNER_TTL_SECONDS, name="circle.banner")
+
+
+def invalidate_banner_cache() -> None:
+    """清横幅缓存（测试夹具用；数据变更后要立刻看到新值也走这里）。"""
+    _banner_cache.clear()
 
 
 def _display_name(child: Child) -> str:
@@ -202,15 +217,23 @@ class CircleService:
 
         计数同源：口径与周榜完全一致（LeaderboardService.period_entries——
         active_only 且在会、words>0），禁在此另写聚合（计数同源第 8 案预防）。
-        """
-        from backend.domain.growth.board_service import LeaderboardService
 
-        today = datetime.now().date()
-        monday = today - timedelta(days=today.weekday())
-        entries = LeaderboardService(self.db).period_entries(
-            datetime.combine(monday, datetime.min.time())
-        )
-        return {"words": sum(e["words"] for e in entries), "kids": len(entries)}
+        P2-40（2026-10-20 第八轮）：结果进 `_banner_cache`（TTL 60 秒）。原先**每个信息流
+        请求**都重算一次全馆周聚合（随流水线性增长）；横幅是展示型统计，秒级陈旧无感。
+        口径未变——缓存的仍是 `period_entries` 的同一份结果（不是第二套算法）。
+        """
+
+        def _compute() -> dict:
+            from backend.domain.growth.board_service import LeaderboardService
+
+            today = datetime.now().date()
+            monday = today - timedelta(days=today.weekday())
+            entries = LeaderboardService(self.db).period_entries(
+                datetime.combine(monday, datetime.min.time())
+            )
+            return {"words": sum(e["words"] for e in entries), "kids": len(entries)}
+
+        return _banner_cache.get_or_compute("week", _compute)
 
     def _name_maps(self, rows: list[CirclePost]) -> tuple[dict[int, Child], dict[int, Parent]]:
         """发帖孩子/家长**批查**（P2-3，2026-10-11 审查）。

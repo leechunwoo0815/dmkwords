@@ -633,6 +633,9 @@ class ReservationAdminService:
     def __init__(self, db: Session):
         self.db = db
 
+    #: 管理端预约列表硬上限（P2-44：上限与是否已达上限经响应头告知）
+    ADMIN_LIST_LIMIT = 200
+
     def list_reservations(
         self, status: str | None = None, keyword: str | None = None
     ) -> list[dict]:
@@ -655,7 +658,7 @@ class ReservationAdminService:
                     Parent.phone.ilike(kw, escape="\\"),
                 )
             )
-        rows = q.order_by(Reservation.id.desc()).limit(200).all()
+        rows = q.order_by(Reservation.id.desc()).limit(self.ADMIN_LIST_LIMIT).all()
         book_ids = {r[0].book_id for r in rows}
         books = (
             {b.id: b for b in self.db.query(Book).filter(Book.id.in_(book_ids)).all()}

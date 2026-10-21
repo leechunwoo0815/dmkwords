@@ -1,5 +1,5 @@
 // refunds API（WM10：退款/退会/转让审核 + 评估报告）
-import { request } from "./client";
+import { ListResult, request, requestList } from "./client";
 
 export interface RefundRequestItem {
   id: number;
@@ -47,9 +47,11 @@ export interface TransferItem {
   created_at: string;
 }
 
-export function apiListRefunds(status?: string): Promise<RefundRequestItem[]> {
+// P2-44：三个台账都是"最近 N 条"硬上限（200）——返回上限元信息，页面据此提示
+// "可能还有更多未显示"（原先 200 条看起来就是全部，待审单会被漏看）。
+export function apiListRefunds(status?: string): Promise<ListResult<RefundRequestItem[]>> {
   const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-  return request(`/api/admin/refund-requests${qs}`);
+  return requestList(`/api/admin/refund-requests${qs}`);
 }
 
 export function apiReviewRefund(
@@ -75,9 +77,9 @@ export function apiQueryRefundGateway(id: number): Promise<{
   return request(`/api/admin/refund-requests/${id}/query-gateway`, { method: "POST" });
 }
 
-export function apiListWithdrawals(status?: string): Promise<WithdrawalItem[]> {
+export function apiListWithdrawals(status?: string): Promise<ListResult<WithdrawalItem[]>> {
   const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-  return request(`/api/admin/withdrawals${qs}`);
+  return requestList(`/api/admin/withdrawals${qs}`);
 }
 
 export function apiReviewWithdrawal(
@@ -105,9 +107,9 @@ export function apiSettlePreview(id: number): Promise<SettlePreview> {
   return request(`/api/admin/withdrawals/${id}/settle-preview`);
 }
 
-export function apiListTransfers(status?: string): Promise<TransferItem[]> {
+export function apiListTransfers(status?: string): Promise<ListResult<TransferItem[]>> {
   const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-  return request(`/api/admin/transfers${qs}`);
+  return requestList(`/api/admin/transfers${qs}`);
 }
 
 export function apiReviewTransfer(

@@ -11,6 +11,7 @@ from decimal import Decimal
 
 from sqlalchemy import func
 
+from backend.common.batch import fetch_by_ids
 from backend.common.exceptions import ValidationError
 from backend.common.notification_models import Notification
 from backend.common.notifications import SCENE_ACTIVITY_CANCEL, NotificationService
@@ -68,6 +69,15 @@ class ActivityCancelMixin:
         from backend.domain.identity.wm10_service import RefundService
 
         refund_svc = RefundService(self.db)
+        # P2-41（2026-10-20 第八轮）：**消 N+1**（原先每个报名各查一次 Child、每个已付报名
+        # 各查一次 Order、通知阶段又各查一次 Child/Parent）。这里保持**整场单事务**不拆分块：
+        # 活动取消是一条原子业务（活动行已 `with_for_update` 锁住，半场取消=既没活动也没退款），
+        # 与"逐条独立"的定时任务不同；报名数受 `max_quota` 约束（几十~几百），不构成 6000 条那种
+        # 长事务风险。
+        enroll_child_ids = [e.child_id for e in enrollments]
+        enroll_order_ids = [e.order_id for e in enrollments if e.order_id]
+        kids = {c.id: c for c in fetch_by_ids(self.db, Child, enroll_child_ids)}
+        orders = {o.id: o for o in fetch_by_ids(self.db, Order, enroll_order_ids)}
         for e in enrollments:
             if e.status == ActivityEnrollment.STATUS_PENDING_PAYMENT:
                 e.status = ActivityEnrollment.STATUS_CANCELLED
@@ -107,7 +117,7 @@ class ActivityCancelMixin:
                     e.status = ActivityEnrollment.STATUS_REFUND_PENDING
                     e.cancel_reason = "活动取消，待退款审核"
                     refund_cnt += 1
-                    child = self.db.query(Child).filter(Child.id == e.child_id).first()
+                    child = kids.get(e.child_id)
                     if child:
                         refund_svc.apply(
                             child,
@@ -117,7 +127,7 @@ class ActivityCancelMixin:
                             skip_commit=True,  # T31：循环内不提交，尾部统一收口（原子性）
                         )
                     # WM13 触发点4：累计待退金额（关联订单金额，Q6 裁定）
-                    o = self.db.query(Order).filter(Order.id == e.order_id).first()
+                    o = orders.get(e.order_id)
                     if o:
                         refund_amounts.append(Decimal(str(o.amount)))
                 else:
@@ -129,13 +139,10 @@ class ActivityCancelMixin:
         # WM11：活动取消通知已报名家庭（每家庭一条，去重）
         from backend.domain.identity.models import Parent
 
-        parent_ids: set[int] = set()
-        for e in enrollments:
-            c = self.db.query(Child).filter(Child.id == e.child_id).first()
-            if c:
-                parent_ids.add(c.parent_id)
+        parent_ids: set[int] = {c.parent_id for c in kids.values() if c}
+        parents = {p.id: p for p in fetch_by_ids(self.db, Parent, list(parent_ids))}
         for pid in parent_ids:
-            p = self.db.query(Parent).filter(Parent.id == pid).first()
+            p = parents.get(pid)
             NotificationService(self.db).send(
                 parent_id=pid,
                 scene=SCENE_ACTIVITY_CANCEL,

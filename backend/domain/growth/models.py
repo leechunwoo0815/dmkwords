@@ -29,6 +29,10 @@ class WordsLedger(BaseModel):
         # 周期榜/周报聚合：WHERE created_at >= ? AND < ? GROUP BY child_id
         # （上线前审查 P1-6：无此索引时按 child_id 全索引扫描）
         Index("ix_words_ledgers_created_at", "created_at"),
+        # P2-40（2026-10-20 第八轮）：榜单/横幅聚合的**覆盖索引**——join 键(child_id)、
+        # 过滤列(is_deleted)、时间窗(created_at)、求和列(word_count)全在索引里，消掉回表
+        # （12 万流水实测：聚合 68.3ms → 25.4ms，计划变 Covering index lookup）。
+        Index("ix_words_ledgers_board_agg", "child_id", "is_deleted", "created_at", "word_count"),
     )
 
     child_id = Column(Integer, nullable=False, index=True)

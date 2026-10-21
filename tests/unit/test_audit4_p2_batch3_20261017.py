@@ -405,13 +405,14 @@ def test_wechat_status_skipped_with_real_reason(client: TestClient, monkeypatch)
     """标题未命中模板映射 → `skipped` + 真实原因（原先写 `failed` + 假原因"额度不足/用户拒收"）。"""
     from backend.common import notifications as notif
     from backend.common.notification_models import Notification
+    from backend.config import get_settings
     from tests.unit.test_wm10_concurrency import _db
 
-    settings = notif.get_settings()
+    settings = get_settings()
     monkeypatch.setattr(settings, "WECHAT_SUBSCRIBE_ENABLED", True, raising=False)
 
     def fake_push(openid, title, content, scene="", on_result=None):
-        return False, "标题未命中订阅模板映射（随便一个标题）——仅站内消息"
+        return False, "标题未命中订阅模板映射（随便一个标题）——仅站内消息", "skipped"
 
     monkeypatch.setattr("backend.integrations.wechat.subscribe.push_subscribe_message", fake_push)
 
@@ -446,15 +447,16 @@ def test_wechat_status_queued_then_written_back(client: TestClient, monkeypatch)
     """入队 ≠ 送达：先 `queued`，拿到回执后回写 sent/failed。"""
     from backend.common import notifications as notif
     from backend.common.notification_models import Notification
+    from backend.config import get_settings
     from tests.unit.test_wm10_concurrency import _db
 
-    settings = notif.get_settings()
+    settings = get_settings()
     monkeypatch.setattr(settings, "WECHAT_SUBSCRIBE_ENABLED", True, raising=False)
     captured: dict = {}
 
     def fake_push(openid, title, content, scene="", on_result=None):
         captured["on_result"] = on_result
-        return True, "已提交微信（模板 MEMBER_EXPIRE_REMIND）"
+        return True, "已提交微信（模板 MEMBER_EXPIRE_REMIND）", None
 
     monkeypatch.setattr("backend.integrations.wechat.subscribe.push_subscribe_message", fake_push)
 

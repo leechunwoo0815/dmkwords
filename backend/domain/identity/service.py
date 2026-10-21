@@ -640,7 +640,12 @@ class ChildService:
         """会员到期提醒（PRD §12：前 30/14/7 天 + 当天；每节点只发一次）。
 
         幂等：dedup_key=提醒节点值，唯一索引防重复。只提醒 formal 且未过期。
+
+        P2-41（2026-10-20 第八轮）：**消 N+1 + 分块提交**——原先每个孩子各查一次
+        `Parent`（N 条）+ 每条一次通知存在性 SELECT（第 2N 条），且整批一个事务。
+        现在家长一次 `IN`、已发键一次 `IN` 预取，每 `BATCH_COMMIT_CHUNK` 条提交一次。
         """
+        from backend.common.batch import commit_every, fetch_by_ids
         from backend.common.config_service import ConfigService
 
         notify_days = [
@@ -654,6 +659,7 @@ class ChildService:
             return 0
         today = date.today()
         sent = 0
+        done = 0
         # P2-5（2026-10-09 审查）：补发窗口——原按"节点日"精确匹配（member_expire == target），
         # 停机一整天该节点永久漏发。现在向前放宽 1 天，文案按实际剩余天数算；
         # 幂等键仍是节点值 `str(days)` → 补发不重复。
@@ -671,8 +677,23 @@ class ChildService:
                 )
                 .all()
             )
+            if not children:
+                continue
+            # 批量上下文（P2-41）：家长一次 IN + 已发键一次 IN（原先是 2N 条 SELECT）
+            parents = {
+                p.id: p for p in fetch_by_ids(self.db, Parent, [c.parent_id for c in children])
+            }
+            already = NotificationService.existing_keys(
+                self.db,
+                scene=SCENE_MEMBER_EXPIRE_REMIND,
+                ref_type="child",
+                ref_ids=[c.id for c in children],
+            )
             for child in children:
-                parent = self.db.query(Parent).filter(Parent.id == child.parent_id).first()
+                done += 1
+                if (str(child.id), f"{child.member_expire}-{days}", child.parent_id) in already:
+                    continue  # 该节点该覆盖期已发过（本任务每小时跑一次）
+                parent = parents.get(child.parent_id)
                 actual_days = (child.member_expire - today).days
                 label = (
                     "今天"
@@ -700,6 +721,7 @@ class ChildService:
                     openid=parent.wechat_openid if parent else None,
                 ):
                     sent += 1
+                commit_every(self.db, done)
         if sent:
             self.db.commit()
         return sent

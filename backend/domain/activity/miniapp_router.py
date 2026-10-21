@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Response
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
+from backend.common.list_meta import stamp_list_meta
 from backend.common.media_paths import is_within
 from backend.database import get_db
 from backend.domain.activity.admin_service import AdminActivityService
@@ -18,10 +19,14 @@ router = APIRouter(tags=["activity-miniapp"])
 
 
 @router.get("/activities")
-def list_activities(child_id: int, auth: Any = Depends(get_current_parent)):
+def list_activities(response: Response, child_id: int, auth: Any = Depends(get_current_parent)):
+    """家长端近期活动（P2-44：50 条硬上限经响应头如实告知）。"""
     parent, db = auth
     child = child_of_parent(db, parent.id, child_id)
-    return ActivityService(db).list_upcoming(child)
+    svc = ActivityService(db)
+    rows = svc.list_upcoming(child)
+    stamp_list_meta(response, loaded=len(rows), limit=svc.UPCOMING_LIMIT)
+    return rows
 
 
 @router.get("/activities/past")

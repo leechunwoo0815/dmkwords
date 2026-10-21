@@ -1,5 +1,5 @@
 // reservations API（WM6：预约管理 / 核销 / 孩子阅读档案）
-import { request } from "./client";
+import { ListResult, request, requestList } from "./client";
 
 export interface ReservationItem {
   id: number;
@@ -42,14 +42,17 @@ export interface ChildReadingProfile {
   finished_books: FinishedBook[];
 }
 
-export function apiListReservations(status?: string, keyword?: string): Promise<ReservationItem[]> {
+// P2-44：预约列表后端硬上限 200——返回上限元信息，页面据此提示"可能还有更多"。
+export function apiListReservations(
+  status?: string, keyword?: string,
+): Promise<ListResult<ReservationItem[]>> {
   const params = new URLSearchParams();
   if (status) params.set("status", status);
   // 2026-10-12 审查 P1：**不要预编码**——URLSearchParams.toString() 会再编码一次，
   // 中文关键词会变成 `%25E5%25BC%25A0` 字面量传给后端 → 模糊匹配必然为空（搜索框形同失效）。
   if (keyword) params.set("keyword", keyword);
   const qs = params.toString();
-  return request(`/api/admin/reservations${qs ? `?${qs}` : ""}`);
+  return requestList(`/api/admin/reservations${qs ? `?${qs}` : ""}`);
 }
 
 export function apiCheckoutReservation(reservationId: number): Promise<CheckOutResult> {

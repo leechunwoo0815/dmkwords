@@ -4,10 +4,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
+from backend.common.list_meta import stamp_list_meta
 from backend.database import get_db
 from backend.domain.reading.service import ReservationAdminService
 from backend.middleware.admin_rbac import require_perm
@@ -58,13 +59,20 @@ class ChildReadingProfileResponse(BaseSchema):
 
 @router.get("/reservations", response_model=list[ReservationItemResponse])
 def list_reservations(
+    response: Response,
     status: str | None = None,
     keyword: str | None = Query(None),
     admin: Any = Depends(require_perm("borrow.operate")),
     db: Session = Depends(get_db),
 ):
-    """预约管理列表（默认全部；status=active 看锁定中；keyword 模糊搜索）。"""
-    return ReservationAdminService(db).list_reservations(status, keyword)
+    """预约管理列表（默认全部；status=active 看锁定中；keyword 模糊搜索）。
+
+    P2-44：硬上限经响应头如实告知（`X-List-Limit` / `X-List-Truncated`）。
+    """
+    svc = ReservationAdminService(db)
+    rows = svc.list_reservations(status, keyword)
+    stamp_list_meta(response, loaded=len(rows), limit=svc.ADMIN_LIST_LIMIT)
+    return rows
 
 
 @router.post("/reservations/{reservation_id}/checkout", response_model=CheckOutResponse)

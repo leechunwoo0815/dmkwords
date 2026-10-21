@@ -453,12 +453,15 @@ class TransferService:
         return req
 
     # ---------- 管理端 ----------
+    #: 管理端转让台账硬上限（P2-44：上限与是否已达上限经响应头告知）
+    ADMIN_LIST_LIMIT = 200
+
     def admin_list(self, status: str | None = None) -> list[dict]:
         self.expire_overdue()
         q = self.db.query(TransferRequest).filter(TransferRequest.is_deleted == 0)
         if status:
             q = q.filter(TransferRequest.status == status)
-        rows = q.order_by(TransferRequest.id.desc()).limit(200).all()
+        rows = q.order_by(TransferRequest.id.desc()).limit(self.ADMIN_LIST_LIMIT).all()
         return [self._view(r) for r in rows]
 
     def review(self, admin, transfer_id: int, approve: bool, remark: str) -> dict:

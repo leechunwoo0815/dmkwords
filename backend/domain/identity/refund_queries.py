@@ -40,6 +40,10 @@ def my_list(db: Session, child: Child) -> list[dict]:
     return [view(r) for r in rows]
 
 
+#: 管理端退款台账硬上限（P2-44：上限与"是否已达上限"经响应头如实告知，见 `common/list_meta.py`）
+ADMIN_LIST_LIMIT = 200
+
+
 def admin_list(db: Session, status: str | None = None) -> list[dict]:
     """管理端退款台账（最多 200 条）：补齐孩子名/订单信息 + 退款渠道（WM12-B）。
 
@@ -49,7 +53,7 @@ def admin_list(db: Session, status: str | None = None) -> list[dict]:
     q = db.query(RefundRequest).filter(RefundRequest.is_deleted == 0)
     if status:
         q = q.filter(RefundRequest.status == status)
-    rows = q.order_by(RefundRequest.id.desc()).limit(200).all()
+    rows = q.order_by(RefundRequest.id.desc()).limit(ADMIN_LIST_LIMIT).all()
     if not rows:
         return []
     child_ids = {r.child_id for r in rows}

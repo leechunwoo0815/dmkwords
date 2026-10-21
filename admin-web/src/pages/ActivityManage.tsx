@@ -60,6 +60,8 @@ export default function ActivityManage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const activityPg = usePaintPagination();
+  // P2-44：后端硬上限（200）——已达上限时提示"可能还有更多未显示"
+  const [listLimit, setListLimit] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [enrollActivity, setEnrollActivity] = useState<ActivityItem | null>(null);
   const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
@@ -72,7 +74,7 @@ export default function ActivityManage() {
       keyword: keyword.trim() || undefined,
       activity_type: filterType || undefined,
     })
-      .then(setActivities)
+      .then((r) => { setActivities(r.items); setListLimit(r.limit); })
       .catch((e: Error) => message.error(e.message))
       .finally(() => setLoading(false));
   }, [message, keyword, filterType, filterStatus]);
@@ -314,7 +316,7 @@ export default function ActivityManage() {
                   ]}
                  scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
-                <PaintPagination current={activityPg.page} pageSize={activityPg.pageSize} total={activities.length} onChange={activityPg.onChange} />
+                <PaintPagination current={activityPg.page} pageSize={activityPg.pageSize} total={activities.length} onChange={activityPg.onChange} listLimit={listLimit} />
               </>
             ),
           },

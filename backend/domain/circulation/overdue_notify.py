@@ -16,6 +16,7 @@ from __future__ import annotations
 from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session
 
+from backend.common.batch import commit_every, fetch_by_ids
 from backend.common.notification_models import Notification
 from backend.common.notifications import SCENE_BORROW_OVERDUE, NotificationService
 from backend.domain.catalog.models import Book
@@ -23,42 +24,31 @@ from backend.domain.circulation.models import BorrowRecord
 from backend.domain.identity.models import Child, Parent
 
 
-def _by_ids(db: Session, model, ids: list[int]) -> list:
-    """批量取行（空列表直接返回空，避免 `IN ()` 语法错）。"""
-    if not ids:
-        return []
-    return db.query(model).filter(model.id.in_(set(ids))).all()
-
-
-def _notified_keys(db: Session, record_ids: list[int]) -> set[tuple[str, str]]:
-    """本轮候选记录里**已经通知过**的 `(ref_id, dedup_key)` 集合（一次 IN 查询）。
+def _notified_keys(db: Session, record_ids: list[int]) -> set[tuple[str, str, int]]:
+    """本轮候选记录里**已经通知过**的 `(ref_id, dedup_key, parent_id)` 集合（一次 IN 查询）。
 
     为什么要它（第八轮审查 P1-1 修复的一部分）：扫描面从"只扫 ACTIVE"放宽到
     "ACTIVE ∪ OVERDUE"后，每一轮都会重新看到**全部存量逾期行**——若不做这个预取，
     6000 条存量逾期每 300 秒就要各发一次"存在性 SELECT"（`NotificationService.send`
     内部先查重）。预取让稳态开销回到"一次 IN 查询 + 只对新记录写通知"。
+
+    P2-41（2026-10-20）：实现收敛到 `NotificationService.existing_keys`（提醒类任务同款预取，
+    口径一处实现；三元组与唯一索引同口径，见该函数注释）。
     """
-    ids = [str(i) for i in set(record_ids)]
-    if not ids:
-        return set()
-    rows = (
-        db.query(Notification.ref_id, Notification.dedup_key)
-        .filter(
-            Notification.scene == SCENE_BORROW_OVERDUE,
-            Notification.ref_type == "borrow_record",
-            Notification.ref_id.in_(ids),
-            Notification.is_deleted == 0,
-        )
-        .all()
+    return NotificationService.existing_keys(
+        db, scene=SCENE_BORROW_OVERDUE, ref_type="borrow_record", ref_ids=record_ids
     )
-    return {(r[0], r[1]) for r in rows}
 
 
 def mark_and_notify(db: Session, overdue: list[BorrowRecord]) -> int:
     """把扫描出的逾期记录标 `OVERDUE` 并逐条通知家长；返回**本轮新标记**条数。
 
-    调用方（`CirculationService.overdue_mark`）负责扫描与最终 commit——本函数只执行，
-    不提交，保持"一次任务一次提交"的原语义。
+    调用方（`CirculationService.overdue_mark`）负责扫描与最终 commit——本函数**每
+    `BATCH_COMMIT_CHUNK` 条提交一次**（P2-41，2026-10-20 第八轮）：原先"整批单事务"，
+    6000 条逾期 ≈ 8000 条 SQL 全在一个事务里、持锁数十秒；而本链路逐条独立
+    （状态守卫 UPDATE + 带去重键的通知），分块提交安全：部分进度落库、下轮幂等续跑。
+    计数按"处理到的条数"推进；提前 `continue` 的分支（已通知过 / 无孩子档案）**不新增写操作**，
+    故漏掉一次提交也不影响持锁窗口。
 
     **第八轮审查 P1-1（2026-10-19）**：扫描面含 `OVERDUE` 之后，本函数对"已 OVERDUE"
     的行**不再重复 CAS**（那是借阅台惰性标记干的），但**仍然补发通知**——修复前
@@ -67,12 +57,12 @@ def mark_and_notify(db: Session, overdue: list[BorrowRecord]) -> int:
     """
     marked = 0
     # 批量上下文：三张表各一次查询（原先是 3N 次）
-    kids = {c.id: c for c in _by_ids(db, Child, [r.child_id for r in overdue])}
-    books = {b.id: b for b in _by_ids(db, Book, [r.book_id for r in overdue])}
-    parents = {p.id: p for p in _by_ids(db, Parent, [c.parent_id for c in kids.values()])}
+    kids = {c.id: c for c in fetch_by_ids(db, Child, [r.child_id for r in overdue])}
+    books = {b.id: b for b in fetch_by_ids(db, Book, [r.book_id for r in overdue])}
+    parents = {p.id: p for p in fetch_by_ids(db, Parent, [c.parent_id for c in kids.values()])}
     notified = _notified_keys(db, [r.id for r in overdue])
 
-    for rec in overdue:
+    for done, rec in enumerate(overdue, 1):
         key = f"overdue:{rec.due_at:%Y%m%d}"
         if rec.status == BorrowRecord.STATUS_ACTIVE:
             # P1-F5：状态守卫条件写（只 ACTIVE→OVERDUE），防与还书并发时覆盖已 returned。
@@ -94,12 +84,12 @@ def mark_and_notify(db: Session, overdue: list[BorrowRecord]) -> int:
                 continue  # 已被并发方还书/推进，跳过（不误发逾期通知）
             rec.status = BorrowRecord.STATUS_OVERDUE
             marked += 1
-        if (str(rec.id), key) in notified:
-            continue  # 本周期已通知过（去重键=到期日，续借后再逾期会生成新键）
-        notified.add((str(rec.id), key))
         child = kids.get(rec.child_id)
         if not child:
             continue
+        if (str(rec.id), key, child.parent_id) in notified:
+            continue  # 本周期已通知过（去重键=到期日，续借后再逾期会生成新键）
+        notified.add((str(rec.id), key, child.parent_id))
         book = books.get(rec.book_id)
         title = book.title if book else f"书目#{rec.book_id}"
         parent = parents.get(child.parent_id)
@@ -119,4 +109,5 @@ def mark_and_notify(db: Session, overdue: list[BorrowRecord]) -> int:
             dedup_key=key,
             openid=parent.wechat_openid if parent else None,
         )
+        commit_every(db, done)
     return marked

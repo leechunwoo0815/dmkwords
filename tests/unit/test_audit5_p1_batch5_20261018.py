@@ -80,14 +80,15 @@ def test_push_carries_scene_to_subscribe(client: TestClient, monkeypatch):
     """推送链路必须把 scene 传给订阅模块（修前：调用方只传 title → 映射无从匹配）。"""
     from backend.common import notifications as notif
     from backend.common.notification_models import Notification
+    from backend.config import get_settings
 
-    settings = notif.get_settings()
+    settings = get_settings()
     monkeypatch.setattr(settings, "WECHAT_SUBSCRIBE_ENABLED", True, raising=False)
     captured: dict = {}
 
     def fake_push(openid, title, content, scene="", on_result=None):
         captured.update(openid=openid, title=title, scene=scene)
-        return True, "已提交微信（模板 RETURN_REMIND）"
+        return True, "已提交微信（模板 RETURN_REMIND）", None
 
     monkeypatch.setattr("backend.integrations.wechat.subscribe.push_subscribe_message", fake_push)
 
@@ -152,18 +153,20 @@ def test_43101_is_skipped_not_sent(client: TestClient):
 
 def test_unmapped_scene_and_missing_template_degrade_with_true_reason(monkeypatch):
     """未映射场景 / 模板未配置 → 如实降级 + **真实原因**（不伪装成发送失败）。"""
-    from backend.common import notifications as notif
+    # 前置：通道开关打开（否则先撞"通道未启用"，测不到映射分支）
+    from backend.config import get_settings
     from backend.integrations.wechat.subscribe import push_subscribe_message
 
-    # 前置：通道开关打开（否则先撞"通道未启用"，测不到映射分支）
-    monkeypatch.setattr(notif.get_settings(), "WECHAT_SUBSCRIBE_ENABLED", True, raising=False)
+    monkeypatch.setattr(get_settings(), "WECHAT_SUBSCRIBE_ENABLED", True, raising=False)
 
-    queued, reason = push_subscribe_message(
+    queued, reason, hint = push_subscribe_message(
         "openid-stub", "阅读圈点赞", "有人赞了你", "circle.liked"
     )
     assert queued is False and "场景未映射" in reason and "circle.liked" in reason, reason
+    assert hint == "skipped", f"未映射场景是**主动跳过**（不是发送失败）：{hint}"
 
-    queued, reason = push_subscribe_message(
+    queued, reason, hint = push_subscribe_message(
         "openid-stub", "借阅到期提醒", "内容", "borrow.due_remind"
     )
     assert queued is False and "未配置" in reason and "RETURN_REMIND" in reason, reason
+    assert hint == "skipped", f"模板未配置是**主动跳过**：{hint}"

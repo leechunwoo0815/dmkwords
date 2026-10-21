@@ -5,6 +5,7 @@ import asyncio
 import logging
 import threading
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 import httpx
@@ -13,6 +14,16 @@ from backend.common.exceptions import PaymentError, ValidationError
 from backend.integrations.wechat.config import SubscribeTemplate
 
 logger = logging.getLogger(__name__)
+
+#: 推送工作线程数（P2-42，2026-10-20 第八轮大审查）。
+#: 原先**每条通知起一个 daemon 线程**（`threading.Thread(...).start()`，无上限）：6000 条提醒
+#: = 6000 个线程，每个线程回写时还要各占一条数据库连接（池 10+20）→ 连接池直接打爆。
+#: 8 的取法：每个 worker 在回写时会占 1 条连接，留足请求链余量（池 10+20）。
+PUSH_WORKERS = 8
+#: 积压上限（待发队列硬上限）。满了**如实记 failed + 真实原因**，既不静默丢弃也不无限排队。
+PUSH_QUEUE_MAX = 512
+_PUSH_POOL = ThreadPoolExecutor(max_workers=PUSH_WORKERS, thread_name_prefix="wechat-push")
+_PUSH_BACKLOG = threading.BoundedSemaphore(PUSH_QUEUE_MAX)
 
 # 高价值**通知场景** → 模板映射（P1-5，2026-10-18 第七十五批）。
 #
@@ -56,61 +67,104 @@ def classify_send_result(result: object) -> tuple[bool, str, str | None]:
     return True, "", None
 
 
+def _scene_template(scene: str) -> tuple[str, str]:
+    """`(模板属性名, 模板 ID)`——场景未映射时属性名/ID 均为空串。"""
+    attr = _SCENE_TEMPLATE_RULES.get(scene or "", "")
+    if not attr:
+        return "", ""
+    return attr, (getattr(SubscribeTemplate, attr, "") or "")
+
+
+def precheck_subscribe(openid: str, scene: str) -> tuple[bool, str, str | None]:
+    """订阅推送前置判定（**单一事实源**）：`(可入队, 模板ID 或 真实原因, 状态提示)`。
+
+    为什么单列一个函数（P2-42，2026-10-20 第八轮）：这套判定原先写死在
+    `push_subscribe_message` 里，调用方 `NotificationService._wechat_push` 又**另抄一份**
+    "通道未启用 / 无 openid"的判定 → 同一口径两处实现（改一处漏一处）。
+    现在调用方直接调本函数取 `(状态, 原因)`，`push_subscribe_message` 也走它。
+    """
+    from backend.config import get_settings
+
+    if not get_settings().WECHAT_SUBSCRIBE_ENABLED:
+        return False, "通道未启用", "skipped"
+    if not openid:
+        return False, "家长未授权（无 openid）", "skipped"
+    attr, template_id = _scene_template(scene)
+    if not attr:
+        return False, f"场景未映射订阅模板（{scene or '未传 scene'}）——仅站内消息", "skipped"
+    if not template_id:
+        return False, f"订阅模板 {attr} 未配置（微信后台申请后填入 .env）", "skipped"
+    return True, template_id, None
+
+
+def _runner(
+    openid: str,
+    template_id: str,
+    title: str,
+    content: str,
+    on_result: Callable[..., None] | None,
+) -> None:
+    """线程池工作体：发一条订阅消息，把**真实结果**回调给调用方。
+
+    **必须**在 finally 释放积压名额——漏了就会把队列越用越小（永久性误报"队列已满"）。
+    """
+    ok, error, status = False, "", None
+    try:
+        result = asyncio.run(
+            WeChatSubscribe.send(openid, template_id, _build_template_data(title, content))
+        )
+        ok, error, status = classify_send_result(result)
+        if status == "skipped":
+            logger.info(f"Subscribe push skipped(43101): template={template_id}")
+        else:
+            logger.info(f"Subscribe push ok: template={template_id}, title={title[:20]}")
+    except Exception as exc:  # noqa: BLE001 — 网络失败不阻塞主流程，但结果要如实回报
+        ok, error = False, f"微信订阅发送失败: {str(exc)[:200]}"
+        logger.exception(f"Subscribe push failed: title={title[:20]}")
+    finally:
+        _PUSH_BACKLOG.release()
+    if on_result is not None:
+        try:
+            on_result(ok, error, status)
+        except Exception:  # noqa: BLE001 — 回写失败只记日志，不影响已完成的发送
+            logger.exception("Subscribe push on_result 回调失败")
+
+
 def push_subscribe_message(
     openid: str,
     title: str,
     content: str,
     scene: str = "",
     on_result: Callable[..., None] | None = None,
-) -> tuple[bool, str]:
+) -> tuple[bool, str, str | None]:
     """SystemMessage 落库后调用 — 排队微信订阅消息推送。
 
-    返回 `(是否已入队, 原因/说明)`（P2-24，2026-10-17 第六十九批·大审查）：
-    - **未入队**（False）：条件不满足，`原因` 是**真实原因**（通道未启用 / 标题未命中模板映射 /
-      模板未配置）——调用方据此写 `skipped` 并展示原因，不许再伪装成"发送失败（额度不足/用户拒收）"；
-    - **已入队**（True）：**"已提交"不等于"已送达"**——发送在 daemon 线程执行 asyncio.run
-      （避免在请求/事件循环线程内冲突），真实结果通过 `on_result(ok, error)` 回调告知
-      （调用方在后台线程里用独立 session 回写 `sent`/`failed`）。
+    返回 `(是否已入队, 原因/说明, 状态提示)`（P2-42，2026-10-20 第八轮补第三项）：
+    - **未入队**（False）：`原因` 是**真实原因**，`状态提示` 是**该写库的状态**——
+      `"skipped"` = 主动跳过（通道未启用 / 无 openid / 场景未映射 / 模板未配置）；
+      `"failed"` = 本该发但没发成（推送队列已满 / 线程池不可用）。两者都不许伪装成"已送达"；
+    - **已入队**（True）：**"已提交"不等于"已送达"**——发送在线程池 worker 里执行 asyncio.run
+      （避免在请求/事件循环线程内冲突），真实结果通过 `on_result(ok, error, status)` 回调告知
+      （调用方在 worker 线程里用独立 session 回写 `sent`/`failed`/`skipped`）。
 
-    条件：总开关开启（WECHAT_SUBSCRIBE_ENABLED）+ openid 有效 + 标题命中高价值映射
-    + 模板 ID 已配置。网络失败/微信拒发均不阻塞主流程。
+    P2-42（2026-10-20 第八轮）：**并发有界**。原先每条通知起一个 daemon 线程（无上限），
+    千条提醒 = 千线程 + 千连接；现在固定 `PUSH_WORKERS` 个 worker，积压超 `PUSH_QUEUE_MAX`
+    时如实返回"队列已满"（调用方记 failed + 原因），不静默丢弃、不无限排队。
     """
-    from backend.config import get_settings
-
-    if not get_settings().WECHAT_SUBSCRIBE_ENABLED:
-        return False, "通道未启用"
-    if not openid:
-        return False, "家长未授权（无 openid）"
-    attr = _SCENE_TEMPLATE_RULES.get(scene or "", "")
-    if not attr:
-        return False, f"场景未映射订阅模板（{scene or '未传 scene'}）——仅站内消息"
-    template_id = getattr(SubscribeTemplate, attr, "") or ""
-    if not template_id:
-        return False, f"订阅模板 {attr} 未配置（微信后台申请后填入 .env）"
-
-    def _runner():
-        status: str | None = None
-        try:
-            result = asyncio.run(
-                WeChatSubscribe.send(openid, template_id, _build_template_data(title, content))
-            )
-            ok, error, status = classify_send_result(result)
-            if status == "skipped":
-                logger.info(f"Subscribe push skipped(43101): template={template_id}")
-            else:
-                logger.info(f"Subscribe push ok: template={template_id}, title={title[:20]}")
-        except Exception as exc:  # noqa: BLE001 — 网络失败不阻塞主流程，但结果要如实回报
-            ok, error = False, f"微信订阅发送失败: {str(exc)[:200]}"
-            logger.exception(f"Subscribe push failed: title={title[:20]}")
-        if on_result is not None:
-            try:
-                on_result(ok, error, status)
-            except Exception:  # noqa: BLE001 — 回写失败只记日志，不影响已完成的发送
-                logger.exception("Subscribe push on_result 回调失败")
-
-    threading.Thread(target=_runner, daemon=True).start()
+    ok, info, hint = precheck_subscribe(openid, scene)
+    if not ok:
+        return False, info, hint
+    template_id = info
+    if not _PUSH_BACKLOG.acquire(blocking=False):
+        return False, f"推送队列已满（上限 {PUSH_QUEUE_MAX} 条待发），本条未提交微信", "failed"
+    try:
+        _PUSH_POOL.submit(_runner, openid, template_id, title, content, on_result)
+    except RuntimeError as exc:  # 线程池已关闭（进程退出中）
+        _PUSH_BACKLOG.release()
+        return False, f"推送线程池不可用（{str(exc)[:80]}）", "failed"
+    attr, _tid = _scene_template(scene)
     logger.info(f"Subscribe push queued: template={template_id}, title={title[:20]}")
-    return True, f"已提交微信（模板 {attr}）"
+    return True, f"已提交微信（模板 {attr}）", None
 
 
 def _build_template_data(title: str, content: str) -> dict:

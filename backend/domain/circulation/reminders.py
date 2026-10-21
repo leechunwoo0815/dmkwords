@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
+from backend.common.batch import commit_every, fetch_by_ids
 from backend.common.config_service import ConfigService
 from backend.common.notification_models import Notification
 from backend.common.notifications import SCENE_BORROW_DUE_REMIND, NotificationService
@@ -31,6 +32,11 @@ def book_due_remind(db: Session) -> int:
     幂等键（P1-2，2026-10-18）：`f"{节点}:{到期日}"`——**必须带周期**。原先只放节点值
     `str(days)`，而 `ref_id` 是借阅行 id（终身不变）→ 续借后第二周期走到同一节点时判重命中，
     提醒被**静默**吞掉（家长以为提醒过）。
+
+    P2-41（2026-10-20 第八轮）：**消 N+1 + 分块提交**。原先每条记录各查
+    `Child`/`Book`/`Parent`（3N 条 SELECT）+ 每条一次通知存在性 SELECT（第 4N 条），
+    6000 条 = 2.4 万条 SQL；现在三张表各一次 `IN`、已发键一次 `IN` 预取，
+    查询数与记录数解耦，且每 `BATCH_COMMIT_CHUNK` 条提交一次（不再整批单事务持锁数十秒）。
     """
     remind_days = [
         int(x)
@@ -41,6 +47,7 @@ def book_due_remind(db: Session) -> int:
         return 0
     today = datetime.now().date()
     sent = 0
+    done = 0
     catchup = timedelta(days=1)
     nodes = sorted(set(remind_days))
     for idx, days in enumerate(nodes):
@@ -64,13 +71,28 @@ def book_due_remind(db: Session) -> int:
             )
             .all()
         )
+        if not records:
+            continue
+        # 批量上下文（P2-41）：三张表各一次 IN + 已发键一次 IN（原先是 4N 条 SELECT）
+        kids = {c.id: c for c in fetch_by_ids(db, Child, [r.child_id for r in records])}
+        books = {b.id: b for b in fetch_by_ids(db, Book, [r.book_id for r in records])}
+        parents = {p.id: p for p in fetch_by_ids(db, Parent, [c.parent_id for c in kids.values()])}
+        already = NotificationService.existing_keys(
+            db,
+            scene=SCENE_BORROW_DUE_REMIND,
+            ref_type="borrow_record",
+            ref_ids=[r.id for r in records],
+        )
         for rec in records:
-            child = db.query(Child).filter(Child.id == rec.child_id).first()
+            done += 1
+            child = kids.get(rec.child_id)
             if not child:
                 continue
-            book = db.query(Book).filter(Book.id == rec.book_id).first()
+            if (str(rec.id), f"{days}:{rec.due_at:%Y%m%d}", child.parent_id) in already:
+                continue  # 该节点该周期已发过（本任务每小时跑一次，存量记录占绝大多数）
+            book = books.get(rec.book_id)
             title = book.title if book else f"书目#{rec.book_id}"
-            parent = db.query(Parent).filter(Parent.id == child.parent_id).first()
+            parent = parents.get(child.parent_id)
             actual_days = (rec.due_at.date() - today).days
             label = (
                 "今天"
@@ -90,6 +112,7 @@ def book_due_remind(db: Session) -> int:
                 openid=parent.wechat_openid if parent else None,
             ):
                 sent += 1
+            commit_every(db, done)
     if sent:
         db.commit()
     return sent
