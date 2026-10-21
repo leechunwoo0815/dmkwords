@@ -269,7 +269,12 @@ export default function CircleManage() {
     <>
       {/* 页顶胶囊：今日新帖未赞数（与侧边栏徽标同源） */}
       <div style={{ marginBottom: 12 }}>
-        {unlikedCount > 0 ? (
+        {/* P2-57：计数取数失败**不许**渲染成"均已馆长赞 ✓"（那是把故障说成"没活干"） */}
+        {failed || !todoCounts ? (
+          <Typography.Text type="warning">
+            待赞计数取不到（可能还有待赞帖，别当成"已赞完"）
+          </Typography.Text>
+        ) : unlikedCount > 0 ? (
           <span
             style={{
               background: "#ff4d4f",

@@ -45,7 +45,7 @@ const ENTRY_LABEL: Record<string, string> = {
 };
 
 export default function DepositManage() {
-  const configs = useConfigs();
+  const { configs, failed: configsFailed } = useConfigs();
   const { message } = AntdApp.useApp();
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [total, setTotal] = useState(0);
@@ -53,6 +53,8 @@ export default function DepositManage() {
   const [status, setStatus] = useState<string | undefined>();
   const [keyword, setKeyword] = useState("");
   const [loading, setLoading] = useState(true);
+  // P2-62：列表取数失败标记（空表会骗人——运营以为"没有押金记录"）
+  const [listError, setListError] = useState("");
   const [ledgerChild, setLedgerChild] = useState<Deposit | null>(null);
   const [ledgers, setLedgers] = useState<DepositLedger[]>([]);
   const [deductChild, setDeductChild] = useState<Deposit | null>(null);
@@ -61,9 +63,10 @@ export default function DepositManage() {
   const load = useCallback(
     (targetPage: number) => {
       setLoading(true);
+      setListError("");
       apiListDeposits({ page: targetPage, page_size: pageSize, status, keyword: keyword || undefined })
         .then((r) => { setDeposits(r.items ?? []); setTotal(r.total); })
-        .catch((e: Error) => message.error(e.message))
+        .catch((e: Error) => { message.error(e.message); setDeposits([]); setListError(e.message); })
         .finally(() => setLoading(false));
     },
     [status, keyword, pageSize, message]
@@ -82,6 +85,12 @@ export default function DepositManage() {
       <Typography.Paragraph type="secondary">
         押金按孩子独立（${money(cfgNum(configs, "deposit_amount", 1200))} 元/人）；遗失损坏按原价赔偿、优先扣本人押金；不足部分记「待结清」并持续提醒。
       </Typography.Paragraph>
+      {/* P2-55：配置没取到时金额是**默认值**——如实提示，别让运营照默认值办事 */}
+      {configsFailed && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 12 }}>
+          价格配置未取到：上方金额按默认值展示，可能与实际收费不一致——请刷新或到「系统配置」确认。
+        </Typography.Text>
+      )}
 
       <Space style={{ marginBottom: 12 }}>
         <Input.Search
@@ -97,6 +106,13 @@ export default function DepositManage() {
         />
       </Space>
 
+      {/* P2-62：取数失败**不许**渲染成空表（运营会以为"没有押金记录"） */}
+      {listError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+          {listError} · 列表未加载，不代表没有记录——请重试
+          <Typography.Link onClick={() => load(page)} style={{ marginLeft: 8 }}>重试</Typography.Link>
+        </Typography.Text>
+      )}
       <Table<Deposit> locale={{ emptyText: <PaintEmpty character="cat" /> }}
         rowKey="id" loading={loading} dataSource={deposits} size="middle"
         pagination={false}

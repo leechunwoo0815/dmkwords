@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cfgNum, money, useConfigs } from "../hooks/useConfigs";
+import { TODO_REFRESH_EVENT } from "../hooks/useTodoCounts";
 import {
   App as AntdApp,
   Button,
@@ -90,7 +91,7 @@ const PAY_METHOD_OPTIONS = [
 ];
 
 export default function MemberManage() {
-  const configs = useConfigs();
+  const { configs, failed: configsFailed } = useConfigs();
   const { message } = AntdApp.useApp();
   const { user } = useAuth();
   // 二孩年费（下单弹窗的订单类型文案用）：配置 `second_child_discount_percent` 的语义是
@@ -259,23 +260,32 @@ export default function MemberManage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // P2-61（第八轮）：**文案必须如实**——本按钮调的是 `/orders/{id}/refund`，
+  // 后端 B-15 改造后它**只建一笔"待审"退款申请**（走 R-308 审核链：review→execute），
+  // 钱**没有**出去。原先标题写"订单退款执行"、成功提示写"订单已退款"，
+  // 操作员会以为钱已经退了（资金口径误导，属"声称已执行"族）。
   const onRefundOrder = (o: Order) => {
     let remarkInput = "";
     Modal.confirm({
-      title: "订单退款执行",
+      title: "发起退款申请（待审核）",
       content: (
         <div>
           <div style={{ marginBottom: 8 }}>
             {o.order_no} · ￥{Number(o.amount).toLocaleString()}（仅超管；${cfgNum(configs, "first_activity_fee", 99)} 元资格随退款恢复）
           </div>
+          <div style={{ marginBottom: 8, color: "#b26a00" }}>
+            这里只**发起申请**，钱不会立即退出——需再到「退款中心」审核通过并执行。
+          </div>
           <Input.TextArea rows={2} onChange={(e) => { remarkInput = e.target.value; }} placeholder="退款说明（留痕）" />
         </div>
       ),
-      okText: "确认退款",
+      okText: "发起申请",
       onOk: async () => {
         try {
-          await apiRefundOrder(o.id, remarkInput || "退款执行");
-          message.success("订单已退款");
+          const r = await apiRefundOrder(o.id, remarkInput || "退款执行");
+          // 如实告知下一步（去哪审、当前状态）
+          message.success(`已发起退款申请（${r?.status ?? "待审核"}）——请到「退款中心」审核执行`);
+          window.dispatchEvent(new Event(TODO_REFRESH_EVENT));
           loadOrders(orderPg.page);
         } catch (e) {
           message.error((e as Error).message);
@@ -396,6 +406,12 @@ export default function MemberManage() {
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <PageTitle>会员管理</PageTitle>
+      {/* P2-55：配置没取到时订单文案里的金额是**默认值**——如实提示（调价后不一致会误导收银） */}
+      {configsFailed && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 12 }}>
+          价格配置未取到：订单金额文案按默认值展示，可能与实际收费不一致——请刷新或到「系统配置」确认。
+        </Typography.Text>
+      )}
         <Space>
           <Button onClick={() => {
             childForm.resetFields();
@@ -1013,12 +1029,16 @@ export default function MemberManage() {
           if (!editChild) return;
           try {
             const v = await editForm.validateFields();
+            // P2-60（第八轮）：**`|| undefined` 表达不了"清空"**——字段被省略 = 后端视为"不改"，
+            // 于是英文名/年级/生日**永远清不掉**（表单里删掉、保存后原值还在）。
+            // 口径：文本字段送**空串**（后端 `english_name or None` 落 NULL）；日期字段送 **null**
+            // （后端按"显式传 null"清空，见 `update_profile(clear_birthday=...)`）。
             await apiUpdateChild(editChild.id, {
               name: v.name || undefined,
               gender: v.gender ?? undefined,
-              birthday: v.birthday || undefined,
-              english_name: v.english_name || undefined,
-              grade: v.grade || undefined,
+              birthday: v.birthday ? v.birthday.format("YYYY-MM-DD") : null,
+              english_name: v.english_name ?? "",
+              grade: v.grade ?? "",
               ar_level: v.ar_level || undefined,
               avatar: v.avatar ?? "",
             });

@@ -60,6 +60,8 @@ export default function BorrowRecordPanel({ active = true }: { active?: boolean 
   const [rows, setRows] = useState<BorrowRecordItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  // P2-62：取数失败标记（空表会骗人）
+  const [listError, setListError] = useState("");
 
   const params = useCallback(
     (targetPage = page) => ({
@@ -77,12 +79,13 @@ export default function BorrowRecordPanel({ active = true }: { active?: boolean 
   const load = useCallback(
     (targetPage = page) => {
       setLoading(true);
+      setListError("");
       apiBorrowRecords(params(targetPage))
         .then((r) => {
           setRows(r.items ?? []);
           setTotal(r.total ?? 0);
         })
-        .catch((e: Error) => message.error(e.message))
+        .catch((e: Error) => { message.error(e.message); setRows([]); setListError(e.message); })
         .finally(() => setLoading(false));
     },
     [params, page, message],
@@ -166,6 +169,13 @@ export default function BorrowRecordPanel({ active = true }: { active?: boolean 
         </Button>
       </Space>
 
+      {/* P2-62：取数失败**不许**渲染成空表（运营会以为"这段时间没有借还"） */}
+      {listError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+          {listError} · 记录未加载，不代表没有借还——请重试
+          <Typography.Link onClick={() => load(page)} style={{ marginLeft: 8 }}>重试</Typography.Link>
+        </Typography.Text>
+      )}
       <Table<BorrowRecordItem>
         rowKey="record_id"
         size="small"

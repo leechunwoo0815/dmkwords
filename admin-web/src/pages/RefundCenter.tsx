@@ -90,6 +90,11 @@ export default function RefundCenter() {
   const [withdrawalTotal, setWithdrawalTotal] = useState<number | null>(null);
   const [transferTotal, setTransferTotal] = useState<number | null>(null);
   const [counts, setCounts] = useState<RefundCenterCounts | null>(null);
+  // P2-57（第八轮）：**列表取数失败不许渲染成空表**——徽标说"待审 N"、表格却空着，
+  // 运营会以为"没单可审"（假 0 变体）。三个台账各自记失败原因，表格区如实提示 + 重试。
+  const [listErrors, setListErrors] = useState<{ refund: string; withdrawal: string; transfer: string }>(
+    { refund: "", withdrawal: "", transfer: "" },
+  );
   // R5（#3）时序加固：3 秒清除窗口从列表数据到达起算——原实现挂载即起算，
   // 接口返回前窗口已烧掉，行渲染时 highlightId 已被清（高亮不出现真凶嫌疑）
   const [hlArmed, setHlArmed] = useState(false);
@@ -137,19 +142,34 @@ export default function RefundCenter() {
     apiListRefunds(undefined, refundPg.page, refundPg.pageSize)
       .then((r) => {
         setRefunds(r.items); setRefundLimit(r.limit); setRefundTotal(r.total);
+        setListErrors((s) => ({ ...s, refund: "" }));
       })
-      .catch((e: Error) => message.error(e.message));
+      .catch((e: Error) => {
+        message.error(e.message);
+        setRefunds([]);
+        setListErrors((s) => ({ ...s, refund: e.message }));
+      });
     // F-H4/T26：资金域列表 fetch 失败必须报错——静默置空=管理员误判无待审（最高危）
     apiListWithdrawals(undefined, withdrawalPg.page, withdrawalPg.pageSize)
       .then((r) => {
         setWithdrawals(r.items); setWithdrawalLimit(r.limit); setWithdrawalTotal(r.total);
+        setListErrors((s) => ({ ...s, withdrawal: "" }));
       })
-      .catch((e: Error) => { message.error(e.message); setWithdrawals([]); });
+      .catch((e: Error) => {
+        message.error(e.message);
+        setWithdrawals([]);
+        setListErrors((s) => ({ ...s, withdrawal: e.message }));
+      });
     apiListTransfers(undefined, transferPg.page, transferPg.pageSize)
       .then((r) => {
         setTransfers(r.items); setTransferLimit(r.limit); setTransferTotal(r.total);
+        setListErrors((s) => ({ ...s, transfer: "" }));
       })
-      .catch((e: Error) => { message.error(e.message); setTransfers([]); });
+      .catch((e: Error) => {
+        message.error(e.message);
+        setTransfers([]);
+        setListErrors((s) => ({ ...s, transfer: e.message }));
+      });
     // P1-7：徽标计数来自后端（分页后本页行数算不出"待审 N"，那会变成"假 0"）
     apiRefundCenterCounts()
       .then(setCounts)
@@ -318,6 +338,12 @@ export default function RefundCenter() {
               </>
             ),
             children: (<>
+              {listErrors.refund && (
+                <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+                  {listErrors.refund} · 列表未加载，不代表没有待办——请重试
+                  <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
+                </Typography.Text>
+              )}
               <Table<RefundRequestItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
                 rowKey="id"
                 rowClassName={(r) => (r.id === highlightId ? "wm13-highlight-row" : "")}
@@ -403,6 +429,12 @@ export default function RefundCenter() {
               </>
             ),
             children: (<>
+              {listErrors.withdrawal && (
+                <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+                  {listErrors.withdrawal} · 列表未加载，不代表没有待办——请重试
+                  <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
+                </Typography.Text>
+              )}
               <Table<WithdrawalItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
                 rowKey="id"
                 rowClassName={(r) => (r.id === highlightId ? "wm13-highlight-row" : "")}
@@ -476,6 +508,12 @@ export default function RefundCenter() {
               </>
             ),
             children: (<>
+              {listErrors.transfer && (
+                <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+                  {listErrors.transfer} · 列表未加载，不代表没有待办——请重试
+                  <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
+                </Typography.Text>
+              )}
               <Table<TransferItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
                 rowKey="id"
                 rowClassName={(r) => (r.id === highlightId ? "wm13-highlight-row" : "")}

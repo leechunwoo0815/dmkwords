@@ -362,6 +362,7 @@ class ChildService:
         gender: int | None = None,
         birthday=None,
         avatar: str | None = None,
+        clear_birthday: bool = False,
     ) -> Child:
         """维护孩子资料（C19 + WM3-B1 扩展：姓名/性别/生日全开）；AR 只升不降 + 订单守卫。"""
         child = self._get_child(child_id)
@@ -382,7 +383,13 @@ class ChildService:
         if gender is not None:
             child.gender = gender
             changed.append("gender")
-        if birthday is not None:
+        if clear_birthday:
+            # P2-60（2026-10-20 第八轮）：**显式清空生日**。原先只有 `is not None` 分支，
+            # 前端无论送 null 还是省略都等于"不改" → 生日**永远清不掉**（表单里删了、保存后还在）。
+            # 现在前端送显式 null，路由据 `model_fields_set` 传 clear_birthday=True 到这里。
+            child.birthday = None
+            changed.append("birthday")
+        elif birthday is not None:
             child.birthday = birthday
             changed.append("birthday")
         if english_name is not None:

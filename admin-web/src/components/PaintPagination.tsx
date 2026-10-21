@@ -14,10 +14,14 @@ interface PaintPaginationProps {
    * 不传则不显示（后端未提供元信息的列表保持原样）。
    */
   listLimit?: number | null;
+  /**
+   * 本页接口的每页上限（默认 100）。超上限的预设按钮**不显示**——避免"能选却必 422"（P2-56）。
+   */
+  maxPageSize?: number;
 }
 
 export default function PaintPagination({
-  current, pageSize, total, onChange, listLimit = null,
+  current, pageSize, total, onChange, listLimit = null, maxPageSize = 100,
 }: PaintPaginationProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const lastJumpRef = useRef<number | null>(null);
@@ -31,14 +35,14 @@ export default function PaintPagination({
           <Typography.Text>每页显示</Typography.Text>
           <InputNumber
             min={1}
-            max={200}
+            max={maxPageSize}
             value={pageSize}
             onChange={(value) => onChange(1, value ?? pageSize)}
             style={{ width: 70 }}
           />
           <Typography.Text>条</Typography.Text>
           <Space size={4}>
-            {PRESETS.map((n) => (
+            {PRESETS.filter((n) => n <= maxPageSize).map((n) => (
               <Button
                 key={n}
                 size="small"

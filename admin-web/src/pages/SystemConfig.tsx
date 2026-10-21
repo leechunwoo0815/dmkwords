@@ -14,6 +14,7 @@ import {
 } from "antd";
 
 import { apiListConfigs, apiUpdateConfig, type SystemConfig } from "../api/admin";
+import { invalidateConfigsCache } from "../hooks/useConfigs";
 import { hasPermission, useAuth } from "../auth";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
@@ -75,6 +76,9 @@ export default function SystemConfigPage() {
     setSaving(true);
     try {
       await apiUpdateConfig(editing.config_key, values);
+      // P2-55：**改完立刻让其他页面的配置缓存失效**——否则会员/押金页仍显示旧价格文案，
+      // 直到整页刷新才跟上（"改价后文案不跟随"）。
+      invalidateConfigsCache();
       message.success(`「${editing.display_name || editing.description}」已更新`);
       setEditing(null);
       load();

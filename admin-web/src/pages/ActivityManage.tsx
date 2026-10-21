@@ -89,7 +89,9 @@ export default function ActivityManage() {
         start_at: v.start_at.toISOString(), location: v.location,
         max_quota: v.max_quota, fee: v.fee ?? 0,
         description: v.description, member_only: v.member_only ?? false,
-        enroll_deadline: v.enroll_deadline ? v.enroll_deadline.toISOString() : undefined,
+        // P2-60：清空报名截止要送**显式 null**（后端 `model_dump(exclude_unset=True)` 会把
+        // 出现在 payload 里的 null 应用到字段上）；送 `undefined` 会被当成"不改"，永远清不掉。
+        enroll_deadline: v.enroll_deadline ? v.enroll_deadline.toISOString() : null,
       });
       message.success("活动已发布");
       setCreateOpen(false);

@@ -165,6 +165,8 @@ def update_child(
     db: Session = Depends(get_db),
 ):
     """维护孩子资料（C19 + WM3-B1 扩展：姓名/性别/生日全开；AR 只升不降；订单守卫 409）。"""
+    # P2-60：`birthday` 显式传 null = **清空**（Pydantic 的 `model_fields_set` 能区分
+    # "没传"与"传了 null"）——否则前端没法把生日清掉。
     return ChildResponse.model_validate(
         ChildService(db).update_profile(
             admin,
@@ -176,6 +178,7 @@ def update_child(
             gender=body.gender,
             birthday=body.birthday,
             avatar=getattr(body, "avatar", None),
+            clear_birthday=("birthday" in body.model_fields_set and body.birthday is None),
         )
     )
 

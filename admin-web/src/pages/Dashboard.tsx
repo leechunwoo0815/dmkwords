@@ -220,13 +220,17 @@ export default function Dashboard() {
           >
             导出看板
           </Button>
-          <Button
-            icon={<DownloadOutlined />}
-            size="small"
-            onClick={() => apiExportAuditLogs().catch((e) => message.error((e as Error).message))}
-          >
-            导出审计日志
-          </Button>
+          {/* P2-58（第八轮）：审计导出后端是 `require_perm("audit.view")`——专员点了**必 403**，
+              属"能点不能用"回归族。按同一权限码隐藏（与退款中心/媒体体检同款判据）。 */}
+          {isSuper && (
+            <Button
+              icon={<DownloadOutlined />}
+              size="small"
+              onClick={() => apiExportAuditLogs().catch((e) => message.error((e as Error).message))}
+            >
+              导出审计日志
+            </Button>
+          )}
           <Button icon={<ReloadOutlined />} size="small" type="text" onClick={load}>
             刷新
           </Button>

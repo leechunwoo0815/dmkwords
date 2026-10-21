@@ -70,6 +70,8 @@ export default function CirculationDesk() {
   const [searchResults, setSearchResults] = useState<{ id: number; name: string; parent_phone: string }[]>([]);
   const [card, setCard] = useState<ChildCard | null>(null);
   const [overdue, setOverdue] = useState<OverdueItem[]>([]);
+  // P2-57：逾期名单取数失败标记（标题据此显示「取数失败」，不显示（0））
+  const [overdueError, setOverdueError] = useState("");
   const [recent, setRecent] = useState<RecentRow[]>([]);
   const [tab, setTab] = useState("desk");
   // G7（2026-10-13）：逾期书人工续借弹窗（原因必填 → 审计留痕）
@@ -96,7 +98,12 @@ export default function CirculationDesk() {
 
   const loadOverdue = useCallback(() => {
     // F-M8/T26：逾期名单 fetch 失败必须报错——馆员误判无逾期（催还漏操作）
-    apiOverdueList().then(setOverdue).catch((e: Error) => { message.error(e.message); setOverdue([]); });
+    // P2-57（第八轮）：光 toast 不够——**标题里的"（0）"会一直骗人**。失败置 overdueError，
+    // 标题改成"取数失败"并给重试入口（清空列表但如实说明，不假装没逾期）。
+    setOverdueError("");
+    apiOverdueList()
+      .then((rows) => { setOverdue(rows); })
+      .catch((e: Error) => { message.error(e.message); setOverdue([]); setOverdueError(e.message); });
   }, []);
   useEffect(loadOverdue, [loadOverdue]);
 
@@ -506,8 +513,14 @@ export default function CirculationDesk() {
 
       {/* 逾期名单 */}
       <Typography.Title level={5} style={{ fontFamily: "var(--font-display)", marginTop: 24 }}>
-        逾期名单（{overdue.length}）
+        逾期名单（{overdueError ? "取数失败" : overdue.length}）
       </Typography.Title>
+      {overdueError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+          {overdueError} · 名单未加载，不代表没有逾期——请重试
+          <Typography.Link onClick={loadOverdue} style={{ marginLeft: 8 }}>重试</Typography.Link>
+        </Typography.Text>
+      )}
       <Table<OverdueItem> locale={{ emptyText: <PaintEmpty character="bear" /> }}
         rowKey="record_id" size="small" pagination={false} dataSource={overdue}
         columns={[

@@ -60,7 +60,13 @@ const SCENE_OPTIONS: { value: string; label: string }[] = [
 // 免得混在"待处理/已处理"里看着乱（用户 2026-10-13 明确要求分开）。
 const MILESTONE_SCENE = "admin.milestone_achieved";
 
-// WM13 管理待办事项类型（6 场景，Q5 裁定）
+// WM13 管理待办事项类型。
+//
+// P2-59（2026-10-20 第八轮）：原先只列 7 个（6 场景 + 里程碑），而
+// `backend/common/admin_notification_models.AdminNotification` 里有 **18 个**场景 →
+// 另外 10 个场景的通知在待办墙里**筛不出来**、且场景列显示**裸英文**（如
+// `admin.pending_evaluation`），运营看不懂。现在与后端常量**逐一对齐**（含 2 个超时类）。
+// 改后端场景常量时**必须同步这里**（`tests/unit/test_audit8_e4_admin_scenes_20261020.py` 钉住）。
 const ADMIN_SCENE_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "全部事项" },
   { value: "admin.refund_apply", label: "退款申请" },
@@ -69,6 +75,17 @@ const ADMIN_SCENE_OPTIONS: { value: string; label: string }[] = [
   { value: "admin.activity_batch_refund", label: "活动批量退款" },
   { value: "admin.transfer_expiring", label: "转让临近超时" },
   { value: "admin.refund_execute_failed", label: "退款执行失败" },
+  // ↓ P2-59 补齐的 10 个（后端有、前端原先没有）
+  { value: "admin.activity_enroll_manual", label: "活动报名待确认" },
+  { value: "admin.member_follow_up", label: "会员跟进" },
+  { value: "admin.activity_order_voided", label: "活动订单作废" },
+  { value: "admin.copy_damage_compensation", label: "副本损坏赔偿" },
+  { value: "admin.payment_anomaly", label: "支付异常留痕" },
+  { value: "admin.pending_evaluation", label: "待评估跟进" },
+  { value: "admin.deposit_settle", label: "押金结清" },
+  { value: "admin.reservation_exception", label: "预约转异常" },
+  { value: "admin.refund_review_timeout", label: "退款审核超时" },
+  { value: "admin.withdrawal_review_timeout", label: "退会审核超时" },
   { value: MILESTONE_SCENE, label: "里程碑达成" },
 ];
 
@@ -140,9 +157,12 @@ export default function Notifications() {
   const [searchParams, setSearchParams] = useSearchParams();
   // T20e #1：默认落管理待办（运营主工作面）；URL 显式 box=parent 时尊重（分享链接不破坏）
   const box = searchParams.get("box") === "parent" ? "parent" : "admin";
+  // P2-56：本页两个列表接口后端都是 `page_size ≤ 200`（通知中心独有），显式给上限 200；
+  // 其余管理端接口多为 ≤100——别把 200 带过去（带过去首屏就是 422）。
   const { page, setPage, pageSize, setPageSize } = usePaintPagination(
     20,
-    Number(searchParams.get("page")) || 1
+    Number(searchParams.get("page")) || 1,
+    200,
   );
   // URL 五态镜像（WM13 批次二：box/tab/page/keyword/scene，replace 不堆栈）
   // tab 双语义：box=parent 时 all/unread/read；box=admin 时 todo/done
@@ -779,7 +799,8 @@ export default function Notifications() {
               scene,
             });
           }}
-        />
+                maxPageSize={200}
+      />
       </div>
       <Modal
         title="标记已处理"

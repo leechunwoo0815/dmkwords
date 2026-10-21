@@ -1,4 +1,5 @@
 import PaintEmpty from "../components/PaintEmpty";
+import PaintLoading from "../components/PaintLoading";
 import PreviewImage from "../components/PreviewImage";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -82,6 +83,8 @@ export default function BookDetail() {
   const navigate = useNavigate();
   const { message } = AntdApp.useApp();
   const [book, setBook] = useState<Book | null>(null);
+  // P2-62：主数据取数失败标记（原先失败整页 return null = 白屏）
+  const [bookError, setBookError] = useState("");
   const [copies, setCopies] = useState<BookCopy[]>([]);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [coverProgress, setCoverProgress] = useState<number | null>(null);
@@ -125,7 +128,12 @@ export default function BookDetail() {
   };
 
   const load = () => {
-    apiGetBook(bookId).then(setBook).catch((e: Error) => message.error(e.message));
+    // P2-62（第八轮）：主数据取数失败原先**整页 return null（白屏）**——
+    // 深链/删书后进来就是一片空白，运营只能刷新猜。现在记失败原因，渲染失败态 + 重试。
+    setBookError("");
+    apiGetBook(bookId)
+      .then((b) => { setBook(b); setBookError(""); })
+      .catch((e: Error) => { message.error(e.message); setBookError(e.message); });
     apiListCopies(bookId)
       .then(setCopies)
       .catch(() => message.error("副本列表加载失败，请刷新重试"));
@@ -136,7 +144,23 @@ export default function BookDetail() {
 
   useEffect(load, [bookId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!book) return null;
+  if (!book) {
+    // P2-62：**不许白屏**——加载中给加载态，失败给失败态 + 重试
+    if (bookError) {
+      return (
+        <Card>
+          <Typography.Title level={5} style={{ fontFamily: "var(--font-display)" }}>
+            图书详情加载失败
+          </Typography.Title>
+          <Typography.Text type="warning">{bookError}</Typography.Text>
+          <div style={{ marginTop: 12 }}>
+            <Button onClick={load}>重试</Button>
+          </div>
+        </Card>
+      );
+    }
+    return <PaintLoading character="bookworm" message="正在加载图书详情..." />;
+  }
   const openEdit = () => {
     form.setFieldsValue({
       isbn: book.isbn ?? "",

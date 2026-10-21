@@ -152,9 +152,12 @@ export default function MediaHealthPanel() {
       loading={loading}
       extra={
         <span style={{ display: "inline-flex", gap: 8, flexWrap: "wrap" }}>
-          <Button icon={<SyncOutlined />} loading={busy} onClick={() => void recount()}>
-            重新点数
-          </Button>
+          {/* P2-58：重新点数后端是超管专属（require_super_admin）——非超管点了必 403，直接不渲染 */}
+          {isSuper && (
+            <Button icon={<SyncOutlined />} loading={busy} onClick={() => void recount()}>
+              重新点数
+            </Button>
+          )}
           <Button icon={<ReloadOutlined />} onClick={() => void load()}>
             刷新
           </Button>
