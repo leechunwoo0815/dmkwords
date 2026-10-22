@@ -144,6 +144,8 @@
   flex-shrink: 0;
   background: var(--accent-soft);
 }
+/* P3（第一百一十六批）：续听封面加载失败/无封面 → 复用同一尺寸的本地占位图 */
+.continue-cover-fb { background: var(--accent-soft); }
 .continue-info { flex: 1; min-width: 0; }
 .continue-title {
   font-size: 30rpx;
@@ -311,6 +313,8 @@
 }
 .carousel-item { position: relative; width: 100%; height: 100%; }
 .carousel-img { width: 100%; height: 100%; }
+/* P3（第一百一十六批）：活动轮播无封面/加载失败占位（与活动列表 banner 同款纯色观感） */
+.carousel-img-empty { background: var(--accent-soft); }
 .carousel-caption {
   position: absolute;
   left: 0; right: 0; bottom: 0;

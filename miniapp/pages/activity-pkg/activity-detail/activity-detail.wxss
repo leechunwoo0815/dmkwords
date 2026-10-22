@@ -193,6 +193,17 @@
   margin-bottom: 12rpx;
   background: var(--surface);
 }
+/* P3（第一百一十六批）：详情图块加载失败占位（清空 image_url 后走这支） */
+.detail-img-fail {
+  min-height: 220rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  color: var(--muted);
+  text-align: center;
+  padding: 24rpx;
+}
 .detail-cap {
   font-size: 24rpx;
   color: var(--muted);

@@ -15,6 +15,13 @@
   <!-- WM12-C（审查 P0-3）：不能线上支付时说明原因 -->
   <view class="pay-hint" wx:if="{{payHint}}">{{payHint}}</view>
 
+  <!-- P3（第一百一十六批）：订单列表背后有 50 条硬上限（`OrderService.MY_ORDERS_LIMIT`），
+       截断信号本来就在响应头（`X-List-Truncated`）里，但小程序这一层把它丢了 →
+       家长看到 50 条会以为"这就是全部订单"。这里如实说明"可能还有更早的"。 -->
+  <view class="list-hint" wx:if="{{!loadError && truncated}}">
+    仅显示最近 {{orderLimit}} 条订单，可能还有更早的未列出
+  </view>
+
   <!-- Order List -->
   <!-- P2-45：失败态显式呈现（原先失败静默 → 渲染成"暂无订单"） -->
   <error-view wx:if="{{loadError}}" type="network" title="订单加载失败"

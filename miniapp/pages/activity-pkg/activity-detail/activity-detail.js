@@ -3,6 +3,7 @@ const api = require('../../../utils/api')
 const session = require('../../../utils/session')
 const { loadConfigs, getConfigs, configsFailed } = require('../../../utils/configs')
 const media = require('../../../utils/media')
+const img = require('../../../utils/img')
 
 const STATUS_TEXT = {
   enrolled: '已报名', checked_in: '已签到', pending_payment: '待收款确认',
@@ -10,6 +11,9 @@ const STATUS_TEXT = {
 }
 
 Page({
+  // P3（第一百一十六批）：封面/配图加载失败兜底——清空该字段 → 走同页既有占位分支
+  // （实现与用法见 utils/img.js；`data-img-path` 标的就是这里 setData 的路径）
+  onImgError(e) { img.onImgError.call(this, e) },
   data: {
     cfg: getConfigs(),  // 业务口径（后端下发；见 utils/configs.js）
     activity: null,

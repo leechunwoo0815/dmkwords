@@ -4,8 +4,10 @@
     <view class="success-wrap">
       <view class="success-title"><image class="success-icon" src="/icons/ui/party.png" mode="aspectFit" /> 晒出去啦！</view>
       <view class="success-sub">长按卡片可保存，转发现实朋友圈让更多人看到</view>
-      <image class="success-card" src="{{sharedPost.image_url}}" mode="widthFix"
-        bindtap="onPreviewShared" />
+      <image wx:if="{{sharedPost.image_url}}" class="success-card" src="{{sharedPost.image_url}}" mode="widthFix"
+        bindtap="onPreviewShared"
+        data-img-path="sharedPost.image_url" binderror="onImgError" />
+      <view wx:else class="success-card success-card-fail">卡片图片加载失败，请返回「继续晒」重试</view>
       <view class="success-btns">
         <view class="btn-secondary" bindtap="onKeepSharing">继续晒</view>
         <view class="btn-primary" bindtap="goCircle">去阅读圈看看</view>

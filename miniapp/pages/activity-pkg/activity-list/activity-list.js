@@ -2,6 +2,7 @@
 const api = require('../../../utils/api')
 const media = require('../../../utils/media')
 const session = require('../../../utils/session')
+const img = require('../../../utils/img')
 
 const TYPE_TEXT = {
   lecture: '宣讲会', book_club: '读书会', experience_sharing: '经验交流会',
@@ -9,6 +10,9 @@ const TYPE_TEXT = {
 }
 
 Page({
+  // P3（第一百一十六批）：封面/配图加载失败兜底——清空该字段 → 走同页既有占位分支
+  // （实现与用法见 utils/img.js；`data-img-path` 标的就是这里 setData 的路径）
+  onImgError(e) { img.onImgError.call(this, e) },
   data: {
     childName: '',
     tab: 'upcoming',
@@ -18,6 +22,10 @@ Page({
     pastActivities: [],
     loading: true,
     loadError: false,
+    // P3（第一百一十六批）：近期活动有 50 条硬上限（`ActivityService.UPCOMING_LIMIT`），
+    // 截断信号在后端响应头里；原先被前端丢掉 → 家长看到 50 场以为"就这些活动"
+    truncated: false,
+    activityLimit: 0,  // 上限数字由后端下发（前端不自持「50」）
   },
 
   onShow() {
@@ -35,11 +43,13 @@ Page({
     if (!silent) this.setData({ loading: true })
     this.setData({ loadError: false })
     try {
-      const [acts, mine, past] = await Promise.all([
-        api.listActivities(this._childId),
+      const [actsRes, mine, past] = await Promise.all([
+        api.listActivities(this._childId, { meta: true }),
         api.myEnrollments(this._childId),
         api.activitiesPast(30),
       ])
+      const acts = actsRes.rows
+      const actsMeta = actsRes.meta
       // R2（插修 16）：卡片封面拼 token（书封面正解同款）；时间去掉秒级精度
       const fmt = (t) => (t ? String(t).replace('T', ' ').slice(0, 16) : '')
       const activities = (acts || []).map((a) => ({
@@ -69,7 +79,13 @@ Page({
           ? `${a.checked_in_total} 位小朋友参加过`
           : (a.enrolled_total > 0 ? `${a.enrolled_total} 位小朋友报名` : '暂无报名记录'),
       }))
-      this.setData({ activities, myEnrollments, pastActivities })
+      this.setData({
+        activities,
+        myEnrollments,
+        pastActivities,
+        truncated: !!actsMeta.truncated,
+        activityLimit: actsMeta.limit || 0,
+      })
     } catch (e) {
       // F-M12/T26：fetch 失败进错误态（点击重试），不再静默空列表
       this.setData({ loadError: true })

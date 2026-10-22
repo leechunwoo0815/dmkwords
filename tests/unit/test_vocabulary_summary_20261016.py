@@ -104,7 +104,11 @@ def test_summary_three_metrics_match_server_aggregate(client: TestClient):
     books, _ = _seed_12_words_3_books_20_lookups(client, h, mini, c["id"])
 
     s = _summary(client, mini, c["id"])
-    assert s == {"word_count": 12, "lookup_total": 20, "book_count": 3}, s
+    # P3 第一百一十六批：summary 由三口径扩为五口径（列表改分页后，「本周新增/查过多次」
+    # 也随之下沉服务端）——本用例的判据是三口径的**值**，故按三键投影比对，
+    # 五口径齐全性由 test_audit8_p3_miniapp_20261022.py 与 BDD 场景断言。
+    three = ("word_count", "lookup_total", "book_count")
+    assert {k: s[k] for k in three} == {"word_count": 12, "lookup_total": 20, "book_count": 3}, s
     # 与列表口径必须自洽（前端渲染的是列表，统计行不能与它打架）
     rows = _list(client, mini, c["id"])
     assert len(rows) == s["word_count"]

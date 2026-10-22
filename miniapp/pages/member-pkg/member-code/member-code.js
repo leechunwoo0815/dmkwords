@@ -5,8 +5,12 @@
 // 前端不参与任何派生计算（用户拍板：防伪造）。
 const session = require('../../../utils/session')
 const ticketCode = require('../../../utils/ticket-code')
+const img = require('../../../utils/img')
 
 Page({
+  // P3（第一百一十六批）：封面/配图加载失败兜底——清空该字段 → 走同页既有占位分支
+  // （实现与用法见 utils/img.js；`data-img-path` 标的就是这里 setData 的路径）
+  onImgError(e) { img.onImgError.call(this, e) },
   data: {
     childId: 0,
     childName: '',

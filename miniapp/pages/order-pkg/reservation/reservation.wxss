@@ -32,6 +32,17 @@
   flex-shrink: 0;
 }
 
+/* P3（第一百一十六批）：预约记录截断提示（含历史时后端 50 条上限） */
+.list-hint {
+  margin: 0 32rpx 16rpx;
+  padding: 16rpx 20rpx;
+  border-radius: var(--radius-sm);
+  background: var(--muted-light);
+  color: var(--fg);
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
 /* Section Labels */
 .section-label {
   padding: 28rpx 32rpx 16rpx;

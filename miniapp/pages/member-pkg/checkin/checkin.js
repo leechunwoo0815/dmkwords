@@ -1,5 +1,6 @@
 // pages/member-pkg/checkin/checkin.js — 打卡日历（WM6）
 const api = require('../../../utils/api')
+const session = require('../../../utils/session')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -15,11 +16,14 @@ Page({
     currentStreak: 0,
     checkinDates: [],
     loadError: '',  // P2-45：失败态（原先失败静默 → 渲染成"连续 0 天"）
+    noChild: false, // 同族补齐（第一百一十六批）：无孩子时显式空态，不渲染"本月没打卡"的假象
   },
 
   onLoad(options) {
     this.setData({ childName: options.child_name ? decodeURIComponent(options.child_name) : '' })
-    this._childId = options.child_id ? Number(options.child_id) : null
+    // 同族补齐（第一百一十六批）：统一解析（URL 合法才用，否则回落当前孩子）——
+    // 原写法拿不到 child_id 就静默早退，日历照渲一屏"本月没打卡、连续 0 天"（禁假 0 同族）
+    this._childId = session.resolveChildId(options)
     const now = new Date()
     this._setMonth(now.getFullYear(), now.getMonth() + 1)
     this.load()
@@ -41,13 +45,32 @@ Page({
     this.setData({ year: y, month: m, monthText: `${y} 年 ${m} 月`, days })
   },
 
+  /** 当前所看月份的日期区间（ISO）——**按区间取数**，翻到哪个月就拉哪个月。
+
+   *  原先固定请求「最近 90 条」：往前翻月超过这个窗口就一片空白，家长以为孩子那几个月
+   *  没坚持（P3 第一百一十六批）。区间模式由后端新增，`today_checked`/`current_streak`
+   *  已与取数区间解耦（否则翻历史月份会把连续天数算成 0）。
+   */
+  _monthRange() {
+    const { year, month } = this.data
+    const pad = (n) => String(n).padStart(2, '0')
+    const lastDay = new Date(year, month, 0).getDate()
+    return {
+      startDate: `${year}-${pad(month)}-01`,
+      endDate: `${year}-${pad(month)}-${pad(lastDay)}`,
+    }
+  },
+
   onRetryLoad() { this.load() },
 
   async load() {
-    if (!this._childId) return
+    if (!this._childId) {
+      this.setData({ noChild: true, loadError: '', checkinDates: [], todayChecked: false, currentStreak: 0 })
+      return
+    }
     this.setData({ loadError: '' })
     try {
-      const res = await api.getCheckins(this._childId, 90)
+      const res = await api.getCheckins(this._childId, 60, this._monthRange())
       const dates = res.dates || []
       const key = `${this.data.year}-${String(this.data.month).padStart(2, '0')}`
       const days = this.data.days.map((d) =>

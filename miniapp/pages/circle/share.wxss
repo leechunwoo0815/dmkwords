@@ -114,6 +114,18 @@
   border: 3rpx solid var(--fg);
   box-shadow: var(--shadow-hard);
 }
+/* P3（第一百一十六批）：卡片图加载失败占位（清空 image_url 后走这支） */
+.success-card-fail {
+  min-height: 320rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: var(--muted);
+  background: var(--surface);
+}
 .success-btns {
   display: flex;
   gap: 24rpx;

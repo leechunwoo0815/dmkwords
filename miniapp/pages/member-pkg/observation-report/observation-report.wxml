@@ -40,7 +40,8 @@
     <view class="obs-pages-wrap">
       <view class="obs-page" wx:for="{{latest.imageUrls}}" wx:key="*this"
         data-index="{{index}}" bindtap="onPreviewLatest">
-        <image class="obs-page-img" src="{{item}}" mode="widthFix" />
+        <image class="obs-page-img" src="{{item}}" mode="widthFix"
+          data-img-path="latest.imageUrls[{{index}}]" binderror="onImgError" />
         <view class="obs-page-no">{{index + 1}}/{{latest.imageUrls.length}}</view>
       </view>
     </view>
@@ -63,7 +64,8 @@
       <view class="obs-hist-card" wx:for="{{history}}" wx:for-item="rep" wx:key="id"
         data-report="{{rep.id}}" bindtap="onPreviewHistory">
         <view class="obs-hist-thumb">
-          <image class="obs-hist-thumb-img" src="{{rep.imageUrls[0]}}" mode="aspectFill" />
+          <image class="obs-hist-thumb-img" src="{{rep.imageUrls[0]}}" mode="aspectFill"
+            data-img-path="history[{{index}}].imageUrls[0]" binderror="onImgError" />
           <view class="obs-thumb-no">{{rep.imageUrls.length}} 页</view>
         </view>
         <view class="obs-hist-info">

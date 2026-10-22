@@ -5,7 +5,8 @@
 <view class="page-bg" wx:if="{{!loading && !loadError && activity}}">
   <!-- RB（插修 17）：hero 有封面显图+深色遮罩保文字，无封面降级纯色渐变 -->
   <view class="hero {{activity.cover_url ? 'hero-cover' : ''}}">
-    <image wx:if="{{activity.cover_url}}" src="{{activity.cover_url}}" mode="aspectFill" class="hero-img" />
+    <image wx:if="{{activity.cover_url}}" src="{{activity.cover_url}}" mode="aspectFill" class="hero-img"
+      data-img-path="activity.cover_url" binderror="onImgError" />
     <view class="hero-mask"></view>
     <view class="hero-content">
       <view class="hero-title">
@@ -74,8 +75,10 @@
         <block wx:for="{{detailBlocks}}" wx:key="index">
           <view wx:if="{{item.type === 'paragraph'}}" class="detail-p">{{item.text}}</view>
           <block wx:else>
-            <image class="detail-img" src="{{item.image_url}}" mode="widthFix"
-              data-src="{{item.image_url}}" bindtap="onPreviewImage" />
+            <image wx:if="{{item.image_url}}" class="detail-img" src="{{item.image_url}}" mode="widthFix"
+              data-src="{{item.image_url}}" bindtap="onPreviewImage"
+              data-img-path="detailBlocks[{{index}}].image_url" binderror="onImgError" />
+            <view wx:else class="detail-img detail-img-fail">图片加载失败，请稍后重试</view>
             <view wx:if="{{item.caption}}" class="detail-cap">{{item.caption}}</view>
           </block>
         </block>

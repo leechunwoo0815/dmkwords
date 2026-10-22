@@ -4,15 +4,17 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Depends, Header, Query, Response
 from pydantic import Field
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
-from backend.common.exceptions import NotFoundError
+from backend.common.exceptions import NotFoundError, ValidationError
 from backend.common.file_utils import book_cover_url, image_media_type
+from backend.common.list_meta import stamp_list_meta
 from backend.common.media_paths import is_within
 from backend.database import get_db
 from backend.domain.catalog.models import Book
@@ -111,18 +113,42 @@ def checkin_calendar(
     # P2-11（2026-10-17 第六十九批·大审查）：原先无上下界——`days=-1` 会 `.limit(-1)` 直落
     # MySQL 报错（500）；`days=10**9` 则一次拉全量（无分页，可拖垮库）。钉在 1..365（一年）。
     days: int = Query(30, ge=1, le=365),
+    # P3（第一百一十六批）：日历页翻月按**所看的那个月**取数。原先只能请求"最近 N 条"，
+    # 往前翻超过 N 就一片空白（家长以为孩子那几个月没坚持）。区间是加法的：不给则行为不变。
+    start_date: date | None = None,
+    end_date: date | None = None,
     auth: Any = Depends(get_current_parent),
 ):
+    """打卡日历（默认最近 `days` 条；给了 `start_date`/`end_date` 则按日期段取）。"""
     parent, db = auth
     child = child_of_parent(db, parent.id, child_id)  # P0-F1 归属校验
-    return ReadingService(db).checkin_calendar(child, days)
+    if start_date is not None and end_date is not None:
+        if end_date < start_date:
+            raise ValidationError("end_date 不能早于 start_date")
+        # 区间跨度钉死：单次最多一年（与 `days` 的 1..365 同一纪律——防一次拉全量）
+        if (end_date - start_date).days > 366:
+            raise ValidationError("日期区间最多一年，请分次查询")
+    return ReadingService(db).checkin_calendar(child, days, start_date, end_date)
 
 
 @router.get("/reservations")
-def list_reservations(child_id: int, auth: Any = Depends(get_current_parent)):
+def list_reservations(
+    response: Response,
+    child_id: int,
+    # P3（第一百一十六批）：「我的预约」页要能看到已核销/已取消/已超时的单子
+    # （docs/04 S35 验收点：「家长端我的预约显示已核销」）；书架/首页/详情页仍用默认
+    # 的"只回锁定中"口径 ⇒ 默认值不变，既有三端行为零变化。
+    include_closed: bool = False,
+    auth: Any = Depends(get_current_parent),
+):
     parent, db = auth
     child = child_of_parent(db, parent.id, child_id)  # P0-F1 归属校验（含 None 检查）
-    return ReservationService(db).list_mine(child)
+    svc = ReservationService(db)
+    rows = svc.list_mine(child, include_closed=include_closed)
+    if include_closed:
+        # 含历史时是**有上限**的列表：按 P2-44 用响应头如实告知（不静默截断）
+        stamp_list_meta(response, loaded=len(rows), limit=svc.HISTORY_LIMIT)
+    return rows
 
 
 class ReservationCreateRequest(BaseSchema):
@@ -325,11 +351,25 @@ def vocabulary_summary(child_id: int, auth: Any = Depends(get_current_parent)):
 
 
 @router.get("/vocabulary")
-def vocabulary_list(child_id: int, auth: Any = Depends(get_current_parent)):
+def vocabulary_list(
+    response: Response,
+    child_id: int,
+    # P3（第一百一十六批）：生词本只增不减，原实现全表回吐 + 前端整表 setData。
+    # `page_size` 与 `books` 列表同款钉在 1..50（防 `page_size=10**9` 一次拉全量）。
+    page: int = Query(1, ge=1),
+    page_size: int = Query(VocabularyService.PAGE_SIZE, ge=1, le=50),
+    auth: Any = Depends(get_current_parent),
+):
+    """生词本列表（**分页**；五口径统计见 `/vocabulary/summary`）。"""
     parent, db = auth
     child = child_of_parent(db, parent.id, child_id)
     guards.require_member_action(db, child, guards.VOCAB_VIEW)
-    return VocabularyService(db).list_words(child)
+    svc = VocabularyService(db)
+    rows = svc.list_words(child, page=page, page_size=page_size)
+    # 是否还有下一页：`summary` 已给权威口径（word_count），前端据此判"到底了"；
+    # 这里仍按 P2-44 把头带上（离线/直连调 API 的消费方也能看见上限）。
+    stamp_list_meta(response, loaded=len(rows), limit=page_size)
+    return rows
 
 
 @router.delete("/vocabulary/{vocabulary_id}")

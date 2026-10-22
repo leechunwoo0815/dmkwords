@@ -3,6 +3,7 @@
 const api = require('../../utils/api')
 const media = require('../../utils/media')
 const session = require('../../utils/session')
+const img = require('../../utils/img')
 
 const DEFAULT_AVATAR = '/icons/avatars/cat_sun.png'
 
@@ -11,6 +12,9 @@ function _fmt(n) {
 }
 
 Page({
+  // P3（第一百一十六批）：封面/配图加载失败兜底——清空该字段 → 走同页既有占位分支
+  // （实现与用法见 utils/img.js；`data-img-path` 标的就是这里 setData 的路径）
+  onImgError(e) { img.onImgError.call(this, e) },
   data: {
     childId: null,
     profile: null,

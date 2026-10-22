@@ -4,6 +4,7 @@
 const api = require('../../../utils/api')
 const session = require('../../../utils/session')
 const ticketCode = require('../../../utils/ticket-code')
+const img = require('../../../utils/img')
 
 //: 可出示入场券的报名态（待收款 pending_payment 不发放——"确认收款后入场券生效"）
 const TICKET_STATUSES = ['enrolled', 'checked_in']
@@ -13,6 +14,9 @@ const WATCH_INTERVAL_MS = 3000
 const SUCCESS_HOLD_MS = 1400
 
 Page({
+  // P3（第一百一十六批）：封面/配图加载失败兜底——清空该字段 → 走同页既有占位分支
+  // （实现与用法见 utils/img.js；`data-img-path` 标的就是这里 setData 的路径）
+  onImgError(e) { img.onImgError.call(this, e) },
   data: {
     loading: true,
     loadError: false,

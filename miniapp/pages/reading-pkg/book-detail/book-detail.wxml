@@ -1,7 +1,8 @@
 <view class="page-bg" wx:if="{{book}}">
   <!-- 头部：封面 + 信息 -->
   <view class="book-hero">
-    <image wx:if="{{book.cover_url}}" class="hero-cover" src="{{book.cover_url}}" mode="aspectFill" />
+    <image wx:if="{{book.cover_url}}" class="hero-cover" src="{{book.cover_url}}" mode="aspectFill"
+      data-img-path="book.cover_url" binderror="onImgError" />
     <image wx:else class="hero-cover hero-cover-empty" src="/icons/ui/cover.png" mode="aspectFit" />
     <view class="hero-info">
       <view class="hero-title">{{book.title}}</view>

@@ -13,12 +13,14 @@
       <block wx:if="{{code}}">
         <!-- 二维码（主）：展示用 <image>（canvasToTempFilePath 产物），不是 canvas 本身 -->
         <view class="qr-canvas-wrap">
-          <image wx:if="{{qrImage}}" class="qr-canvas" src="{{qrImage}}" mode="scaleToFill" />
+          <image wx:if="{{qrImage}}" class="qr-canvas" src="{{qrImage}}" mode="scaleToFill"
+            data-img-path="qrImage" binderror="onImgError" />
           <text wx:else class="qr-fallback">{{code}}</text>
         </view>
         <!-- 条形码（备）：纸质/摄像枪识别不稳时用 -->
         <view class="bc-canvas-wrap" wx:if="{{bcImage}}">
-          <image class="bc-canvas" src="{{bcImage}}" mode="scaleToFill" />
+          <image class="bc-canvas" src="{{bcImage}}" mode="scaleToFill"
+            data-img-path="bcImage" binderror="onImgError" />
         </view>
         <!-- 文本码（兜底）：扫码枪读不出来时馆员可手输 -->
         <view class="mc-code" bindtap="copyCode">

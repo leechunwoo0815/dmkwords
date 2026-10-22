@@ -2,6 +2,7 @@
 const api = require('../../utils/api')
 const session = require('../../utils/session')
 const media = require('../../utils/media')
+const img = require('../../utils/img')
 
 const PAGE_SIZE = 20
 
@@ -19,6 +20,9 @@ const SORT_OPTIONS = ['最新上架', 'AR 低→高', 'AR 高→低', '词数少
 const SORT_KEYS = ['newest', 'ar_asc', 'ar_desc', 'words_asc', 'words_desc']
 
 Page({
+  // P3（第一百一十六批）：封面/配图加载失败兜底——清空该字段 → 走同页既有占位分支
+  // （实现与用法见 utils/img.js；`data-img-path` 标的就是这里 setData 的路径）
+  onImgError(e) { img.onImgError.call(this, e) },
   data: {
     keyword: '',
     gradeOptions: GRADE_OPTIONS,

@@ -1,6 +1,23 @@
 // miniapp/utils/api.js — WM6 家长端 API 层（新契约 /api/miniapp/*）
 const req = require('./request')
 
+/**
+ * 列表接口统一入口。
+ *
+ * `opts.meta === true` 时返回 `{ rows, meta }`——`meta` 是后端在**响应头**里给的截断信号
+ * （`X-List-Limit` / `X-List-Truncated`，P2-44）。为什么要有：列表类接口有硬上限
+ * （家长订单 50、预约含历史 50、活动 50…），而响应体就是裸数组——页面看到 50 行会渲染成
+ * "这就是全部"，于是家长以为自己只有 50 条订单。需要提示条的页面传 `meta: true`，
+ * 其余调用点不传 ⇒ 行为与形状完全不变。
+ */
+function listCall(path, options, opts) {
+  if (!opts || !opts.meta) return req.get(path, null, options)
+  return req.get(path, null, { ...options, withHeaders: true }).then((r) => ({
+    rows: r.data,
+    meta: req.listMeta(r.headers),
+  }))
+}
+
 module.exports = {
   // 登录（2026-10-08 接线）：微信一键登录为主，短信验证码为兜底
   // ① 微信主通道：wx.login 拿 code → openid 已绑 → 直接登录态；未绑 → need_bind + bind_ticket
@@ -103,8 +120,9 @@ module.exports = {
   },
 
   // 退款 / 退会 / 转让 / 评估报告（WM10）
-  myOrders(childId) {
-    return req.get('/api/miniapp/orders', null, { params: { child_id: childId } })
+  // `opts.meta` → `{rows, meta}`（订单列表有 50 条硬上限，`meta.truncated` 为真即"还有更多"）
+  myOrders(childId, opts) {
+    return listCall('/api/miniapp/orders', { params: { child_id: childId } }, opts)
   },
   // 线上支付（WM12-A）：价格下发 → 下单 → 发起支付（返回 wx.requestPayment 参数）
   getPaymentPlans(childId) {
@@ -168,8 +186,9 @@ module.exports = {
   },
 
   // 线下活动（WM9）
-  listActivities(childId) {
-    return req.get('/api/miniapp/activities', null, { params: { child_id: childId } })
+  // `opts.meta` → `{rows, meta}`（近期活动同样有 50 条硬上限）
+  listActivities(childId, opts) {
+    return listCall('/api/miniapp/activities', { params: { child_id: childId } }, opts)
   },
   activityDetail(activityId, childId) {
     return req.get(`/api/miniapp/activities/${activityId}`, null, { params: { child_id: childId } })
@@ -205,10 +224,12 @@ module.exports = {
     const sub = relPath.replace(/^observation\//, '')
     return `${app.globalData.baseURL}/api/miniapp/observation-images/${sub}?token=${encodeURIComponent(token)}`
   },
-  listVocabulary(childId) {
-    return req.get('/api/miniapp/vocabulary', null, { params: { child_id: childId } })
+  // 生词本列表（P3 第一百一十六批：**分页**——原实现全表回吐 + 整表 setData）
+  listVocabulary(childId, page = 1) {
+    return req.get('/api/miniapp/vocabulary', null, { params: { child_id: childId, page } })
   },
-  // 统计三口径（收录词数/累计查词/来源书目）由服务端聚合，前端不另算（PRD §8.1.1 实现说明）
+  // 统计五口径（收录词数/累计查词/来源书目/本周新增/查过多次）由服务端聚合，前端不另算
+  // （PRD §8.1.1 实现说明：列表一旦分页，前端 reduce 出来的数就与真实口径漂移）
   summaryVocabulary(childId) {
     return req.get('/api/miniapp/vocabulary/summary', null, { params: { child_id: childId } })
   },
@@ -252,13 +273,30 @@ module.exports = {
   },
 
   // 打卡
-  getCheckins(childId, days) {
-    return req.get('/api/miniapp/checkins', null, { params: { child_id: childId, days: days || 60 } })
+  // 打卡日历。
+  // ① 默认：最近 `days` 条打卡记录（首页只要"今天打没打 + 连续几天"）；
+  // ② `range = { startDate, endDate }`：按**日期段**取（日历页翻月——原先固定请求最近 90 条，
+  //    往前翻超过窗口就一片空白，家长以为孩子那几个月没坚持，P3 第一百一十六批）。
+  getCheckins(childId, days, range) {
+    const params = { child_id: childId, days: days || 60 }
+    if (range && range.startDate && range.endDate) {
+      params.start_date = range.startDate
+      params.end_date = range.endDate
+    }
+    return req.get('/api/miniapp/checkins', null, { params })
   },
 
   // 预约
-  listReservations(childId) {
-    return req.get('/api/miniapp/reservations', null, { params: { child_id: childId } })
+  // `opts.includeClosed` = 连已结束（已核销/已取消/已超时）一起回 ——「我的预约」页用；
+  // 默认只回锁定中（书架/首页/详情页口径，与后端默认一致）。
+  // `opts.meta` → `{rows, meta}`（含历史时有 50 条上限）
+  listReservations(childId, opts) {
+    const { includeClosed = false } = opts || {}
+    return listCall(
+      '/api/miniapp/reservations',
+      { params: includeClosed ? { child_id: childId, include_closed: true } : { child_id: childId } },
+      opts
+    )
   },
   createReservation(childId, bookId) {
     return req.post('/api/miniapp/reservations', { child_id: childId, book_id: bookId })

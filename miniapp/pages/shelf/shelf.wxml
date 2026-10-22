@@ -32,7 +32,8 @@
   <block wx:if="{{!loadError && tab === 'borrows'}}">
     <view wx:for="{{borrows}}" wx:key="record_id" class="asset-card">
       <view class="asset-cover-wrap">
-        <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
+        <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill"
+          data-img-path="borrows[{{index}}].cover_url" binderror="onImgError" />
         <image wx:else class="asset-cover asset-cover-fb" src="/icons/ui/cover.png" mode="aspectFit" />
         <!-- T43（U2）：passed 金色 🏆 角标 -->
         <image wx:if="{{item.passed}}" class="trophy-badge" src="/icons/ui/trophy.png" mode="aspectFit" />
@@ -58,7 +59,8 @@
   <block wx:if="{{!loadError && tab === 'favorites'}}">
     <view wx:for="{{favorites}}" wx:key="id" class="asset-card">
       <view class="asset-cover-wrap">
-        <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
+        <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill"
+          data-img-path="favorites[{{index}}].cover_url" binderror="onImgError" />
         <image wx:else class="asset-cover asset-cover-fb" src="/icons/ui/cover.png" mode="aspectFit" />
         <!-- T43（U2）：passed 金色 🏆 角标 -->
         <image wx:if="{{item.passed}}" class="trophy-badge" src="/icons/ui/trophy.png" mode="aspectFit" />
@@ -86,7 +88,8 @@
   <block wx:if="{{!loadError && tab === 'reservations'}}">
     <view wx:for="{{reservations}}" wx:key="id" class="asset-card">
       <view class="asset-cover-wrap">
-        <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
+        <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill"
+          data-img-path="reservations[{{index}}].cover_url" binderror="onImgError" />
         <image wx:else class="asset-cover asset-cover-fb" src="/icons/ui/cover.png" mode="aspectFit" />
         <!-- T43（U2）：passed 金色 🏆 角标 -->
         <image wx:if="{{item.passed}}" class="trophy-badge" src="/icons/ui/trophy.png" mode="aspectFit" />
@@ -109,7 +112,8 @@
   <block wx:if="{{!loadError && tab === 'passed'}}">
     <view wx:for="{{passedBooks}}" wx:key="book_id" class="asset-card">
       <view class="asset-cover-wrap">
-        <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill" />
+        <image wx:if="{{item.cover_url}}" class="asset-cover" src="{{item.cover_url}}" mode="aspectFill"
+          data-img-path="passedBooks[{{index}}].cover_url" binderror="onImgError" />
         <image wx:else class="asset-cover asset-cover-fb" src="/icons/ui/cover.png" mode="aspectFit" />
         <image class="trophy-badge" src="/icons/ui/trophy.png" mode="aspectFit" />
       </view>

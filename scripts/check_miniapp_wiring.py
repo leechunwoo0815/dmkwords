@@ -86,6 +86,31 @@ CATCH_BLOCK_RE = re.compile(r"catch\s*\([^)]*\)\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*
 SILENT_EMPTY_IN_CATCH_RE = re.compile(r"setData\(\s*\{[^}]*:\s*\[\s*\]")
 FAILURE_MARK_RE = re.compile(r"loadError|noChild|error|toast|message|showToast|降级")
 
+#: W5 **远程图必须带加载失败兜底**（2026-10-22 第一百一十六批；第八轮 P3 实测）：
+#: 全仓 135 个 `<image>` 里 `binderror` 出现 **0 次**。封面/活动封面/帖子配图/二维码这些
+#: `src` 来自后端（URL 由 `utils/media.fullUrl` 拼 baseURL + token），一旦文件被运维删了、
+#: token 过期、图片接口 5xx，`<image>` 会停在**空白/裂图**上——家长看到的是"这本书没有
+#: 封面""孩子头像没了"，而不是"加载失败"。
+#:
+#: 判据：`src` 插值表达式里出现**远程资源字段名** ⇒ 该 `<image>` 必须带 `binderror`
+#: （处理器清空该字段 → 翻到同页既有的 `wx:else` 占位分支，实现见 `miniapp/utils/img.js`）。
+#: 只认下面这组字段名：本地包内资产（`/icons/ui/*.png`、`item.iconUrl` 之类）不在内——
+#: 它们在包里不会 404，要求一遍只会制造 100+ 处噪音改动。
+#:
+#: **已知盲区（如实登记）**：字段改了名（如 `item.cover`）就测不到——这是**命名型**规则，
+#: 不是数据流分析；新增远程图字段时把名字加进 `REMOTE_IMG_FIELDS` 并跑 `--self-test`。
+REMOTE_IMG_FIELDS = (
+    "cover_url",
+    "image_url",
+    "imageUrls",
+    "thumbUrl",
+    "imageUrl",
+    "qrImage",
+    "bcImage",
+)
+IMAGE_TAG_RE = re.compile(r"<image\b[^>]*?>", re.S)
+HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+
 
 def js_defines(js_text: str, name: str) -> bool:
     """js 里是否存在该方法（三种写法：`name(` / `name: (` / `name: function (`，均可带 async）。"""
@@ -176,6 +201,39 @@ def scan(wxml_files: list[Path], app_wxss: Path | None = None) -> list[str]:
                         f"W2 {rel}: 插值类名前缀 `{frag}` 在本页作用域 wxss 里没有对应类定义"
                         f"（状态样式会静默失效）"
                     )
+    return problems
+
+
+def scan_remote_img_fallback(wxml_files: list[Path]) -> list[str]:
+    """W5：`src` 来自后端的 `<image>` 必须带 `binderror`（见 `REMOTE_IMG_FIELDS` 的说明）。
+
+    先剥 `<!-- -->` 注释：注释里出现的 `<image>`（这些页面的注释常写"展示用 `<image>`"）
+    不是真实标签，把它当标签就会报出幽灵违例（本规则首版就踩过）。
+    """
+    problems: list[str] = []
+    for wxml in wxml_files:
+        raw = wxml.read_text(encoding="utf-8", errors="ignore")
+        text = HTML_COMMENT_RE.sub(lambda m: " " * len(m.group(0)), raw)
+        try:
+            rel = wxml.relative_to(ROOT)
+        except ValueError:  # 自检样本在临时目录
+            rel = wxml
+        for m in IMAGE_TAG_RE.finditer(text):
+            tag = m.group(0)
+            src = re.search(r'src="([^"]*)"', tag)
+            if not src or "{{" not in src.group(1):
+                continue
+            if not any(fld in src.group(1) for fld in REMOTE_IMG_FIELDS):
+                continue
+            if "binderror" in tag:
+                continue
+            line = text[: m.start()].count("\n") + 1
+            problems.append(
+                f'W5 {rel}:{line}: 远程图 `<image src="{src.group(1)}">` 没有 binderror 兜底——'
+                f"文件缺失/token 过期/接口 5xx 时会停在空白或裂图；"
+                f'补 `data-img-path="<要清空的 data 路径>" binderror="onImgError"`'
+                f"（实现见 miniapp/utils/img.js）"
+            )
     return problems
 
 
@@ -400,6 +458,30 @@ def selftest() -> list[str]:
             fails.append(
                 f"S1: W4 第二形态「降级」逃生口被误报：{scan_silent_empty_catch([degrade_try])}"
             )
+
+        # W5：远程图缺兜底必须命中；带 binderror / 本地资产 / 注释里的举例都必须零命中
+        bad_img = base / "bad_img.wxml"
+        bad_img.write_text(
+            '<image src="{{item.cover_url}}" mode="aspectFill" />\n'
+            '<image src="{{rep.imageUrls[0]}}" mode="aspectFill" />\n'
+            '<image src="{{sharedPost.image_url}}" mode="widthFix" />\n',
+            encoding="utf-8",
+        )
+        w5_hits = scan_remote_img_fallback([bad_img])
+        for want in ("cover_url", "imageUrls", "image_url"):
+            if not any(want in p for p in w5_hits):
+                fails.append(f"S1: W5 未命中注入样本（{want}）")
+        good_img = base / "ok_img.wxml"
+        good_img.write_text(
+            '<image src="{{item.cover_url}}" data-img-path="books[{{index}}].cover_url" binderror="onImgError" />\n'
+            '<image src="/icons/ui/book.png" mode="aspectFit" />\n'
+            '<image src="{{item.iconUrl}}" mode="aspectFit" />\n'
+            '<!-- 说明：展示用 <image src="{{x.cover_url}}"> 是历史写法 -->\n',
+            encoding="utf-8",
+        )
+        w5_good = scan_remote_img_fallback([good_img])
+        if w5_good:
+            fails.append(f"S1: W5 正例被误报（本地资产/注释/已带兜底）：{w5_good}")
     return fails
 
 
@@ -416,20 +498,27 @@ def main() -> int:
     if self_fails:
         print("FAIL(S1): " + "；".join(self_fails))
         return 1
-    problems = scan(wxml_files) + scan_reader_entry(js_files) + scan_silent_empty_catch(js_files)
+    problems = (
+        scan(wxml_files)
+        + scan_reader_entry(js_files)
+        + scan_silent_empty_catch(js_files)
+        + scan_remote_img_fallback(wxml_files)
+    )
     print(f"扫描面: {len(wxml_files)} 个 wxml（pages + components）+ {len(js_files)} 个 js")
     print(f"W1 bind*/catch* handler 缺失: {sum(1 for p in problems if p.startswith('W1'))}")
     print(f"W2 插值类名无样式定义: {sum(1 for p in problems if p.startswith('W2'))}")
     print(f"W3 reader 入口传整对象: {sum(1 for p in problems if p.startswith('W3'))}")
     print(f"W4 失败吞成空数据: {sum(1 for p in problems if p.startswith('W4'))}")
+    print(f"W5 远程图缺 binderror 兜底: {sum(1 for p in problems if p.startswith('W5'))}")
     if problems:
         print("\n违例明细：")
         for p in problems:
             print("  ✗", p)
-        print("\nFAIL: 接线检查不通过（W1~W4 必须为 0）")
+        print("\nFAIL: 接线检查不通过（W1~W5 必须为 0）")
         return 1
     print(
-        "PASS: 小程序接线四条规则全零（handler 存在 / 插值类名可解析 / reader 入口传 id / 失败不吞成空）✓"
+        "PASS: 小程序接线五条规则全零（handler 存在 / 插值类名可解析 / reader 入口传 id / "
+        "失败不吞成空 / 远程图带兜底）✓"
     )
     return 0
 
@@ -441,6 +530,9 @@ if __name__ == "__main__":
         if _fails:
             print("FAIL(S1): " + "；".join(_fails))
             sys.exit(1)
-        print("✓ S1 注入自检通过（W1~W4 违例命中 + 冒号式/单引号绑定命中 + 正例零误报）")
+        print(
+            "✓ S1 注入自检通过（W1~W5 违例命中 + 冒号式/单引号绑定命中 + "
+            "本地资产/注释/已带兜底正例零误报）"
+        )
         sys.exit(0)
     sys.exit(main())

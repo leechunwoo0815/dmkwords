@@ -1,8 +1,11 @@
 // pages/circle/share.js — 晒成就（WM14-A：可晒成就列表 → 选卡确认 → 落帖）
 const api = require('../../utils/api')
 const media = require('../../utils/media')
+const img = require('../../utils/img')
 
 Page({
+  // P3（第一百一十六批）：晒出的卡片图加载失败兜底（清空该字段 → 走同页失败占位分支）
+  onImgError(e) { img.onImgError.call(this, e) },
   data: {
     childId: null,
     childName: '',

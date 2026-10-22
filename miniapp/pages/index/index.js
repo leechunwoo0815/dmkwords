@@ -2,10 +2,14 @@
 const api = require('../../utils/api')
 const session = require('../../utils/session')
 const media = require('../../utils/media')
+const img = require('../../utils/img')
 // P3（第一百一十三批）：会员状态文案收编到 `utils/labels.js`（原先首页自建第二份副本）
 const { MEMBER_STATUS_TEXT } = require('../../utils/labels')
 
 Page({
+  // P3（第一百一十六批）：封面/配图加载失败兜底——清空该字段 → 走同页既有占位分支
+  // （实现与用法见 utils/img.js；`data-img-path` 标的就是这里 setData 的路径）
+  onImgError(e) { img.onImgError.call(this, e) },
   data: {
     parent: null,
     currentChild: null,
@@ -54,7 +58,9 @@ Page({
     this.refresh()
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 0 })
-      this.getTabBar().refreshBadge && this.getTabBar().refreshBadge() // fix34b：每个 tab 页各自刷新（红点只活在首页实例上=原 bug）
+      // P3（第一百一十六批）：**不再**在此调 `refreshBadge()`。原先 tabBar 自己发一次
+      // `notifications`，本页 `loadBadges` 又发一次 → 首页 onShow 9 个请求里那 1 个重复。
+      // 现在红点由本页 `loadNotifications()` 统一取回后喂给 tabBar（见该方法）。
     }
   },
 
@@ -71,6 +77,8 @@ Page({
       currentChild,
       statusText: currentChild ? (MEMBER_STATUS_TEXT[currentChild.member_status] || currentChild.member_status) : '',
     })
+    // 未读消息是**家长级**（不随孩子切换清空）→ 无孩子时也要拉：提醒条与 tabBar 红点同源
+    this.loadNotifications()
     if (currentChild) this.loadAll(currentChild)
   },
 
@@ -78,7 +86,7 @@ Page({
     this.loadCheckin(child.id)
     this.loadGrowth(child.id)
     this.loadContinue(child.id)
-    this.loadBadges(child.id)
+    this.loadReservationCount(child.id)
     this.loadRecommend()
     this.loadCarousel()
   },
@@ -150,19 +158,14 @@ Page({
     // P2-45：**失败与"没有在听的书"必须分开**。原先两个请求各自 `.catch(() => null)`：
     // 失败时卡片消失 = 看起来"没有可续听的书"（家长以为进度丢了）。
     // 现在失败进 `continueError`（如实提示"信息未加载"），只有真无进度才不显示卡片。
-    let cont = null
-    let borrows = null
-    let failed = false
-    try {
-      cont = await api.continueListening(childId)
-    } catch (e) {
-      failed = true
-    }
-    try {
-      borrows = await api.currentBorrows(childId)
-    } catch (e) {
-      failed = true
-    }
+    // P3（第一百一十六批）：两个请求**并行**（原先串行两个 await → 白等一个 RTT）。
+    const [contR, borrowR] = await Promise.allSettled([
+      api.continueListening(childId),
+      api.currentBorrows(childId),
+    ])
+    const cont = contR.status === 'fulfilled' ? contR.value : null
+    const borrows = borrowR.status === 'fulfilled' ? borrowR.value : null
+    const failed = contR.status === 'rejected' || borrowR.status === 'rejected'
     this.setData({
       borrowCount: borrows ? borrows.length : null,
       continueError: failed && !cont,
@@ -191,23 +194,33 @@ Page({
     return `${days} 天后到期`
   },
 
-  // 提醒条：未读消息 + 预约中数量
-  async loadBadges(childId) {
-    // F-L14/T34：两独立请求并行（原串行 await 拖慢首页徽标）
-    const [nRes, rsRes] = await Promise.allSettled([
-      api.notifications(1, 1),
-      api.listReservations(childId),
-    ])
-    if (nRes.status === 'fulfilled') {
-      this.setData({ unreadCount: nRes.value.unread || 0 })
-    }
-    if (rsRes.status === 'fulfilled') {
+  // 提醒条：预约中数量（未读消息已拆到 `loadNotifications`——它是家长级且要喂 tabBar）
+  async loadReservationCount(childId) {
+    try {
+      const rows = await api.listReservations(childId)
       // F-M1/T26：后端枚举是 active（waiting/ready 不存在，枚举错配同族第 4 案）
-      const active = (rsRes.value || []).filter((r) => r.status === 'active')
+      const active = (rows || []).filter((r) => r.status === 'active')
       this.setData({ reservationCount: active.length })
-    } else {
+    } catch (e) {
       this.setData({ reservationCount: null }) // 取不到 = 未知（不许留着上一个孩子的计数）
     }
+  },
+
+  /** 消息中心**一次请求，两处消费**：页面「N 条新消息」+ 底部 tabBar 的阅读圈红点。
+
+   *  为什么要合并（P3 第一百一十六批）：tabBar 的 `refreshBadge()` 原先自己再发一次
+   *  同样的 `GET /api/miniapp/notifications?page=1&page_size=1`，首页每次 onShow 因此
+   *  白多一个请求（onShow 扇出 9 个里的那 1 个重复）。红点口径不变——仍是
+   *  `unread_by_scene.circle_liked`，只是数据改由本页取回后 `applyNotifications` 转发。
+   *  拉不到时**保留旧值**（不清成 0 → 不制造"没有新消息"的假象）。
+   */
+  async loadNotifications() {
+    try {
+      const r = await api.notifications(1, 1)
+      this.setData({ unreadCount: r.unread || 0 })
+      const bar = typeof this.getTabBar === 'function' ? this.getTabBar() : null
+      if (bar && bar.applyNotifications) bar.applyNotifications(r)
+    } catch (e) { /* 未读数取不到：保留屏幕上的旧值（不冒充 0） */ }
   },
 
   // 今日推荐：从书库取 6 本真实书目（封面横滑卡）

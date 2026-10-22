@@ -1,8 +1,13 @@
 <view class="page-bg x-cb307e">
+  <!-- 同族补齐（第一百一十六批）：无孩子时显式空态——原先静默早退，日历照渲成
+       "本月没打卡 + 连续 0 天"（家长以为孩子的记录丢了） -->
+  <error-view wx:if="{{noChild}}" type="empty" title="还没有选择孩子"
+    desc="请先在「我的」里添加或选择孩子，再来查看打卡日历" showRetry="{{false}}" />
+
   <!-- P2-45：失败态显式呈现（原先失败静默 → 渲染成"连续 0 天 / 本月没打卡"） -->
-  <error-view wx:if="{{loadError}}" type="network" title="打卡记录加载失败"
+  <error-view wx:if="{{!noChild && loadError}}" type="network" title="打卡记录加载失败"
     desc="{{loadError}}（记录未加载，不代表没有打卡）" bind:onRetry="onRetryLoad" />
-  <view class="streak-banner" wx:if="{{!loadError}}">
+  <view class="streak-banner" wx:if="{{!noChild && !loadError}}">
     <view class="cal-header">
       <text class="cal-nav-btn" bindtap="onPrevMonth">‹</text>
       <text class="x-f0c0b3">{{monthText}}</text>
@@ -14,7 +19,7 @@
     </view>
   </view>
 
-  <view class="calendar-card" wx:if="{{!loadError}}">
+  <view class="calendar-card" wx:if="{{!noChild && !loadError}}">
     <view class="cal-weekdays">
       <text wx:for="{{weekdays}}" wx:key="*this" class="cal-weekday">{{item}}</text>
     </view>
@@ -26,7 +31,7 @@
     </view>
   </view>
 
-  <view class="x-43089c" wx:if="{{!loadError}}">
+  <view class="x-43089c" wx:if="{{!noChild && !loadError}}">
     {{childName}} · 当天首次完播自动打卡，重复听书不重复计
   </view>
 </view>

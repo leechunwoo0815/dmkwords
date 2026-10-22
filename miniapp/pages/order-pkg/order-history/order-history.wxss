@@ -234,3 +234,15 @@
   line-height: 1.6;
   border: 3rpx dashed var(--fg);
 }
+
+/* P3（第一百一十六批）：列表截断提示（后端 50 条上限）——与 pay-hint 同款"括号说明"观感，
+   避免被当成普通小字忽略掉 */
+.list-hint {
+  margin: 16rpx 24rpx 0;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: var(--warning-soft, var(--muted-light));
+  color: var(--fg);
+  font-size: 24rpx;
+  line-height: 1.6;
+}

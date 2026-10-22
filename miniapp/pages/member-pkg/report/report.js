@@ -1,8 +1,12 @@
 // pages/member-pkg/report/report.js — 周报/月报（WM8/C1）
 const api = require('../../../utils/api')
 const session = require('../../../utils/session')
+const img = require('../../../utils/img')
 
 Page({
+  // P3（第一百一十六批）：封面/配图加载失败兜底——清空该字段 → 走同页既有占位分支
+  // （实现与用法见 utils/img.js；`data-img-path` 标的就是这里 setData 的路径）
+  onImgError(e) { img.onImgError.call(this, e) },
   data: {
     childName: '',
     kind: 'weekly',

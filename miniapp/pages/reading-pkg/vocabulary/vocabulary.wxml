@@ -57,6 +57,10 @@
       </view>
     </view>
     <view class="list-hint">长按词条可移出生词本 · 点词看闪卡释义</view>
+    <!-- P3（第一百一十六批）：分页加载态与到底提示（生词本只增不减，整表 setData 会卡帧） -->
+    <view class="list-hint" wx:if="{{loadingMore}}">正在加载更多…</view>
+    <view class="list-hint" wx:elif="{{hasMore}}">上滑加载更多（已显示 {{words.length}}/{{wordCount}} 词）</view>
+    <view class="list-hint" wx:elif="{{words.length > 10}}">已显示全部 {{wordCount}} 词</view>
   </view>
 
   <view class="flashcard-overlay {{cardWord ? 'show' : ''}}" bindtap="onCloseCard">

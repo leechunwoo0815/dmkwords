@@ -2,6 +2,7 @@
 const api = require('../../../utils/api')
 const { loadConfigs, getConfigs, configsFailed } = require('../../../utils/configs')
 const media = require('../../../utils/media')
+const img = require('../../../utils/img')
 
 // 插修8/U1（FEAT-081）：通过测验的鼓励语，每次进详情随机一条
 const QUIZ_CHEERS = ['你太棒了！继续挑战下一本吧！', '阅读小达人就是你！', '向下一本书进发吧！']
@@ -14,6 +15,9 @@ function durText(sec) {
 }
 
 Page({
+  // P3（第一百一十六批）：封面/配图加载失败兜底——清空该字段 → 走同页既有占位分支
+  // （实现与用法见 utils/img.js；`data-img-path` 标的就是这里 setData 的路径）
+  onImgError(e) { img.onImgError.call(this, e) },
   data: {
     borrowStateError: '',  // P2-54：借阅状态查询失败原因（unknown 态展示）
     book: null,

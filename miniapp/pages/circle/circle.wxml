@@ -92,7 +92,8 @@
         <view wx:if="{{item.subtitle}}" class="ach-sub">{{item.subtitle}}</view>
         <view wx:if="{{item.thumbUrl}}" class="thumb-wrap {{item.admin_liked ? 'thumb-gold' : ''}}">
           <image class="post-thumb" src="{{item.thumbUrl}}" mode="widthFix"
-            data-url="{{item.imageUrlFull}}" bindtap="onPreviewCard" />
+            data-url="{{item.imageUrlFull}}" bindtap="onPreviewCard"
+            data-img-path="posts[{{index}}].thumbUrl" binderror="onImgError" />
           <!-- fix34e 羡慕杀②：被馆长赞过的帖子，缩略图上一道金色流光循环扫过 -->
           <view wx:if="{{item.admin_liked}}" class="thumb-shine"></view>
         </view>

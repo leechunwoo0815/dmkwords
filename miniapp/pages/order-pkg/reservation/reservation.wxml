@@ -22,14 +22,25 @@
         <view wx:if="{{item.remainText}}" class="countdown-row">
           <text class="countdown">{{item.remainText}}</text>
         </view>
-        <view wx:if="{{item.status === 'checked_out'}}" class="queue-badge">已到店借出</view>
-        <view wx:if="{{item.status === 'expired'}}" class="expired-badge">超时已释放</view>
-        <view wx:if="{{item.status === 'cancelled'}}" class="expired-badge">已取消</view>
+        <!-- P3（第一百一十六批）：这几支原先**永远不可达**——后端 `list_mine` 只回 active，
+             而 docs/04 S35 的验收点写的是「家长端我的预约显示**已核销**」（核销后预约直接从
+             列表消失 = 家长以为记录丢了）。本批改走 `include_closed=true` 这几支才真会渲染；
+             文案统一取 `statusText`（唯一映射源在 js 的 STATUS_TEXT，不在 wxml 再抄一份） -->
+        <view wx:if="{{item.status === 'checked_out'}}" class="queue-badge">{{item.statusText}}</view>
+        <view wx:elif="{{item.status === 'exception'}}" class="queue-badge">{{item.statusText}}</view>
+        <view wx:elif="{{item.status === 'expired'}}" class="expired-badge">{{item.statusText}}</view>
+        <view wx:elif="{{item.status === 'cancelled'}}" class="expired-badge">{{item.statusText}}</view>
       </view>
       <view class="reservation-actions" wx:if="{{item.canCancel}}">
         <view class="cancel-btn" data-id="{{item.id}}" bindtap="onCancel">取消预约</view>
       </view>
     </view>
+  </view>
+
+  <!-- P3（第一百一十六批）：含历史时后端有 50 条上限（`X-List-Truncated` 响应头下发），
+       截断必须如实说明，不能让家长以为"我一共就这些预约" -->
+  <view class="list-hint" wx:if="{{!loading && !loadError && truncated}}">
+    仅显示最近 {{historyLimit}} 条预约记录，可能还有更早的未列出
   </view>
 
   <view wx:if="{{items.length}}" class="tip-banner">

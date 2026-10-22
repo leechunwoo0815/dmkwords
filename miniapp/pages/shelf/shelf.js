@@ -2,6 +2,7 @@
 const api = require('../../utils/api')
 const session = require('../../utils/session')
 const media = require('../../utils/media')
+const img = require('../../utils/img')
 const { loadConfigs, getConfigs } = require('../../utils/configs')
 
 // 预约状态文案（第八轮 E 批剩余：预约保留时长由后端下发，前端不再写死 72h）
@@ -16,6 +17,9 @@ function resStatusText(cfg) {
 }
 
 Page({
+  // P3（第一百一十六批）：封面/配图加载失败兜底——清空该字段 → 走同页既有占位分支
+  // （实现与用法见 utils/img.js；`data-img-path` 标的就是这里 setData 的路径）
+  onImgError(e) { img.onImgError.call(this, e) },
   data: {
     tab: 'borrows',
     borrows: [],

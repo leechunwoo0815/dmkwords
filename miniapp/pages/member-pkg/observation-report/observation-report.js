@@ -2,6 +2,7 @@
 // 2026-09-21 重排（用户报障「看不清/太简陋」）：竖版整页展示 + 原生缩放预览 + 老师评语 + 往期折叠。
 // 展示口径：docs/15 §十九 报告类图片展示规范（整页 mode=widthFix / 放大出口必须走 wx.previewImage）。
 const api = require('../../../utils/api')
+const img = require('../../../utils/img')
 
 /** 后端给的是 `str(datetime)`（"2026-09-21 15:04:05.123456"）——只取年月日，别原样糊给家长看。 */
 function fmtDate(s) {
@@ -11,6 +12,9 @@ function fmtDate(s) {
 }
 
 Page({
+  // P3（第一百一十六批）：封面/配图加载失败兜底——清空该字段 → 走同页既有占位分支
+  // （实现与用法见 utils/img.js；`data-img-path` 标的就是这里 setData 的路径）
+  onImgError(e) { img.onImgError.call(this, e) },
   data: {
     childName: '',
     reports: [], // 全部期次（上传时间倒序）

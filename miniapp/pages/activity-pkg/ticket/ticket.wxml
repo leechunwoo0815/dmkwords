@@ -38,11 +38,13 @@
              `canvas type="2d"` 是原生层，首帧坐标若早于布局稳定会停在旧位置且不自愈
              （实测画到 hero/按钮上 = 用户报的"遮挡"真因）。导出失败时露出券码文本兜底。 -->
         <view class="qr-canvas-wrap">
-          <image wx:if="{{qrImage}}" class="qr-canvas" src="{{qrImage}}" mode="scaleToFill" />
+          <image wx:if="{{qrImage}}" class="qr-canvas" src="{{qrImage}}" mode="scaleToFill"
+            data-img-path="qrImage" binderror="onImgError" />
           <text wx:else class="qr-fallback">{{enrollment.ticket_code}}</text>
         </view>
         <view class="bc-canvas-wrap" wx:if="{{bcImage}}">
-          <image class="bc-canvas" src="{{bcImage}}" mode="scaleToFill" />
+          <image class="bc-canvas" src="{{bcImage}}" mode="scaleToFill"
+            data-img-path="bcImage" binderror="onImgError" />
         </view>
         <view class="qr-hint qr-code-line" bindtap="copyTicket">入场券码：{{enrollment.ticket_code}}</view>
         <view class="qr-hint qr-checked" wx:if="{{checkedIn}}">

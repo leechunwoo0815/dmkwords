@@ -51,7 +51,8 @@
   <view class="book-grid">
     <view wx:for="{{books}}" wx:key="id" class="book-card" data-book="{{item}}" bindtap="goDetail">
       <view class="card-cover">
-        <image wx:if="{{item.cover_url}}" class="card-cover-img" src="{{item.cover_url}}" mode="aspectFill" lazy-load="{{true}}" />
+        <image wx:if="{{item.cover_url}}" class="card-cover-img" src="{{item.cover_url}}" mode="aspectFill" lazy-load="{{true}}"
+          data-img-path="books[{{index}}].cover_url" binderror="onImgError" />
         <view wx:else class="card-cover-emoji"><image class="cover-ph" src="/icons/ui/cover.png" mode="aspectFit" /></view>
         <image wx:if="{{item.has_audio}}" class="audio-badge" src="/icons/ui/headphone.png" mode="aspectFit" />
       </view>

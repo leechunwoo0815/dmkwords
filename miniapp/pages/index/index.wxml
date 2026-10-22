@@ -29,7 +29,9 @@
     indicator-dots indicator-color="rgba(255,255,255,0.4)" indicator-active-color="#ffffff">
     <swiper-item wx:for="{{carousel}}" wx:key="id">
       <view class="carousel-item" data-id="{{item.id}}" bindtap="goActivityDetail">
-        <image src="{{item.cover_url}}" mode="aspectFill" class="carousel-img" />
+        <image wx:if="{{item.cover_url}}" src="{{item.cover_url}}" mode="aspectFill" class="carousel-img"
+          data-img-path="carousel[{{index}}].cover_url" binderror="onImgError" />
+        <view wx:else class="carousel-img carousel-img-empty"></view>
         <view class="carousel-caption">
           <text class="carousel-title">{{item.title}}</text>
           <text class="carousel-sub">{{item.start_at}}</text>
@@ -64,7 +66,9 @@
       <text>继续听</text>
     </view>
     <view class="continue-card" bindtap="goContinue">
-      <image class="continue-cover" src="{{continueBook.cover_url}}" mode="aspectFill" />
+      <image wx:if="{{continueBook.cover_url}}" class="continue-cover" src="{{continueBook.cover_url}}" mode="aspectFill"
+        data-img-path="continueBook.cover_url" binderror="onImgError" />
+      <image wx:else class="continue-cover continue-cover-fb" src="/icons/ui/cover.png" mode="aspectFit" />
       <view class="continue-info">
         <view class="continue-title">{{continueBook.title}}</view>
         <view class="continue-meta">{{continueBook.author}} · {{continueBook.dueText}}</view>
@@ -117,7 +121,8 @@
         <view wx:for="{{recommend}}" wx:key="id" class="rec-card"
           data-book="{{item}}" bindtap="goRecommend">
           <view class="rec-cover-wrap">
-            <image wx:if="{{item.cover_url}}" class="rec-cover" src="{{item.cover_url}}" mode="aspectFill" />
+            <image wx:if="{{item.cover_url}}" class="rec-cover" src="{{item.cover_url}}" mode="aspectFill"
+              data-img-path="recommend[{{index}}].cover_url" binderror="onImgError" />
             <view wx:else class="rec-cover rec-cover-fallback">
             <image class="rec-cover-fallback-icon" src="/icons/ui/cover.png" mode="aspectFit" /></view>
             <image wx:if="{{item.has_audio}}" class="rec-audio" src="/icons/ui/headphone.png" mode="aspectFit" />

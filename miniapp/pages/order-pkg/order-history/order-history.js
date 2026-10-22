@@ -52,6 +52,8 @@ Page({
     payHint: '',      // WM12-C（审查 P0-3）：不能支付时说明原因，不留"点了没反应"的死按钮
     paying: false,    // WM12-C（审查 P2-10）：请求期间禁止重复点击
     loadError: '',    // P2-45：失败态（原先失败静默 → 渲染成"暂无订单"）
+    truncated: false, // P3（第一百一十六批）：已到后端硬上限（响应头 X-List-Truncated）
+    orderLimit: 0,    // 上限数字**由后端下发**（`X-List-Limit`），前端不自持「50」
   },
 
   onLoad(options) {
@@ -100,7 +102,9 @@ Page({
     wx.showLoading({ title: '加载中' })
     this.setData({ loadError: '' })
     try {
-      const rows = await api.myOrders(this._childId)
+      // P3（第一百一十六批）：`meta: true` 拿响应头——后端 50 条硬上限原先被静默截断，
+      // 家长看到 50 条会当成"全部订单"（平台另有更早的订单，客服被问"我的订单呢"）
+      const { rows, meta } = await api.myOrders(this._childId, { meta: true })
       const orders = (rows || []).map((o) => ({
         ...o,
         typeText: labels.orderTypeText(o.order_type),  // 唯一映射源（custom 也翻成中文）
@@ -112,7 +116,12 @@ Page({
         // WM12-A：待支付（线上/待人工确认）都可继续发起线上支付
         payable: o.status === 'pending_payment' || o.status === 'pending_manual_confirm',
       }))
-      this.setData({ orders, filtered: this._filter(orders, this.data.activeTab) })
+      this.setData({
+        orders,
+        filtered: this._filter(orders, this.data.activeTab),
+        truncated: !!meta.truncated,
+        orderLimit: meta.limit || 0,
+      })
     } catch (e) {
       // P2-45：失败**不许**渲染成"暂无订单"（家长会以为订单丢了）
       this.setData({

@@ -1,11 +1,15 @@
 <!-- 头像 + 等级头像框（框比头像大 FRAME_SCALE，居中偏移由 js 算好） -->
 <view class="ring" style="width:{{size}}rpx;height:{{size}}rpx;">
-  <image class="ring-avatar" src="{{src}}" style="width:{{size}}rpx;height:{{size}}rpx;" mode="aspectFill" />
+  <!-- P3（第一百一十六批）：头像加载失败/为空时兜底到本地默认猫（组件 docstring 早已承诺
+       "空则用默认猫"，但原实现把空串直接给了 <image> → 渲染成空白圆） -->
+  <image class="ring-avatar" src="{{shownSrc}}" style="width:{{size}}rpx;height:{{size}}rpx;"
+    mode="aspectFill" binderror="onAvatarError" />
   <image
     wx:if="{{frameUrl}}"
     class="ring-frame"
     src="{{frameUrl}}"
     style="width:{{frameSize}}rpx;height:{{frameSize}}rpx;left:{{offset}}rpx;top:{{offset}}rpx;"
     mode="aspectFit"
+    binderror="onFrameError"
   />
 </view>

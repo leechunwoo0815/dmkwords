@@ -250,9 +250,17 @@ def _build_library(context, total_words: int, books: int, total_lookups: int) ->
     for i in range(extra):
         _lookup(context, WORDS_12[i % total_words], created[i % books]["id"])
     s = _summary(context)
-    assert s == {"word_count": total_words, "lookup_total": total_lookups, "book_count": books}, s
+    three = ("word_count", "lookup_total", "book_count")
+    # P3 第一百一十六批：summary 由三口径扩为五口径（week_count/repeat_count 一并下沉）。
+    # 这里**只投影造数关心的三口径**返回——本场景的判据是"造多少就是多少"，
+    # 五口径齐全性由下一支（`五个数字与服务端聚合口径一致`）断言，两处不重复也不互吞。
+    assert {k: s[k] for k in three} == {
+        "word_count": total_words,
+        "lookup_total": total_lookups,
+        "book_count": books,
+    }, s
     ctx["source_books"] = created
-    return s
+    return {k: s[k] for k in three}
 
 
 # ---------- 背景：播放语境 ----------
@@ -512,19 +520,35 @@ def step_summary_row(context, n: int, k: int, b: int) -> None:
     built = context.vocab_ctx.get("built") or context.vocab_ctx.get("padded")
     assert built, "统计行场景缺少造数步骤"
     assert {"word_count": n, "lookup_total": k, "book_count": b} == built, built
-    assert _summary(context) == built, _summary(context)
-
-
-@then("三个数字与服务端聚合口径一致（不前端另算）")
-def step_server_side_aggregate(context) -> None:
-    """三层证据：① 服务端有聚合端点且三口径齐全；② 列表自洽（前端渲染的列表与口径不打架）；
-    ③ 页面**消费**聚合端点、不再 `reduce`/`Set` 自算（"不前端另算"是判据原文，属可判定事实）。"""
     s = _summary(context)
-    assert set(s) == {"word_count", "lookup_total", "book_count"}, s
+    assert {key: s[key] for key in built} == built, s  # 三口径与造数一致（五口径见下一支）
+
+
+@then("五个数字与服务端聚合口径一致（不前端另算）")
+def step_server_side_aggregate(context) -> None:
+    """三层证据：① 服务端有聚合端点且**五口径**齐全；② 列表自洽（前端渲染的列表与口径不打架）；
+    ③ 页面**消费**聚合端点、不再 `reduce`/`Set` 自算（"不前端另算"是判据原文，属可判定事实）。
+
+    P3 第一百一十六批：列表改分页后，本周新增/查过多次若仍由前端对**整表**滤波就会只剩当前页
+    的结果——两枚指标随之下沉服务端，故这里是"五口径齐全"而不是"键数随意"。
+    本场景词数为 12 < 每页 20，所以"列表行数 == word_count"这一条成立（跨页口径由
+    `tests/unit/test_audit8_p3_miniapp_20261022.py::test_vocabulary_summary_counts_all_pages` 覆盖 25 词）。
+    """
+    s = _summary(context)
+    assert set(s) == {
+        "word_count",
+        "lookup_total",
+        "book_count",
+        "week_count",
+        "repeat_count",
+    }, s
     rows = _list(context)
     assert len(rows) == s["word_count"]
     assert sum(r["lookup_count"] for r in rows) == s["lookup_total"]
     assert len({r["source_title"] for r in rows if r["source_title"]}) == s["book_count"]
+    # 新下沉的两枚：语义必须与列表逐行一致（不是另算一套）
+    assert s["repeat_count"] == sum(1 for r in rows if (r["lookup_count"] or 1) > 1), s
+    assert s["week_count"] <= s["word_count"], s
     src = PAGE_JS.read_text(encoding="utf-8")
     assert "api.summaryVocabulary(" in src, "生词本页没有消费服务端聚合接口"
     assert "list.reduce(" not in src, "生词本页仍在用 reduce 自算统计（判据：不前端另算）"

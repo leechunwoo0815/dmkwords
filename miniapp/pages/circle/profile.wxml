@@ -53,7 +53,8 @@
             <text class="mini-sub">{{item.subtitle}}</text>
           </view>
           <image wx:if="{{item.thumbUrl}}" class="mini-thumb" src="{{item.thumbUrl}}" mode="widthFix"
-            data-url="{{item.imageUrlFull}}" bindtap="onPreviewPost" />
+            data-url="{{item.imageUrlFull}}" bindtap="onPreviewPost"
+            data-img-path="posts[{{index}}].thumbUrl" binderror="onImgError" />
         </view>
       </view>
       <view wx:else class="empty-hint">还没有晒过成就</view>

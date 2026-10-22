@@ -2649,7 +2649,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Checkin Calendar */
+        /**
+         * Checkin Calendar
+         * @description 打卡日历（默认最近 `days` 条；给了 `start_date`/`end_date` 则按日期段取）。
+         */
         get: operations["checkin_calendar_api_miniapp_checkins_get"];
         put?: never;
         post?: never;
@@ -3722,7 +3725,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Vocabulary List */
+        /**
+         * Vocabulary List
+         * @description 生词本列表（**分页**；五口径统计见 `/vocabulary/summary`）。
+         */
         get: operations["vocabulary_list_api_miniapp_vocabulary_get"];
         put?: never;
         post?: never;
@@ -10942,6 +10948,8 @@ export interface operations {
             query: {
                 child_id: number;
                 days?: number;
+                start_date?: string | null;
+                end_date?: string | null;
             };
             header?: {
                 authorization?: string;
@@ -12725,6 +12733,7 @@ export interface operations {
         parameters: {
             query: {
                 child_id: number;
+                include_closed?: boolean;
             };
             header?: {
                 authorization?: string;
@@ -12996,6 +13005,8 @@ export interface operations {
         parameters: {
             query: {
                 child_id: number;
+                page?: number;
+                page_size?: number;
             };
             header?: {
                 authorization?: string;

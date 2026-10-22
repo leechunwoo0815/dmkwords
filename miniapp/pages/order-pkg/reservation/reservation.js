@@ -18,6 +18,9 @@ Page({
     items: [],
     loading: true,
     now: 0,
+    // P3（第一百一十六批）：含历史时的 50 条上限信号（后端响应头下发）
+    truncated: false,
+    historyLimit: 0,
   },
 
   async onLoad(options) {
@@ -43,8 +46,14 @@ Page({
     }
     this.setData({ loading: true, noChild: false, loadError: '' })
     try {
-      const res = await api.listReservations(this._childId)
-      const items = (res || []).map((r) => {
+      // P3（第一百一十六批）：`includeClosed` — 把已核销/已取消/已超时/副本异常的单子也取回来
+      // （docs/04 S35：「家长端我的预约显示已核销」；原先后端只回 active，那三支徽标是死代码）。
+      // `meta` 拿响应头里的 50 条上限信号。书架/首页/详情页仍用默认的"只回锁定中"口径。
+      const { rows, meta } = await api.listReservations(this._childId, {
+        includeClosed: true,
+        meta: true,
+      })
+      const items = (rows || []).map((r) => {
         const remainMs = r.status === 'active' ? new Date(String(r.expires_at).replace(/-/g, '/')).getTime() - Date.now() : 0
         let remainText = ''
         if (remainMs > 0) {
@@ -59,7 +68,11 @@ Page({
           remainText,
         }
       })
-      this.setData({ items })
+      this.setData({
+        items,
+        truncated: !!meta.truncated,
+        historyLimit: meta.limit || 0,
+      })
     } catch (e) {
       // P2-45 同族：失败**不许伪装成空列表**（原先把错误吞成 items:[]）
       this.setData({ items: [], loadError: (e && e.message) || '加载失败' })

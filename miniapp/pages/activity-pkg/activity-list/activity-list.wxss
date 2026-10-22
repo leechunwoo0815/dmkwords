@@ -8,6 +8,17 @@
   padding: 20rpx 0 calc(60rpx + env(safe-area-inset-bottom));
 }
 
+/* P3（第一百一十六批）：列表截断提示（近期活动有 50 条硬上限，后端响应头下发信号） */
+.list-hint {
+  margin: 0 24rpx 16rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: var(--muted-light);
+  color: var(--fg);
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
 /* ---------- tab 胶囊（触控区 ≥88rpx，MP-018） ---------- */
 .tabs {
   display: flex;

@@ -13192,6 +13192,7 @@
     },
     "/api/miniapp/checkins": {
       "get": {
+        "description": "打卡日历（默认最近 `days` 条；给了 `start_date`/`end_date` 则按日期段取）。",
         "operationId": "checkin_calendar_api_miniapp_checkins_get",
         "parameters": [
           {
@@ -13213,6 +13214,40 @@
               "minimum": 1,
               "title": "Days",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
             }
           },
           {
@@ -16037,6 +16072,16 @@
             }
           },
           {
+            "in": "query",
+            "name": "include_closed",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Closed",
+              "type": "boolean"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -16424,6 +16469,7 @@
     },
     "/api/miniapp/vocabulary": {
       "get": {
+        "description": "生词本列表（**分页**；五口径统计见 `/vocabulary/summary`）。",
         "operationId": "vocabulary_list_api_miniapp_vocabulary_get",
         "parameters": [
           {
@@ -16432,6 +16478,29 @@
             "required": true,
             "schema": {
               "title": "Child Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Page Size",
               "type": "integer"
             }
           },

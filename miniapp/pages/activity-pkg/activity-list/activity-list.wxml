@@ -13,11 +13,17 @@
   <block wx:if="{{!loading && !loadError && tab === 'upcoming'}}">
     <empty-state wx:if="{{!activities.length}}" icon-name="calendar" title="近期没有活动"
       desc="有新活动会第一时间在这里发布" />
+    <!-- P3（第一百一十六批）：近期活动有 50 条硬上限，截断信号在后端响应头——
+         原先被前端丢掉，家长看到 50 场会以为"就这些活动" -->
+    <view class="list-hint" wx:if="{{truncated}}">
+      仅显示最近 {{activityLimit}} 场活动，可能还有更早的未列出
+    </view>
     <view class="activity-list">
       <view wx:for="{{activities}}" wx:key="id" class="activity-card" data-id="{{item.id}}" bindtap="goDetail">
         <view class="activity-banner banner-{{index % 3}}">
           <!-- T45：有封面显封面图，无封面保持渐变占位 -->
-          <image wx:if="{{item.cover_url}}" src="{{item.cover_url}}" mode="aspectFill" class="activity-banner-img" />
+          <image wx:if="{{item.cover_url}}" src="{{item.cover_url}}" mode="aspectFill" class="activity-banner-img"
+            data-img-path="activities[{{index}}].cover_url" binderror="onImgError" />
           <text class="activity-banner-text">{{item.fee_display}}</text>
         </view>
         <view class="activity-body">
@@ -70,7 +76,8 @@
       <view wx:for="{{pastActivities}}" wx:key="id" class="activity-card"
         data-id="{{item.id}}" bindtap="goDetail">
         <view class="activity-banner banner-{{index % 3}}">
-          <image wx:if="{{item.cover_url}}" src="{{item.cover_url}}" mode="aspectFill" class="activity-banner-img" />
+          <image wx:if="{{item.cover_url}}" src="{{item.cover_url}}" mode="aspectFill" class="activity-banner-img"
+            data-img-path="pastActivities[{{index}}].cover_url" binderror="onImgError" />
           <text class="activity-banner-text past-badge">往期回顾</text>
         </view>
         <view class="activity-body">

@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -77,17 +77,28 @@ class VocabularyService:
             "recorded": recorded,
         }
 
-    def list_words(self, child: Child) -> list[dict]:
-        """生词本列表（含释义/音标/查词次数）。
+    #: 生词本列表每页条数（路由的 `page_size` 默认值与之同源，避免两处各写一个数）
+    PAGE_SIZE = 20
+
+    def list_words(self, child: Child, page: int = 1, page_size: int = PAGE_SIZE) -> list[dict]:
+        """生词本列表（含释义/音标/查词次数）。**分页**（P3 第一百一十六批）。
 
         2026-09-15：原先只回 word + 来源书名，前端因此只能把「书名单行 + 生词」挤在
         同一行、同色同字号，且点单词没有任何可弹的东西——而词典（DictionaryWord）
         的音标/释义/翻译本来就在库。这里一次 join 出去，前端才能做闪卡。
+
+        为什么补分页（第八轮 P3 实测）：原实现 `.all()` 全表回吐 + 前端整表 `setData`——
+        生词本是**只增不减**的（查过的词自动收录），重度用户几年下来会把一次响应撑到
+        几百 KB、`setData` 卡帧。分页后列表只渲染当前页，而「收录词数/累计查词/来源书目/
+        本周新增/查过多次」五口径**全部**由 `summary()` 服务端聚合（本文件 `summary`
+        的 docstring 早已写明"列表一旦分页/裁剪，前端 reduce 出来的数就与真实口径漂移"）。
         """
         rows = (
             self.db.query(Vocabulary)
             .filter(Vocabulary.child_id == child.id, Vocabulary.is_deleted == 0)
             .order_by(Vocabulary.id.desc())
+            .offset(max(0, (page - 1) * page_size))
+            .limit(page_size)
             .all()
         )
         book_ids = {r.book_id for r in rows if r.book_id}
@@ -126,7 +137,7 @@ class VocabularyService:
         return out
 
     def summary(self, child: Child) -> dict:
-        """生词本统计三口径（PRD §8.1.1 实现说明：**服务端聚合，前端不另算**）。
+        """生词本统计五口径（PRD §8.1.1 实现说明：**服务端聚合，前端不另算**）。
 
         BDD 解封暴露的缺口（2026-10-16）：早先这三个数字由小程序拿到列表后
         `reduce`/`Set` 现算——列表一旦分页/裁剪就与真实口径漂移，且同一数字两处算法。
@@ -134,8 +145,12 @@ class VocabularyService:
         - `word_count`：当前**可见**生词条数（不含已移出）；
         - `lookup_total`：**历史全部**查词次数累加，**含已移出的词**——查过的次数是已发生的
           历史，删除不回退（否则"移出一个词"等于抹掉一段阅读足迹）；
-        - `book_count`：当前可见生词的来源书数（同一本只算一次、未记来源的词不计）。
+        - `book_count`：当前可见生词的来源书数（同一本只算一次、未记来源的词不计）；
+        - `week_count` / `repeat_count`（P3 第一百一十六批补）：**本周新增**与**查过多次**
+          两枚展示指标。原先由前端对**整个列表**滤波现算，列表一分页这两个数就只剩
+          当前页的结果（少得离谱）——按同一条纪律一并下沉到服务端。
         """
+        from sqlalchemy import case as _case
         from sqlalchemy import func as _func
 
         word_count = (
@@ -161,10 +176,30 @@ class VocabularyService:
             .scalar()
             or 0
         )
+        top = self.db.query(
+            _func.coalesce(
+                _func.sum(
+                    _case((Vocabulary.created_at >= datetime.now() - timedelta(days=7), 1), else_=0)
+                ),
+                0,
+            ),
+            _func.coalesce(
+                _func.sum(
+                    _case(
+                        (_func.coalesce(Vocabulary.lookup_count, 1) > 1, 1),
+                        else_=0,
+                    )
+                ),
+                0,
+            ),
+        ).filter(Vocabulary.child_id == child.id, Vocabulary.is_deleted == 0)
+        week_count, repeat_count = (int(x or 0) for x in top.one())
         return {
             "word_count": int(word_count),
             "lookup_total": int(lookup_total),
             "book_count": int(book_count),
+            "week_count": week_count,
+            "repeat_count": repeat_count,
         }
 
     def remove(self, child: Child, vocabulary_id: int) -> None:
