@@ -20,6 +20,7 @@ from backend.common.admin_notifications import AdminNotifyService
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity import refund_online, refund_rules
+from backend.domain.identity.guards import ensure_not_locked as _ensure_not_locked
 from backend.domain.identity.models import (
     Child,
     Order,
@@ -31,11 +32,6 @@ from backend.domain.identity.wm_notify import (
     notify_refund_executed,
     notify_refund_reviewed,
 )
-
-
-def _ensure_not_locked(child: Child) -> None:
-    if child.operation_locked:
-        raise ValidationError("孩子正在转让/退会审核流程中，相关操作已冻结（审核完成后自动解锁）")
 
 
 class RefundService:

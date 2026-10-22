@@ -40,6 +40,11 @@ class _RedactQueryString(logging.Filter):
 logging.basicConfig(level=logging.INFO)
 # uvicorn 的 access logger 由 uvicorn 自己配置（basicConfig 管不到），单独挂过滤器
 logging.getLogger("uvicorn.access").addFilter(_RedactQueryString())
+# 第九轮 P1-4：httpx（微信 code2session / access_token 走 URL query）是**另一条日志通道**，
+# uvicorn.access 的过滤器管不到它——统一挂脱敏，见 `common/log_redaction`
+from backend.common.log_redaction import install_log_redaction  # noqa: E402
+
+install_log_redaction()
 logger = logging.getLogger(__name__)
 
 settings = get_settings()

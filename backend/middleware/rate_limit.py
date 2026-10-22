@@ -7,17 +7,18 @@
 内存实现（单进程）。生产多副本时每副本独立计数，需要全局配额应换 Redis 方案。
 """
 
-import hashlib
 import logging
 import re
 import threading
 import time
 
+import jwt
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from backend.common.exceptions import RateLimitError
+from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -224,21 +225,44 @@ def is_routed_path(app, path: str) -> bool:
     return True if pattern is None else pattern.match(path) is not None
 
 
-def _identity(request: Request) -> str:
-    """限流身份：**优先登录态**——`Authorization` 里**凭证本体**的 sha1 摘要前 16 位
-    （不把 token 原文留在内存键/日志里）；无头回落 `_client_ip`（只信传输层，口径同登录限流）。
+def _verified_identity(request: Request) -> str | None:
+    """验签通过的凭证 → 稳定身份键 `{type}:{sub}`；无头/验签失败 → None。
 
-    第八轮审查 P1-4 ②：原先对**整个头原文**做 sha1 —— `Bearer tok` / `bearer tok` /
-    `BEARER tok` / `Bearer  tok`（多空格）各是一个桶（实测同一 token 5 种写法 = **5 个桶**），
-    等于把一个身份的写入预算放大 5 倍（攻击者还能继续变体）。
-    现在按 HTTP 语义归一：**空白折叠 + scheme 大小写不敏感**，取凭证本体再哈希。
-    与两端取 token 的方式对齐（管理端 `HTTPBearer.credentials`、家长端
-    `authorization.replace("Bearer ", "").strip()` 的目标都是"凭证本体"）。
+    **本地验签、不查库**（HS256，微秒级）：两端 token 都是 `SECRET_KEY` 签名的 JWT
+    （管理端 `common/security.create_admin_token`、家长端 `identity/auth._parent_token`），
+    载荷 `type`+`sub` 即身份本体，且**不含敏感值**（可以安全留在内存键里，不像 token 原文）。
+    业务侧仍各自完整鉴权（`gen` 代数 / 角色 / 归属），本函数**只决定限流分桶**。
     """
     parts = (request.headers.get("authorization") or "").split()
-    if parts:
-        cred = parts[1] if len(parts) > 1 else parts[0]
-        return "tok:" + hashlib.sha1(cred.encode("utf-8")).hexdigest()[:16]
+    if not parts:
+        return None
+    cred = parts[1] if len(parts) > 1 else parts[0]
+    try:
+        payload = jwt.decode(cred, get_settings().SECRET_KEY, algorithms=["HS256"])
+    except jwt.PyJWTError:
+        return None
+    subject = str(payload.get("sub") or "")
+    if not subject:
+        return None
+    return f"{payload.get('type') or 'unknown'}:{subject}"
+
+
+def _identity(request: Request) -> str:
+    """限流身份：**只认已校验的身份**，否则回落 `_client_ip`（只信传输层，口径同登录限流）。
+
+    第八轮审查 P1-4 ②（保留）：不能对**整个头原文**做哈希——`Bearer tok` / `bearer tok` /
+    `BEARER tok` / `Bearer  tok` 各是一个桶，等于把一个身份的写入预算放大 5 倍。
+
+    第九轮 P1-3（2026-10-22，**修正的正是"取凭证本体再哈希"这一步**）：原先哈希的是
+    **未校验**的凭证——攻击者每个请求换一个随机 token 就换一个新桶（每桶各 60/min），
+    实测"固定伪造 token 第 61 次 429，轮换 3 个伪造 token 连打 63 次 0 命中"；
+    配合 `_MAX_BUCKETS` 溢出桶还能把新身份整体降速。
+    现在：**验签通过才配拿到独立桶**（`type:sub` 稳定键，换写法/换副本仍是同一桶），
+    未通过的一律落 IP 桶——伪造凭证不再增殖桶，IP 预算也不会被无头请求重复消耗。
+    """
+    verified = _verified_identity(request)
+    if verified:
+        return "tok:" + verified
     return "ip:" + _client_ip(request)
 
 

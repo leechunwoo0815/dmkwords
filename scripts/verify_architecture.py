@@ -356,6 +356,281 @@ def check_like_escape(errors: list[str]) -> None:
                     )
 
 
+#: 事件契约白名单：`event_type` → **不修的理由**（空理由不放行；条目过期会被判红）。
+#: 依据：`CLAUDE.md` 第三节「跨域副作用走事件…**事件发布/订阅双向对账入门禁**」——
+#: 第九轮 P1-8 实证这条承诺从未落地，而 P1-1（预约成功通知链断链）正是靠这个空档长期存活。
+EVENT_CONTRACT_WHITELIST: dict[str, str] = {
+    "reservation.cancelled": "N-8 死事件类：零发布零订阅——补接「家长取消预约」通知还是删类，待甲方裁定（整改任务书 §八-1）",
+    "reservation.fulfilled": "N-8 死事件类：零发布零订阅——核销转借阅是否需要独立通知，待甲方裁定（同上）",
+    "reading.book_finished": "N-8 死事件类：零发布零订阅——待甲方裁定（同上）",
+    "reading.session_completed": "N-8 死事件类：零发布零订阅——待甲方裁定（同上）",
+}
+
+
+def _scan_event_contract(backend: Path):
+    """AST 全量扫事件契约三面：类定义（event_type）/ 发布点 / 订阅点。
+
+    **订阅的三种写法都要解析**——第九轮专家复核 N-7 的假阳性教训：`growth_handlers.py:23`
+    用的是 `event_bus.subscribe("reading.checkin", ...)`，只认 `X.event_type` 写法的扫描器
+    看不见它，于是把「CheckInEvent 发布无订阅」写进了报告。对账器若犯同一个错，等于把
+    假阳性固化成 gate 规则。
+
+    解析不出的写法进 notes（**不判红**）：静态解析不可能覆盖全部写法，误报会逼出绕过。
+    """
+    import ast
+
+    classes: dict[str, str | None] = {}  # 类名 → event_type（None = 未声明）
+    sites: dict[str, str] = {}  # 类名 → "file:line"
+    published: dict[str, str] = {}  # 类名 → "file:line"（事件类型在第二遍之后解析）
+    subscribed: dict[str, str] = {}  # event_type → "file:line"
+    notes: list[str] = []
+
+    parsed = []
+    for py in sorted(backend.rglob("*.py")):
+        if "__pycache__" in py.parts:
+            continue
+        try:
+            tree = ast.parse(py.read_text(encoding="utf-8"))
+        except SyntaxError:  # 语法错由 lint 管，这里不重复报
+            continue
+        rel = py.relative_to(ROOT) if ROOT in py.parents else py
+        parsed.append((rel, tree))
+        # 第一遍：类定义（发布点可能写在定义之前，必须先把类收齐）
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            if not any("Event" in ast.unparse(b) for b in node.bases):
+                continue
+            et: str | None = None
+            for st in node.body:
+                if (
+                    isinstance(st, ast.AnnAssign)
+                    and getattr(st.target, "id", None) == "event_type"
+                    and isinstance(st.value, ast.Constant)
+                    and isinstance(st.value.value, str)
+                ):
+                    et = st.value.value
+            classes[node.name] = et
+            sites[node.name] = f"{rel}:{node.lineno}"
+
+    for rel, tree in parsed:
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not node.args:
+                continue
+            attr = getattr(node.func, "attr", None)
+            arg0 = node.args[0]
+            if attr == "publish":
+                name = None
+                if isinstance(arg0, ast.Call):
+                    name = getattr(arg0.func, "id", None) or getattr(arg0.func, "attr", None)
+                elif isinstance(arg0, ast.Name):
+                    name = arg0.id
+                if name is None:
+                    notes.append(f"{rel}:{node.lineno} publish 载荷无法静态解析")
+                    continue
+                published.setdefault(name, f"{rel}:{node.lineno}")
+            elif attr == "subscribe":
+                owner: str | None = None
+                if isinstance(arg0, ast.Constant) and isinstance(arg0.value, str):
+                    subscribed.setdefault(arg0.value, f"{rel}:{node.lineno}")
+                    continue
+                if isinstance(arg0, ast.Attribute) and arg0.attr == "event_type":
+                    owner = getattr(arg0.value, "id", None)
+                elif isinstance(arg0, ast.Name):
+                    owner = arg0.id
+                if owner is None:
+                    notes.append(f"{rel}:{node.lineno} subscribe 参数无法静态解析")
+                    continue
+                if owner not in classes:
+                    notes.append(f"{rel}:{node.lineno} subscribe({owner}) 的类不在扫描面内")
+                    continue
+                et = classes[owner]
+                if et is None:
+                    notes.append(f"{rel}:{node.lineno} subscribe({owner}) 的类未声明 event_type")
+                    continue
+                subscribed.setdefault(et, f"{rel}:{node.lineno}")
+    return classes, sites, published, subscribed, notes
+
+
+def check_event_contract(errors: list[str]) -> str:
+    """事件**发布 / 订阅 / 定义**三向对账（宪法第三节承诺；第九轮 P1-8）。
+
+    判据（任一差集非空即红；例外只能进 `EVENT_CONTRACT_WHITELIST` 并写清理由）：
+      · **发布无订阅**（断链）：P1-1 就是这个形状——订阅器与微信模板都在，发布方从不存在，
+        接口照常 200、无审计、无死信，家长端永远收不到通知；
+      · **订阅无发布**（死订阅）：订阅了一个全仓没有任何发布方的事件；
+      · **定义即死类**：类存在但零发布零订阅（要么补接，要么删类）；
+      · **订阅串不存在**：`subscribe("typo.here")` 这类拼错的事件类型；
+      · **白名单过期**：条目已不再命中任何问题 → 必须删（防白名单长成第二个垃圾场）。
+    """
+    classes, sites, published, subscribed, notes = _scan_event_contract(BACKEND)
+    declared = {et: cls for cls, et in classes.items() if et}
+
+    pub_types: dict[str, str] = {}
+    for name, site in sorted(published.items()):
+        if name not in classes:
+            errors.append(f"{site}: publish 的事件类 `{name}` 在本仓库内无定义（拼错？）")
+            continue
+        et = classes[name]
+        if et is None:
+            errors.append(f"{site}: 事件类 `{name}` 未声明 event_type（发布了也只会被静默丢弃）")
+            continue
+        pub_types.setdefault(et, f"{sites.get(name, '?')} → {site}")
+
+    known = set(declared)
+    for et, site in sorted(subscribed.items()):
+        if et not in known:
+            errors.append(f"{site}: 订阅了不存在的事件类型 `{et}`（拼错？全仓无此 event_type）")
+
+    problems: set[str] = set()
+    for et, chain in sorted(pub_types.items()):
+        if et in subscribed:
+            continue
+        problems.add(et)
+        if et not in EVENT_CONTRACT_WHITELIST:
+            errors.append(
+                f"事件契约断链：`{et}` 有发布方无订阅者（{chain}）——订阅方丢了，家长端永远收不到"
+            )
+    for et, site in sorted(subscribed.items()):
+        if et in pub_types or et not in known:
+            continue
+        problems.add(et)
+        if et not in EVENT_CONTRACT_WHITELIST:
+            errors.append(f"事件契约死订阅：`{et}` 有人订阅但全仓无发布方（{site}）")
+    for et, cls in sorted(declared.items()):
+        if et in pub_types or et in subscribed:
+            continue
+        problems.add(et)
+        if et not in EVENT_CONTRACT_WHITELIST:
+            errors.append(
+                f"事件契约死类：`{et}`（{cls} @ {sites.get(cls, '?')}）零发布零订阅"
+                "——要么补接、要么删类"
+            )
+    for et, why in sorted(EVENT_CONTRACT_WHITELIST.items()):
+        if et not in problems:
+            errors.append(f"事件契约白名单条目 `{et}` 已不再命中任何问题（理由：{why}）——请删除")
+    for note in notes:
+        print(f"[事件契约·待自查] {note}")
+    return (
+        f"事件面 {len(declared)} 类 / 发布 {len(pub_types)} / 订阅 {len(subscribed)}"
+        f" / 白名单 {len(EVENT_CONTRACT_WHITELIST)}"
+    )
+
+
+def _module_index(pkg_root: Path) -> dict[str, Path]:
+    """`backend.a.b` → 磁盘文件（只收该包内的模块，`__init__` 归到包名）。"""
+    idx: dict[str, Path] = {}
+    for py in pkg_root.rglob("*.py"):
+        if "__pycache__" in py.parts:
+            continue
+        parts = list(py.relative_to(pkg_root.parent).with_suffix("").parts)
+        if parts[-1] == "__init__":
+            parts.pop()
+        idx[".".join(parts)] = py
+    return idx
+
+
+def _module_level_imports(path: Path) -> list[str]:
+    """该文件的**模块级** import 目标（候选名，含 `from X import y` 里的 `X.y`）。
+
+    只收模块级：函数/类体内的延迟导入**不算**——那是项目允许的形态（第九轮 N-4 已登记的
+    circulation↔reading / activity↔identity 隐式环全在函数体内，导入期安全）。
+    `if TYPE_CHECKING:` 也不算（运行时不执行）。
+    """
+    import ast
+
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except SyntaxError:
+        return []
+    out: list[str] = []
+
+    def walk(nodes: list) -> None:
+        for node in nodes:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue
+            if isinstance(node, ast.If):
+                if "TYPE_CHECKING" in ast.unparse(node.test):
+                    continue
+                walk(node.body)
+                walk(node.orelse)
+                continue
+            if isinstance(node, ast.Try):
+                walk(node.body)
+                walk(node.orelse)
+                walk(node.finalbody)
+                continue
+            if isinstance(node, ast.Import):
+                out.extend(a.name for a in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                if node.level or not node.module:  # 相对导入留空（解析易出错）
+                    continue
+                out.append(node.module)
+                out.extend(f"{node.module}.{a.name}" for a in node.names)
+
+    walk(tree.body)
+    return out
+
+
+def _resolve_module(candidate: str, index: dict[str, Path]) -> str | None:
+    """候选名 → 索引里的模块全名：精确命中优先，否则退到最长的包前缀。"""
+    parts = candidate.split(".")
+    while parts:
+        name = ".".join(parts)
+        if name in index:
+            return name
+        parts.pop()
+    return None
+
+
+def _find_cycle(graph: dict[str, set[str]]) -> list[str] | None:
+    """DFS 三色法找第一个环（返回环上模块名，首尾同点）。"""
+    color: dict[str, int] = dict.fromkeys(graph, 0)
+    stack: list[str] = []
+
+    def dfs(node: str):
+        color[node] = 1
+        stack.append(node)
+        for nxt in sorted(graph.get(node, ())):
+            if color.get(nxt, 2) == 1:
+                return stack[stack.index(nxt) :] + [nxt]
+            if color.get(nxt, 2) == 0:
+                got = dfs(nxt)
+                if got:
+                    return got
+        stack.pop()
+        color[node] = 2
+        return None
+
+    for node in sorted(graph):
+        if color[node] == 0:
+            got = dfs(node)
+            if got:
+                return got
+    return None
+
+
+def check_import_cycles(errors: list[str]) -> None:
+    """**模块级导入环 = 0**（第九轮 P1-2 防复发）。
+
+    为什么必须有：`wm10_service` ↔ `wm10_withdrawal_service` 曾互相顶层 import——实测
+    `ImportError`，能跑只因 pytest 收集顺序恰好先导了其中一边。这类缺陷**在 CI 里可能永远不显形**
+    （换个入口顺序就炸），只能靠机械对账拦。判据：只收模块级 import（延迟导入不算），任一环即红。
+    """
+    index = _module_index(BACKEND)
+    graph: dict[str, set[str]] = {name: set() for name in index}
+    for name, path in index.items():
+        for candidate in _module_level_imports(path):
+            target = _resolve_module(candidate, index)
+            if target and target != name:
+                graph[name].add(target)
+    cycle = _find_cycle(graph)
+    if not cycle:
+        return
+    chain = " → ".join(str(index[name].relative_to(ROOT)) for name in cycle)
+    errors.append(f"模块级导入环（顶层循环导入，换导入顺序即 ImportError）：{chain}")
+
+
 def self_test() -> int:
     """S1 注入自检：**每条规则各喂一个违例样本，必须全命中**。
 
@@ -365,8 +640,8 @@ def self_test() -> int:
     """
     import tempfile
 
-    global BACKEND, ROOT, DOMAINS
-    saved = (BACKEND, ROOT, DOMAINS)
+    global BACKEND, ROOT, DOMAINS, EVENT_CONTRACT_WHITELIST
+    saved = (BACKEND, ROOT, DOMAINS, EVENT_CONTRACT_WHITELIST)
     bad = 0
     try:
         with tempfile.TemporaryDirectory(prefix="arch-selftest-") as d:
@@ -420,8 +695,48 @@ def self_test() -> int:
             (backend / "common/like_single.py").write_text(
                 "like = f'%{kw}%'\nq = X.like(like, escape='\\\\\\\\')\n", encoding="utf-8"
             )
+            # ⑩ 事件契约三向对账（第九轮 P1-8）：发布无订阅 / 订阅无发布 / 死类 / 订阅串拼错 /
+            #    白名单命中不判红 / **字符串字面量订阅必须被认出**（专家 N-7 假阳性的反向样本）
+            (backend / "common/events_fixture.py").write_text(
+                "class PubOnlyEvent(Event):\n"
+                '    event_type: str = "fx.pub_only"\n'
+                "\n\n"
+                "class SubOnlyEvent(Event):\n"
+                '    event_type: str = "fx.sub_only"\n'
+                "\n\n"
+                "class DeadEvent(Event):\n"
+                '    event_type: str = "fx.dead"\n'
+                "\n\n"
+                "class WhitelistedDeadEvent(Event):\n"
+                '    event_type: str = "fx.whitelisted"\n'
+                "\n\n"
+                "class LiteralOkEvent(Event):\n"
+                '    event_type: str = "fx.literal_ok"\n'
+                "\n\n"
+                "def pub():\n"
+                "    event_bus.publish(PubOnlyEvent())\n"
+                "    event_bus.publish(LiteralOkEvent())\n"
+                "\n\n"
+                "def sub():\n"
+                '    event_bus.subscribe("fx.sub_only", handler)\n'
+                '    event_bus.subscribe("fx.literal_ok", handler)\n'
+                '    event_bus.subscribe("fx.no_such_type", handler)\n',
+                encoding="utf-8",
+            )
+
+            # ⑪ 模块级导入环（第九轮 P1-2 防复发）：互导对 + 延迟导入反向样本
+            (backend / "cyc_a.py").write_text(
+                "from backend.cyc_b import bee\n\n\ndef aye():\n    return 1\n", encoding="utf-8"
+            )
+            (backend / "cyc_b.py").write_text(
+                "from backend.cyc_a import aye\n\n\ndef bee():\n    return 1\n", encoding="utf-8"
+            )
+            (backend / "lazy_c.py").write_text(
+                "def f():\n    from backend.cyc_a import aye\n    return aye()\n", encoding="utf-8"
+            )
 
             BACKEND, ROOT, DOMAINS = backend, root, ["identity"]
+            EVENT_CONTRACT_WHITELIST = {"fx.whitelisted": "自证样本：白名单命中即不判红"}
             errs: list[str] = []
             check_domain_list(errs)
             check_four_pieces(errs)
@@ -431,8 +746,10 @@ def self_test() -> int:
             check_sqlite_ban(errs)
             check_import_whitelist(errs)
             check_like_escape(errs)
+            check_import_cycles(errs)
+            check_event_contract(errs)
             joined = "\n".join(errs)
-            for label, needle in (
+            needles = (
                 ("四件套缺 repository.py", "identity/repository.py 缺失"),
                 ("Router 出现 ORM", "Router 层出现 ORM 操作"),
                 ("with_for_update 未链 populate_existing", "未链 populate_existing"),
@@ -445,14 +762,27 @@ def self_test() -> int:
                 ("alembic 里的 sqlite", "alembic/versions/bad_mig.py"),
                 ("tests 里的 sqlite 真实用法", "sqlite 真实用法"),
                 ("LIKE 单引号模式变量", "like_single.py"),
-            ):
+                ("事件契约断链（发布无订阅）", "fx.pub_only"),
+                ("事件契约死订阅（订阅无发布）", "fx.sub_only"),
+                ("事件契约死类", "fx.dead"),
+                ("订阅了不存在的事件类型", "fx.no_such_type"),
+                ("模块级导入环", "模块级导入环"),
+            )
+            for label, needle in needles:
                 if needle not in joined:
                     print(f"✗ S1 [{label}] 未命中（期望输出含 {needle!r}）")
                     bad += 1
-            # 叙述性 sqlite 不得判红（tests 档只判真实用法）
-            if "test_narrative.py" in joined:
-                print("✗ S1 tests 里的叙述性 sqlite 被误报")
-                bad += 1
+            # 反向样本：叙述性 sqlite 不得判红；字符串字面量订阅必须被认出（不得报"发布无订阅"）；
+            # 白名单命中的死类不得判红（否则白名单形同虚设）；**延迟导入不得被当成环**
+            for label, needle in (
+                ("tests 里的叙述性 sqlite", "test_narrative.py"),
+                ("字符串字面量订阅被误判为无订阅", "fx.literal_ok"),
+                ("白名单命中的死类仍被判红", "fx.whitelisted"),
+                ("函数内延迟导入被误判为导入环", "lazy_c.py"),
+            ):
+                if needle in joined:
+                    print(f"✗ S1 [{label}] 被误报")
+                    bad += 1
 
             # 反向样本：把违例全修好 → 必须零违规（检查器过严会逼出无意义的绕过）
             (backend / "domain/identity/service.py").write_text(
@@ -487,6 +817,24 @@ def self_test() -> int:
                 "like = f'%{escape_like(kw)}%'\nq = X.like(like, escape='\\\\\\\\')\n",
                 encoding="utf-8",
             )
+            # 事件契约的合法样本：一 publish 一 subscribe（**字面量写法**），白名单清空
+            EVENT_CONTRACT_WHITELIST = {}
+            (backend / "common/events_fixture.py").write_text(
+                "class LiteralOkEvent(Event):\n"
+                '    event_type: str = "fx.literal_ok"\n'
+                "\n\n"
+                "def pub():\n"
+                "    event_bus.publish(LiteralOkEvent())\n"
+                "\n\n"
+                "def sub():\n"
+                '    event_bus.subscribe("fx.literal_ok", handler)\n',
+                encoding="utf-8",
+            )
+            # 导入环的合法样本：把互导改成「一方延迟导入」→ 环消失
+            (backend / "cyc_b.py").write_text(
+                "def bee():\n    from backend.cyc_a import aye\n    return aye()\n",
+                encoding="utf-8",
+            )
             clean: list[str] = []
             check_domain_list(clean)
             check_four_pieces(clean)
@@ -496,15 +844,24 @@ def self_test() -> int:
             check_sqlite_ban(clean)
             check_import_whitelist(clean)
             check_like_escape(clean)
+            check_import_cycles(clean)
+            check_event_contract(clean)
             if clean:
                 print(f"✗ S1 合法样本被误报（检查器过严）: {clean}")
                 bad += 1
+            # 白名单过期自检：条目指向一个已不再是问题的 event_type → 必须判红（防白名单长成垃圾场）
+            EVENT_CONTRACT_WHITELIST = {"fx.literal_ok": "自证样本：该条目已不再命中问题"}
+            rot: list[str] = []
+            check_event_contract(rot)
+            if not any("白名单条目" in e for e in rot):
+                print("✗ S1 事件契约白名单过期未判红（白名单不可腐烂）")
+                bad += 1
     finally:
-        BACKEND, ROOT, DOMAINS = saved
+        BACKEND, ROOT, DOMAINS, EVENT_CONTRACT_WHITELIST = saved
     if bad:
         print(f"✗ S1 注入自检失败 {bad} 项")
         return 1
-    print("✓ S1 注入自检通过（7 类违例全命中 + 合法样本零误报）")
+    print(f"✓ S1 注入自检通过（{len(needles)} 类违例全命中 + 合法样本与白名单零误报）")
     return 0
 
 
@@ -518,6 +875,8 @@ def main() -> int:
     check_sqlite_ban(errors)
     check_import_whitelist(errors)
     check_like_escape(errors)
+    check_import_cycles(errors)
+    event_summary = check_event_contract(errors)
 
     if errors:
         print(f"架构关 FAIL（{len(errors)} 处违规）：")
@@ -528,6 +887,8 @@ def main() -> int:
         "架构关 PASS：域列表与磁盘一致 / 四件套齐全 / Router 零违规（含 miniapp_router）"
         " / 锁定读均链 populate_existing（backend 全量）/ 行数达标"
         " / 无 sqlite（backend+scripts+alembic 严格、tests 判真实用法）/ import 白名单通过 / LIKE 全转义"
+        " / 模块级导入环 0（延迟导入不算）"
+        f" / 事件契约三向对账（{event_summary}）"
     )
     alerts = check_mutation_count_flush()
     if alerts:

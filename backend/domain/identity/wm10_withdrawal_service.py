@@ -17,6 +17,11 @@ from backend.common.exceptions import ConflictError, NotFoundError, ValidationEr
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.circulation.models import BorrowRecord
 from backend.domain.identity import refund_rules
+
+# 第九轮 P1-2（2026-10-22）：从 `wm10_service` 改为从 `guards` 取——原先两个模块**互相顶层
+# import**（本行 ← wm10_service 底部的 `WithdrawalService` re-export）构成模块级循环导入，
+# 实测 `ImportError`，能跑只因 pytest 收集顺序恰好先导 wm10_service。
+from backend.domain.identity.guards import ensure_not_locked as _ensure_not_locked
 from backend.domain.identity.models import (
     Child,
     Order,
@@ -25,7 +30,6 @@ from backend.domain.identity.models import (
     TransferRequest,
     WithdrawalRequest,
 )
-from backend.domain.identity.wm10_service import _ensure_not_locked
 from backend.domain.identity.wm_notify import (
     notify_withdrawal_reviewed,
 )

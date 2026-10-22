@@ -62,7 +62,9 @@ Page({
   },
 
   _expireLine(c) {
-    if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return } // F-L17/T34 ''
+    // P1-6（第九轮审查）：`return` 裸返回 = `undefined`，而调用方紧接着 `.indexOf('即将到期')`
+    // → 无孩家长进「我的」页必抛 TypeError 整页白屏。所有分支必须返回**字符串**。
+    if (!c) { wx.showToast({ title: '请先添加孩子档案', icon: 'none' }); return '' } // F-L17/T34 ''
     const fmt = (d) => {
       const dt = new Date(String(d).replace(/-/g, '/'))
       const m = String(dt.getMonth() + 1).padStart(2, '0')
@@ -74,7 +76,11 @@ Page({
     const today = new Date()
     if (c.member_status === 'observation' && !c.member_expire) {
       const d = new Date(today.getTime() + 30 * 24 * 3600 * 1000)
-      return `会员到期(观察期 ${cfg.observation_period_days} 天) ${fmt(d)}`
+      // P1-6：`cfg` 只存在于页面 data（`this.data.cfg`），裸 `cfg` 在模块作用域不存在
+      // → ReferenceError（观察期且无到期日的孩子必踩）。取不到口径时按 30 天兜底。
+      const cfg = this.data.cfg || {}
+      const days = cfg.observation_period_days || 30
+      return `会员到期(观察期 ${days} 天) ${fmt(d)}`
     }
     if (!c.member_expire) return ''
     const diff = Math.ceil((new Date(String(c.member_expire).replace(/-/g, '/')).getTime() - today.getTime()) / 86400000)

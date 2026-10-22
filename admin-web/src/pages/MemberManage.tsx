@@ -1030,7 +1030,11 @@ export default function MemberManage() {
             await apiUpdateChild(editChild.id, {
               name: v.name || undefined,
               gender: v.gender ?? undefined,
-              birthday: v.birthday ? v.birthday.format("YYYY-MM-DD") : null,
+              // P1-5（第九轮审查）：控件是 `<Input>`（值恒为字符串），原写法 `v.birthday.format(...)`
+              // 打在字符串上必抛 `TypeError: v.birthday.format is not a function` → **保存整体失败**
+              // （姓名/英文名/年级一起存不进去，且只弹一句报错）。统一按字符串送；空串 = 清空
+              // （后端 schema `birthday: date | None` 会把非法格式挡成 422，错误文案走上面的 catch）。
+              birthday: (v.birthday || "").trim() || null,
               english_name: v.english_name ?? "",
               grade: v.grade ?? "",
               ar_level: v.ar_level || undefined,

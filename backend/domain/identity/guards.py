@@ -38,6 +38,18 @@ DEPOSIT_SUPPLEMENT = "deposit_supplement"
 AUDIO = "audio"  # R2（插修 15/C-13）：音频流会员门禁——403 语义（ForbiddenError）
 
 
+def ensure_not_locked(child: Child) -> None:
+    """孩子处于转让/退会审核流程中（`operation_locked`）时拒绝操作。
+
+    第九轮 P1-2（2026-10-22）：从 `wm10_service` 移到这里——该函数同时被 `RefundService`
+    （`wm10_service`）与退会状态机（`wm10_withdrawal_service`）使用，而那两个模块之间
+    **互相顶层 import → 模块级循环导入**（实测 `ImportError`，靠 pytest 收集顺序侥幸能跑）。
+    挪到双方都只依赖 models/exceptions 的中立模块（本文件）后，环自然消失。
+    """
+    if child.operation_locked:
+        raise ValidationError("孩子正在转让/退会审核流程中，相关操作已冻结（审核完成后自动解锁）")
+
+
 def _member_state(child: Child) -> str:
     """归并为 R-313 四态：unpaid / active / expired / withdrawn。"""
     if child.member_status == Child.MEMBER_WITHDRAWN:

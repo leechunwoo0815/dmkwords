@@ -57,6 +57,9 @@ export default function DepositManage() {
   const [listError, setListError] = useState("");
   const [ledgerChild, setLedgerChild] = useState<Deposit | null>(null);
   const [ledgers, setLedgers] = useState<DepositLedger[]>([]);
+  // P1-7（第九轮审查）：流水取数失败标记——原先失败时抽屉里留着**上一个孩子**的流水
+  // （`await` 抛错后 setLedgers 没执行，旧数据原样在），且失败后显示「暂无流水」也是在说谎
+  const [ledgerError, setLedgerError] = useState("");
   const [deductChild, setDeductChild] = useState<Deposit | null>(null);
   const [deductForm] = Form.useForm();
 
@@ -76,7 +79,15 @@ export default function DepositManage() {
 
   const openLedgers = async (dep: Deposit) => {
     setLedgerChild(dep);
-    setLedgers(await apiGetDepositLedgers(dep.child_id));
+    setLedgers([]); // P1-7：先清空——否则抽屉在取数期间（或失败后）显示的是**上一个孩子**的流水
+    setLedgerError("");
+    try {
+      setLedgers(await apiGetDepositLedgers(dep.child_id));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "流水加载失败";
+      setLedgerError(msg);
+      message.error(msg);
+    }
   };
 
   return (
@@ -133,14 +144,23 @@ export default function DepositManage() {
               <Space>
                 {r.status === "unpaid" && (
                   <Button type="link" size="small" onClick={async () => {
-                    const order = await apiCreateDepositOrder(r.child_id);
-                    message.success(`押金订单已创建（￥${Number(order.amount).toLocaleString()}），请到「会员管理 → 订单」确认收款`);
+                    // P1-7：原先无 catch——接口挂掉时 promise 静默 reject，运营看到的是"点了没反应"
+                    try {
+                      const order = await apiCreateDepositOrder(r.child_id);
+                      message.success(`押金订单已创建（￥${Number(order.amount).toLocaleString()}），请到「会员管理 → 订单」确认收款`);
+                    } catch (e) {
+                      message.error(e instanceof Error ? e.message : "创建押金订单失败");
+                    }
                   }}>缴押金</Button>
                 )}
                 {(r.status === "partially_deducted" || r.status === "fully_deducted") && (
                   <Button type="link" size="small" onClick={async () => {
-                    const order = await apiCreateSupplementOrder(r.child_id);
-                    message.success(`补缴订单已创建（￥${Number(order.amount).toLocaleString()}），确认收款后恢复全额`);
+                    try {
+                      const order = await apiCreateSupplementOrder(r.child_id);
+                      message.success(`补缴订单已创建（￥${Number(order.amount).toLocaleString()}），确认收款后恢复全额`);
+                    } catch (e) {
+                      message.error(e instanceof Error ? e.message : "创建补缴订单失败");
+                    }
                   }}>补缴</Button>
                 )}
                 {(r.status === "paid" || r.status === "partially_deducted") && (
@@ -161,7 +181,18 @@ export default function DepositManage() {
         title={`押金流水 — ${ledgerChild?.child_name ?? ""}`}
         open={ledgerChild !== null} onClose={() => setLedgerChild(null)} width={480}
       >
-        {ledgers.length === 0 ? (
+        {ledgerError ? (
+          // P1-7：失败要说"未加载"，不能说"暂无"（同列表侧的 listError 口径）
+          <Typography.Text type="warning" style={{ display: "block" }}>
+            {ledgerError} · 流水未加载，不代表没有记录——请重试
+            <Typography.Link
+              onClick={() => ledgerChild && openLedgers(ledgerChild)}
+              style={{ marginLeft: 8 }}
+            >
+              重试
+            </Typography.Link>
+          </Typography.Text>
+        ) : ledgers.length === 0 ? (
           <Typography.Text type="secondary">暂无流水</Typography.Text>
         ) : (
           ledgers.map((l) => (

@@ -154,6 +154,16 @@ class ReservationService:
         copy.status = BookCopy.STATUS_RESERVED
         self.db.add(res)
         self.db.flush()
+        # 第九轮 P1-1（2026-10-22）：**预约成功事件此前全仓没有发布方**——订阅器
+        # （`tasks/notify_handlers._on_reservation_created`）与微信模板映射三件都在，
+        # 唯独缺这一行：家长预约成功后永远收不到「预约成功」站内信，而接口照常 200、
+        # 无审计、无死信（最典型的静默数据缺失）。同事务发布，订阅器抛错即整体回滚。
+        from backend.common.events import ReservationCreatedEvent, event_bus
+
+        event_bus.publish(
+            ReservationCreatedEvent(child_id=child.id, book_id=book_id, reservation_id=res.id),
+            db=self.db,
+        )
         self.db.commit()
         return res
 
