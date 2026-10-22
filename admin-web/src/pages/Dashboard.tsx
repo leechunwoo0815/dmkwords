@@ -44,7 +44,7 @@ const BUSINESS_CELLS: { label: string; unit: string; valueKey: string }[] = [
   { label: "会员总数", unit: "人", valueKey: "member_total" },
   { label: "待评估", unit: "人", valueKey: "pending_evaluation_count" },
   { label: "本周新增会员", unit: "人", valueKey: "member_new_week" },
-  { label: "续费率", unit: "%", valueKey: "renew_rate" },
+  { label: "续借率", unit: "%", valueKey: "renew_rate" },
   { label: "退会率", unit: "%", valueKey: "withdrawal_rate" },
   { label: "测验通过率", unit: "%", valueKey: "quiz_pass_rate" },
   { label: "里程碑达成", unit: "人", valueKey: "milestone_count" },

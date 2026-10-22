@@ -61,6 +61,7 @@ import {
   type Parent,
   type ParentRow,
 } from "../api/members";
+import { PAY_METHOD_OPTIONS, payMethodLabel } from "../constants/pay";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
 import PageTitle from "../components/PageTitle";
@@ -82,13 +83,6 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   pending_payment: "待支付", pending_manual_confirm: "待人工确认",
   paid: "已支付", cancelled: "已取消", refunded: "已退款",
 };
-const PAY_METHOD_OPTIONS = [
-  { value: "scan", label: "微信扫码" },
-  { value: "alipay", label: "支付宝" },
-  { value: "transfer", label: "对公转账" },
-  { value: "card", label: "刷卡" },
-  { value: "cash", label: "现金" },
-];
 
 export default function MemberManage() {
   const { configs, failed: configsFailed } = useConfigs();
@@ -271,7 +265,7 @@ export default function MemberManage() {
       content: (
         <div>
           <div style={{ marginBottom: 8 }}>
-            {o.order_no} · ￥{Number(o.amount).toLocaleString()}（仅超管；${cfgNum(configs, "first_activity_fee", 99)} 元资格随退款恢复）
+            {o.order_no} · ￥{Number(o.amount).toLocaleString()}（仅超管；{cfgNum(configs, "first_activity_fee", 99)} 元资格随退款恢复）
           </div>
           <div style={{ marginBottom: 8, color: "#b26a00" }}>
             这里只**发起申请**，钱不会立即退出——需再到「退款中心」审核通过并执行。
@@ -623,7 +617,7 @@ export default function MemberManage() {
                   {ORDER_STATUS_LABEL[s] ?? s}
                 </Tag>
               ) },
-              { title: "收款方式", dataIndex: "pay_method", width: 100, render: (v) => v ? PAY_METHOD_OPTIONS.find((o) => o.value === v)?.label ?? v : "—" },
+              { title: "收款方式", dataIndex: "pay_method", width: 100, render: (v) => payMethodLabel(v) },
               { title: "创建时间", dataIndex: "create_time", key: "created_at", width: 170, sorter: true, render: (v) => String(v ?? "").slice(0, 19).replace("T", " ") },
               {
                 title: "操作", key: "op", width: 150,
@@ -874,7 +868,7 @@ export default function MemberManage() {
                   </Form.Item>
                 </>
               ) : getFieldValue("order_type") === "deposit" ? (
-                <Typography.Text type="secondary">押金金额按标准配置（${money(cfgNum(configs, "deposit_amount", 1200))} 元），确认收款后自动激活押金账户。</Typography.Text>
+                <Typography.Text type="secondary">押金金额按标准配置（{money(cfgNum(configs, "deposit_amount", 1200))} 元），确认收款后自动激活押金账户。</Typography.Text>
               ) : null}
             </Form.Item>
           <Form.Item name="remark" label="备注">

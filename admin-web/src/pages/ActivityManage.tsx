@@ -255,7 +255,7 @@ export default function ActivityManage() {
         {/* T3：活动列表三件套——搜索+类型/状态筛选（B7 预约先例同款） */}
         <Input.Search
           placeholder="按活动标题搜索" style={{ width: 220 }} allowClear
-          onSearch={(v) => setKeyword(v)}
+          onSearch={(v) => { setKeyword(v); activityPg.setPage(1); }}
         />
         {/* R9：显式「全部」选项（A4/B7 口径），替 allowClear */}
         <Select

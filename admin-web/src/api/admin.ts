@@ -162,6 +162,9 @@ export function apiListAdminInbox(params: {
   read_only?: boolean;
   page: number;
   page_size: number;
+  /** P3 管理端族（2026-10-22）：已审结历史窗口上限（后端常量随响应下发，前端不再写死） */
+  scan_limit?: number;
+  open_limit?: number;
 }> {
   const query = new URLSearchParams({ page: String(params.page), page_size: String(params.page_size) });
   if (params.status_filter) query.set("status_filter", params.status_filter);
@@ -281,8 +284,16 @@ export type DeadLetterList = {
   page_size: number;
 };
 
-export function apiDeadLetters(unresolvedOnly = false): Promise<DeadLetterList> {
-  return request(`/api/admin/dead-letters?unresolved_only=${unresolvedOnly}&page_size=20`);
+export function apiDeadLetters(
+  unresolvedOnly = false,
+  page = 1,
+  pageSize = 20
+): Promise<DeadLetterList> {
+  // P3 管理端族（2026-10-22）：原先把 page_size=20 写死在 URL 里 → 面板**无法翻页**
+  // （后端 `/api/admin/dead-letters` 早已支持 page/page_size 并返回 total）。
+  return request(
+    `/api/admin/dead-letters?unresolved_only=${unresolvedOnly}&page=${page}&page_size=${pageSize}`
+  );
 }
 
 export function apiHandleDeadLetter(

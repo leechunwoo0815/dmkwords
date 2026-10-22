@@ -83,7 +83,7 @@ export default function DepositManage() {
     <>
       <PageTitle>押金与赔偿</PageTitle>
       <Typography.Paragraph type="secondary">
-        押金按孩子独立（${money(cfgNum(configs, "deposit_amount", 1200))} 元/人）；遗失损坏按原价赔偿、优先扣本人押金；不足部分记「待结清」并持续提醒。
+        押金按孩子独立（{money(cfgNum(configs, "deposit_amount", 1200))} 元/人）；遗失损坏按原价赔偿、优先扣本人押金；不足部分记「待结清」并持续提醒。
       </Typography.Paragraph>
       {/* P2-55：配置没取到时金额是**默认值**——如实提示，别让运营照默认值办事 */}
       {configsFailed && (

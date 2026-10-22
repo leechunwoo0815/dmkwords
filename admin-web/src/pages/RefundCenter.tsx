@@ -28,6 +28,7 @@ import {
   type RefundRequestItem, type TransferItem, type WithdrawalItem,
 } from "../api/refunds";
 import { hasPermission, useAuth } from "../auth";
+import { payMethodLabel } from "../constants/pay";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { TODO_REFRESH_EVENT } from "../hooks/useTodoCounts";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
@@ -359,7 +360,7 @@ export default function RefundCenter() {
                           <Typography.Text code style={{ fontSize: 12 }}>{r.order_no}</Typography.Text>
                           <div style={{ fontSize: 12, color: "var(--paint-ink-light)" }}>
                             {ORDER_TYPE_LABEL[r.order_type ?? ""] ?? r.order_type}
-                            {r.pay_method ? ` · ${r.pay_method}` : ""}
+                            {r.pay_method ? ` · ${payMethodLabel(r.pay_method)}` : ""}
                           </div>
                         </div>
                       ) : "押金账户"

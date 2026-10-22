@@ -193,6 +193,8 @@ export default function Notifications() {
   const [inboxTruncated, setInboxTruncated] = useState(false);
   const [inboxTotalAll, setInboxTotalAll] = useState(0);
   const [inboxReadOnly, setInboxReadOnly] = useState(false); // T20g：staff 可见只读
+  // P3 管理端族（2026-10-22）：窗口上限由后端下发（原先写死「2000 条」）
+  const [inboxScanLimit, setInboxScanLimit] = useState<number | null>(null);
   // R3（#5）：staff 待办"查看"=行展开详情（不跨页）——expandedRowKeys 受控
   const [inboxExpanded, setInboxExpanded] = useState<React.Key[]>([]);
   const { counts: todoCounts, failed: todoFailed } = useTodoCounts();  // WM13-F4：与徽标同源
@@ -259,6 +261,7 @@ export default function Notifications() {
       setInboxTruncated(Boolean(data.truncated));
       setInboxTotalAll(data.total_all ?? data.total);
       setInboxReadOnly(Boolean(data.read_only)); // T20g
+      setInboxScanLimit(data.scan_limit ?? null);
     } catch (e) {
       message.error((e as Error).message);
     } finally {
@@ -693,8 +696,9 @@ export default function Notifications() {
           }}
         >
           <Typography.Text type="secondary">
-            该筛选下历史共 {inboxTotalAll} 条；待办墙按显示态实时排序，只加载最近 2000 条已审结记录
-            （未销项一条不落）。更早的历史可用下方「场景 / 关键词」缩小范围查询。
+            该筛选下历史共 {inboxTotalAll} 条；待办墙按显示态实时排序，只加载最近
+            {inboxScanLimit ?? "若干"} 条已审结记录（未销项一条不落）。更早的历史可用下方「场景 /
+            关键词」缩小范围查询。
           </Typography.Text>
         </div>
       )}

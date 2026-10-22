@@ -579,6 +579,10 @@ class AdminTodoService:
             "read_only": not viewer_is_super,
             "page": page,
             "page_size": page_size,
+            # P3 管理端族（2026-10-22）：窗口上限**随响应下发**——前端原先把「2000 条」
+            # 写死在说明条里，常量一改文案就静默失真（改配置不改文案族）。
+            "scan_limit": TODO_SCAN_LIMIT,
+            "open_limit": TODO_OPEN_LIMIT,
         }
 
     def handle(self, notification_id: int, admin, reason: str) -> dict:

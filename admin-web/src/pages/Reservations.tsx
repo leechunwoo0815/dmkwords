@@ -30,9 +30,10 @@ export default function Reservations() {
   const [searchParams] = useSearchParams();
   const [items, setItems] = useState<ReservationItem[]>([]);
   const [status, setStatus] = useState("");
-  const [keyword, setKeyword] = useState(
-    searchParams.get("keyword") ? decodeURIComponent(searchParams.get("keyword")!) : ""
-  );
+  // P3 管理端族（2026-10-22）：原写 `decodeURIComponent(searchParams.get("keyword")!)`——
+  // URLSearchParams 已经解码过一次，再解一次遇 `%` 关键词（如「50%」）抛 URIError，
+  // 且发生在 useState 初始化器里 → **整页崩**（当前无带参跳转，属潜伏）。
+  const [keyword, setKeyword] = useState(searchParams.get("keyword") ?? "");
   const [loading, setLoading] = useState(true);
   const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination();
   // P2-44：后端硬上限（200）——已达上限时提示"可能还有更多未显示"

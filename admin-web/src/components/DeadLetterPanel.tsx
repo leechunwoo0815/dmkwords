@@ -4,6 +4,8 @@ import { ReloadOutlined } from "@ant-design/icons";
 
 import { apiDeadLetters, apiHandleDeadLetter, type DeadLetterItem } from "../api/admin";
 import PaintEmpty from "./PaintEmpty";
+import PaintPagination from "./PaintPagination";
+import { usePaintPagination } from "../hooks/usePaintPagination";
 
 const NUM: CSSProperties = { fontFamily: "var(--font-mono)" };
 const MUTED: CSSProperties = { color: "rgba(0,0,0,0.45)" };
@@ -22,19 +24,24 @@ export default function DeadLetterPanel() {
   const [unresolvedOnly, setUnresolvedOnly] = useState(false);
   const [loading, setLoading] = useState(false);
   const [handling, setHandling] = useState<number | null>(null);
+  // P3 管理端族（2026-10-22）：原先固定只取 20 条且 `pagination={false}` → 死信一多就
+  // 「看不到、也翻不到」（后端早已支持分页并返回 total）。现在走统一分页组件。
+  const [total, setTotal] = useState(0);
+  const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination();
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await apiDeadLetters(unresolvedOnly);
+      const r = await apiDeadLetters(unresolvedOnly, page, pageSize);
       setRows(r.items);
       setPending(r.pending);
+      setTotal(r.total);
     } catch (e) {
       message.error((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [unresolvedOnly, message]);
+  }, [unresolvedOnly, page, pageSize, message]);
 
   useEffect(() => {
     void load();
@@ -59,7 +66,14 @@ export default function DeadLetterPanel() {
       extra={
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={MUTED}>只看未处理</span>
-          <Switch size="small" checked={unresolvedOnly} onChange={setUnresolvedOnly} />
+          <Switch
+            size="small"
+            checked={unresolvedOnly}
+            onChange={(v) => {
+              setUnresolvedOnly(v);
+              setPage(1); // 筛选变更回第 1 页（否则第 3 页切筛选会空列表）
+            }}
+          />
           <Button icon={<ReloadOutlined />} onClick={() => void load()}>
             刷新
           </Button>
@@ -130,6 +144,14 @@ export default function DeadLetterPanel() {
           },
         ]}
       />
+      <div style={{ marginTop: 12 }}>
+        <PaintPagination
+          current={page}
+          pageSize={pageSize}
+          total={total}
+          onChange={onPageChange}
+        />
+      </div>
     </Card>
   );
 }

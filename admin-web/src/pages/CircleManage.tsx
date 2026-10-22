@@ -26,6 +26,7 @@ import {
   apiCircleAdminLike,
   apiCircleAdminUnlike,
   apiCircleDeletePost,
+  apiCircleCardTypes,
   apiCircleOverview,
   apiCirclePin,
   apiCircleUnpin,
@@ -33,15 +34,14 @@ import {
   circlePostImageUrl,
 } from "../api/circle";
 
-// 类型枚举中英文映射全覆盖（防「英文裸输出」）；「全部」显式首项——A4 三犯纪律
-const CARD_TYPE_OPTIONS: { value: string; label: string }[] = [
+// 类型选项**由后端下发**（P3 管理端族，2026-10-22 第一百一十二批）：
+// 原先是硬编码 6 种 + 全部，而后端 `CARD_TYPES` 有 **10 种**（另有 rank_top / rank_up /
+// weekly_report / breakthrough）→ 这 4 类的帖子在管理端**筛不出来**。
+// 后端早有现成端点 `GET /api/admin/circle/card-types`（返回 `[{value,label}]`，含「全部」），
+// 前端 api 层也早有 `apiCircleCardTypes()`——只是**零调用点**（本批接上）。
+// 兜底：接口失败时只保留「全部」，并在页面提示（不静默给一份过期的本地副本）。
+const FALLBACK_CARD_TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "全部" },
-  { value: "milestone", label: "里程碑" },
-  { value: "books_count", label: "读本数" },
-  { value: "level_up", label: "等级晋级" },
-  { value: "perfect_quiz", label: "测验满分" },
-  { value: "streak", label: "连续打卡" },
-  { value: "finish_book", label: "完读" },
 ];
 
 function typeTagColor(t: string): string {
@@ -79,8 +79,24 @@ export default function CircleManage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [cardType, setCardType] = useState<string>("");
+  const [cardTypeOptions, setCardTypeOptions] = useState(FALLBACK_CARD_TYPE_OPTIONS);
   const [range, setRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
   const [keyword, setKeyword] = useState("");
+  useEffect(() => {
+    let alive = true;
+    apiCircleCardTypes()
+      .then((r) => {
+        if (alive && r.items?.length) setCardTypeOptions(r.items);
+      })
+      .catch(() => {
+        // 失败保留兜底（只有「全部」）——筛选面窄总好过筛出"不存在的类型"或显示裸英文
+        message.warning("阅读圈类型选项加载失败，筛选项暂只显示「全部」");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [message]);
+
   // 运营概览
   const [overview, setOverview] = useState<{
     week_new_posts: number;
@@ -298,7 +314,7 @@ export default function CircleManage() {
             setCardType(v);
             setPage(1);
           }}
-          options={CARD_TYPE_OPTIONS}
+          options={cardTypeOptions}
         />
         <DatePicker.RangePicker
           showTime={{ format: "HH:mm" }}

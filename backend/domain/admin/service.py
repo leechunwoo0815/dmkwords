@@ -668,7 +668,7 @@ class DashboardExportService:
             "member_new_week": "本周新增会员",
             "pending_evaluation_count": "待评估人数",
             "activity_enroll_recent": "近7天活动报名",
-            "renew_rate": "续费率(%)",
+            "renew_rate": "续借率(%)",
             "withdrawal_rate": "退会率(%)",
             "quiz_pass_rate": "测验通过率(%)",
             "milestone_count": "里程碑达成人数",
