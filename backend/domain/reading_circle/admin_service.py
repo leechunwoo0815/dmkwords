@@ -178,6 +178,9 @@ class AdminCircleService(CircleService):
                     CirclePost.id != post_id,
                 )
                 .with_for_update()
+                # B-16（P3 门禁族 2026-10-22 扩面时抓到）：锁实体必须链 populate_existing，
+                # 否则命中行若已在 session 身份映射里，拿到的是**旧对象**（锁白加）。
+                .populate_existing()
                 .all()
             )
             for row in locked:

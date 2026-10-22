@@ -153,6 +153,10 @@ if [ -f "docs/api/openapi.json" ]; then
   # 契约源统一为快照（不再直连 8002），逐字节比对，无服务也能进 CI。
   if [ -f "admin-web/node_modules/.bin/openapi-typescript" ]; then
     run bash -c "cd admin-web && pnpm gen:api --check"
+  elif [ -n "${CI:-}" ]; then
+    # P3 门禁族（2026-10-22 第一百一十四批）：[7] 步有 CI 硬失败分支、[8] 步原先**没有**——
+    # CI 里缺依赖会走逃生口静默 skip（前端类型产物比对凭空消失，与 [7] 步同一红线）。
+    fail "CI 环境缺 admin-web 依赖（node_modules/.bin/openapi-typescript 不存在）——pnpm install 后重跑"
   elif [ "${SKIP_FRONTEND_CHECKS:-0}" = "1" ]; then
     skip "显式 SKIP_FRONTEND_CHECKS=1（本地临时跳过前端类型产物比对）"
   else
@@ -170,15 +174,27 @@ step 9 "交付完整性检查（E-20260903-03 起源；G1 起扩为全仓 untrac
 # 现在改为：**任何 untracked 都判红**，白名单只有工具产物 .zcodeignore。
 # quotepath 假阴性防呆：git 默认对中文路径输出八进制转义（E-20260903-03 同款坑，
 # 专家三批复核时实测中招）——关闭 quotepath 转义后中文路径才可匹配
-UNTRACKED_OTHERS=$(
-  git -c core.quotepath=false status --porcelain | grep '^??' | grep -vE '^\?\? \.zcodeignore$' || true
-)
-if [ -n "$UNTRACKED_OTHERS" ]; then
-  echo "✗ 工作区存在未入库文件（先 git add 或显式忽略；seed 依赖/文档引用的文件尤其不能留）："
-  echo "$UNTRACKED_OTHERS"
+# P3 门禁族（2026-10-22 第一百一十四批）：**git 不可用必须判红**——
+# 原先 `git status | grep ... || true` 把"git 报错"和"没有 untracked"压成同一种结果
+# （都得到空串 → 照印 PASS），交付完整性会在 git 坏掉时静默失效。
+if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+  echo "✗ 交付完整性无法执行：当前不是 git 工作树（或 git 不可用）——不许静默 PASS"
   FAILED=1
 else
-  echo "交付完整性 PASS：工作区零 untracked（白名单 .zcodeignore）✓"
+  GIT_STATUS_OUT=$(git -c core.quotepath=false status --porcelain 2>&1) || {
+    echo "✗ git status 执行失败（交付完整性检查无法完成）："
+    echo "$GIT_STATUS_OUT"
+    FAILED=1
+    GIT_STATUS_OUT=""
+  }
+  UNTRACKED_OTHERS=$(printf '%s\n' "$GIT_STATUS_OUT" | grep '^??' | grep -vE '^\?\? \.zcodeignore$' || true)
+  if [ -n "$UNTRACKED_OTHERS" ]; then
+    echo "✗ 工作区存在未入库文件（先 git add 或显式忽略；seed 依赖/文档引用的文件尤其不能留）："
+    echo "$UNTRACKED_OTHERS"
+    FAILED=1
+  elif [ "$FAILED" -eq 0 ]; then
+    echo "交付完整性 PASS：工作区零 untracked（白名单 .zcodeignore）✓"
+  fi
 fi
 
 sleep 0.3  # E-20260901-04：等 tee 落盘再退出，防日志末行截断
@@ -192,7 +208,7 @@ if [ "$FAILED" -eq 0 ]; then
   # （E-20260905-01：start 幂等跳过=旧代码继续跑）
   if curl -sf -m 2 http://localhost:8002/health > /dev/null 2>&1 || [ -d ".dev-logs" ]; then
     echo "----- 检测到本地 dev 环境，自动恢复现场（dev.sh restart：重启后端+双 seed） -----"
-    if bash scripts/dev.sh restart > /dev/null 2>&1; then
+    if bash scripts/dev.sh restart >> "$GATE_LOG_FILE" 2>&1; then
       echo "----- 现场已自动恢复 ✓ -----"
     else
       echo "⚠ 自动恢复失败——请手动执行: bash scripts/dev.sh restart"
@@ -208,7 +224,7 @@ else
   # docs/19 记录过三次"库里空了没人发现"的事故）。恢复失败不影响退出码语义。
   if curl -sf -m 2 http://localhost:8002/health > /dev/null 2>&1 || [ -d ".dev-logs" ]; then
     echo "----- 门禁失败但仍是本地 dev 环境：自动恢复现场（dev.sh restart） -----"
-    if bash scripts/dev.sh restart > /dev/null 2>&1; then
+    if bash scripts/dev.sh restart >> "$GATE_LOG_FILE" 2>&1; then
       echo "----- 现场已自动恢复 ✓（业务表已回填演示数据） -----"
     else
       echo "⚠ 自动恢复失败——请手动执行: bash scripts/dev.sh restart"

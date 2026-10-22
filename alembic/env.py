@@ -82,6 +82,9 @@ def run_migrations_offline() -> None:
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
+        # 与 online 分支同口径（P3 第一百一十四批）
+        compare_server_default=True,
+        compare_type=True,
         dialect_opts={"paramstyle": "named"},
     )
     with context.begin_transaction():
@@ -96,7 +99,15 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        # P3 门禁族（2026-10-22 第一百一十四批）：原先没开这两项 → `alembic check`
+        # **看不见 server_default 与列类型的漂移**（模型侧有 7 处 server_default）。
+        # 开了之后 gate [6] 的 `alembic check` 才真的覆盖「模型 vs 库」全貌。
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_server_default=True,
+            compare_type=True,
+        )
         with context.begin_transaction():
             context.run_migrations()
 

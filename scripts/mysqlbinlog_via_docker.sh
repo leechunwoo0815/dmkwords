@@ -27,19 +27,23 @@ set -euo pipefail
 
 IMG="${MYSQLBINLOG_IMAGE:-dmkwords-mysqlbinlog:local}"
 args=()
-dir=""
+dirs=()
+# P3 门禁族（2026-10-22 第一百一十四批）：原先 `dir` 被逐个覆盖 → **只挂最后一个目录**，
+# 传两个不同目录下的 binlog 时第一个会变成容器内不存在的路径（静默失败）。
+# 现在每个绝对路径的父目录都收集起来（去重），逐个 -v 挂载。
 for a in "$@"; do
   case "$a" in
     /*)
-      dir="$(dirname "$a")"
+      d="$(dirname "$a")"
+      if [[ ! " ${dirs[*]-} " =~ " $d " ]]; then dirs+=("$d"); fi
       args+=("/binlog/$(basename "$a")")
       ;;
     *) args+=("$a") ;;
   esac
 done
 
-if [ -z "$dir" ]; then
-  echo "用法：$0 [mysqlbinlog 参数…] <绝对路径的 binlog 文件>" >&2
+if [ "${#dirs[@]}" -eq 0 ]; then
+  echo "用法：$0 [mysqlbinlog 参数…] <绝对路径的 binlog 文件>（可多个，各自目录都会挂载）" >&2
   exit 2
 fi
 
@@ -48,4 +52,6 @@ if ! docker image inspect "$IMG" >/dev/null 2>&1; then
   exit 3
 fi
 
-exec docker run --rm -i -v "${dir}:/binlog:ro" "$IMG" "${args[@]}"
+mounts=()
+for d in "${dirs[@]}"; do mounts+=(-v "${d}:/binlog:ro"); done
+exec docker run --rm -i "${mounts[@]}" "$IMG" "${args[@]}"

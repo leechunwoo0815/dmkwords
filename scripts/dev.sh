@@ -35,13 +35,17 @@ start() {
 
   echo "===== [2/4] 数据库迁移 + 种子（幂等） ====="
   .venv/bin/alembic upgrade head || exit 1
-  .venv/bin/python -m backend.seeds.seed_admin
-  .venv/bin/python -m backend.seeds.seed_configs
+  # P3 门禁族（2026-10-22 第一百一十四批）：seed 失败**必须让 dev.sh 失败退出**——
+  # 原先 `set -uo pipefail` 无 `-e`、四支 seed 裸跑，失败被吞；而 gate.sh 只认
+  # `dev.sh restart` 的退出码，于是"现场已自动恢复 ✓"照印、库里却是空的
+  # （docs/19 §恢复核验 记录过这个失败模式，靠人工核验兜底）。
+  .venv/bin/python -m backend.seeds.seed_admin || { echo "✗ seed_admin 失败"; exit 1; }
+  .venv/bin/python -m backend.seeds.seed_configs || { echo "✗ seed_configs 失败"; exit 1; }
   # 演示数据双 seed（幂等；behave/gate 清业务表后一键恢复演示动线）——
   # 用户指定标准动作（2026-09-04）：seed_demo_library（35 本+绘本封面+音频+5 题）
   # + seed_wm11_demo（演示家庭/订单/待办四态）
-  .venv/bin/python scripts/seed_demo_library.py | tail -1
-  .venv/bin/python -m scripts.seed_wm11_demo | tail -1
+  .venv/bin/python scripts/seed_demo_library.py | tail -1 || { echo "✗ seed_demo_library 失败"; exit 1; }
+  .venv/bin/python -m scripts.seed_wm11_demo | tail -1 || { echo "✗ seed_wm11_demo 失败"; exit 1; }
 
   echo "===== [3/4] 后端 API（:8002） ====="
   # 端口防呆：8002 被"非 pid 文件管理"的进程占用时，新进程会绑定失败退出，

@@ -65,19 +65,44 @@ DEMO_FIGURES = {
 }
 
 
+#: 演示家长手机号（docs/04 演示账号表同源；seed 的稳定业务键，比"演示孩"姓名稳）
+DEMO_PARENT_PHONE = "13800008888"
+
+
 def count_demo_figures() -> dict:
     """读演示家长（13800008888）名下 **演示孩** 的手册口径数字（走服务层，与页面同源）。"""
     from backend.database import SessionLocal
     from backend.domain.circulation.service import CirculationService
     from backend.domain.growth.service import GrowthService
-    from backend.domain.identity.models import Child
+    from backend.domain.identity.models import Child, Parent
     from backend.domain.reading.models import Vocabulary
 
     db = SessionLocal()
     try:
-        child = db.query(Child).filter(Child.name == "演示孩", Child.is_deleted == 0).first()
+        # P3 门禁族（2026-10-22 第一百一十四批）：原先按**姓名**「演示孩」定位——
+        # 姓名是展示字段（seed 改字面量、家长改名都会让基线静默失效）。改为按
+        # **演示家长手机号**（seed 的稳定业务键，与 docs/04 演示账号表同源）定位，
+        # 姓名只留作断言（对不上就明确报错，而不是静默返回空字典）。
+        parent = (
+            db.query(Parent)
+            .filter(Parent.phone == DEMO_PARENT_PHONE, Parent.is_deleted == 0)
+            .first()
+        )
+        if parent is None:
+            raise RuntimeError(f"演示家长不存在（手机号 {DEMO_PARENT_PHONE}）——先跑 dev.sh restart")
+        child = (
+            db.query(Child)
+            .filter(Child.parent_id == parent.id, Child.is_deleted == 0)
+            .order_by(Child.id)
+            .first()
+        )
         if child is None:
-            return {}
+            raise RuntimeError(f"演示家长（{DEMO_PARENT_PHONE}）名下没有孩子——seed 不完整")
+        if child.name != "演示孩":
+            raise RuntimeError(
+                f"演示家长名下第一个孩子是「{child.name}」，预期「演示孩」——"
+                f"seed 顺序或数据被改动，基线口径需复核（docs/04 演示账号表）"
+            )
         card = CirculationService(db).child_card(child.id)
         summary = GrowthService(db).summary(child)
         return {

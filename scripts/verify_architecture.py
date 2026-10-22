@@ -27,6 +27,13 @@ FOUR_PIECES = ["models.py", "schemas.py", "repository.py", "service.py", "router
 
 ROUTER_VIOLATIONS = [
     (re.compile(r"db\.(query|add|commit|delete)\b"), "Router 层出现 ORM 操作"),
+    # P3 门禁族（2026-10-22 第一百一十四批）：补 `execute/get/scalar/flush`——
+    # 原先只拦 query/add/commit/delete，`db.execute(text(...))` / `db.get(Model, id)` /
+    # `db.flush()` 三种写法**整体逃逸**（当前仓库恰好零命中，属"红色消失的通道"型缺口）。
+    (
+        re.compile(r"\bdb\.(execute|get|scalar|flush)\b"),
+        "Router 层出现 ORM 操作（execute/get/scalar/flush）",
+    ),
     (re.compile(r"\btry\s*:"), "Router 层出现 try/except"),
     (re.compile(r"raise\s+HTTPException"), "Router 层抛 HTTPException（应在 Service）"),
 ]
@@ -62,8 +69,14 @@ def check_router_violations(errors: list[str]) -> None:
 
 def check_lock_populate(errors: list[str]) -> None:
     """B-16/T2 防复发：所有 with_for_update 必须链 populate_existing（identity map 陷阱）。
-    支持同行或下一行补链（reading 既有跨行先例）。"""
-    for py in BACKEND.rglob("service.py"):
+    支持同行或下一行补链（reading 既有跨行先例）。
+
+    P3 门禁族（2026-10-22 第一百一十四批）：扫描面从 `service.py` 扩到 **backend 全量 .py**——
+    原先只有 `service.py` 受管，而实测有 12 处锁定读散落在 `order_guards.py` / `refund_online.py` /
+    `deposit_refund_guards.py` / `reservation_ops.py` / `cancel_flow.py` / `repository.py`
+    （当时恰好都合规，属"换个人写就漏"的盲区）。
+    """
+    for py in BACKEND.rglob("*.py"):
         if "__pycache__" in py.parts:
             continue
         lines = py.read_text(encoding="utf-8").splitlines()
@@ -72,10 +85,40 @@ def check_lock_populate(errors: list[str]) -> None:
                 continue
             if ".populate_existing()" in line:
                 continue
-            nxt = lines[i + 1] if i + 1 < len(lines) else ""
-            if ".populate_existing()" not in nxt:
-                rel = py.relative_to(ROOT)
-                errors.append(f"{rel}:{i + 1}: with_for_update 未链 populate_existing（B-16）")
+            # 允许中间夹注释/空行（P3 第一百一十四批：加了说明注释后"下一行"判定失效）
+            follow = [
+                ln for ln in lines[i + 1 : i + 4] if ln.strip() and not ln.strip().startswith("#")
+            ]
+            if follow and ".populate_existing()" in follow[0]:
+                continue
+            # 逃生口：**裸列锁**不加载实体 → identity map 陷阱不适用（`query(Child.id)` 这类）。
+            # 判据取同一条语句里的 `.query(...)` 参数是否含点号（跨行向上找 ≤12 行）。
+            head = "\n".join(lines[max(0, i - 12) : i + 1])
+            m = list(re.finditer(r"\.query\(\s*([^)\n]+)\)", head))
+            if m and "." in m[-1].group(1):
+                continue
+            rel = py.relative_to(ROOT)
+            errors.append(f"{rel}:{i + 1}: with_for_update 未链 populate_existing（B-16）")
+
+
+def check_domain_list(errors: list[str]) -> None:
+    """域列表**不得硬编码漂移**（P3 门禁族，2026-10-22 第一百一十四批）。
+
+    为什么：`DOMAINS` 是字面量列表，四件套 / Router 违规 / import 白名单三条规则都只
+    `for domain in DOMAINS` —— 新增一个域目录但忘了登记，那个域就**完全不受架构关管辖**
+    （静默豁免）。判据：磁盘 `backend/domain/*` 子目录集合与 `DOMAINS` **互为子集**。
+    """
+    domain_root = BACKEND / "domain"
+    if not domain_root.is_dir():
+        return
+    actual = {p.name for p in domain_root.iterdir() if p.is_dir() and not p.name.startswith("__")}
+    declared = set(DOMAINS)
+    for extra in sorted(actual - declared):
+        errors.append(
+            f"backend/domain/{extra} 未登记进 DOMAINS —— 新域不受四件套/Router/import 规则管辖"
+        )
+    for missing in sorted(declared - actual):
+        errors.append(f"DOMAINS 声明的域 {missing} 在磁盘上不存在（backend/domain/{missing}）")
 
 
 def check_file_length(errors: list[str]) -> None:
@@ -88,14 +131,32 @@ def check_file_length(errors: list[str]) -> None:
 
 
 def check_sqlite_ban(errors: list[str]) -> None:
-    for py in list(BACKEND.rglob("*.py")) + list(ROOT.joinpath("scripts").rglob("*.py")):
-        if "__pycache__" in py.parts or py.name == "verify_architecture.py":
-            continue  # 跳过自身（检查器含禁词字面量）
-        if py.name == "import_ecdict.py":
-            continue  # C5 一次性导入工具：ECDICT 源文件 data/ecdict.db 本就是 SQLite，运行时库仍 MySQL-only
-        text = py.read_text(encoding="utf-8").lower()
-        if "sqlite" in text:
-            errors.append(f"{py.relative_to(ROOT)}: 检测到 sqlite（宪法禁令）")
+    """SQLite 禁令（宪法：MySQL-only）。
+
+    P3 门禁族（2026-10-22 第一百一十四批）：扫描面原先只有 `backend/**` + `scripts/**`，
+    **`alembic/**`（迁移）与 `tests/**`（用例）是真空**——迁移里写 SQLite DSN、或用例偷偷
+    用 `sqlite://` 起引擎都不判红。现在：
+      · `alembic/**`：与 backend/scripts 同档**严格**（出现 `sqlite` 即判红）；
+      · `tests/**`：**只判真实用法**（`sqlite://` DSN / `:memory:` / `import sqlite3`）——
+        用例里有大量"叙述性 sqlite 字面量"（如门禁自证用例讲解本禁令），严格档会全量假红。
+    """
+    strict_roots = [BACKEND, ROOT / "scripts", ROOT / "alembic"]
+    for root in strict_roots:
+        for py in root.rglob("*.py"):
+            if "__pycache__" in py.parts or py.name == "verify_architecture.py":
+                continue  # 跳过自身（检查器含禁词字面量）
+            if py.name == "import_ecdict.py":
+                continue  # C5 一次性导入工具：ECDICT 源文件 data/ecdict.db 本就是 SQLite，运行时库仍 MySQL-only
+            text = py.read_text(encoding="utf-8").lower()
+            if "sqlite" in text:
+                errors.append(f"{py.relative_to(ROOT)}: 检测到 sqlite（宪法禁令）")
+    usage = re.compile(r"sqlite:///|:memory:|import\s+sqlite3|from\s+sqlite3", re.I)
+    for py in (ROOT / "tests").rglob("*.py"):
+        if "__pycache__" in py.parts:
+            continue
+        text = py.read_text(encoding="utf-8")
+        if usage.search(text):
+            errors.append(f"{py.relative_to(ROOT)}: 检测到 sqlite 真实用法（DSN/import；宪法禁令）")
 
 
 def check_import_whitelist(errors: list[str]) -> None:
@@ -263,9 +324,12 @@ def check_like_escape(errors: list[str]) -> None:
             continue
         lines = py.read_text(encoding="utf-8").split("\n")
         # 扫描一：收集"由 f-string 拼出来的 LIKE 模式变量"，记录该赋值有没有过 escape_like
+        # P3 门禁族（2026-10-22 第一百一十四批）：引号**两种都要认**——原正则只匹配双引号
+        # `f"%`，于是 `like = f'%{kw}%'` + `X.like(like)` 可**整体逃逸**（实测全仓当前无此写法，
+        # 属"换个人写就漏"）。
         pattern_vars: dict[str, tuple[int, bool]] = {}
         for ln, line in enumerate(lines, 1):
-            m = re.match(r"\s*(\w+)\s*=\s*f\"%", line)
+            m = re.match(r"\s*(\w+)\s*=\s*f[\"']%", line)
             if m:
                 pattern_vars[m.group(1)] = (ln, "escape_like(" in line)
         # 扫描二：逐行检查 .like/.ilike 调用
@@ -333,9 +397,33 @@ def self_test() -> int:
             (backend / "common/huge.py").write_text(
                 "x = 1\n" * (MAX_FILE_LINES + 5), encoding="utf-8"
             )
+            # ⑥ 域列表漂移（P3 第一百一十四批）：磁盘多一个域目录
+            (backend / "domain/rogue_domain").mkdir(parents=True)
+            # ⑦ Router 的 db.execute 形态（新增正则）——注意必须写进 **ROUTER_PIECES 内的文件名**
+            # （首版写成 router2.py，不在扫描面 → 自证当场判"未命中"，这就是自证的价值）
+            (backend / "domain/identity/miniapp_router.py").write_text(
+                "def y(db):\n    return db.execute(text('select 1'))\n", encoding="utf-8"
+            )
+            # ⑧ sqlite 扩面：alembic 严格档 + tests 真实用法档
+            (root / "alembic/versions").mkdir(parents=True)
+            (root / "alembic/versions/bad_mig.py").write_text(
+                "SQLITE_URL = 'sqlite:///tmp.db'\n", encoding="utf-8"
+            )
+            (root / "tests").mkdir(parents=True)
+            (root / "tests/test_bad_dsn.py").write_text(
+                "engine = create_engine('sqlite:///:memory:')\n", encoding="utf-8"
+            )
+            (root / "tests/test_narrative.py").write_text(
+                "# 本用例讲的是 sqlite 禁令的叙述性文字（不该判红）\nX = 1\n", encoding="utf-8"
+            )
+            # ⑨ LIKE 单引号形态（新增：原正则只认双引号）
+            (backend / "common/like_single.py").write_text(
+                "like = f'%{kw}%'\nq = X.like(like, escape='\\\\\\\\')\n", encoding="utf-8"
+            )
 
             BACKEND, ROOT, DOMAINS = backend, root, ["identity"]
             errs: list[str] = []
+            check_domain_list(errs)
             check_four_pieces(errs)
             check_router_violations(errs)
             check_lock_populate(errs)
@@ -352,10 +440,19 @@ def self_test() -> int:
                 ("sqlite 禁令", "检测到 sqlite"),
                 ("common 依赖业务域", "common 依赖了业务域"),
                 ("LIKE 未经 escape_like", "未经 escape_like 转义"),
+                ("域列表漂移（未登记的新域）", "未登记进 DOMAINS"),
+                ("Router 的 db.execute 形态", "execute/get/scalar/flush"),
+                ("alembic 里的 sqlite", "alembic/versions/bad_mig.py"),
+                ("tests 里的 sqlite 真实用法", "sqlite 真实用法"),
+                ("LIKE 单引号模式变量", "like_single.py"),
             ):
                 if needle not in joined:
                     print(f"✗ S1 [{label}] 未命中（期望输出含 {needle!r}）")
                     bad += 1
+            # 叙述性 sqlite 不得判红（tests 档只判真实用法）
+            if "test_narrative.py" in joined:
+                print("✗ S1 tests 里的叙述性 sqlite 被误报")
+                bad += 1
 
             # 反向样本：把违例全修好 → 必须零违规（检查器过严会逼出无意义的绕过）
             (backend / "domain/identity/service.py").write_text(
@@ -372,7 +469,26 @@ def self_test() -> int:
                 'q = X.like(f"%{escape_like(kw)}%", escape="\\\\")\n', encoding="utf-8"
             )
             (backend / "common/huge.py").write_text("x = 1\n", encoding="utf-8")
+            # 新规则的合法样本：新域登记进 DOMAINS、alembic/tests 干净、LIKE 单引号但已转义
+            DOMAINS = ["identity", "rogue_domain"]
+            (backend / "domain/rogue_domain/repository.py").write_text("", encoding="utf-8")
+            (backend / "domain/rogue_domain/models.py").write_text("", encoding="utf-8")
+            (backend / "domain/rogue_domain/schemas.py").write_text("", encoding="utf-8")
+            (backend / "domain/rogue_domain/service.py").write_text("", encoding="utf-8")
+            (backend / "domain/rogue_domain/router.py").write_text("", encoding="utf-8")
+            (backend / "domain/identity/miniapp_router.py").write_text(
+                "def y():\n    return 1\n", encoding="utf-8"
+            )
+            (root / "alembic/versions/bad_mig.py").write_text(
+                "URL = 'mysql+pymysql://x'\n", encoding="utf-8"
+            )
+            (root / "tests/test_bad_dsn.py").write_text("X = 1\n", encoding="utf-8")
+            (backend / "common/like_single.py").write_text(
+                "like = f'%{escape_like(kw)}%'\nq = X.like(like, escape='\\\\\\\\')\n",
+                encoding="utf-8",
+            )
             clean: list[str] = []
+            check_domain_list(clean)
             check_four_pieces(clean)
             check_router_violations(clean)
             check_lock_populate(clean)
@@ -394,6 +510,7 @@ def self_test() -> int:
 
 def main() -> int:
     errors: list[str] = []
+    check_domain_list(errors)
     check_four_pieces(errors)
     check_router_violations(errors)
     check_lock_populate(errors)
@@ -408,8 +525,9 @@ def main() -> int:
             print(f"  ✗ {e}")
         return 1
     print(
-        "架构关 PASS：四件套齐全 / Router 零违规（含 miniapp_router）/ 锁定读均链 populate_existing"
-        " / 行数达标 / 无 sqlite / import 白名单通过 / LIKE 全转义"
+        "架构关 PASS：域列表与磁盘一致 / 四件套齐全 / Router 零违规（含 miniapp_router）"
+        " / 锁定读均链 populate_existing（backend 全量）/ 行数达标"
+        " / 无 sqlite（backend+scripts+alembic 严格、tests 判真实用法）/ import 白名单通过 / LIKE 全转义"
     )
     alerts = check_mutation_count_flush()
     if alerts:

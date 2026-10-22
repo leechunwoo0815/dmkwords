@@ -13,7 +13,16 @@
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    DateTime,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 
 from backend.common.base_model import BaseModel
 
@@ -59,15 +68,45 @@ class Notification(BaseModel):
     parent_id = Column(Integer, nullable=False, index=True, comment="接收家长ID")
     child_id = Column(Integer, nullable=True, index=True, comment="关联孩子ID（可为空）")
     scene = Column(String(64), nullable=False, index=True, comment="场景标识（如 borrow.success）")
-    category = Column(String(24), nullable=False, default="", comment="分类（资金/借阅/阅读/…）")
+    category = Column(
+        String(24),
+        nullable=False,
+        default="",
+        server_default=text("''"),
+        comment="分类（资金/借阅/阅读/…）",
+    )
     title = Column(String(100), nullable=False, comment="中文标题")
-    content = Column(String(500), nullable=False, default="", comment="中文内容")
-    ref_type = Column(String(32), nullable=False, default="", comment="业务对象类型")
-    ref_id = Column(String(64), nullable=False, default="", comment="业务对象ID")
-    dedup_key = Column(String(64), nullable=False, default="", comment="去重键（提醒节点/固定1）")
+    content = Column(
+        String(500), nullable=False, default="", server_default=text("''"), comment="中文内容"
+    )
+    ref_type = Column(
+        String(32), nullable=False, default="", server_default=text("''"), comment="业务对象类型"
+    )
+    ref_id = Column(
+        String(64), nullable=False, default="", server_default=text("''"), comment="业务对象ID"
+    )
+    dedup_key = Column(
+        String(64),
+        nullable=False,
+        default="",
+        server_default=text("''"),
+        comment="去重键（提醒节点/固定1）",
+    )
     read_at = Column(DateTime, nullable=True, comment="家长已读时间")
-    wechat_status = Column(String(16), nullable=False, default=WECHAT_NONE, comment="微信通道状态")
-    wechat_error = Column(String(500), nullable=False, default="", comment="微信发送失败/跳过原因")
+    wechat_status = Column(
+        String(16),
+        nullable=False,
+        default=WECHAT_NONE,
+        server_default=WECHAT_NONE,
+        comment="微信通道状态",
+    )
+    wechat_error = Column(
+        String(500),
+        nullable=False,
+        default="",
+        server_default=text("''"),
+        comment="微信发送失败/跳过原因",
+    )
 
     @property
     def is_read(self) -> bool:
@@ -87,8 +126,14 @@ class TaskRunLog(BaseModel):
     task_name = Column(String(64), nullable=False, index=True, comment="任务标识")
     started_at = Column(DateTime, nullable=False, default=datetime.now, comment="开始时间")
     finished_at = Column(DateTime, nullable=True, comment="结束时间")
-    status = Column(String(16), nullable=False, default=STATUS_RUNNING, comment="结果状态")
-    processed = Column(Integer, nullable=False, default=0, comment="处理条数")
+    status = Column(
+        String(16),
+        nullable=False,
+        default=STATUS_RUNNING,
+        server_default=STATUS_RUNNING,
+        comment="结果状态",
+    )
+    processed = Column(Integer, nullable=False, default=0, server_default="0", comment="处理条数")
     error = Column(Text, nullable=True, comment="失败原因")
 
 
@@ -101,7 +146,7 @@ class DeadLetter(BaseModel):
     handler_name = Column(String(100), nullable=False, comment="处理器名")
     payload = Column(Text, nullable=True, comment="事件负载JSON")
     error = Column(Text, nullable=True, comment="失败原因")
-    retry_count = Column(Integer, nullable=False, default=0, comment="重试次数")
+    retry_count = Column(Integer, nullable=False, default=0, server_default="0", comment="重试次数")
     # P2-1（2026-10-18 第七十八批）：死信此前**只有落库没有读取面**（跨域副作用失败=静默数据缺失，
     # 而同样兜底性质的 TaskRunLog 有看板）。补两个"销项"字段：看板标记已处理后不再计入待处理数。
     handled_at = Column(DateTime, nullable=True, comment="人工处理时刻（看板销项）")

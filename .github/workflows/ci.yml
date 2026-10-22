@@ -13,9 +13,19 @@ on:
 # verify_action_wiring/gen_config_doc.py）为 librio 遗留工具，仓库中不存在。
 # fix44 R2：CI 装了 admin-web 依赖 → gate[8] 的 `pnpm gen:api --check`（前端类型漂移）在 CI 同样生效。
 
+# P3 门禁族（2026-10-22 第一百一十四批）：原先**没有超时、没有并发取消、没有日志归档**——
+# ① 挂死的 job 会占满 runner（默认 6 小时）却不给出任何信号；
+# ② 同一分支连推两次会并行跑两条全量门禁（互相抢 CI 额度，先跑的那条已过时）；
+# ③ 门禁红的日志只留在 CI 界面，翻旧记录成本高。
+# 现在：超时 60 分钟（全量门禁本地约 40 分钟，留足余量）+ 同分支新推取消旧跑 + 失败必留日志工件。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     services:
       mysql:
         image: mysql:8.0
@@ -68,3 +78,12 @@ jobs:
 
       - name: Run full gate
         run: bash scripts/gate.sh
+
+      - name: Upload gate logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-logs-${{ github.run_id }}
+          path: gate-runs/
+          if-no-files-found: warn
+          retention-days: 14

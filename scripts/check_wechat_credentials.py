@@ -24,6 +24,20 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 RESULTS: list[tuple[str, bool, bool]] = []  # (label, ok, critical)
 
 
+def _safe_exc(exc: Exception, limit: int = 120) -> str:
+    """异常文本脱敏（P3 门禁族，2026-10-22 第一百一十四批）。
+
+    为什么必须：原先直接回显 `str(exc)[:120]`——而 httpx 类异常的文本里会带**完整 URL query**
+    （微信 token 端点的 `secret=` 正在 query 里），一旦调用链改成抛错就会把密钥打进终端与日志。
+    这里只保留异常类型 + 微信 errcode/errmsg，其余一律掩码。
+    """
+    text = str(exc)
+    # 掩掉常见的密钥形态：secret/appid/key=xxxx、32~64 位十六进制串
+    text = re.sub(r"(?i)(secret|appid|key|token)=([A-Za-z0-9_\-]{6,})", r"\1=***", text)
+    text = re.sub(r"\b[0-9a-fA-F]{32,64}\b", "***", text)
+    return f"{type(exc).__name__}: {text[:limit]}"
+
+
 def _check(label: str, ok: bool, detail: str = "", *, critical: bool = True) -> None:
     RESULTS.append((label, bool(ok), critical))
     mark = "OK  " if ok else ("FAIL" if critical else "WARN")
@@ -177,7 +191,7 @@ def check_online(settings) -> None:
         token = WeChatService().get_access_token()
         _check("access_token 获取（验证 AppID+Secret）", bool(token), "已获取（不回显）")
     except Exception as exc:
-        _check("access_token 获取（验证 AppID+Secret）", False, str(exc)[:120])
+        _check("access_token 获取（验证 AppID+Secret）", False, _safe_exc(exc))
 
     # code2session 探针：故意用一个假 code——凭据有效时微信回 40029（code 无效），
     # 凭据无效时回 40013（appid 无效）/40125（secret 无效）。这样不用真 code 也能验凭据。
@@ -232,7 +246,7 @@ def check_probe_pay(settings) -> None:
 
         gateway = WeChatPayV3()
     except Exception as exc:
-        _check("支付网关可实例化（私钥/平台证书）", False, str(exc)[:120])
+        _check("支付网关可实例化（私钥/平台证书）", False, _safe_exc(exc))
         return
 
     url = "/v3/pay/transactions/jsapi"

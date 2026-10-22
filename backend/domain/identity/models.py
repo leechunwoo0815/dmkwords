@@ -2,7 +2,18 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import Column, Date, DateTime, Index, Integer, Numeric, SmallInteger, String, Text
+from sqlalchemy import (
+    Column,
+    Date,
+    DateTime,
+    Index,
+    Integer,
+    Numeric,
+    SmallInteger,
+    String,
+    Text,
+    text,
+)
 
 from backend.common.base_model import BaseModel
 from backend.domain.identity.member_code import generate_member_code
@@ -23,7 +34,11 @@ class Parent(BaseModel):
     # P1-11（2026-10-09 审查）：家长 token 原先 30 天不可撤销（只能删档案=废号）。
     # 现在 token 带 `gen`，撤销（小程序退出登录 / 馆员踢下线）= 本列 +1 → 旧 token 一律 401。
     token_generation = Column(
-        Integer, nullable=False, default=0, comment="撤销/改绑后 +1，旧 token 失效"
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+        comment="撤销/改绑后 +1，旧 token 失效",
     )
 
 
@@ -83,7 +98,11 @@ class Child(BaseModel):
         comment="退会原因码（user_withdrawal/user_refund/membership_transfer）",
     )
     operation_locked = Column(
-        SmallInteger, nullable=False, default=0, comment="操作冻结（转让/退会审核中）"
+        SmallInteger,
+        nullable=False,
+        default=0,
+        server_default="0",
+        comment="操作冻结（转让/退会审核中）",
     )
 
     # 会员码（2026-09-21 任务包 A 批）：借阅台扫码识别的身份码。
@@ -193,7 +212,11 @@ class Order(BaseModel):
     amount = Column(Numeric(10, 2), nullable=False, comment="实收金额（Decimal 铁律）")
     status = Column(String(24), nullable=False, default=STATUS_PENDING_MANUAL, index=True)
     refund_status = Column(
-        String(24), nullable=False, default="", server_default="", comment="退款链路状态（R-308）"
+        String(24),
+        nullable=False,
+        default="",
+        server_default=text("''"),
+        comment="退款链路状态（R-308）",
     )
     pay_method = Column(
         String(24), nullable=True, comment="收款方式（wechat/scan/alipay/transfer/card/cash）"
@@ -378,11 +401,19 @@ class SmsCode(BaseModel):
     PURPOSE_BIND = "bind"  # 微信 openid 首次绑定手机号
 
     phone = Column(String(20), nullable=False, index=True, comment="手机号")
-    purpose = Column(String(16), nullable=False, default=PURPOSE_LOGIN, comment="login/bind")
+    purpose = Column(
+        String(16),
+        nullable=False,
+        default=PURPOSE_LOGIN,
+        server_default=PURPOSE_LOGIN,
+        comment="login/bind",
+    )
     code_hash = Column(String(64), nullable=False, comment="sha256(phone:code:SECRET_KEY)")
     expires_at = Column(DateTime, nullable=False, comment="过期时间")
     used_at = Column(DateTime, nullable=True, comment="使用时间（一次性）")
-    attempts = Column(Integer, nullable=False, default=0, comment="校验失败次数（防爆破）")
+    attempts = Column(
+        Integer, nullable=False, default=0, server_default="0", comment="校验失败次数（防爆破）"
+    )
     request_ip = Column(
         String(45), nullable=True, index=True, comment="请求来源 IP（2026-10-12：单 IP 日上限防刷）"
     )
