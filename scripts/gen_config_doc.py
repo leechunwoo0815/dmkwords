@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """从 SystemConfig.DEFAULTS 生成《PRD/动态配置清单.md》
 
+⚠️ **2026-10-22 标记：本脚本是死资产，不可运行**（第八轮审查 P3 文档族点名，实测复现）：
+  - `from backend.domain.admin.config_levels import ...` → **ModuleNotFoundError**（该模块已不存在；
+    `SystemConfig.DEFAULTS` 也已迁到 `backend/seeds/seed_configs.py`）；
+  - 目标产物 `PRD/动态配置清单.md` **不存在**；「三级管控（锁定/警告/自由级）」概念全仓只剩本脚本；
+  - 全仓唯一引用是归档脚本 `docs/legacy-attic/loop_gate.sh`（历史批次的循环门禁）。
+  **建议按死资产删除**（连同 `loop_gate.sh` 的引用）；删除前不接任何门禁，跑它必红。
+  若将来仍需要这份清单：改为读 `backend/seeds/seed_configs.py` 的键表 + 输出到实际存在的路径，
+  并接入 `check_docs_code_alignment` 的配置键对账（当前 58 键已由该检查器覆盖）。
+
 用法: PYTHONPATH=. venv/bin/python scripts/gen_config_doc.py [--check]
   默认重写文档；--check 仅校验文档与代码是否一致（CI 可用），不一致退出码 1。
 

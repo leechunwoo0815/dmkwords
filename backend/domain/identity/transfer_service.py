@@ -1,5 +1,5 @@
 # backend/domain/identity/transfer_service.py — 权益转让（WM10，从 wm10_service 拆出）
-"""R-305 权益转让：16 项前置条件、家长申请/撤销、超管审核 12 步事务（转出方退会 +
+"""R-305 权益转让：12 项前置条件（R-303 的 14 个语义项合并实现）、家长申请/撤销、超管审核 12 步事务（转出方退会 +
 押金退款自动发起 + 受让方继承到期日 + WithdrawalRequest 记录 + 年费不退款留痕）。
 
 事务纪律：Service 统一 commit；留痕走审计事件。
@@ -33,7 +33,7 @@ class TransferService:
     def __init__(self, db: Session):
         self.db = db
 
-    # ---------- 16 项前置条件（返回 [名称, 是否满足] 列表） ----------
+    # ---------- 12 项前置条件（返回 [名称, 是否满足] 列表；口径见下方 docstring） ----------
     def check_conditions(
         self,
         parent,

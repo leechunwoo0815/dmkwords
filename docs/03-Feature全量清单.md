@@ -18,10 +18,11 @@
 
 ## 总览
 
-- **15 个 Feature 包（F0-F14）× 90 项 Feature**（FEAT-001 ~ FEAT-085 + 补登 FEAT-086/087 + **FEAT-088 往期活动回顾** + **FEAT-089 借还记录查询与导出** + **FEAT-090 媒体体检**；另 FEAT-074 有一行变更记录）。
+- **16 个 Feature 包（F0-F15）× 90 项 Feature**（FEAT-001 ~ FEAT-085 + 补登 FEAT-086/087 + **FEAT-088 往期活动回顾** + **FEAT-089 借还记录查询与导出** + **FEAT-090 媒体体检**；另 FEAT-074 有一行变更记录）。
   〔2026-10-16 订正（P2 #30）〕原文写「89 项」且未含媒体体检。实测：清单共 **91 行 / 去重后 90 项**——原 **FEAT-086 被两行复用**（书架「已通过」页签 + 媒体体检，后者补登时重号），媒体体检改挂 **FEAT-090**；
 - 每项 Feature 的完整验收标准 = 本清单"验收标准"列 + 对应 Gherkin 文件场景集（双层结构，场景文件不重复抄元数据）；
-- **状态汇总（2026-10-16 实测重数）**：**ACCEPTED 23 / MANUAL_TEST 64 / IMPLEMENTED 2 / REGISTERED 2 / DRAFTED 1**（原 2026-09-15 口径 ACCEPTED 20 / MANUAL_TEST 62 / IMPLEMENTED 1 / REGISTERED 3 / DRAFTED 1 已与行数对不上；ACCEPTED 含 3 行带长尾说明的验收记录）。
+- **状态汇总（2026-10-22 实测重数）**：**ACCEPTED 22 / MANUAL_TEST 65 / IMPLEMENTED 2 / REGISTERED 1 / DRAFTED 1**（合计 **91 行**，与表体 `^| FEAT-` 行数一致）。
+  〔**2026-10-22 订正（P3 文档族）**〕原写「ACCEPTED 23 / MANUAL_TEST 64 / REGISTERED 2」与表体不符（第八轮审查 P3 点名「状态汇总不符」）：按状态列逐行重数得 22/65/2/1/1——注意含 `|` 字符的长尾行（FEAT-003/005/088/090）会干扰朴素 awk 计数，重数时按「整行内是否出现状态词」判。
   FEAT-086/087 是"代码已做但清单原先没有承载行"的补登（书架已通过页签 / 合规静态页）。
   本轮用户对"门店扫码签到 + 活动只读详情 + 券码置顶/亮度"整体点头（原话"整体 ok"）并授权提交，
   故当轮范围内、用户已实测过的行（FEAT-046 词账可见性/已通过、FEAT-059 活动签到、FEAT-028 退会申请）计 ACCEPTED；
@@ -191,8 +192,8 @@
 | FEAT-078 | 可退金额三形态展示 + 0 元拦截 | 资金可见性 | P1 | F2 | 小程序可退卡片三形态：proportional（实付 · 已用 N/总天 → 预计可退，比例退折算过程可见）/ full（全额徽标）/ zero（不可退+原因）；0 元禁提交三层守卫（后端 422「该订单当前无可退金额」/前端按钮置灰+提示/前置校验双保险）——0 元申请会联动建退会单+锁孩子，审核员误批即 withdrawn（真业务陷阱） | —（X6+R1 单测） | MANUAL_TEST |
 | FEAT-079 | 小程序退款申请撤销入口 | 用户自主权 | P1 | F2 | refund-apply 退款记录行 pending 态「撤销申请」按钮（wx.showModal 确认→cancelRefund→列表刷新）；后端 cancel 端点本就绪（仅 pending 可撤，撤后 cancelled+订单恢复）；管理端 todo 显示「已失效·家长已撤销」已有（WM13 S1 灵魂设计的前端断链修复） | refund.feature（存量 @draft）；R1/X5 pytest 兜底 | MANUAL_TEST |
 | FEAT-080 | 管理端订单类型扩展 | 资金动线 | P1 | 004,015 | 管理端创建订单六类：现有三类+押金（deposit_amount 配置，confirm 激活 Deposit+Ledger）+活动（activity_id 必填带出 fee，不联动报名——边界默认值）+自定义（说明+金额，纯资金流水不参与会员计算，可走退款链）〔PRD §3.5.2〕 | order_types.feature（四场景 16 steps） | ACCEPTED |
-| FEAT-083 | 会员购买/续费动线（R3 占位承接，插修 16 登记） | 会员 | P1 | 29 号插修16 | 小程序会员购买页（观察期/年费两档）：**占位已全部替换为真实动线**——R3 播放入口前置拦截的引导弹窗跳 `/pages/member-pkg/purchase/purchase?child_id=…`（2026-10-12 拍板 P12：原跳 `/pages/member/member` 是 **tabBar 页**，`wx.navigateTo` 必然失败＝点了没反应；购买页早在，只是没人接上），支付走 WM12 线上支付（`/miniapp/orders` + `/pay`）。来源：用户 20260908 反馈。〔2026-10-16 订正（P2 #30）〕原文写「本期占位跳转 member 页 + TODO 锚点 book-detail.js onPlay」——该 TODO 已于 2026-10-12 落地（代码注释同款记录），本行属**过时描述**、与同函数注释打架；状态由 REGISTERED 改 MANUAL_TEST（动线可用、待用户走一遍验收） | MANUAL_TEST |
-| FEAT-082 | 活动封面+管理端详情编辑+小程序轮播/热门（S5 需求登记，插修 12） | 线下活动 | P2 | 22 号插修12 | 活动支持封面图（上传/存储走 R-316 同款通道 cover/{活动id}.jpg）；管理端活动详情查看+编辑（发布后可改未开始活动的 info/封面/名额，动资金字段需谨慎——fee 修改只影响新报名）；小程序首页轮播位（有封面活动优先）+热门活动（报名数排序）〔PRD §9 活动域增补草案——见 docs/03 附录 Gherkin 场景（D8 先例：behave 无步骤定义炸 gate，实现时移入 features/）〕；**2026-09-15 增补**：管理端**活动只读详情**——点活动名称弹只读抽屉（封面/简介/时间地点/费用/名额/创建时间 + 已缴费待参加·已签到·待收款三计数），供领导查看不可编辑 | ACCEPTED |
+| FEAT-083 | 会员购买/续费动线（R3 占位承接，插修 16 登记） | 会员 | P1 | 29 号插修16 | 小程序会员购买页（观察期/年费两档）：**占位已全部替换为真实动线**——R3 播放入口前置拦截的引导弹窗跳 `/pages/member-pkg/purchase/purchase?child_id=…`（2026-10-12 拍板 P12：原跳 `/pages/member/member` 是 **tabBar 页**，`wx.navigateTo` 必然失败＝点了没反应；购买页早在，只是没人接上），支付走 WM12 线上支付（`/miniapp/orders` + `/pay`）。来源：用户 20260908 反馈。〔2026-10-16 订正（P2 #30）〕原文写「本期占位跳转 member 页 + TODO 锚点 book-detail.js onPlay」——该 TODO 已于 2026-10-12 落地（代码注释同款记录），本行属**过时描述**、与同函数注释打架；状态由 REGISTERED 改 MANUAL_TEST（动线可用、待用户走一遍验收） | membership.feature | MANUAL_TEST |
+| FEAT-082 | 活动封面+管理端详情编辑+小程序轮播/热门（S5 需求登记，插修 12） | 线下活动 | P2 | 22 号插修12 | 活动支持封面图（上传/存储走 R-316 同款通道 cover/{活动id}.jpg）；管理端活动详情查看+编辑（发布后可改未开始活动的 info/封面/名额，动资金字段需谨慎——fee 修改只影响新报名）；小程序首页轮播位（有封面活动优先）+热门活动（报名数排序）〔PRD §9 活动域增补草案——见 docs/03 附录 Gherkin 场景（D8 先例：behave 无步骤定义炸 gate，实现时移入 features/）〕；**2026-09-15 增补**：管理端**活动只读详情**——点活动名称弹只读抽屉（封面/简介/时间地点/费用/名额/创建时间 + 已缴费待参加·已签到·待收款三计数），供领导查看不可编辑 | activity.feature | ACCEPTED |
 | FEAT-081 | 儿童测验成就徽章（详情页三态） | 儿童激励 | P2 | 17 号插修8 | book-detail 测验区三态徽章：金卡 PASSED（🏆+金橙渐变+星级档位+最佳成绩+鼓励语随机，点击→quiz-result 成绩单）/蓝卡再挑战（剩余次数+最佳分+脉冲按钮，attempts_used=0 文案自适应"开始挑战"）/灰态锁定引导（locked 含已听百分比、failed 提示找老师重置）；数据源 getQuiz 现成字段零后端改动，onLoad/onShow 双接线（测完返回徽章即时切换）；书架🏆角标需后端批量接口挂第四批；reader 完播弹窗文案同批统一；**2026-09-15 更正**：`GET /api/miniapp/quiz/status-batch` 与书架 🏆 角标/「已通过」页签均已落地（原写"需后端批量接口"已过期） | 纯 miniapp 前端（node --check+C 级 gate 基线持平）；真机目视 | ACCEPTED |
 
 ## F14 阅读圈（growth + admin，对应 WM14，2026-09-10 增补）

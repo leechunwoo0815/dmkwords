@@ -331,7 +331,7 @@ class WithdrawalRequest(BaseModel):
 
 
 class TransferRequest(BaseModel):
-    """权益转让（16 条件；双方冻结；72h 超时自动 expired）。"""
+    """权益转让（12 项前置条件——R-303 的 14 语义项合并实现；双方冻结；72h 超时自动 expired）。"""
 
     __tablename__ = "transfer_requests"
 
