@@ -30,6 +30,7 @@ from backend.common.security import (
     verify_password,
 )
 from backend.common.sql_utils import escape_like
+from backend.common.ttl_cache import TtlCache
 from backend.config import get_settings
 from backend.domain.admin.models import AdminUser, AuditLog, SystemConfig
 from backend.domain.admin.repository import (
@@ -160,6 +161,19 @@ class AuditService:
         return self.audit_repo.list_with_filters(page, page_size, actor_id, action)
 
 
+#: 仪表盘总览的进程内 TTL 缓存（P3 性能族，2026-10-22 第一百一十五批）。
+#: 三条判据都满足（见 `common/ttl_cache.py`）：① 全馆统计聚合（21 条 COUNT + 配置名查询
+#: ≈27 条 SQL/次）；② 高频（管理端首页 + 店外大屏 60s 轮询）；③ 展示型统计、允许秒级陈旧
+#: ——**资金/库存/待办计数不在其中**（那些口径另走实时查询）。
+DASHBOARD_TTL_SECONDS = 30
+_overview_cache = TtlCache(DASHBOARD_TTL_SECONDS, name="admin.dashboard_overview")
+
+
+def invalidate_dashboard_cache() -> None:
+    """清仪表盘缓存（用例/写操作后可显式失效；与 `invalidate_banner_cache` 同款）。"""
+    _overview_cache.clear()
+
+
 class DashboardService:
     """仪表盘运行数据（WM1：全部真实可查；业务指标随模块交付扩展）。"""
 
@@ -170,6 +184,10 @@ class DashboardService:
         self.audit_repo = AuditLogRepository(db)
 
     def overview(self) -> dict:
+        """仪表盘总览（走 30 秒 TTL 缓存；`?fresh=1` 或写后调 `invalidate_dashboard_cache()`）。"""
+        return _overview_cache.get_or_compute("overview", self._overview_uncached)
+
+    def _overview_uncached(self) -> dict:
         from datetime import datetime, timedelta
 
         from sqlalchemy import func
@@ -576,108 +594,13 @@ class NotifyAdminService:
 
 # TaskAdminService 已迁至 task_specs.py（第六十九批：service.py 触 800 行上限）——
 # 保持 re-export，router 等既有 import 路径不变。
+# 导出三件套已拆到 export_service.py（P3 性能族，2026-10-22 第一百一十五批：本文件贴 800 行红线）。
+# 与 task_specs 同款：**保持 re-export**，router 等既有 import 路径不变。
+from backend.domain.admin.export_service import (  # noqa: E402,F401 — 兼容旧引用
+    AuditExportService,
+    DashboardExportService,
+)
 from backend.domain.admin.task_specs import TaskAdminService  # noqa: E402,F401 — 兼容旧引用
-
-
-class AuditExportService:
-    """审计日志 Excel 导出（C18：FEAT-005「可查询导出」）。"""
-
-    def __init__(self, db: Session):
-        self.db = db
-
-    def export_excel(self) -> bytes:
-        """审计日志导出（P2-44：上限在文件里如实写明，不再静默截断）。"""
-        from io import BytesIO
-
-        from openpyxl import Workbook
-        from openpyxl.styles import Font
-
-        q = self.db.query(AuditLog).filter(AuditLog.is_deleted == 0)
-        total = q.count()
-        rows = q.order_by(AuditLog.id.desc()).limit(AUDIT_EXPORT_LIMIT).all()
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "操作审计"
-        headers = ["ID", "操作人", "动作", "对象类型", "对象ID", "详情", "原因", "时间"]
-        if total > len(rows):
-            ws.append(
-                [
-                    f"注意：符合条件的记录共 {total} 条，本表仅导出最新 {len(rows)} 条"
-                    f"（上限 {AUDIT_EXPORT_LIMIT}）——请缩小筛选范围后分批导出。"
-                ]
-            )
-        ws.append(headers)
-        for c in ws[1]:
-            c.font = Font(bold=True)
-        from backend.common.sheet_safety import safe_row
-
-        for r in rows:
-            # P2-18（审查点名处）：审计 `reason` 是**专员可写**的自由文本，原样落进超管导出的
-            # Excel 就是"低权限对高权限工作站的公式注入"——统一净化后再写。
-            ws.append(
-                safe_row(
-                    [
-                        r.id,
-                        r.actor_name,
-                        r.action,
-                        r.target_type,
-                        r.target_id,
-                        r.detail or "",
-                        r.reason,
-                        r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
-                    ]
-                )
-            )
-        buf = BytesIO()
-        wb.save(buf)
-        return buf.getvalue()
-
-
-class DashboardExportService:
-    """数据看板 Excel 导出（docs/04 WM11 步骤 7：导出任意报表 Excel）。"""
-
-    def __init__(self, db: Session):
-        self.db = db
-
-    def export_excel(self) -> bytes:
-        from io import BytesIO
-
-        from openpyxl import Workbook
-        from openpyxl.styles import Font
-
-        data = DashboardService(self.db).overview()
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "数据看板"
-        ws.append(["指标", "数值"])
-        for c in ws[1]:
-            c.font = Font(bold=True)
-        label_map = {
-            "admin_count": "后台账号",
-            "today_logins": "今日登录",
-            "config_count": "业务配置项",
-            "copy_total": "总藏书量",
-            "copy_available": "在馆",
-            "copy_borrowed": "借出",
-            "copy_maintenance": "维护",
-            "copy_lost": "遗失",
-            "today_borrowed": "今日借出",
-            "today_returned": "今日归还",
-            "overdue_active": "当前逾期",
-            "member_total": "会员总数",
-            "member_new_week": "本周新增会员",
-            "pending_evaluation_count": "待评估人数",
-            "activity_enroll_recent": "近7天活动报名",
-            "renew_rate": "续借率(%)",
-            "withdrawal_rate": "退会率(%)",
-            "quiz_pass_rate": "测验通过率(%)",
-            "milestone_count": "里程碑达成人数",
-        }
-        for key, label in label_map.items():
-            ws.append([label, data.get(key, 0)])
-        buf = BytesIO()
-        wb.save(buf)
-        return buf.getvalue()
 
 
 class StaffService:

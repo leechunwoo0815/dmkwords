@@ -51,15 +51,21 @@ class ReportService:
         """
         from backend.domain.reading.models import CheckIn
 
-        rows = (
-            self.db.query(WordsLedger)
+        # P3 性能族（2026-10-22 第一百一十五批）：**聚合下推 SQL**——原先把区间内全部
+        # 词账行拉回来在 Python 里 len/sum（一个孩子一学期几千行）。口径不变：
+        # `books` = 词账**行数**（= 读完本数），`words` = word_count 求和。
+        agg = (
+            self.db.query(
+                func.count(WordsLedger.id),
+                func.coalesce(func.sum(WordsLedger.word_count), 0),
+            )
             .filter(
                 WordsLedger.child_id == child.id,
                 WordsLedger.created_at >= start,
                 WordsLedger.created_at < end,
                 WordsLedger.is_deleted == 0,
             )
-            .all()
+            .one()
         )
         checkin_days = (
             self.db.query(func.count(CheckIn.id))
@@ -72,30 +78,34 @@ class ReportService:
             .scalar()
         )
         return {
-            "books": len(rows),
-            "words": sum(r.word_count for r in rows),
+            "books": int(agg[0] or 0),
+            "words": int(agg[1] or 0),
             "checkin_days": int(checkin_days or 0),
         }
 
     def report_data(self, child: Child, kind: str) -> dict:
         start, end, label = self.period_range(kind)
         summary_range = self.range_summary(child, start, end)
-        attempts = (
-            self.db.query(QuizAttempt)
+        # 同上：测验区间聚合也下推（原先拉回整段作答行再 Python 求和）
+        q_agg = (
+            self.db.query(
+                func.count(QuizAttempt.id),
+                func.coalesce(func.sum(QuizAttempt.score), 0),
+                func.coalesce(func.sum(QuizAttempt.total_questions), 0),
+            )
             .filter(
                 QuizAttempt.child_id == child.id,
                 QuizAttempt.submitted_at >= start,
                 QuizAttempt.submitted_at < end,
                 QuizAttempt.is_deleted == 0,
             )
-            .all()
+            .one()
         )
         summary = GrowthService(self.db).summary(child)
-        avg_score = (
-            round(100 * sum(a.score for a in attempts) / sum(a.total_questions for a in attempts))
-            if attempts
-            else None
-        )
+        attempts_n = int(q_agg[0] or 0)
+        score_sum = int(q_agg[1] or 0)
+        total_sum = int(q_agg[2] or 0)
+        avg_score = round(100 * score_sum / total_sum) if attempts_n and total_sum else None
         return {
             "kind": kind,
             "period_label": label,
@@ -104,7 +114,7 @@ class ReportService:
             "books": summary_range["books"],
             "words": summary_range["words"],
             "checkin_days": summary_range["checkin_days"],
-            "quiz_count": len(attempts),
+            "quiz_count": attempts_n,
             "quiz_avg_percent": avg_score,
             "total_words": summary["words_total"],
             "level": summary["level"],

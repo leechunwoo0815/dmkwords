@@ -144,7 +144,10 @@ def clean_db():
     invalidate_config_cache()
     # P2-40（2026-10-20 第八轮）：社区横幅是**进程内 TTL 缓存**（60 秒）——与配置缓存同理，
     # 数据被 TRUNCATE 后必须清掉，否则下个用例读到上个用例的横幅数字（跨用例串台）。
+    from backend.domain.admin.service import invalidate_dashboard_cache
     from backend.domain.reading_circle.service import invalidate_banner_cache
+
+    invalidate_dashboard_cache()  # P3 性能族：仪表盘 30s TTL 缓存（跨用例必须清，否则读到上个用例的统计）
 
     invalidate_banner_cache()
     # 2026-10-12（P6 下架禁借落地后）：测试里**新建的书默认上架**——否则所有"建书即借"的

@@ -179,6 +179,24 @@ class ParentService:
         ) > 0
 
     @staticmethod
+    def has_orders_map(db: Session, parent_ids: list[int]) -> set[int]:
+        """**批量**版 has_orders（P3 性能族，2026-10-22 第一百一十五批）。
+
+        为什么：列表页原先逐行调 `has_orders` → 每页 1+N 条 COUNT（page_size 上限 100）。
+        这里一条 `GROUP BY parent_id` 出集合，列表处改 `p.id in set`。**单行守卫路径
+        （编辑/删除家长）继续用 `has_orders`**——那里就是要立刻对。
+        """
+        if not parent_ids:
+            return set()
+        rows = (
+            db.query(Order.parent_id)
+            .filter(Order.parent_id.in_(parent_ids), Order.is_deleted == 0)
+            .group_by(Order.parent_id)
+            .all()
+        )
+        return {pid for (pid,) in rows}
+
+    @staticmethod
     def children_count(db: Session, parent_ids: list[int]) -> dict[int, int]:
         if not parent_ids:
             return {}
@@ -283,7 +301,8 @@ class ParentService:
         q = q.order_by(Parent.id.desc())
         parents = q.offset((page - 1) * page_size).limit(page_size).all()
         counts = self.children_count(self.db, [p.id for p in parents])
-        out = [(p, counts.get(p.id, 0), self.has_orders(self.db, p.id)) for p in parents]
+        has_orders_set = self.has_orders_map(self.db, [p.id for p in parents])
+        out = [(p, counts.get(p.id, 0), p.id in has_orders_set) for p in parents]
         return out, total
 
 

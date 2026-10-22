@@ -47,6 +47,10 @@ def quiz_status_batch(db, child, book_ids: list[int]) -> list[dict]:
             QuizAttempt.book_id,
             func.count(QuizAttempt.id),
             func.max(QuizAttempt.score),
+            # P3 性能族（2026-10-22 第一百一十五批）：`total_questions` 的 MAX **并进这条
+            # GROUP BY**——原先在下面用字典推导逐书再查一次（N = 有测验记录的书数，上限 50）
+            # → 书架页最坏多付 50 条 SQL。
+            func.max(QuizAttempt.total_questions),
         )
         .filter(
             QuizAttempt.child_id == child.id,
@@ -56,19 +60,7 @@ def quiz_status_batch(db, child, book_ids: list[int]) -> list[dict]:
         .group_by(QuizAttempt.book_id)
         .all()
     )
-    total_map = {
-        bid: (
-            db.query(func.max(QuizAttempt.total_questions))
-            .filter(
-                QuizAttempt.child_id == child.id,
-                QuizAttempt.book_id == bid,
-                QuizAttempt.is_deleted == 0,
-            )
-            .scalar()
-            or 0
-        )
-        for bid, _, _ in attempt_rows
-    }
+    total_map = {r[0]: (r[3] or 0) for r in attempt_rows}
     attempt_map = {r[0]: r for r in attempt_rows}
     out = []
     for bid in book_ids:

@@ -67,7 +67,10 @@ class AdminCircleService(CircleService):
             .limit(page_size)
             .all()
         )
-        items = [self._admin_post_view(p) for p, _, _ in rows]
+        # P3 性能族（2026-10-22 第一百一十五批）：JOIN 出来的 Child/Parent **直接用**——
+        # 原先写 `for p, _, _ in rows` 丢弃、再由 `_admin_post_view` 逐帖各查一次
+        # （page_size=100 时 201 条 SQL）。
+        items = [self._admin_post_view(p, child=ch, parent=pa) for p, ch, pa in rows]
         return {
             "items": items,
             "total": total,
@@ -76,9 +79,13 @@ class AdminCircleService(CircleService):
             "has_next": page * page_size < total,
         }
 
-    def _admin_post_view(self, post: CirclePost) -> dict:
-        child = self.db.query(Child).filter(Child.id == post.child_id).first()
-        parent = self.db.query(Parent).filter(Parent.id == post.parent_id).first()
+    def _admin_post_view(self, post: CirclePost, child=None, parent=None) -> dict:
+        """单帖视图。列表路径**传入已 JOIN 的 child/parent**（零额外查询）；
+        单帖路径（detail 等）不传 → 回落到按 id 查（保持原语义）。"""
+        if child is None:
+            child = self.db.query(Child).filter(Child.id == post.child_id).first()
+        if parent is None:
+            parent = self.db.query(Parent).filter(Parent.id == post.parent_id).first()
         return {
             "id": post.id,
             "parent_name": _parent_display(parent) if parent else "",

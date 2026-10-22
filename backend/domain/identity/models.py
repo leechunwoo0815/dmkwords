@@ -270,7 +270,10 @@ class RefundRequest(BaseModel):
             raise ConflictError(f"状态不允许从 {self.status} 变更为 {new_status}")
 
     kind = Column(String(10), nullable=False, comment="order/deposit")
-    order_id = Column(Integer, nullable=True, comment="关联订单（order 类）")
+    # P3 性能族（2026-10-22 第一百一十五批）：加索引——该列是 **7 处资金热路径**的查询条件
+    # （押金累计闸 `deposit_refund_guards` / 订单退款在途闸 `order_service` / 对账 JOIN
+    # `payment_reconcile_service`×4 / `wm10_withdrawal_service`），原先**全表扫**。
+    order_id = Column(Integer, nullable=True, index=True, comment="关联订单（order 类）")
     deposit_id = Column(Integer, nullable=True, comment="关联押金（deposit 类）")
     withdrawal_id = Column(Integer, nullable=True, comment="关联退会申请（退会/退款联动结算生成）")
     child_id = Column(Integer, nullable=False, index=True)
