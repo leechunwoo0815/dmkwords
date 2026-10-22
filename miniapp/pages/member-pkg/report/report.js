@@ -1,5 +1,6 @@
 // pages/member-pkg/report/report.js — 周报/月报（WM8/C1）
 const api = require('../../../utils/api')
+const session = require('../../../utils/session')
 
 Page({
   data: {
@@ -13,7 +14,8 @@ Page({
 
   onLoad(options) {
     this.setData({ childName: decodeURIComponent(options.child_name || '') })
-    this._childId = Number(options.child_id)
+    // P3（第一百一十三批）：统一解析（原 `Number(undefined)` → NaN → 早退 → 永久「生成中」）
+    this._childId = session.resolveChildId(options)
   },
 
   onShow() { this.load() },
@@ -34,9 +36,12 @@ Page({
   },
 
   async load() {
-    if (!this._childId) return
+    if (!this._childId) {
+      this.setData({ noChild: true, loadError: '', report: null })
+      return
+    }
     // P2-45：切换周/月报失败时**清空旧数据**（否则月报 tab 挂着周报的数字与图）
-    this.setData({ loadError: '', report: null, imageUrl: '' })
+    this.setData({ loadError: '', report: null, imageUrl: '', noChild: false })
     try {
       const r = await api.report(this.data.kind, this._childId)
       const imgUrl = api.reportImageUrl(this.data.kind, this._childId)

@@ -31,10 +31,13 @@
         <text class="msg-title">{{item.title}}</text>
         <text class="msg-time">{{item.timeText}}</text>
       </view>
+      <!-- P3（第一百一十三批）：原先第二个 `wx:else` 挂在「有 ref 才显示」的那条 `wx:if` 上，
+           于是「展开但没有 ref」的消息会**同时渲染 expanded 与 one-line 两份正文**。
+           改成显式条件：未展开才渲染单行摘要。 -->
       <view wx:if="{{expandedId === item.id}}" class="msg-content expanded">{{item.content}}</view>
       <view wx:if="{{expandedId === item.id && item.ref}}" class="msg-ref"
         data-ref="{{item.ref}}" catchtap="onGoRef">{{item.ref.label}}</view>
-      <view wx:else class="msg-content one-line">{{item.content}}</view>
+      <view wx:if="{{expandedId !== item.id}}" class="msg-content one-line">{{item.content}}</view>
     </view>
   </view>
 

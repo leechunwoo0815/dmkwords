@@ -45,7 +45,14 @@ Page({
     const child = session.getCurrentChild()
     const childId = child ? child.id : null
     this.setData({ childId, childName: child ? child.name : '' })
-    if (childId) this.load()
+    if (childId) {
+      this.setData({ noChild: false })
+      this.load()
+    } else {
+      // P3（第一百一十三批）：无孩子时必须落 loading=false（原先 loading 初值 true +
+      // 不调 load → 列表区永久「加载中…」）
+      this.setData({ loading: false, noChild: true })
+    }
   },
 
   onTab(e) {

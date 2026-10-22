@@ -17,6 +17,9 @@ const STATUS_TEXT = {
 const REFUND_STATUS_TEXT = {
   pending: '退款待审核', approved: '退款已通过', processing: '退款执行中',
   refunded: '已退款', failed: '退款失败',
+  // P3（第一百一十三批）：`REFUND_STATUS_TRANSFERRED` 真实存在（年费随转让处置），
+  // 原先漏这一档 → 家长看到裸英文 `transferred`
+  transferred: '已随权益转让处置',
 }
 
 const TABS = [

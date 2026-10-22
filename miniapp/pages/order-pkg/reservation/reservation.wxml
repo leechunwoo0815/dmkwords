@@ -1,9 +1,15 @@
 <view class="page-bg">
   <view class="section-label">{{childName}} 的预约</view>
 
-  <view wx:if="{{loading}}" class="loading-state">加载中…</view>
+  <error-view wx:if="{{noChild}}" type="empty" title="还没有选择孩子"
+    desc="请先在「我的」里添加或选择孩子，再来查看预约" showRetry="{{false}}" />
 
-  <empty-state wx:if="{{!loading && !items.length}}" icon-name="bookmark" title="还没有预约"
+  <error-view wx:if="{{loadError}}" type="network" title="预约加载失败"
+    desc="{{loadError}}（列表未加载，不代表没有数据）" bind:onRetry="onRetryLoad" />
+
+  <view wx:if="{{loading && !noChild && !loadError}}" class="loading-state">加载中…</view>
+
+  <empty-state wx:if="{{!loading && !noChild && !loadError && !items.length}}" icon-name="bookmark" title="还没有预约"
     desc="在图书馆里选一本书，点「预约此书」，副本会为你保留 {{cfg.reservation_hours}} 小时" />
 
   <view class="reservation-list">
@@ -11,7 +17,8 @@
       <view class="reservation-info">
         <view class="reservation-title">{{item.title}}</view>
         <view class="reservation-author">{{item.author || '佚名'}}</view>
-        <view class="reservation-time">预约于 {{item.expires_at}}</view>
+        <!-- P3（第一百一十三批）：`expires_at` 是**到期时间**，原写「预约于」语义相反 -->
+        <view class="reservation-time">保留至 {{item.expires_at}}</view>
         <view wx:if="{{item.remainText}}" class="countdown-row">
           <text class="countdown">{{item.remainText}}</text>
         </view>

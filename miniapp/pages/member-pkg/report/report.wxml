@@ -41,6 +41,9 @@
     <view class="rp-note">累计：{{report.total_words}} 词 · {{report.points_total}} 积分</view>
   </view>
 
+  <error-view wx:if="{{noChild}}" type="empty" title="还没有选择孩子"
+    desc="请先在「我的」里添加或选择孩子，报告按孩子生成" showRetry="{{false}}" />
+
   <error-view wx:if="{{loadError}}" type="network" title="报告加载失败"
     desc="{{loadError}}（不是「正在生成」，请重试）" bind:onRetry="onRetryLoad" />
 

@@ -96,6 +96,8 @@ Page({
       wx.setStorageSync(`quiz_result_${childId}:${bookId}`, JSON.stringify({
         ...result, book_id: bookId, book_title: this.data.bookTitle,
         total: questions.length, attempts_left: result.attempts_left,
+        // P3（第一百一十三批）：写入时间戳——该前缀原先**永不清理**（每孩每书一条，永久驻留）
+        _ts: Date.now(),
       }))
       wx.redirectTo({
         url: `/pages/reading-pkg/quiz-result/quiz-result?child_id=${childId}&book_id=${bookId}` +

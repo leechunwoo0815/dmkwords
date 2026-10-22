@@ -1,5 +1,6 @@
 // pages/member-pkg/profile-card/profile-card.js — 阅读护照（WM8）
 const api = require('../../../utils/api')
+const session = require('../../../utils/session')
 
 const DEFAULT_AVATAR = '/icons/avatars/cat_sun.png'
 
@@ -39,13 +40,20 @@ Page({
 
   onLoad(options) {
     this.setData({ childName: decodeURIComponent(options.child_name || '') })
-    this._childId = Number(options.child_id)
+    // P3（第一百一十三批）：统一解析 + 无孩子进可见态（原先整页 `wx:if="{{passport}}"` 不成立 → 白屏）
+    this._childId = session.resolveChildId(options)
   },
+
+  onRetryLoad() { this.load() },
 
   onShow() { this.load() },
 
   async load() {
-    if (!this._childId) return
+    if (!this._childId) {
+      this.setData({ noChild: true, loadError: '' })
+      return
+    }
+    this.setData({ noChild: false, loadError: '' })
     try {
       const p = await api.passport(this._childId)
       // 2026-09-17：护照头像此前是写死的 emoji（🧒/📚），孩子换头像后这里不跟着变

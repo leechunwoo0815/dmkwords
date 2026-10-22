@@ -6,12 +6,15 @@ module.exports = {
   // ① 微信主通道：wx.login 拿 code → openid 已绑 → 直接登录态；未绑 → need_bind + bind_ticket
   // 登录选项（2026-10-12 拍板 P1）：服务端下发短信通道开关 → 关闭时隐藏手机号入口
   getLoginOptions() {
-    return req.get('/api/miniapp/login/options', { auth: false })
+    // P3（第一百一十三批）：`get(path, data, options)` 三参——`{auth:false}` 原先落在 **data 槽**，
+    // 被拼成 `?auth=false`，而 `auth` 实际仍是默认 true（有 token 时照样带 Authorization）。
+    // 端点本身公开，故无功能故障，但意图未生效。
+    return req.get('/api/miniapp/login/options', null, { auth: false })
   },
   // 业务口径下发（第八轮 E 批剩余）：预约保留小时/完播阈值/观察期/短信重发间隔等**展示口径**
   // 一律读这里，前端不再自持数字副本（改配置 → 文案跟随）。公开端点：登录页倒计时也要用。
   getConfigs() {
-    return req.get('/api/miniapp/configs', { auth: false })
+    return req.get('/api/miniapp/configs', null, { auth: false })
   },
   loginByWechat(wxCode) {
     return req.post('/api/miniapp/login/wechat', { code: wxCode }, { auth: false })

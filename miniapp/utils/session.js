@@ -9,6 +9,24 @@ function getCurrentChild() {
   // children[0] —— 表现就是"切了孩子，页面还显示上一个孩子的数据"（2026-09-21 用户报障同族）。
   return children.find((c) => String(c.id) === String(id)) || children[0] || null
 }
+/**
+ * 解析页面 URL 上的 `child_id`（P3 小程序族，2026-10-22 第一百一十三批）。
+ *
+ * 为什么需要：多页原先直接 `Number(options.child_id)`（上游带 `child_id=null` 时
+ * `Number('null') = NaN` → 请求 422），或缺参数时 `null`，随后 `if (!this._childId) return`
+ * **早退在 `setData({loading:false})` 之前** → 页面永久「加载中…」/白屏/「生成中」。
+ * 本函数：URL 参数为**合法正整数**才采用，否则回落到当前孩子；都没有 → `null`
+ * （页面据此渲染"无孩子"态，而不是假装在加载）。
+ */
+function resolveChildId(options) {
+  const raw = options && options.child_id
+  if (raw !== undefined && raw !== null && raw !== '' && String(raw) !== 'null') {
+    const n = Number(raw)
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  const child = getCurrentChild()
+  return child && child.id ? child.id : null
+}
 function setCurrentChild(id) {
   // 写入口径统一成数字（页面与接口都按 number 用）；纯数字串转数字，其余原样存
   wx.setStorageSync('currentChildId', typeof id === 'string' && /^\d+$/.test(id) ? Number(id) : id)
@@ -108,4 +126,4 @@ function logout() {
   } catch (e) { /* 忽略：本地清理照常 */ }
   done()
 }
-module.exports = { getParent, getChildren, getCurrentChild, setCurrentChild, patchParent, isLoggedIn, ensureLogin, refreshChildren, logout }
+module.exports = { getParent, getChildren, getCurrentChild, resolveChildId, setCurrentChild, patchParent, isLoggedIn, ensureLogin, refreshChildren, logout }

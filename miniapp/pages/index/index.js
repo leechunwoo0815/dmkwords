@@ -2,11 +2,8 @@
 const api = require('../../utils/api')
 const session = require('../../utils/session')
 const media = require('../../utils/media')
-
-const MEMBER_STATUS_TEXT = {
-  none: '未入会', observation: '观察期', pending_evaluation: '待评估',
-  formal: '正式会员', expired: '已过期', withdrawn: '已退会',
-}
+// P3（第一百一十三批）：会员状态文案收编到 `utils/labels.js`（原先首页自建第二份副本）
+const { MEMBER_STATUS_TEXT } = require('../../utils/labels')
 
 Page({
   data: {

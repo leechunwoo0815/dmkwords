@@ -10,6 +10,9 @@ const CATEGORIES = [
   { key: '活动', label: '活动' },
   { key: '预约', label: '预约' },
   { key: '报告', label: '报告' },
+  // P3（第一百一十三批）：后端 `Notification.CATEGORY_OTHER = "其他"` 真实存在，
+  // 前端分类原先**没有这一档** → 这类消息（评估报告上传/转让结果/押金到账等）筛不出来
+  { key: '其他', label: '其他' },
 ]
 
 const PAGE_SIZE = 20

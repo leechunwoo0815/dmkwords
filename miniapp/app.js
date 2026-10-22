@@ -57,6 +57,16 @@ App({
       const now = Date.now()
       const keys = wx.getStorageInfoSync().keys || []
       keys.forEach(key => {
+        // P3（第一百一十三批）：`quiz_result_*` 原先不在清理面内（每孩每书一条、永不回收）
+        if (key.startsWith('quiz_result_')) {
+          try {
+            const data = wx.getStorageSync(key)
+            const parsed = typeof data === 'string' ? JSON.parse(data) : data
+            if (parsed && parsed._ts && (now - parsed._ts > 7 * 24 * 60 * 60 * 1000)) {
+              wx.removeStorageSync(key)
+            }
+          } catch (e) { /* silent */ }
+        }
         if (key.startsWith('quiz_wrong_')) {
           const data = wx.getStorageSync(key)
           if (data && data._ts && (now - data._ts > 7 * 24 * 60 * 60 * 1000)) {

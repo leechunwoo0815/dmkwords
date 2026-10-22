@@ -1,3 +1,10 @@
+<!-- P3（第一百一十三批）：无孩子 / 加载失败都要有可见态（原先整页 wx:if 不成立 → 白屏） -->
+<error-view wx:if="{{noChild}}" type="empty" title="还没有选择孩子"
+  desc="请先在「我的」里添加或选择孩子，阅读名片按孩子生成" showRetry="{{false}}" />
+
+<error-view wx:if="{{loadError}}" type="network" title="名片加载失败"
+  desc="{{loadError}}（不是「没有名片」，请重试）" bind:onRetry="onRetryLoad" />
+
 <view class="page" wx:if="{{passport}}">
   <view class="profile-card">
     <view class="card-header">

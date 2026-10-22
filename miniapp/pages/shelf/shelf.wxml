@@ -17,6 +17,9 @@
   </view>
 
   <!-- P2-45：**请求失败必须显式呈现**（原先四个请求各自吞错 → 失败被渲染成"还没有在借的书"） -->
+  <error-view wx:if="{{noChild}}" type="empty" title="还没有孩子档案"
+    desc="请先在「我的」里添加或选择孩子，书架按孩子独立" showRetry="{{false}}" />
+
   <error-view wx:if="{{loadError}}" type="network" title="书架加载失败"
     desc="{{loadError}}（列表未加载，不代表没有数据）" bind:onRetry="onRetryLoad" />
 

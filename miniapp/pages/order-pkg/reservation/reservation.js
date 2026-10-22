@@ -1,5 +1,6 @@
 // pages/order-pkg/reservation/reservation.js — 我的预约（WM6）
 const api = require('../../../utils/api')
+const session = require('../../../utils/session')
 const { loadConfigs, getConfigs } = require('../../../utils/configs')
 
 const STATUS_TEXT = {
@@ -23,7 +24,8 @@ Page({
     const { configs } = await loadConfigs()
     this.setData({ cfg: configs })
     this.setData({ childName: options.child_name ? decodeURIComponent(options.child_name) : '' })
-    this._childId = options.child_id ? Number(options.child_id) : null
+    // P3（第一百一十三批）：走统一解析（URL 参数合法才用，否则回落当前孩子）
+    this._childId = session.resolveChildId(options)
   },
 
   onShow() {
@@ -31,9 +33,15 @@ Page({
     this.setData({ now: Date.now() })
   },
 
+  onRetryLoad() { this.load() },
+
   async load() {
-    if (!this._childId) return
-    this.setData({ loading: true })
+    if (!this._childId) {
+      // 无孩子：**必须落 loading=false**（原先早退在置 loading 之前 → 永久「加载中…」）
+      this.setData({ loading: false, noChild: true, items: [] })
+      return
+    }
+    this.setData({ loading: true, noChild: false, loadError: '' })
     try {
       const res = await api.listReservations(this._childId)
       const items = (res || []).map((r) => {
@@ -53,7 +61,8 @@ Page({
       })
       this.setData({ items })
     } catch (e) {
-      this.setData({ items: [] })
+      // P2-45 同族：失败**不许伪装成空列表**（原先把错误吞成 items:[]）
+      this.setData({ items: [], loadError: (e && e.message) || '加载失败' })
     } finally {
       this.setData({ loading: false })
     }

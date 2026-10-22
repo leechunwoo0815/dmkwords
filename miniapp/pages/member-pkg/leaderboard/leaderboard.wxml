@@ -12,7 +12,13 @@
     <view class="rules-text" wx:else>仅展示当前有效会员；英文名/昵称展示，保护隐私</view>
   </view>
 
-  <view class="x-931c22" wx:if="{{loading}}">加载中…</view>
+  <error-view wx:if="{{noChild}}" type="empty" title="还没有选择孩子"
+    desc="请先在「我的」里添加或选择孩子，榜单按孩子参与" showRetry="{{false}}" />
+
+  <error-view wx:if="{{loadError}}" type="network" title="榜单加载失败"
+    desc="{{loadError}}（未入会的孩子不参与榜单，属正常）" bind:onRetry="onRetryLoad" />
+
+  <view class="x-931c22" wx:if="{{loading && !noChild && !loadError}}">加载中…</view>
 
   <view class="rank-list" wx:if="{{board && board.entries.length}}">
     <view wx:for="{{board.entries}}" wx:key="child_id"
@@ -33,6 +39,7 @@
   </view>
 
   <view class="x-2a2b2d" wx:if="{{board && !board.entries.length && !loading}}">
-    本期还没有孩子上榜\n继续听书测验，第一名就是你！
+    本期还没有孩子上榜
+继续听书测验，第一名就是你！
   </view>
 </view>

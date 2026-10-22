@@ -19,7 +19,8 @@
   </view>
   <view wx:elif="{{status === 'passed'}}" class="feedback">
     <image class="feedback-icon" src="/icons/ui/party.png" mode="aspectFit" />
-    <text class="feedback-text">这本书你已经通过测验啦，词数已入账\n去挑战下一本书吧！</text>
+    <text class="feedback-text">这本书你已经通过测验啦，词数已入账
+去挑战下一本书吧！</text>
     <view class="feedback-btn" bindtap="goBack">选下一本</view>
   </view>
   <view wx:elif="{{status === 'failed'}}" class="feedback">

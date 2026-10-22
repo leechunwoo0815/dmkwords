@@ -75,6 +75,17 @@ SILENT_EMPTY_CATCH_RE = re.compile(
     r"|\.catch\(\s*function\s*\(\s*\)\s*\{\s*return\s+(?:\[\s*\]|null)\s*;?\s*\}\s*\)"
 )
 
+#: W4 **第二形态**（2026-10-22 第一百一十三批）：`try { … } catch (e) { this.setData({ rows: [] }) }`
+#: ——同一条规则，但原先只认内联 `.catch(() => [])`，于是预约页/榜单页那种
+#: `catch (e) { this.setData({ items: [] }) }` **一路绿灯**（第八轮 P3 实测：那两页确实把
+#: 失败渲染成"还没有预约 / 整页白屏"）。判据：catch 块里出现 `setData({ <键>: [] })`，且
+#: 同块内**没有任何**失败态或提示（loadError / noChild / error / toast / message）→ 违例。
+#: **逃生口**：catch 块内写明「降级」二字的注释 = 有意的次级功能降级（如 circle.js 的点赞
+#: 通知条失败不显示条、信息流照常）——与 `check_fake_assertions` 的"同行注释才是逃生口"同款。
+CATCH_BLOCK_RE = re.compile(r"catch\s*\([^)]*\)\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}", re.S)
+SILENT_EMPTY_IN_CATCH_RE = re.compile(r"setData\(\s*\{[^}]*:\s*\[\s*\]")
+FAILURE_MARK_RE = re.compile(r"loadError|noChild|error|toast|message|showToast|降级")
+
 
 def js_defines(js_text: str, name: str) -> bool:
     """js 里是否存在该方法（三种写法：`name(` / `name: (` / `name: function (`，均可带 async）。"""
@@ -213,6 +224,27 @@ def scan_silent_empty_catch(js_files: list[Path]) -> list[str]:
                 f'失败会被渲染成"没有数据/0"；请改走失败态（error-view + 重试）'
             )
             break  # 每个文件报一处即可（同类问题看第一处就够定位）
+
+        # W4 第二形态：`try/catch` 里把失败吞成空数组（内联形态之外的那一半）
+        for m in CATCH_BLOCK_RE.finditer(text):
+            body = m.group(1)
+            if not SILENT_EMPTY_IN_CATCH_RE.search(body):
+                continue
+            if FAILURE_MARK_RE.search(body):
+                continue  # 同块内有失败态/提示/「降级」说明 → 不是静默吞错
+            if in_comment(text, m.start()):
+                continue
+            try:
+                rel = js.relative_to(ROOT)
+            except ValueError:
+                rel = js
+            line = text[: m.start()].count("\n") + 1
+            problems.append(
+                f"W4 {rel}:{line}: catch 里把请求失败吞成空数组（`setData({{ …: [] }})`）——"
+                f'失败会被渲染成"没有数据"；请改走失败态（error-view + 重试）；'
+                f"确属次级功能的降级请在注释里写明「降级」"
+            )
+            break
     return problems
 
 
@@ -319,6 +351,55 @@ def selftest() -> list[str]:
         w4_good = scan_silent_empty_catch([good_catch])
         if w4_good:
             fails.append(f"S1: W4 正例被误报：{w4_good}")
+
+        # W4 第二形态（try/catch）：注入违例必须命中；带「降级」注释的次级功能必须零命中
+        bad_try = base / "bad_try_catch.js"
+        bad_try.write_text(
+            "async load() {\n"
+            "  try {\n"
+            "    const r = await api.list()\n"
+            "    this.setData({ items: r })\n"
+            "  } catch (e) {\n"
+            "    this.setData({ items: [] })\n"
+            "  }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        if not any(p.startswith("W4") for p in scan_silent_empty_catch([bad_try])):
+            fails.append("S1: W4 第二形态（try/catch 吞成空数组）未命中注入样本")
+        ok_try = base / "ok_try_catch.js"
+        ok_try.write_text(
+            "async load() {\n"
+            "  try {\n"
+            "    const r = await api.list()\n"
+            "    this.setData({ items: r })\n"
+            "  } catch (e) {\n"
+            "    this.setData({ items: [], loadError: e.message })\n"
+            "  }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        if scan_silent_empty_catch([ok_try]):
+            fails.append(
+                f"S1: W4 第二形态正例（带 loadError）被误报：{scan_silent_empty_catch([ok_try])}"
+            )
+        degrade_try = base / "degrade_try_catch.js"
+        degrade_try.write_text(
+            "async load() {\n"
+            "  try {\n"
+            "    const r = await api.list()\n"
+            "    this.setData({ items: r })\n"
+            "  } catch (e) {\n"
+            "    // 通知条失败不影响信息流（降级：不显示条）\n"
+            "    this.setData({ items: [] })\n"
+            "  }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        if scan_silent_empty_catch([degrade_try]):
+            fails.append(
+                f"S1: W4 第二形态「降级」逃生口被误报：{scan_silent_empty_catch([degrade_try])}"
+            )
     return fails
 
 

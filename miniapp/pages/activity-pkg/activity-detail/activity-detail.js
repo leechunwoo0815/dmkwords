@@ -1,5 +1,6 @@
 // pages/activity-pkg/activity-detail/activity-detail.js — 活动详情与报名（WM9）
 const api = require('../../../utils/api')
+const session = require('../../../utils/session')
 const { loadConfigs, getConfigs, configsFailed } = require('../../../utils/configs')
 const media = require('../../../utils/media')
 
@@ -28,7 +29,9 @@ Page({
     const { configs } = await loadConfigs()
     this.setData({ cfg: configs })
     this._activityId = Number(options.id)
-    this._childId = Number(options.child_id)
+    // P3（第一百一十三批）：原 `Number(options.child_id)` 在上游传 `child_id=null` 时
+    // 得到 NaN → 请求 422（每次进页都弹一次）；统一解析后回落当前孩子，仍无则 null（不报错）
+    this._childId = session.resolveChildId(options)
     this.setData({ childName: decodeURIComponent(options.child_name || '') })
     this._loadedOnce = false
     this.load()
