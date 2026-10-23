@@ -62,6 +62,8 @@ export default function ActivityManage() {
   const activityPg = usePaintPagination();
   // P2-44：后端硬上限（200）——已达上限时提示"可能还有更多未显示"
   const [listLimit, setListLimit] = useState<number | null>(null);
+  // N-6（第九轮 D 批）：失败不许只弹 toast——活动表空着会被读成「没有活动」
+  const [listError, setListError] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [enrollActivity, setEnrollActivity] = useState<ActivityItem | null>(null);
   const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
@@ -74,8 +76,8 @@ export default function ActivityManage() {
       keyword: keyword.trim() || undefined,
       activity_type: filterType || undefined,
     })
-      .then((r) => { setActivities(r.items); setListLimit(r.limit); })
-      .catch((e: Error) => message.error(e.message))
+      .then((r) => { setActivities(r.items); setListLimit(r.limit); setListError(""); })
+      .catch((e: Error) => setListError(e.message || "活动列表加载失败"))
       .finally(() => setLoading(false));
   }, [message, keyword, filterType, filterStatus]);
 
@@ -274,6 +276,12 @@ export default function ActivityManage() {
             key: "activities", label: `活动列表（${activities.length}）`,
             children: (
               <>
+      {listError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+          {listError} · 本次刷新失败：列表可能不是最新的（请重试）
+          <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
+        </Typography.Text>
+      )}
                 <Table<ActivityItem> locale={{ emptyText: <PaintEmpty character="star" /> }}
                   rowKey="id" loading={loading} dataSource={activities.slice((activityPg.page - 1) * activityPg.pageSize, activityPg.page * activityPg.pageSize)} size="middle"
                   pagination={false}

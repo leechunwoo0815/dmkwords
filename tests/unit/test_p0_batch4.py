@@ -96,6 +96,18 @@ def test_t41_passes_after_overdue_cleared(client: TestClient):
         headers=h,
     )
     assert r.status_code == 200, r.text
+    # P2-18（第九轮 D 批）：成功路径**补终态判据**——原先只断言 200（"看起来成功"），
+    # 若落款链路半途中断（状态停在 processing / 订单未联动），这条测试照样绿。
+    from backend.domain.identity.models import Order, RefundRequest
+
+    with get_session() as db:
+        req = db.query(RefundRequest).filter(RefundRequest.id == rid).first()
+        assert req.status == RefundRequest.STATUS_REFUNDED, (
+            f"退款单应落终态 refunded，实 {req.status}"
+        )
+        order = db.query(Order).filter(Order.id == o["id"]).first()
+        assert order.status == Order.STATUS_REFUNDED, f"订单应联动 refunded，实 {order.status}"
+        assert order.refund_status == Order.REFUND_STATUS_REFUNDED, order.refund_status
 
 
 def test_t41_manual_override_with_audit(client: TestClient):

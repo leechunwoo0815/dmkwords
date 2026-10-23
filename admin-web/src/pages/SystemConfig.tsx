@@ -43,6 +43,8 @@ export default function SystemConfigPage() {
   const [category, setCategory] = useState<string>("全部");
   const [editing, setEditing] = useState<SystemConfig | null>(null);
   const [saving, setSaving] = useState(false);
+  // N-6（第九轮 D 批）：失败不许只弹 toast——配置表空着会被读成「没有这些配置项」
+  const [listError, setListError] = useState("");
   const [form] = Form.useForm<{ value: string; reason: string }>();
 
   const canEdit = hasPermission(permissions, "config.update");
@@ -50,8 +52,8 @@ export default function SystemConfigPage() {
   const load = () => {
     setLoading(true);
     apiListConfigs()
-      .then(setConfigs)
-      .catch((e: Error) => message.error(e.message))
+      .then((rows) => { setConfigs(rows); setListError(""); })
+      .catch((e: Error) => setListError(e.message || "配置列表加载失败"))
       .finally(() => setLoading(false));
   };
 
@@ -100,6 +102,12 @@ export default function SystemConfigPage() {
         onChange={(c) => { setCategory(c); setPage(1); }}
         items={categories.map((c) => ({ key: c, label: c }))}
       />
+      {listError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+          {listError} · 本次刷新失败：列表可能不是最新的（请重试）
+          <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
+        </Typography.Text>
+      )}
       <Table<SystemConfig> locale={{ emptyText: <PaintEmpty character="default" /> }}
         rowKey="config_key"
         loading={loading}

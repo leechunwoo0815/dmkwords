@@ -11,6 +11,14 @@
      只对**无副作用**的表达式判定（`assert f() == f()` 有副作用，不算恒真，放行）。
   两类都必须为 0；逃生口是同行注释（`assert True  # 前端交互步骤无服务端断言`）。
 
+规则 C｜源码文本断言的登记制（2026-10-24 第九轮 D 批 P2-21）
+  判据：`assert` 里引用了由 `read_text()/read()/getsource()` 读进来的变量 —— 这类断言验的是
+  **另一份文件的文本**，不是行为。前端 JS/wxml、部署模板、BDD 场景、门禁脚本**没有 Python
+  运行时**，想验它们的接线只能读文本，属**合法但弱**的证据；但不加约束就分不清"合法跨制品校验"
+  与"本该写行为断言的偷懒实现"（第九轮实测：后端自身 3 处文本计数毫无理由，本批已改行为断言）。
+  规则：读取目标必须命中 `SOURCE_ASSERT_ALLOWLIST` 的某个前缀（附理由）；否则红。
+  **僵尸条目（登记了但一处也不命中）也判红**——白名单不许变垃圾场。
+
 规则 B｜时间炸弹（2026-09-20 增补，源自当日真实事故；B2/B3 于 2026-10-21 P2-67 补面）
   测试 payload 里给 `start_at` / `end_at` / `enroll_deadline` / `publish_at` /
   `deadline` / `expire_at` 写**绝对时间**且落在"近期未来"（当年 ~ 2049）→ 到点即失效。
@@ -61,6 +69,218 @@ FEATURE_BOMB_RE = re.compile(
 FAR_FUTURE_YEAR = 2050
 #: B2：写死近期未来年份的日期构造器（`datetime(2026, …)` / `date(2026, …)`）
 DATE_CTOR_NAMES = ("datetime", "date")
+
+#: 规则 C（第九轮 D 批 P2-21）：**源码文本断言的登记制**。
+#: 判据 = 断言里引用了"由 `read_text()/read()/getsource()` 读进来的变量"的那些 `assert`。
+#: 为什么不是"一律禁"：前端 JS/wxml、部署模板、BDD 场景文件、门禁脚本**没有 Python 运行时**，
+#: 想验"页面有没有消费这个字段""nginx 模板有没有启用脱敏格式"只能读文本——这类是**合法但弱**的证据。
+#: 为什么要登记：不登记就分不清"合法的跨制品校验"与"本该写成行为断言的偷懒文本断言"
+#: （第九轮报告实测：后端自身就有 3 处毫无理由的文本计数，本批已改行为断言）。
+#: 新出现的必须显式登记理由，或改写成行为断言。**僵尸条目（登记了但一处也不命中）判红**，
+#: 防止白名单变成历史垃圾场。
+SOURCE_READ_FUNCS = ("read_text", "read", "getsource", "getsourcefile")
+#: 允许的读取目标前缀 → 理由（按前缀匹配；键必须都能命中至少一处，否则僵尸判红）
+SOURCE_ASSERT_ALLOWLIST: dict[str, str] = {
+    "admin-web/": "前端产物（tsx）无 Python 运行时：字段消费/失败态只能读文本；行为面由 tsc、"
+    "契约快照与 check_admin_failure_states 兜底",
+    "miniapp/": "小程序产物（wxml/js）无 Python 运行时：接线由 check_miniapp_* 三件套 + 文本断言兜底",
+    "deploy/": "部署模板（nginx/systemd）无运行时，只能读文本核对（如日志脱敏格式是否真启用）",
+    "features/": "BDD 场景文件本身即产品口径数据，断言其内容 = 断言口径，不是断言实现",
+    "scripts/": "门禁脚本自身的结构断言（防回退）；其行为面无法在 pytest 里安全模拟",
+    "docker-compose": "生产编排模板无运行时：只能读文本核对部署纪律（端口只绑回环/binlog/卷名）",
+    #: `inspect.getsource(...)` 没有磁盘路径：验的是"实现形状"（如必须用 inserted_primary_key）。
+    #: 这类只能是弱证据，登记时必须写明"为什么构造不出可区分的运行时场景"。
+    "<getsource>": "断言实现形状（无路径可登记）：须在用例注释写清为什么造不出可区分的运行时场景",
+}
+
+
+def _is_getsource(call: ast.Call) -> bool:
+    f = call.func
+    fname = f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", "")
+    return fname in ("getsource", "getsourcefile")
+
+
+def _source_read_target(call: ast.Call) -> str:
+    """从 `read_text()/read()/getsource()` 调用里静态抽**读取目标路径串**（抽不到返回 ''）。
+
+    ⚠️ 路径通常在**接收者表达式**上（`(ROOT / "backend/x.py").read_text(encoding="utf-8")`），
+    不在调用参数里——只扫 args 会全部抽空（本批首轮实测：50 处全报"目标无法静态判定"）。
+    `encoding="utf-8"` 这类关键字值是**噪声**，必须排除（否则目标变 `utf-8/backend/...`）。
+    """
+    noise_keywords = {"encoding", "errors", "newline", "mode"}
+    parts: list[str] = []
+    func = call.func
+    receiver = func.value if isinstance(func, ast.Attribute) else None
+    if receiver is not None:
+        parts.extend(
+            x.value
+            for x in ast.walk(receiver)
+            if isinstance(x, ast.Constant) and isinstance(x.value, str)
+        )
+    for a in call.args:
+        if isinstance(a, ast.Constant) and isinstance(a.value, str):
+            parts.append(a.value)
+        else:  # `ROOT / "admin-web/src/pages/X.tsx"` 这类表达式
+            parts.extend(
+                x.value
+                for x in ast.walk(a)
+                if isinstance(x, ast.Constant) and isinstance(x.value, str)
+            )
+    for kw in call.keywords:
+        if kw.arg in noise_keywords:
+            continue
+        if isinstance(kw.value, ast.Constant) and isinstance(kw.value, str):
+            parts.append(kw.value)
+    return "/".join(p.strip("/") for p in parts if p)
+
+
+def _matches_allowlist(target: str) -> bool:
+    """目标是否命中某个登记前缀——按**路径段**匹配（目标常是多段字面量拼接，如 `x.sh/deploy`）。"""
+    padded = f"/{target.strip('/')}"
+    return any(f"/{pref.strip('/')}" in padded for pref in SOURCE_ASSERT_ALLOWLIST)
+
+
+def _source_assert_problem(node: ast.Assert, src_vars: dict[str, str]) -> str | None:
+    """规则 C 判定：断言引用的源码读取变量，其目标是否已登记。"""
+    used = {n.id for n in ast.walk(node.test) if isinstance(n, ast.Name)} & set(src_vars)
+    if not used:
+        return None
+    unregistered = []
+    for name in sorted(used):
+        target = src_vars[name]
+        if not target:
+            unregistered.append(f"{name}（目标路径无法静态判定）")
+            continue
+        if _matches_allowlist(target):
+            continue
+        unregistered.append(f"{name} → {target}")
+    if not unregistered:
+        return None
+    return (
+        "源码文本断言未登记："
+        + "；".join(unregistered)
+        + "——请改写成**行为断言**；确实没有运行时可观测面的，按目标前缀登记进 "
+        "SOURCE_ASSERT_ALLOWLIST（附理由）"
+    )
+
+
+def _loop_literals(tree: ast.AST) -> dict[str, str]:
+    """`for rel in ["a/x.js"]` 与 `consumers = ["a/x.js"]; for rel in consumers`
+    → {rel: "a/x.js"}（一级数据流，供路径解析）。"""
+    lists: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Assign)
+            and isinstance(node.value, (ast.List, ast.Tuple))
+            and all(isinstance(t, ast.Name) for t in node.targets)
+        ):
+            strings = [
+                e.value
+                for e in node.value.elts
+                if isinstance(e, ast.Constant) and isinstance(e.value, str)
+            ]
+            if strings:
+                for t in node.targets:
+                    lists[t.id] = "/".join(x.strip("/") for x in strings)
+    out: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.For) or not isinstance(node.target, ast.Name):
+            continue
+        if isinstance(node.iter, (ast.List, ast.Tuple)):
+            strings = [
+                e.value
+                for e in node.iter.elts
+                if isinstance(e, ast.Constant) and isinstance(e.value, str)
+            ]
+            if strings:
+                out.setdefault(node.target.id, "/".join(x.strip("/") for x in strings))
+        elif isinstance(node.iter, ast.Name):
+            joined = lists.get(node.iter.id)
+            if joined:
+                out.setdefault(node.target.id, joined)
+    return out
+
+
+def _path_consts(tree: ast.AST) -> dict[str, str]:
+    """模块级/函数内**路径常量**：`PAGE_JS = ROOT / "miniapp/pages/x.js"` → {PAGE_JS: "miniapp/..."}。"""
+    out: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        t = node.targets[0]
+        if not isinstance(t, ast.Name):
+            continue
+        v = node.value
+        if isinstance(v, ast.Call):
+            fname = v.func.attr if isinstance(v.func, ast.Attribute) else getattr(v.func, "id", "")
+            if fname in SOURCE_READ_FUNCS or fname == "open":
+                continue
+        strings = [
+            x.value for x in ast.walk(v) if isinstance(x, ast.Constant) and isinstance(x.value, str)
+        ]
+        if strings and (isinstance(v, ast.BinOp) or isinstance(v, ast.Call)):
+            out.setdefault(t.id, "/".join(x.strip("/") for x in strings))
+    return out
+
+
+def _open_bound_names(tree: ast.AST) -> set[str]:
+    """`with open(...) as f:` / `f = open(...)` 的文件对象名——`.read()` 是读**字节**，不是读源码。"""
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.With):
+            for item in node.items:
+                if isinstance(item.optional_vars, ast.Name) and isinstance(
+                    item.context_expr, ast.Call
+                ):
+                    fn = item.context_expr.func
+                    fname = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+                    if fname == "open":
+                        names.add(item.optional_vars.id)
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+            fn = node.value.func
+            fname = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+            if fname == "open":
+                for t in node.targets:
+                    if isinstance(t, ast.Name):
+                        names.add(t.id)
+    return names
+
+
+def _collect_source_vars(tree: ast.AST) -> dict[str, str]:
+    """收集 {变量名: 读取目标}（`src = (ROOT / "backend/x.py").read_text()` 这类）。
+
+    目标解析支持两级：
+      ① 接收者表达式里的字面量（`(ROOT / "admin-web/x.tsx").read_text()`）；
+      ② 一级数据流：`for rel in [字面量列表]` 的循环变量（`(ROOT / rel).read_text()`）。
+    `inspect.getsource(...)` 无路径 → 目标标记 `<getsource>`（登记键同名）。
+    """
+    loops = _loop_literals(tree)
+    consts = _path_consts(tree)
+    file_objs = _open_bound_names(tree)
+    out: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Call):
+            continue
+        call = node.value
+        func = call.func
+        fname = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+        if fname not in SOURCE_READ_FUNCS:
+            continue
+        receiver = func.value if isinstance(func, ast.Attribute) else None
+        if fname == "read" and isinstance(receiver, ast.Name) and receiver.id in file_objs:
+            continue  # `f.read(3)` 是读字节（JPEG 魔数等），不是读源码文本
+        if _is_getsource(call):
+            target = "<getsource>"
+        else:
+            target = _source_read_target(call)
+            if not target and isinstance(receiver, ast.Name):
+                target = loops.get(receiver.id) or consts.get(receiver.id, "")
+        for t in node.targets:
+            if isinstance(t, ast.Name):
+                if out.get(t.id) and not target:
+                    continue  # 已有可解析目标，别被后面的空解析覆盖
+                out.setdefault(t.id, target)
+    return out
 
 
 def _is_pure(node: ast.AST) -> bool:
@@ -156,8 +376,9 @@ def _bomb_from_string(key: str, date_text: str, now_date: datetime.date, where: 
 def scan(root: pathlib.Path, now_date: datetime.date | None = None) -> tuple[list[str], list[str]]:
     """扫描 `root/{features/steps,tests}` 与 `root/features/**/*.feature`。
 
-    返回 (假绿断言, 时间炸弹)。**参数化 root 是为了自证**（第八轮审查 P1-10）：
-    原实现是模块级 for 循环直接扫仓库，没有任何办法给它喂样本 → 检测器改坏了也没人知道。
+    返回 (假绿断言 + 未登记的源码文本断言, 时间炸弹)。**参数化 root 是为了自证**
+    （第八轮审查 P1-10）：原实现是模块级 for 循环直接扫仓库，没有任何办法给它喂样本
+    → 检测器改坏了也没人知道。
     """
     today = datetime.date.today() if now_date is None else now_date
     violations: list[str] = []
@@ -166,17 +387,22 @@ def scan(root: pathlib.Path, now_date: datetime.date | None = None) -> tuple[lis
         for py_file in (root / scan_dir).rglob("*.py"):
             text = py_file.read_text(encoding="utf-8")
             lines = text.splitlines()
-            # 规则 A（AST：常量断言 + 恒真比较）与规则 B2（键位上的日期构造式）
+            # 规则 A（AST：常量断言 + 恒真比较）· 规则 C（源码文本断言登记）· 规则 B2（日期构造式）
             try:
                 tree = ast.parse(text)
             except SyntaxError:
                 tree = None
             if tree is not None:
+                src_vars = _collect_source_vars(tree)
                 for node in ast.walk(tree):
                     if isinstance(node, ast.Assert):
                         problem = _assert_problem(node, lines)
                         if problem:
                             violations.append(f"{py_file}:{node.lineno}: {problem}")
+                        elif src_vars:
+                            text_problem = _source_assert_problem(node, src_vars)
+                            if text_problem:
+                                violations.append(f"{py_file}:{node.lineno}: {text_problem}")
                     elif isinstance(node, ast.Dict):
                         for k, v in zip(node.keys, node.values, strict=False):
                             if isinstance(k, ast.Constant) and isinstance(k.value, str):
@@ -207,6 +433,34 @@ def scan(root: pathlib.Path, now_date: datetime.date | None = None) -> tuple[lis
     return violations, bombs
 
 
+def _hit_source_prefixes(root: pathlib.Path) -> set[str]:
+    """真实仓库里**被命中过**的登记前缀（供僵尸条目判定；只在 main 里用，不进自证样本）。"""
+    hits: set[str] = set()
+    for scan_dir in SCAN_DIRS:
+        for py_file in (root / scan_dir).rglob("*.py"):
+            try:
+                tree = ast.parse(py_file.read_text(encoding="utf-8"))
+            except (SyntaxError, UnicodeDecodeError, OSError):
+                continue
+            src_vars = _collect_source_vars(tree)
+            if not src_vars:
+                continue
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Assert):
+                    continue
+                used = {n.id for n in ast.walk(node.test) if isinstance(n, ast.Name)}
+                for name in used & set(src_vars):
+                    for pref in SOURCE_ASSERT_ALLOWLIST:
+                        if f"/{pref.strip('/')}" in f"/{src_vars[name].strip('/')}":
+                            hits.add(pref)
+    return hits
+
+
+def _zombie_entries(hits: set[str]) -> list[str]:
+    """登记了却一处也不命中的前缀（白名单变成历史垃圾场的信号）。"""
+    return [p for p in SOURCE_ASSERT_ALLOWLIST if p not in hits]
+
+
 def self_test() -> int:
     """S1 注入自检：每条规则的违例必须命中，合法写法不得误报。
 
@@ -216,7 +470,9 @@ def self_test() -> int:
     并对"同行注释""相对时间""远期哨兵""历史日期""有副作用的比较"五种合法写法零误报。
     """
     bad = 0
-    expect_violations = 7  # A1 裸 ×2 + A1 带消息 ×1 + A2 同形 ×1 + A2 双常量 ×2 + steps 样本 ×1
+    expect_violations = (
+        8  # A1 裸 ×2 + A1 带消息 ×1 + A2 同形 ×1 + A2 双常量 ×2 + steps ×1 + 规则 C 未登记 ×1
+    )
     expect_bombs = 3  # B1 字符串 ×1 + B2 构造式 ×1 + B3 .feature ×1
     with tempfile.TemporaryDirectory(prefix="fake-assert-selftest-") as d:
         root = pathlib.Path(d)
@@ -235,6 +491,12 @@ def self_test() -> int:
             "assert True  # 前端交互步骤无服务端断言\n"  # 逃生口：同行注释
             "assert r.status_code == 404\n"  # 正常断言（非双常量）
             "assert f() == f()\n"  # 有副作用 → 不算恒真
+            # ---- 规则 C（源码文本断言登记制）----
+            "src = (ROOT / 'backend/domain/admin/service.py').read_text(encoding='utf-8')\n"
+            "assert 'SUPERADMIN_ONLY_TASK_GROUPS = ' in src\n"  # C 违例：后端实现文本未登记
+            "page = (ROOT / 'admin-web/src/pages/X.tsx').read_text(encoding='utf-8')\n"
+            "assert 'listError' in page\n"  # C 合法：前端产物已登记前缀
+            "assert x == 1\n"  # C 邻居：不涉及源码读取变量 → 不归规则 C 管
             # ---- 规则 B 违例 ----
             '{"start_at": "2026-11-01T10:00:00"}\n'  # B1：键位 + 近期未来字符串
             '{"start_at": datetime(2026, 12, 1, 10, 0)}\n'  # B2：键位 + 构造式近期未来
@@ -297,6 +559,21 @@ def self_test() -> int:
         if not violations or not bombs:
             print("✗ S2 扫描面异常（注入样本一个都没扫到）")
             bad += 1
+        # 规则 C 的**僵尸条目**判定：给一个"只命中 admin-web/"的集合 → 其余前缀必须被判僵尸
+        zombies = _zombie_entries({"admin-web/"})
+        if "backend/" in zombies or "admin-web/" in zombies:
+            print("✗ 规则 C 僵尸判定失灵（已命中/未登记的前缀被误判）")
+            bad += 1
+        if len(zombies) != len(SOURCE_ASSERT_ALLOWLIST) - 1:
+            print(f"✗ 规则 C 僵尸判定数目异常：{zombies}")
+            bad += 1
+        joined_c = "\n".join(violations)
+        if "源码文本断言未登记" not in joined_c:
+            print("✗ 规则 C 未登记的源码文本断言没被扫到")
+            bad += 1
+        if "admin-web/src/pages/X.tsx" in joined_c:
+            print("✗ 规则 C 误报：已登记前缀（admin-web/）被拦")
+            bad += 1
     if bad:
         print(f"✗ S1 注入自检失败 {bad} 项")
         return 1
@@ -308,7 +585,13 @@ def self_test() -> int:
 
 
 def main() -> int:
-    violations, bombs = scan(pathlib.Path.cwd())
+    root = pathlib.Path.cwd()
+    violations, bombs = scan(root)
+    zombie = _zombie_entries(_hit_source_prefixes(root))
+    if zombie:
+        violations.append(
+            f"[C] SOURCE_ASSERT_ALLOWLIST 僵尸条目（登记了但一处也不命中，请删）：{zombie}"
+        )
     failed = False
     if violations:
         print(f"FOUND {len(violations)} 处假绿断言（常量断言 / 恒真比较）：")
@@ -323,7 +606,7 @@ def main() -> int:
     if failed:
         return 1
     print(
-        "OK: 假绿断言 0 处（常量/恒真比较）；时间炸弹 0 处"
+        "OK: 假绿断言 0 处（常量/恒真比较）；源码文本断言 0 处未登记；时间炸弹 0 处"
         f"（.py 字符串 + datetime 构造 + .feature 表格；相对时间或远期哨兵 ≥{FAR_FUTURE_YEAR}）"
     )
     return 0

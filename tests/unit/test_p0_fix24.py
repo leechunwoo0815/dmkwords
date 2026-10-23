@@ -130,6 +130,26 @@ def test_r8_refunded_child_can_reorder(client: TestClient):
         headers=h,
     )
     assert re_.status_code == 200, re_.text
+    # P2-18（第九轮 D 批）：**先证"确实到终态"，再验"终态后能重造单"**——原先只断言 execute
+    # 返回 200，就把它当成了 refunded 终态；若执行半途停在 processing（或订单/报名未联动），
+    # 下面的重造单仍会 200，本用例照样绿，"S4 口径：退款后可重报"其实没被验到。
+    from backend.domain.activity.models import ActivityEnrollment
+    from backend.domain.identity.models import Order
+
+    with _db() as db:
+        req = db.query(RefundRequest).filter(RefundRequest.id == rid).first()
+        assert req.status == RefundRequest.STATUS_REFUNDED, f"退款单应落 refunded，实 {req.status}"
+        order = db.query(Order).filter(Order.id == e["order_id"]).first()
+        assert order.status == Order.STATUS_REFUNDED, f"订单应联动 refunded，实 {order.status}"
+        assert order.refund_status == Order.REFUND_STATUS_REFUNDED, order.refund_status
+        en = (
+            db.query(ActivityEnrollment)
+            .filter(ActivityEnrollment.order_id == e["order_id"])
+            .first()
+        )
+        assert en.status == ActivityEnrollment.STATUS_REFUNDED, (
+            f"报名应联动 refunded，实 {en.status}"
+        )
     # 终态后重造单 → 200
     r2 = client.post(
         ADMIN_ORDER_URL,

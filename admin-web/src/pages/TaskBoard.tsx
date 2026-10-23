@@ -7,6 +7,7 @@ import {
   Popover,
   Table,
   Tag,
+  Typography,
 } from "antd";
 import { PlayCircleOutlined, ReloadOutlined } from "@ant-design/icons";
 
@@ -93,6 +94,8 @@ export default function TaskBoard() {
   const [runs, setRuns] = useState<TaskRunItem[]>([]);
   const [running, setRunning] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // N-6（第九轮 D 批）：失败不许只弹 toast——表空着会被读成「一个任务都没有」
+  const [listError, setListError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,8 +103,9 @@ export default function TaskBoard() {
       const [s, r] = await Promise.all([apiTaskSpecs(), apiTaskRuns(20)]);
       setSpecs(s.items);
       setRuns(r.items);
+      setListError("");
     } catch (e) {
-      message.error((e as Error).message);
+      setListError((e as Error).message || "任务清单加载失败");
     } finally {
       setLoading(false);
     }
@@ -147,6 +151,12 @@ export default function TaskBoard() {
           </Button>
         }
       >
+      {listError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+          {listError} · 本次刷新失败：列表可能不是最新的（请重试）
+          <Typography.Link onClick={() => void load()} style={{ marginLeft: 8 }}>重试</Typography.Link>
+        </Typography.Text>
+      )}
         <Table<TaskSpecItem>
           rowKey="name"
           size="small"

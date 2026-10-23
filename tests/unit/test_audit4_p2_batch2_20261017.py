@@ -227,48 +227,72 @@ def test_task_specs_manual_allowed_by_role(client: TestClient):
 
 def test_manual_trigger_rule_single_source():
     """判据只有一份实现：`TaskAdminService.manual_trigger_allowed` 同时被 run() 与 specs 用。"""
+    import backend.domain.admin.service as admin_service
     from backend.domain.admin.models import AdminUser
     from backend.domain.admin.service import TaskAdminService as Svc
+    from backend.domain.admin.task_specs import TaskAdminService as SpecSvc
 
     assert Svc.manual_trigger_allowed("资金", AdminUser.ROLE_SUPER_ADMIN) is True
     assert Svc.manual_trigger_allowed("资金", AdminUser.ROLE_STAFF) is False
     assert Svc.manual_trigger_allowed("会员", AdminUser.ROLE_STAFF) is True
-    impl = (ROOT / "backend/domain/admin/task_specs.py").read_text(encoding="utf-8")
-    assert impl.count("SUPERADMIN_ONLY_TASK_GROUPS = ") == 1, "分组常量只定义一处"
-    old = (ROOT / "backend/domain/admin/service.py").read_text(encoding="utf-8")
-    assert "SUPERADMIN_ONLY_TASK_GROUPS = " not in old, "旧实现不许留着（同一口径两份实现）"
+    # P2-21（第九轮 D 批）：原先这里是**源码文本计数**（`impl.count("SUPERADMIN_ONLY_TASK_GROUPS = ")
+    # == 1` + 另一文件里 `not in`）——文本断言脆（改注释/换行即红）且**不证明行为**。
+    # 改成模块级**属性**判定：常量必须存在于 task_specs、不得存在于旧实现处。
+    # （两个入口的一致性由上面三条行为断言 + 本文件另一处 run 端点的 403/200 用例共同保证。）
+    assert hasattr(SpecSvc, "SUPERADMIN_ONLY_TASK_GROUPS"), "分组常量应在 task_specs"
+    assert not hasattr(admin_service, "SUPERADMIN_ONLY_TASK_GROUPS"), (
+        "同一口径不许两份实现：旧实现里的分组常量必须删净"
+    )
 
 
 # ---------- P2-22：封面/音频上传响应的 copy_count 必须是真实在册数 ----------
 
 
-def test_upload_cover_returns_real_copy_count(client: TestClient):
+def _jpeg_bytes() -> bytes:
     import io
 
     from PIL import Image
 
+    buf = io.BytesIO()
+    Image.new("RGB", (16, 16), (10, 20, 30)).save(buf, "JPEG")
+    return buf.getvalue()
+
+
+def test_upload_cover_returns_real_copy_count(client: TestClient):
     h = _h(client)
     book = client.post(
         "/api/admin/books",
         json={"isbn": None, "title": "上传响应回归", "word_count": 100, "copy_count": 3},
         headers=h,
     ).json()
-    buf = io.BytesIO()
-    Image.new("RGB", (16, 16), (10, 20, 30)).save(buf, "JPEG")
     r = client.post(
         f"/api/admin/books/{book['id']}/cover",
-        files={"file": ("c.jpg", buf.getvalue(), "image/jpeg")},
+        files={"file": ("c.jpg", _jpeg_bytes(), "image/jpeg")},
         headers=h,
     )
     assert r.status_code == 200, r.text
     assert r.json()["copy_count"] == 3, "上传响应不许写死 0（字段声明是「在册副本总数」）"
 
-    # 两个上传端点共用同一份「重算型响应」（同一口径只有一份实现）
-    src = (ROOT / "backend/domain/catalog/router.py").read_text(encoding="utf-8")
-    assert src.count("_book_response_fresh(db, book)") == 5, (
-        "1 处定义 + 4 处调用（get/update/两个上传）"
+    # P2-21（第九轮 D 批）：原先这里数源码里 `_book_response_fresh(db, book)` 出现 5 次
+    # （"1 处定义 + 4 处调用"）——源码计数是弱证据且会随重构漂移。
+    # 改成**逐个端点实测**：四个出参点都必须回重算后的在册数。
+    got = client.get(f"/api/admin/books/{book['id']}", headers=h).json()["copy_count"]
+    assert got == 3, f"详情端点应在册数 3，实 {got}"
+    upd = client.put(
+        f"/api/admin/books/{book['id']}",
+        json={"title": "上传响应回归·改", "word_count": 100},
+        headers=h,
     )
-    assert "_to_book_response(book, 0" not in src
+    assert upd.status_code == 200, upd.text
+    assert upd.json()["copy_count"] == 3, f"编辑端点应在册数 3，实 {upd.json()['copy_count']}"
+    mp3 = b"\xff\xfb\x90\x00" + b"\x00" * 125000
+    aud = client.post(
+        f"/api/admin/books/{book['id']}/audio",
+        files={"file": ("a.mp3", mp3, "audio/mpeg")},
+        headers=h,
+    )
+    assert aud.status_code == 200, aud.text
+    assert aud.json()["copy_count"] == 3, f"音频上传端点应在册数 3，实 {aud.json()['copy_count']}"
 
 
 # ---------- P2-23：图形区首帧失败禁假 0 ----------

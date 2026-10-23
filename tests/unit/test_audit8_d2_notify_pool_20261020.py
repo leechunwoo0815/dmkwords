@@ -25,6 +25,8 @@ import time
 
 from fastapi.testclient import TestClient
 
+from tests.unit.helpers import lock_wait_query
+
 SCENE_DUE = "borrow.due_remind"  # 已映射模板的高价值场景（订阅推送真路径）
 
 
@@ -79,15 +81,18 @@ def test_writeback_waits_for_visibility_without_holding_connection(client: TestC
         )
         worker.start()
 
-        blocked = 0  # 采样：有多少次采样时"连接被多占了一条"
-        for _ in range(20):
-            time.sleep(0.1)
-            if engine.pool.checkedout() > baseline:
-                blocked += 1
+        # N-10（第九轮 D 批）：原先用 20 次 `sleep(0.1)` **猜时序**采样"连接被多占了几次"，
+        # 判据是"blocked ≤ 8"这种统计阈值（机器慢/调度抖动都可能假绿或假红）。
+        # 改成**确定性探针**：回写在"等行可见"期间**不得在行锁上等待**——
+        # 一旦它去 UPDATE 未提交行（RED 形态），InnoDB 就会让该语句进入 LOCK WAIT，
+        # 而那正是"用一条连接怼着锁 50 秒"的来源；反过来没有 LOCK WAIT 就没有这种占用。
         assert worker.is_alive(), "回写应仍在等行可见（而不是已异常退出）"
-        assert blocked <= 8, (
-            f"回写在等可见期间不应占着连接（20 次采样里 {blocked} 次多占 1 条）——"
-            "RED=直接 UPDATE 未提交行 → InnoDB 等锁 50 秒，白占连接池"
+        blocked_stmt = lock_wait_query(timeout=2.0)
+        assert not blocked_stmt, (
+            f"回写不应在行锁上等待（那会白占一条连接 50 秒）：{blocked_stmt[:120]}"
+        )
+        assert engine.pool.checkedout() <= baseline + 1, (
+            "回写在等可见期间最多瞬时借一条连接（不该长期占住）"
         )
 
         db.commit()  # 事务提交 → 行可见
@@ -135,16 +140,19 @@ def test_push_threads_bounded_by_pool_workers(monkeypatch):
 
     gate = threading.Event()
     lock = threading.Lock()
+    cond = threading.Condition(lock)  # N-10：状态变化即唤醒等待方（不再靠 sleep 轮询）
     live = {"n": 0, "max": 0, "done": 0}
 
     async def fake_send(openid: str, template_id: str, data: dict, page: str = "") -> dict:
-        with lock:
+        with cond:
             live["n"] += 1
             live["max"] = max(live["max"], live["n"])
+            cond.notify_all()
         gate.wait(timeout=20)  # 卡住：让并发数停在峰值上可观测
-        with lock:
+        with cond:
             live["n"] -= 1
             live["done"] += 1
+            cond.notify_all()
         return {"errcode": 0}
 
     monkeypatch.setattr(sub.WeChatSubscribe, "send", staticmethod(fake_send))
@@ -156,17 +164,16 @@ def test_push_threads_bounded_by_pool_workers(monkeypatch):
             for i in range(total)
         ]
         assert all(queued), f"40 条都应入队（积压上限 {sub.PUSH_QUEUE_MAX}）：{queued}"
-        deadline = time.monotonic() + 15
-        while time.monotonic() < deadline and live["max"] < sub.PUSH_WORKERS:
-            time.sleep(0.05)
+        # N-10（第九轮 D 批）：`while + sleep` 猜时序 → 条件变量等待（到点即醒，超时才红）
+        with cond:
+            cond.wait_for(lambda: live["max"] >= sub.PUSH_WORKERS, timeout=15)
         assert live["max"] == sub.PUSH_WORKERS, (
             f"并发峰值应恰好等于 worker 数 {sub.PUSH_WORKERS}（实 {live['max']}）"
         )
     finally:
         gate.set()  # 无论断言成败都要放行，别把 worker 卡死影响后续用例
-    deadline = time.monotonic() + 30
-    while time.monotonic() < deadline and live["done"] < total:
-        time.sleep(0.05)
+    with cond:
+        cond.wait_for(lambda: live["done"] >= total, timeout=30)
     assert live["done"] == total, (
         f"全部任务都应跑完（worker 里必须释放积压名额，否则队列越用越小）：{live}"
     )

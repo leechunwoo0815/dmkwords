@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
-import { Alert, App as AntdApp, Button, Card, Switch, Table, Tag } from "antd";
+import { Alert, App as AntdApp, Button, Card, Switch, Table, Tag, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 
 import { apiDeadLetters, apiHandleDeadLetter, type DeadLetterItem } from "../api/admin";
@@ -24,6 +24,8 @@ export default function DeadLetterPanel() {
   const [unresolvedOnly, setUnresolvedOnly] = useState(false);
   const [loading, setLoading] = useState(false);
   const [handling, setHandling] = useState<number | null>(null);
+  // N-6（第九轮 D 批）：死信列表失败不许只弹 toast——空表会被读成「没有待处理的死信」
+  const [listError, setListError] = useState("");
   // P3 管理端族（2026-10-22）：原先固定只取 20 条且 `pagination={false}` → 死信一多就
   // 「看不到、也翻不到」（后端早已支持分页并返回 total）。现在走统一分页组件。
   const [total, setTotal] = useState(0);
@@ -36,8 +38,9 @@ export default function DeadLetterPanel() {
       setRows(r.items);
       setPending(r.pending);
       setTotal(r.total);
+      setListError("");
     } catch (e) {
-      message.error((e as Error).message);
+      setListError((e as Error).message || "死信列表加载失败");
     } finally {
       setLoading(false);
     }
@@ -87,6 +90,12 @@ export default function DeadLetterPanel() {
           style={{ marginBottom: 12 }}
           message={`有 ${pending} 条死信待处理：事件处理器重试后仍失败 = 对应副作用（积分/词数/通知/审计）没有发生。`}
         />
+      )}
+      {listError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+          {listError} · 本次刷新失败：列表可能不是最新的（请重试）
+          <Typography.Link onClick={() => void load()} style={{ marginLeft: 8 }}>重试</Typography.Link>
+        </Typography.Text>
       )}
       <Table<DeadLetterItem>
         rowKey="id"

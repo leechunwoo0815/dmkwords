@@ -174,7 +174,8 @@ export default function MemberManage() {
     window.clearTimeout(parentSearchTimer.current);
     if (!kw.trim()) {
       // WM3-B4：空关键字=默认展示最新 5 位（后端 ParentService.search(None) id 倒序）
-      apiSearchParents("").then((list) => setParentOptions(list.slice(0, 5))).catch(() => setParentOptions([]));
+      // 建档选择器的远程搜索下拉：空列表 = 本次无候选（重输关键词即重试），不是"没有家长"的结论
+    apiSearchParents("").then((list) => setParentOptions(list.slice(0, 5))).catch(() => setParentOptions([])); // A1-ok: 搜索下拉兜底，非列表结论
       return;
     }
     parentSearchTimer.current = window.setTimeout(() => {
@@ -244,12 +245,13 @@ export default function MemberManage() {
   // 同款兜底：挂载无条件拉一次轻量 total（page_size=1）；parents 挂载即拉
   // （F1 已修）无此病，兜底拉取冗余无害（prev===0 守卫防覆盖）双保险。
   useEffect(() => {
+    // 徽标 total 的冗余兜底（title 栏懒加载负责主取数；prev===0 守卫防覆盖）
     apiListChildren({ page: 1, page_size: 1 })
       .then((r) => setChildTotal((prev) => (prev === 0 ? r.total : prev)))
-      .catch(() => undefined);
+      .catch(() => undefined); // A1-ok: 徽标兜底，主取数另有失败态
     apiListParentsPage({ page: 1, page_size: 1 })
       .then((r) => setParentTotal((prev) => (prev === 0 ? r.total : prev)))
-      .catch(() => undefined);
+      .catch(() => undefined); // A1-ok: 同上（家长总数徽标）
     // 仅挂载一次（懒加载落地后 total 由其维护——不重复拉）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -528,6 +530,7 @@ export default function MemberManage() {
                           acts.items.filter((a) => a.status === "published")
                             .map((a) => ({ value: a.id, label: `${a.title}（￥${a.fee}）` }))
                         ))
+                        // A1-ok: 活动下拉候选兜底——空选项只是本次无可选活动，主数据（订单行）不受影响
                         .catch(() => setActivityOptions([]));
                     }}>创建订单</Button>
                     {r.member_status === "observation" && (

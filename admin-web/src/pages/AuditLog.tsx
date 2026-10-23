@@ -172,6 +172,7 @@ export default function AuditLogPage() {
       })
       // T26 全量枚举处置：降级保留静默——失败时展示 config_key 原文（数据本体在），
       // 仅 display_name 美化缺失，不构成"假 0 误判"
+      // A1-ok: 失败降级为 config_key 原文展示（数据本体在，仅 display_name 美化缺失，不构成假 0）
       .catch(() => undefined);
   }, []);
 
