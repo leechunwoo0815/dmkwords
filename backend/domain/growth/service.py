@@ -59,6 +59,10 @@ def levels_map(db: Session, child_ids: list[int]) -> dict[int, str]:
 
 
 class GrowthService:
+    #: 流水回看条数（P2-44：硬上限必须经响应头如实告知，前端才知道"还有更早的"）
+    POINTS_LIST_LIMIT = 100
+    WORDS_LIST_LIMIT = 100
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -258,7 +262,7 @@ class GrowthService:
             "is_z_capped": state.level == letters[-1],
         }
 
-    def points_list(self, child_id: int, limit: int = 100) -> list[dict]:
+    def points_list(self, child_id: int, limit: int = POINTS_LIST_LIMIT) -> list[dict]:
         rows = (
             self.db.query(PointLedger)
             .filter(PointLedger.child_id == child_id, PointLedger.is_deleted == 0)
@@ -277,7 +281,7 @@ class GrowthService:
             for r in rows
         ]
 
-    def words_list(self, child_id: int, limit: int = 100) -> list[dict]:
+    def words_list(self, child_id: int, limit: int = WORDS_LIST_LIMIT) -> list[dict]:
         from backend.domain.catalog.models import Book
 
         rows = (

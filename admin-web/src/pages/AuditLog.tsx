@@ -157,6 +157,9 @@ export default function AuditLogPage() {
   const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination();
   const [action, setAction] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  // P2-11（第九轮审查）：取数失败不许渲染成空表——审计页的空表等于"这段时间没人动过系统"
+  // 这个**语义结论**，而实际可能只是接口失败（审计排查时会被误判）。照 RefundCenter 的范式。
+  const [listError, setListError] = useState("");
   const [configNames, setConfigNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -179,8 +182,9 @@ export default function AuditLogPage() {
         .then((result) => {
           setLogs(result.items ?? []);
           setTotal(result.total);
+          setListError("");
         })
-        .catch((e: Error) => message.error(e.message))
+        .catch((e: Error) => setListError(e.message || "日志加载失败"))
         .finally(() => setLoading(false));
     },
     [action, pageSize, message]
@@ -209,7 +213,13 @@ export default function AuditLogPage() {
           options={Object.entries(ACTION_LABEL).map(([value, label]) => ({ value, label }))}
         />
       </Space>
-      <Table<AuditLog> locale={{ emptyText: <PaintEmpty character="bird" /> }}
+      {listError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+          {listError} · 本次刷新失败：列表可能不是最新的（不代表这段时间没有操作记录）——请重试
+          <Typography.Link onClick={() => load(page)} style={{ marginLeft: 8 }}>重试</Typography.Link>
+        </Typography.Text>
+      )}
+      <Table<AuditLog> locale={{ emptyText: listError ? null : <PaintEmpty character="bird" /> }}
         rowKey="id"
         loading={loading}
         dataSource={logs}

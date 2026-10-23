@@ -5,10 +5,14 @@
 时序（线程模式）：
 - 借书 → due_at 推到过去（active 超期）
 - s2 锁 BorrowRecord 行（模拟还书事务进行中）
-- s1 线程 overdue_list：快照 join 读到 ACTIVE 超期 → 循环 UPDATE 阻塞在 s2 锁
+- s1 线程 overdue_list：快照 join 读到 ACTIVE 超期 → 逐行**锁定读探针**阻塞在 s2 锁
 - s2 完成还书（RETURNED）提交
-- 修复后：条件 UPDATE 当前读 RETURNED 不匹配 → rowcount=0 → 不标且名单剔除
+- 修复后：锁定读拿到当前版本 RETURNED → 不在 (ACTIVE, OVERDUE) → 不展示、不复活
 - 修复前：无条件覆盖 → RETURNED 被打回 OVERDUE（RED）
+
+第九轮审查（P3）：探针从"条件 UPDATE"改成"`SELECT ... FOR UPDATE`"（GET **不再写库**）。
+判据不变（当前读 vs 快照读），只是不再落写入；本用例的并发断言因此跨两种实现都成立
+（`assert_blocked` 只判"对方确实在等锁"，不判语句形状）。
 """
 
 import threading
@@ -63,12 +67,15 @@ def test_overdue_list_not_override_returned(client: TestClient, session_pair):
 
     t = threading.Thread(target=a_list)
     t.start()
-    assert_blocked(lock_wait_query(), "overdue_list 的条件 UPDATE")
+    assert_blocked(lock_wait_query(), "overdue_list 的锁定读探针")
     locked.status = BorrowRecord.STATUS_RETURNED  # 还书落库
     locked.returned_at = datetime.now()
     s2.commit()  # 还书提交，释放锁
     t.join(timeout=8)
     assert not t.is_alive(), "逾期名单线程 8s 未结束（疑似死锁）"
+    assert results.get("rows") == 0, (
+        f"刚还的书不得出现在逾期催还名单，实 {results.get('rows')} 行（探针失效=旧快照）"
+    )
 
     with _db() as db:
         row = db.query(BorrowRecord).filter(BorrowRecord.id == rid).first()

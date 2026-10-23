@@ -4,11 +4,13 @@
 - R0 通知按场景过滤（scene=circle.liked）——阅读圈「谁赞了你」通知条的数据源
 - R5 里程碑卡「全馆第 N 位达成」：名次按达成时刻排序、含本人、冻结进 card_data
 - R6 名片页 is_birthday：只回布尔，**不泄露生日日期**
-- R2 海报改 JPEG：content-type / 体积 ≤250KB / 旧 .png 被清掉
+- R2 海报改 JPEG：content-type / 体积 ≤250KB / 旧 .png 被清掉（第九轮 P3：文件名带内容指纹，
+  同内容再取不重绘不写盘——见 `test_audit9_c_batch_20261023.py`）
 """
 
 from __future__ import annotations
 
+import glob
 import os
 from datetime import datetime, timedelta
 
@@ -286,7 +288,9 @@ def test_poster_jpeg_and_under_250kb(client: TestClient):
     assert r.content[:2] == b"\xff\xd8"  # JPEG magic
 
     root = os.path.abspath(get_settings().UPLOADS_DIR)
-    assert os.path.isfile(os.path.join(root, "posters", f"poster_{c1}.jpg"))
+    # 第九轮 P3：文件名改「poster_{id}_{内容指纹}.jpg」（命中指纹即复用，不再每次 GET 重绘）
+    posters = glob.glob(os.path.join(root, "posters", f"poster_{c1}_*.jpg"))
+    assert len(posters) == 1, f"该孩子应恰好 1 张海报（旧版自动清理），实 {posters}"
     assert not os.path.isfile(os.path.join(root, "posters", f"poster_{c1}.png"))  # 旧 png 已清
 
 

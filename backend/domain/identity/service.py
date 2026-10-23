@@ -158,7 +158,10 @@ class ParentService:
             .all()
         )
 
-    def search(self, keyword: str | None = None, limit: int = 20) -> list[Parent]:
+    #: 建档选择器远程搜索的条数上限（P2-44：上限经响应头如实告知）
+    SEARCH_LIMIT = 20
+
+    def search(self, keyword: str | None = None, limit: int = SEARCH_LIMIT) -> list[Parent]:
         """家长搜索（W1 建档选择器：姓名/手机号模糊匹配）。"""
         q = self.db.query(Parent).filter(Parent.is_deleted == 0)
         if keyword:

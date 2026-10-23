@@ -19,7 +19,10 @@
         <text class="dp-label">标准押金</text>
       </view>
     </view>
-    <view wx:if="{{dep.unpaid_balance !== '0.00'}}" class="dp-balance">未结清赔偿：￥{{dep.unpaid_balance}}</view>
+    <!-- P2-14（第九轮审查）：判零改**数值比较**。原先按字面量 `!== '0.00'` 判，后端 NULL 落成
+         "0" 时会给孩子显示「未结清赔偿：￥0」（后端已统一两位小数，但这里不再把展示正确性
+         绑死在字符串格式上）。 -->
+    <view wx:if="{{dep.unpaid_balance * 1 > 0}}" class="dp-balance">未结清赔偿：￥{{dep.unpaid_balance}}</view>
     <button class="dp-btn {{(supplementDisabled || dep.status === 'unpaid') ? 'disabled' : ''}}"
       disabled="{{supplementDisabled || dep.status === 'unpaid'}}" bindtap="onSupplement">
       {{supplementHint || (dep.status === 'unpaid' ? '未缴纳，请到店办理' : (dep.need_supplement ? '申请补缴' : '已缴足'))}}

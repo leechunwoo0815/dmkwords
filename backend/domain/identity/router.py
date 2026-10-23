@@ -48,12 +48,19 @@ def create_parent(
 
 @router.get("/members/parents", response_model=list[ParentResponse])
 def search_parents(
+    response: Response,
     keyword: str | None = Query(None),
     admin: Any = Depends(require_perm("member.manage")),
     db: Session = Depends(get_db),
 ):
-    """家长搜索（W1：建档家长选择器远程搜索，姓名/手机号模糊匹配）。"""
-    return [ParentResponse.model_validate(p) for p in ParentService(db).search(keyword)]
+    """家长搜索（W1：建档家长选择器远程搜索，姓名/手机号模糊匹配）。
+
+    P2-44（第九轮 P3 补齐）：服务层默认只回 20 条（选择器够用），但原先**静默截断**——
+    同名家长多时运营以为"就这 20 个"。上限经响应头如实告知。
+    """
+    rows = ParentService(db).search(keyword)
+    stamp_list_meta(response, loaded=len(rows), limit=ParentService.SEARCH_LIMIT)
+    return [ParentResponse.model_validate(p) for p in rows]
 
 
 @router.get("/members/parents-page", response_model=PaginatedResponse[ParentWithStatsResponse])
@@ -324,7 +331,10 @@ def order_voucher_image(
     full = os.path.abspath(os.path.join(root, rel))
     # P2-5（第七轮，2026-10-18）：原先**裸前缀** `full.startswith(abspath(root))`——同前缀兄弟目录
     # （`uploads-evil/x.jpg`）能骗过它；改用单一口径 `is_within`（`common/media_paths.py`）。
-    if not is_within(root, full):
+    # P3（第九轮）：补 `isfile` 守卫——库里登记了凭证路径但**磁盘文件已丢**（清理/迁移遗漏）时，
+    # FileResponse 会在发送阶段抛 RuntimeError → 500，而语义应是"文件不存在"的 404。
+    # 与全仓其余取图端点（书目/观察报告/活动配图/圈帖）同款双判。
+    if not is_within(root, full) or not os.path.isfile(full):
         from backend.common.exceptions import NotFoundError
 
         raise NotFoundError("凭证文件不存在")

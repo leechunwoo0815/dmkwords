@@ -49,6 +49,8 @@ export default function GrowthManage() {
   const [reportUrl, setReportUrl] = useState<string>("");
 
   const [highlightId, setHighlightId] = useState<number | null>(null);
+  // P2-11（第九轮审查）：取数失败不许渲染成空表（成长档案空表 = "没有孩子"的语义结论）
+  const [listError, setListError] = useState("");
 
   const load = useCallback(
     (targetPage: number) => {
@@ -56,8 +58,9 @@ export default function GrowthManage() {
         .then((r) => {
           setChildren(r.items ?? []);
           setChildrenTotal(r.total);
+          setListError("");
         })
-        .catch((e: Error) => message.error(e.message));
+        .catch((e: Error) => setListError(e.message || "孩子列表加载失败"));
     },
     [keyword, pageSize, message]
   );
@@ -179,7 +182,13 @@ export default function GrowthManage() {
         </Typography.Text>
       </Space>
 
-      <Table<Child> locale={{ emptyText: <PaintEmpty character="rabbit" /> }}
+      {listError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+          {listError} · 本次刷新失败：列表可能不是最新的（不代表没有孩子档案）——请重试
+          <Typography.Link onClick={() => load(page)} style={{ marginLeft: 8 }}>重试</Typography.Link>
+        </Typography.Text>
+      )}
+      <Table<Child> locale={{ emptyText: listError ? null : <PaintEmpty character="rabbit" /> }}
         rowKey="id" dataSource={children} size="middle"
         pagination={false}
         onRow={(r) => ({ style: r.id === highlightId ? { background: "#fff7e6" } : {} })}

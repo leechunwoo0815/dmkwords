@@ -156,14 +156,65 @@ class CircleProfileService:
 
     # ---------- 名片海报（R5） ----------
 
+    @staticmethod
+    def _poster_fingerprint(data: dict, base_key: str) -> str:
+        """海报**内容指纹**（只取真正画进图里的字段：头像/英文名/等级/三数字/勋章前 6 枚）。
+
+        `is_birthday`、`is_history`、`member_status` 不上海报 → 不进指纹（否则生日当天会
+        白重画一次、第二天又白重画一次）。
+        """
+        import hashlib
+        import json
+
+        payload = {
+            "base": base_key,
+            "avatar": data.get("avatar"),
+            "english_name": data.get("english_name"),
+            "level": data.get("level"),
+            "words_total": data.get("words_total"),
+            "books": data.get("books"),
+            "checkin_days": data.get("checkin_days"),
+            "badges": [b.get("badge_id") for b in (data.get("badges") or [])][:6],
+        }
+        raw = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+
+    @staticmethod
+    def _prune_old_posters(out_dir: str, child_id: int, keep: str) -> None:
+        """删掉该孩子的**历史版本**海报（含旧命名 `poster_{id}.jpg/.png`）——派生文件不留历史。
+
+        清不掉只留一个孤儿文件，不影响正确性（与原先 legacy png 的删法同口径）。
+        """
+        import glob
+
+        for path in glob.glob(os.path.join(out_dir, f"poster_{child_id}[_.]*")):
+            if os.path.basename(path) == keep:
+                continue
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
     def render_poster(self, child: Child) -> str:
-        """生成「阅读名片」海报 → uploads/posters/{child_id}.png（同孩子覆盖，幂等）。
+        """生成「阅读名片」海报 → uploads/posters/poster_{child_id}_{内容指纹}.jpg（幂等）。
 
         消费通道：GET /api/miniapp/circle/children/{child_id}/poster（query token，
         照抄 posts/{id}/image 先例）——小程序没有通用 uploads 取图通道（A3 裁决）。
+
+        P3（第九轮审查）：原先是**就地覆盖** `poster_{id}.jpg`，于是每个 GET 都全量重绘
+        （750×1150 + 纸纹 + 头像/勋章合成）再覆盖写盘——分享预览、每次进页面都白算一遍。
+        现在按本仓生成图的既有惯例改成**内容指纹命名**（同 `cover/{id}/{isbn}_{fp}.jpg`）：
+        指纹相同 ⇒ 内容逐像素同源 ⇒ 直接返回已有文件，既不重绘也不写盘；内容变了才画新指纹，
+        并顺手清掉该孩子上一版（不堆积）。`posters/` 本就是受保护目录（清理不回白名单），
+        文件名变化不影响任何清盘口径。
         """
         data = self.child_profile(child)
         base_key = self._mascot_for(child)
+        out_dir = os.path.join(self._uploads_root(), "posters")
+        filename = f"poster_{child.id}_{self._poster_fingerprint(data, base_key)}.jpg"
+        full = os.path.join(out_dir, filename)
+        if os.path.isfile(full) and os.path.getsize(full) > 0:
+            return f"posters/{filename}"  # 命中缓存：不重绘、不写盘
         base = art.KIND_BASE[base_key]
         pal = {"top": "#FFF6E4", "bot": "#FFE3D2", "accent": "#F2935B", "deep": "#C4693A"}
 
@@ -233,21 +284,15 @@ class CircleProfileService:
         art.sticker_text(cv, (375, 1115), "DmkWords 少儿英语阅读馆", art.font_cn(26), "#FFFFFF")
         art.paper_grain(cv)
 
-        out_dir = os.path.join(self._uploads_root(), "posters")
         os.makedirs(out_dir, exist_ok=True)
 
-        # 按孩子**覆盖**（派生数据无需留历史；避免每次请求堆积 ~700KB 新文件）
         # fix34 R2：PNG → JPEG q85。海报 750×1150 的 723KB 体积主因是**纸纹噪点**
         # （PNG 压不动噪点），JPEG 对噪点友好 → 降到约 1/4，真机加载明显更快。
         # 2026-09-17：改走 `cv.finish(quality=)` 统一出口（卡片/报告同一口径，不再各写一份 save）。
-        filename = f"poster_{child.id}.jpg"
-        cv.finish(os.path.join(out_dir, filename), quality=generated_jpeg_quality(self.db))
-        legacy = os.path.join(out_dir, f"poster_{child.id}.png")
-        if os.path.isfile(legacy):
-            try:
-                os.remove(legacy)
-            except OSError:
-                pass  # 删不掉只留孤儿文件，不影响正确性
+        # 第九轮 P3：文件名带内容指纹（见上），写完清掉同孩子的上一版（含旧 `poster_{id}.jpg/.png`）
+        # ——派生文件无需留历史，也不让换头像/涨词数时堆积旧图。
+        cv.finish(full, quality=generated_jpeg_quality(self.db))
+        self._prune_old_posters(out_dir, child.id, keep=filename)
         return f"posters/{filename}"
 
     @staticmethod

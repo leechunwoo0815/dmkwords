@@ -177,10 +177,19 @@ class TransferService:
         by_id = {c.id: c for c in locked}
         source = by_id.get(source_child_id)
         target = by_id.get(target_child_id)
-        if source is None or target is None or source.is_deleted or target.is_deleted:
+        # P2-7（第九轮审查，铁律 128 同族）：**越权与不存在同回应**——原先"不存在"走 404
+        # 「孩子不存在」、"是别人的孩子"走 422「只能在自己账号的孩子之间转让」，两者**可区分**
+        # ⇒ 遍历 child_id 即能枚举出哪些 id 真实存在。同族已修点位：`_pending_of`（本文件
+        # 2026-10-16）、`transfer_conditions`（miniapp_router）、`_owned_order`（payment_service）。
+        if (
+            source is None
+            or target is None
+            or source.is_deleted
+            or target.is_deleted
+            or source.parent_id != parent.id
+            or target.parent_id != parent.id
+        ):
             raise NotFoundError("孩子不存在")
-        if source.parent_id != parent.id or target.parent_id != parent.id:
-            raise ValidationError("只能在自己账号的孩子之间转让")
         checks = self.check_conditions(parent, source, target)
         failed = [c["name"] for c in checks if not c["ok"]]
         if failed:

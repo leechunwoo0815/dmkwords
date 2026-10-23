@@ -387,6 +387,16 @@ class DepositService:
 
         from backend.common.config_service import ConfigService
 
+        def _money(v: object) -> str:
+            """金额统一两位小数字符串（P2-14，第九轮审查）。
+
+            原先直接 `str(Decimal)`：`unpaid_balance` 为 NULL 时落成 `"0"`，而"无押金档"分支
+            硬编码 `"0.00"` → 同一个"零"两种写法，小程序按 `!== '0.00'` 判零 → 已结清的孩子
+            看到「未结清赔偿 ￥0」。金额输出**单一口径**：一律 quantize 到分。
+            """
+            d = v if isinstance(v, Decimal) else Decimal(str(v or "0"))
+            return str(d.quantize(Decimal("0.01")))
+
         standard = Decimal(ConfigService(self.db).get_value("deposit_amount"))
         dep, ledgers = self.get_by_child(child_id)
         if not dep:
@@ -403,18 +413,20 @@ class DepositService:
         return {
             "child_id": child_id,
             "status": dep.status,
-            "standard_amount": str(standard),
-            "available_amount": str(dep.available_amount),
-            "deducted_amount": str(dep.deducted_amount),
-            "unpaid_balance": str(dep.unpaid_balance or Decimal("0")),
+            "standard_amount": _money(standard),
+            "available_amount": _money(dep.available_amount),
+            "deducted_amount": _money(dep.deducted_amount),
+            "unpaid_balance": _money(dep.unpaid_balance),
+            # P2-14：差额也按分算（同一函数里 `available_amount < standard` 的 Decimal 比较
+            # 本就正确，这里只是把输出统一到两位小数）
             "need_supplement": dep.status
             in (Deposit.STATUS_PARTIALLY_DEDUCTED, Deposit.STATUS_FULLY_DEDUCTED)
             and dep.available_amount < standard,
             "ledger": [
                 {
                     "entry_type": r.entry_type,
-                    "amount": str(r.amount),
-                    "balance_after": str(r.balance_after),
+                    "amount": _money(r.amount),
+                    "balance_after": _money(r.balance_after),
                     "reason": r.reason,
                     "created_at": str(r.create_time),
                 }

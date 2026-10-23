@@ -58,7 +58,9 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
 @router.get("/books")
 def list_books(
     keyword: str | None = None,
-    page: int = 1,
+    # P2-10（第九轮审查）：`page` 原先无下界——`page=-1` 时 `offset=-20` 直落 MySQL 报错
+    # （实测 500）。与同文件 `vocabulary` 列表、`identity/miniapp_router` 订单列表同口径钉 `ge=1`。
+    page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     grade: str | None = None,
     topic: str | None = None,
@@ -397,10 +399,14 @@ class FavoriteAddRequest(BaseSchema):
 
 
 @router.get("/favorites")
-def favorites_list(child_id: int, auth: Any = Depends(get_current_parent)):
+def favorites_list(response: Response, child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child = child_of_parent(db, parent.id, child_id)
-    return FavoriteService(db).list_mine(child)
+    rows = FavoriteService(db).list_mine(child)
+    # P2-44（第九轮 P3 补齐）：原先无上限（收藏不限量 → 一次全量回传）；现按最近收藏取前 200 条，
+    # 上限经响应头如实告知。
+    stamp_list_meta(response, loaded=len(rows), limit=FavoriteService.LIST_LIMIT)
+    return rows
 
 
 @router.post("/favorites")

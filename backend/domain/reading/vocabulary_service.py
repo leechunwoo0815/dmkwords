@@ -230,6 +230,10 @@ class VocabularyService:
 class FavoriteService:
     """收藏夹（FEAT-056：想读清单；不限量不占额度；下架书可见标注）。"""
 
+    #: 列表硬上限（P2-44：经响应头如实告知）。收藏本身不限量，但一次取全量没有意义——
+    #: 按收藏 id 倒序（最近收藏在前）取前 200 条，更早的本次不展示。
+    LIST_LIMIT = 200
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -246,6 +250,7 @@ class FavoriteService:
                 Book.is_deleted == 0,
             )
             .order_by(Favorite.id.desc())
+            .limit(self.LIST_LIMIT)
             .all()
         )
         return [

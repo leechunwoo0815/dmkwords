@@ -42,6 +42,10 @@ Page({
     paymentEnabled: true,
     plans: [],
     loading: true,
+    // P2-15（第九轮审查）：取数失败必须自成一态——原先 catch 只关 loading，页面于是只剩
+    // 首屏默认文案 `HINT_STORE`（"iOS 端不提供在线开通"）+ 空方案列表：**把网络故障讲成了
+    // 平台政策**（家长以为线上开通被下掉了），且没有重试入口。
+    loadError: '',
   },
 
   onLoad(options) {
@@ -85,10 +89,20 @@ Page({
         headHint: enabled && canPay && !this.data.isIOS ? HINT_ONLINE
           : (!enabled || !canPay ? HINT_LOGIN : HINT_STORE),
         loading: false,
+        loadError: '',
       })
-    } catch (e) { this.setData({ loading: false }) /* toast 已弹 */ }
+    } catch (e) {
+      // P2-15：失败自成一态（error-view + 重试），**不准**把失败渲染成"iOS 不提供"这类语义结论
+      this.setData({
+        loading: false,
+        loadError: (e && e.message) || '会员方案加载失败',
+        plans: [],
+      })
+    }
     finally { wx.hideLoading() }
   },
+
+  onRetryLoad() { this.loadPlans() },
 
   // 下单 → 拉起支付（两步：先建单让服务端算价，再发起支付拿 pay_params）
   async onBuy(e) {

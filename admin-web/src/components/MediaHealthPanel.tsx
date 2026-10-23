@@ -59,13 +59,17 @@ export default function MediaHealthPanel() {
   const [trashReason, setTrashReason] = useState("");
   const [emptyOpen, setEmptyOpen] = useState(false);
   const [emptyReason, setEmptyReason] = useState("");
+  // P2-12（第九轮审查）：取数失败与"从未盘点"原先同渲染——面板会说"还没有盘点记录，点重新点数"，
+  // 而真相是接口挂了（专员还会因为那个按钮只对超管渲染而点不到）。失败必须自成一态。
+  const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       setHealth(await apiMediaHealth());
+      setLoadError("");
     } catch (e) {
-      message.error((e as Error).message);
+      setLoadError((e as Error).message || "媒体体检接口失败");
     } finally {
       setLoading(false);
     }
@@ -188,8 +192,27 @@ export default function MediaHealthPanel() {
       }
     >
       {/* 摘要在首屏——明细收进折叠区（用户 2026-09-23：卡片太长把定时任务挤下去了） */}
+      {loadError && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={`媒体体检数据未加载：${loadError}`}
+          description="这不等于「没有孤儿图」——下面的数字（若有）可能是上一次的旧值，请点「刷新」重试。"
+          action={<Button size="small" onClick={() => void load()}>刷新</Button>}
+        />
+      )}
       {!census ? (
-        <PaintEmpty message="还没有盘点记录——点「重新点数」立即生成一份（每天 08:00 也会自动跑一次）" />
+        loadError ? null : (
+          <PaintEmpty
+            message={
+              // P2-58/P2-12：按钮只对超管渲染，文案就不能让专员去点一个看不见的按钮
+              isSuper
+                ? "还没有盘点记录——点「重新点数」立即生成一份（每天 08:00 也会自动跑一次）"
+                : "还没有盘点记录——每天 08:00 自动盘点一次；如需立即盘点，请联系超级管理员"
+            }
+          />
+        )
       ) : (
         <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
           <span style={{ ...MUTED, fontSize: 12 }}>孤儿图片（可清理）</span>

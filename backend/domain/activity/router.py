@@ -216,7 +216,9 @@ def activity_cover_media(
     # 第六十九批在 growth/miniapp_router 的修法同源）。
     # 连带修：`NotFoundError` 原先是**函数内局部 import**（只在 rel 为空分支执行）→ 本分支一旦命中
     # 就是 `UnboundLocalError`（500 而非 404）——裸前缀放行时它从未暴露。已提为模块级 import。
-    if not is_within(root, full):
+    # P3（第九轮）：再补 `isfile`——库里登记了封面路径但**磁盘文件已丢**（清理/迁移遗漏）时，
+    # FileResponse 发送阶段抛 RuntimeError → 500；应为 404（与小程序端 cover 端点同款双判）。
+    if not is_within(root, full) or not os.path.isfile(full):
         raise NotFoundError("封面文件不存在")
     return FileResponse(full, media_type="image/jpeg")
 

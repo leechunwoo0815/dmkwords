@@ -68,6 +68,8 @@ export default function BookManage() {
   const [batchErrors, setBatchErrors] = useState<string[] | null>(null);
   // C3：Tab 计数（与列表筛选同口径，后端 counts 返回）
   const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
+  // P2-11（第九轮）：列表取数失败原因（空串=正常）。表格区如实提示 + 重试，不把失败画成空态
+  const [listError, setListError] = useState("");
   const tableWrapRef = useRef<HTMLDivElement>(null);
   const [tableContent, setTableContent] = useState<HTMLElement | null>(null);
 
@@ -108,8 +110,11 @@ export default function BookManage() {
           setBooks(result.items ?? []);
           setTotal(result.total);
           setTabCounts(result.counts ?? {});
+          setListError("");
         })
-        .catch((e: Error) => message.error(e.message))
+        // P2-11（第九轮审查）：**取数失败不许渲染成空表**——原先只弹一次 toast，表格区随即显示
+        // "书架还空着呢"，运营会当成"库里真没这些书"（与 RefundCenter 的 listError 同范式）。
+        .catch((e: Error) => setListError(e.message || "列表加载失败"))
         .finally(() => setLoading(false));
     },
     [keyword, tab, pageSize, sortField, sortOrder, message]
@@ -261,7 +266,13 @@ export default function BookManage() {
         ]}
       />
       <div ref={tableWrapRef} style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <Table<Book> locale={{ emptyText: <PaintEmpty character="bookworm" /> }}
+        {listError && (
+          <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+            {listError} · 本次刷新失败：列表可能不是最新的（不代表馆藏为空）——请重试
+            <Typography.Link onClick={() => load(page)} style={{ marginLeft: 8 }}>重试</Typography.Link>
+          </Typography.Text>
+        )}
+        <Table<Book> locale={{ emptyText: listError ? null : <PaintEmpty character="bookworm" /> }}
           rowKey="id"
           loading={loading}
           dataSource={books}

@@ -12,6 +12,7 @@ Page({
     targetId: null,
     conditions: null,
     allOk: false,
+    condError: '',   // P2-16（第九轮审查）：条件查询失败原因（原先失败与"条件不全"同渲染）
     records: [],
     loading: true,
   },
@@ -53,7 +54,7 @@ Page({
   async check() {
     const { sourceId, targetId } = this.data
     if (!sourceId || !targetId || sourceId === targetId) {
-      this.setData({ conditions: null, allOk: false })
+      this.setData({ conditions: null, allOk: false, condError: '' })
       return
     }
     try {
@@ -62,11 +63,21 @@ Page({
       this.setData({
         conditions,
         allOk: conditions.length > 0 && conditions.every((c) => c.ok),
+        condError: '',
       })
     } catch (e) {
-      this.setData({ conditions: null, allOk: false })
+      // P2-16（第九轮审查）：**接口失败 ≠ 条件不满足**。原先这里把 conditions 置空 + allOk=false，
+      // 页面于是只显示"条件不全，暂不能提交"——把网络故障读成了"你自己的条件有问题"。
+      // 现在单独记失败原因，面板区改为如实提示 + 重试，提交按钮的文案也不再冒充条件结论。
+      this.setData({
+        conditions: null,
+        allOk: false,
+        condError: (e && e.message) || '条件查询失败',
+      })
     }
   },
+
+  onRetryCheck() { this.check() },
 
   async onSubmit() {
     const { sourceId, targetId, allOk } = this.data

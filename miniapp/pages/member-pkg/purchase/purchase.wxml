@@ -1,5 +1,9 @@
 <view class="page-bg">
-  <view class="head-hint">{{headHint}}</view>
+  <!-- P2-15（第九轮审查）：失败态显式呈现——原先失败时这行会留首屏默认文案
+       （"iOS 端不提供在线开通"），把网络故障讲成平台政策 -->
+  <error-view wx:if="{{loadError}}" type="network" title="会员方案加载失败"
+    desc="{{loadError}}（方案未加载，不代表线上开通已关闭）" bind:onRetry="onRetryLoad" />
+  <view class="head-hint" wx:else>{{headHint}}</view>
 
   <view class="plan-card" wx:for="{{plans}}" wx:key="order_type">
     <view class="plan-badge {{item.badgeCls}}">{{item.label}}</view>

@@ -23,7 +23,7 @@ class BorrowRecord(BaseModel):
     )
 
     STATUS_ACTIVE = "active"  # 借出中
-    STATUS_OVERDUE = "overdue"  # 逾期（由任务/查询时判定）
+    STATUS_OVERDUE = "overdue"  # 逾期（**只由 `overdue_mark` 任务推进**；展示态按 due_at 实时判定）
     STATUS_RETURNED = "returned"  # 已还
     STATUS_LOST = "lost"  # 遗失
 

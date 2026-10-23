@@ -2,13 +2,14 @@
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from fastapi.responses import StreamingResponse
 from pydantic import Field
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema, PaginatedResponse
 from backend.common.exceptions import ValidationError
+from backend.common.list_meta import stamp_list_meta
 from backend.database import get_db
 from backend.domain.circulation.records_service import BorrowRecordsService
 from backend.domain.circulation.scan_service import ScanService
@@ -298,8 +299,15 @@ def renew_book(
 
 @router.get("/circulation/overdue", response_model=list[OverdueItemResponse])
 def overdue_list(
-    admin: Any = Depends(require_perm("borrow.operate")), db: Session = Depends(get_db)
+    response: Response,
+    admin: Any = Depends(require_perm("borrow.operate")),
+    db: Session = Depends(get_db),
 ):
+    """逾期催还名单（**只读**：状态推进由 `overdue_mark` 任务负责）。
+
+    P2-44（第九轮 P3 补齐）：原先无上限，逾期积压时整表回传；现按最早到期取前 200 条，
+    上限经响应头如实告知（`X-List-Limit` / `X-List-Truncated`）。
+    """
     rows = CirculationService(db).overdue_list()
     now = datetime.now()
     out = []
@@ -315,4 +323,5 @@ def overdue_list(
                 days_overdue=max(0, (now - record.due_at).days),
             )
         )
+    stamp_list_meta(response, loaded=len(out), limit=CirculationService.OVERDUE_LIST_LIMIT)
     return out

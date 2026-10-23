@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, Response
+from fastapi import APIRouter, Depends, Header, Query, Response
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
@@ -31,8 +31,12 @@ def list_activities(response: Response, child_id: int, auth: Any = Depends(get_c
 
 @router.get("/activities/past")
 def activities_past(
-    limit: int = 30,
-    offset: int = 0,
+    response: Response,
+    # P2-8（第九轮审查）：原先无上下界——`limit=-1` 直落 MySQL `.limit(-1)` 报错（实测 500）；
+    # `limit=10**9` 一次拉全量、`offset=-1` 翻出负数偏移。钉在 1..100（与 `UPCOMING_LIMIT=50`
+    # 同量级），偏移上限 10000（往期总量远小于此）。照 `checkins` 的 `days` 先例。
+    limit: int = Query(30, ge=1, le=100),
+    offset: int = Query(0, ge=0, le=10000),
     auth: Any = Depends(get_current_parent),
 ):
     """往期活动回顾（2026-09-20 C 批）——**按时间已过取数**（见 service.list_past 的口径说明）。
@@ -42,7 +46,10 @@ def activities_past(
     只有活动本身的标题/封面/时间与参与人数聚合。
     """
     parent, db = auth
-    return {"items": PastActivityService(db).list_past(limit=limit, offset=offset)}
+    rows = PastActivityService(db).list_past(limit=limit, offset=offset)
+    # P2-44：本页上限经响应头如实告知（与 `/activities` 同口径；无 total，语义是"可能还有更多"）
+    stamp_list_meta(response, loaded=len(rows), limit=limit)
+    return {"items": rows}
 
 
 @router.get("/activities/{activity_id}/detail-image")

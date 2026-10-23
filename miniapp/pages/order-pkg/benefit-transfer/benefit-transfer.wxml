@@ -30,7 +30,22 @@
     </view>
   </view>
 
-  <view class="check-list" wx:if="{{conditions}}">
+  <!-- P2-16（第九轮审查）：条件查询失败与"条件不全"必须分开——失败时原先只剩一句
+       "条件不全，暂不能提交"，等于把网络故障读成家长自己的条件问题 -->
+  <view class="check-list" wx:if="{{condError}}">
+    <view class="check-heading">转让条件核对</view>
+    <view class="check-item">
+      <text class="check-text">条件查询失败：{{condError}}</text>
+    </view>
+    <view class="check-item">
+      <text class="check-text">这不代表条件不满足——请重试；若一直失败可联系馆员。</text>
+    </view>
+    <view class="submit-wrap">
+      <button class="btn-primary" bindtap="onRetryCheck">重试查询</button>
+    </view>
+  </view>
+
+  <view class="check-list" wx:elif="{{conditions}}">
     <view class="check-heading">转让条件核对</view>
     <view wx:for="{{conditions}}" wx:key="name" class="check-item">
       <view class="check-icon-wrap {{item.ok ? 'pass' : 'fail'}}">

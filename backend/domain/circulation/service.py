@@ -30,6 +30,9 @@ from backend.domain.reading.reservation_ops import settle_orphans_after_copy_gon
 
 
 class CirculationService:
+    #: 逾期催还名单硬上限（P2-44：上限经响应头如实告知；超限时按最早到期优先）
+    OVERDUE_LIST_LIMIT = 200
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -709,16 +712,20 @@ class CirculationService:
         return book_due_remind(self.db)
 
     def overdue_mark(self) -> int:
-        """逾期标记落库（接管原"访问列表时惰性标记"）+ 通知家长。幂等。
+        """逾期标记落库（**状态推进的唯一入口**）+ 通知家长。幂等。
 
         执行体在 `circulation/overdue_notify.py`（W6 压测整改 2026-10-18：`service.py` 已到
         god-file 上限，整改要加批量取数；6000 条逾期实测 104.39s → 见该模块 docstring）。
 
         **第八轮审查 P1-1（2026-10-19）**：扫描面从 `== ACTIVE` 放宽为 `IN (ACTIVE, OVERDUE)`
-        ——借阅台 `GET /api/admin/circulation/overdue` 会**惰性**把 ACTIVE 改成 OVERDUE
-        （E-11/T20 的展示守卫），而任务原先只扫 ACTIVE，于是"馆员先看到的那批"永远漏发
-        `borrow.overdue` 通知（实测：先调列表 → `processed=0` 且零通知）。已 OVERDUE 的行
-        不再重复 CAS，但补发通知；去重键带到期日，幂等由唯一索引兜底。
+        ——任务原先只扫 ACTIVE，已在历轮被标记为 OVERDUE 的**存量行**永远漏发
+        `borrow.overdue` 通知（当时的触发源是借阅台 GET 的惰性标记，实测：先调列表 →
+        `processed=0` 且零通知）。已 OVERDUE 的行不再重复 CAS，但补发通知；去重键带到期日，
+        幂等由唯一索引兜底。
+
+        **第九轮审查（P3）后口径**：借阅台 GET 已不再写库（`overdue_list` 改只读），
+        本任务成为状态推进的**唯一**入口——上面这条放宽因此仍是必需的（存量/历史 OVERDUE
+        行照样要靠它补发通知），不是历史遗留。
         """
         now = datetime.now()
         overdue = (
@@ -739,6 +746,16 @@ class CirculationService:
 
     # ---------- 逾期列表 ----------
     def overdue_list(self) -> list[tuple[BorrowRecord, Child, Parent, Book]]:
+        """逾期催还名单（**只读**；状态推进只由任务 `overdue_mark` 负责）。
+
+        P3（第九轮审查，GET 不得写库）：原先本方法在列表里逐行条件 UPDATE 把 ACTIVE 改成
+        OVERDUE 并 `commit()` —— 一个 GET 触发写库，且 session 里带着整份名单的持久化改动。
+        改为**锁定读探针**（`SELECT ... FOR UPDATE`）：只取当前行版本、不落任何写入。
+
+        探针为什么不能省（E-11/T20 P0 竞态，勿回退）：上方 join 是**普通快照读**，并发还书
+        （RETURNED）在快照里仍是 ACTIVE 超期 → 孩子被误催还。锁定读拿到的是**当前已提交版本**，
+        还了的行在此处被剔除——与原先"条件 UPDATE rowcount=0 即剔除"同一判据，只是不再写库。
+        """
         now = datetime.now()
         rows = (
             self.db.query(BorrowRecord, Child, Parent, Book)
@@ -751,33 +768,22 @@ class CirculationService:
                 BorrowRecord.is_deleted == 0,
             )
             .order_by(BorrowRecord.due_at)
+            # P3（第九轮审查）：原先无上限——逾期积压时整表回传（6000 条 ≈ 每次 GET 全量 + 逐行
+            # 锁定读探针）。按"最早到期"截前 200 条（催还优先级最高的一批），超限经响应头告知。
+            .limit(self.OVERDUE_LIST_LIMIT)
             .all()
         )
-        # E-11/T20：逐行条件 UPDATE 守卫（join 查询不宜整查询加锁，对齐 overdue_mark
-        # 先例）——并发还书（RETURNED）不被旧快照复活为逾期；rowcount=0 的行
-        # 从展示列表剔除（还了的书不应再出现在逾期催还名单）
-        from sqlalchemy import update as sa_update
-
         kept: list[tuple[BorrowRecord, Child, Parent, Book]] = []
         for row in rows:
             record = row[0]
-            result = self.db.execute(
-                sa_update(BorrowRecord)
-                .where(
-                    BorrowRecord.id == record.id,
-                    BorrowRecord.status.in_(
-                        [BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]
-                    ),
-                )
-                .values(status=BorrowRecord.STATUS_OVERDUE)
-                # W6 压测（2026-10-18）：`synchronize_session=False`——ORM 版 UPDATE 默认在
-                # session 身份映射里逐对象求值 WHERE，本循环的 session 装着整份逾期名单 → O(N²)；
-                # 下一行手工同步 `record.status`，语义等价（同族分析见 overdue_notify.py）。
-                .execution_options(synchronize_session=False)
+            # 锁定读（当前读）：只读列，不入 identity map；主键等值 → 只锁该行，无间隙锁面。
+            current = (
+                self.db.query(BorrowRecord.status)
+                .filter(BorrowRecord.id == record.id)
+                .with_for_update()
+                .scalar()
             )
-            if result.rowcount == 0:
+            if current not in (BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE):
                 continue  # 已被并发还书/推进，跳过且不在名单展示
-            record.status = BorrowRecord.STATUS_OVERDUE
             kept.append(row)
-        self.db.commit()
         return kept

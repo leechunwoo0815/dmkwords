@@ -104,6 +104,10 @@ def list_audit_logs(
 
 @router.get("/dashboard/charts", response_model=DashboardChartsResponse)
 def dashboard_charts(
+    # 第九轮 C 批 sweep 复核（2026-10-23）：本端点**不属"无界参数"族**，已**撤销**加边界的改法——
+    # 服务层 `DashboardChartsService.charts` 首行就 clamp（days 3..60 / top 1..10），并有守护用例
+    # `test_dashboard_charts_days_clamped`（判据是"越界自动收敛、不因传怪值报错"）。
+    # 加 `Query(ge/le)` 会把越界值变成 422，与既有设计（且上限值不同）冲突——门禁实证后回退。
     days: int = 14,
     top: int = 5,
     admin: AdminUser = Depends(require_perm("dashboard.view")),

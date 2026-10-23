@@ -173,13 +173,50 @@ Page({
       signType: p.signType,
       paySign: p.paySign,
       success: () => {
-        wx.showToast({ title: '支付成功', icon: 'success' })
-        this.load()
+        // P2-13（第九轮审查）：与购买页 P2-46 **同口径**——`wx.requestPayment` 的 success 只代表
+        // "支付动作完成"，后端入账走异步通知（可能晚几秒）。原先直接 toast「支付成功」+ 刷新列表，
+        // 家长看到订单仍是「待支付」会以为没付上再点一次（服务端幂等键兜得住重复扣款，但
+        // "说成功却还是待支付"本身就是在骗人）。
+        this._confirmPaid(orderId)
       },
       fail: (err) => {
         if (err && err.errMsg && err.errMsg.indexOf('cancel') >= 0) return
         wx.showToast({ title: '支付未完成，可再次点按重试', icon: 'none' })
       },
+    })
+  },
+
+  /** P2-13：支付后**查单确认**（轮询本页订单列表直到该单 paid）——超时如实说"确认中"。 */
+  async _confirmPaid(orderId) {
+    wx.showLoading({ title: '确认支付结果', mask: true })
+    const deadline = Date.now() + 15000
+    let paid = false
+    while (Date.now() < deadline) {
+      try {
+        const rows = await api.myOrders(this._childId)
+        const mine = (rows || []).filter((o) => o.id === orderId)[0]
+        if (mine && mine.status === 'paid') {
+          paid = true
+          break
+        }
+      } catch (e) {
+        // 单次查询失败不致命：继续轮询到超时
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+    }
+    wx.hideLoading()
+    if (paid) {
+      wx.showToast({ title: '支付成功', icon: 'success' })
+      this.load()
+      return
+    }
+    // 超时：**不许**说"支付成功"（回执可能还在路上），如实告知去哪儿看结果
+    wx.showModal({
+      title: '支付结果确认中',
+      content: '微信回执可能稍有延迟。请稍后回到本页刷新查看；若已扣款但订单仍显示待支付，请联系馆员处理。',
+      showCancel: false,
+      confirmText: '我知道了',
+      success: () => this.load(),
     })
   },
 

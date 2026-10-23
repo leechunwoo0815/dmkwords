@@ -108,6 +108,10 @@ export default function CircleManage() {
   // 删除 Modal（必填原因——审计留痕）
   const [deleteTarget, setDeleteTarget] = useState<CirclePostItem | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
+  // P2-11（第九轮审查）：取数失败不许渲染成空表——帖子空表 = "这段时间没人晒卡"的语义结论。
+  // 概览（P2-12 同族）另有自己的失败态：失败与"从未加载"不能都渲染成"—"。
+  const [listError, setListError] = useState("");
+  const [overviewError, setOverviewError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -123,8 +127,9 @@ export default function CircleManage() {
       const data = await apiListCirclePosts(params);
       setItems(data.items);
       setTotal(data.total);
+      setListError("");
     } catch (e) {
-      message.error((e as Error).message);
+      setListError((e as Error).message || "帖子列表加载失败");
     } finally {
       setLoading(false);
     }
@@ -133,8 +138,9 @@ export default function CircleManage() {
   const loadOverview = useCallback(async () => {
     try {
       setOverview(await apiCircleOverview());
+      setOverviewError("");
     } catch (e) {
-      message.error((e as Error).message);
+      setOverviewError((e as Error).message || "运营概览加载失败");
     }
   }, [message]);
 
@@ -334,12 +340,18 @@ export default function CircleManage() {
           onSearch={() => setPage(1)}
         />
       </div>
+      {listError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+          {listError} · 本次刷新失败：列表可能不是最新的（不代表没有帖子）——请重试
+          <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
+        </Typography.Text>
+      )}
       <Table<CirclePostItem>
         rowKey="id"
         size="small"
         loading={loading}
         dataSource={items}
-        locale={{ emptyText: <PaintEmpty message="还没有帖子——等家长来晒第一个成就" /> }}
+        locale={{ emptyText: listError ? null : <PaintEmpty message="还没有帖子——等家长来晒第一个成就" /> }}
         pagination={false}
         columns={columns}
         scroll={{ x: "max-content" }}
@@ -364,6 +376,12 @@ export default function CircleManage() {
     : 1;
   const overviewPanel = (
     <div>
+      {overviewError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 12 }}>
+          {overviewError} · 概览未加载，"—"不代表本周为 0——请重试
+          <Typography.Link onClick={loadOverview} style={{ marginLeft: 8 }}>重试</Typography.Link>
+        </Typography.Text>
+      )}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
         <Card size="small" style={{ minWidth: 160 }}>
           <Typography.Text type="secondary">本周新帖数</Typography.Text>

@@ -30,9 +30,14 @@ export default function Staff() {
   const [editForm] = Form.useForm<{ display_name: string; role: string }>();
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
   const [newPwd, setNewPwd] = useState("");
+  // P2-11（第九轮审查）：取数失败不许渲染成空表（员工页空表 = "还没建过账号"的语义结论，
+  // 而真相是"可能一个员工都进不去后台"）
+  const [listError, setListError] = useState("");
 
   const load = useCallback(() => {
-    apiListStaff().then(setRows).catch((e: Error) => message.error(e.message));
+    apiListStaff()
+      .then((r) => { setRows(r); setListError(""); })
+      .catch((e: Error) => setListError(e.message || "员工列表加载失败"));
   }, [message]);
 
   useEffect(() => { load(); }, [load]);
@@ -90,7 +95,13 @@ export default function Staff() {
       <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
         员工=运营专员（借还/图书/活动/会员办理）；角色变更与停用仅超管可操作，全部操作留审计。
       </Typography.Paragraph>
-      <Table<AdminUser> locale={{ emptyText: <PaintEmpty character="default" /> }}
+      {listError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+          {listError} · 本次刷新失败：列表可能不是最新的（不代表没有员工账号）——请重试
+          <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
+        </Typography.Text>
+      )}
+      <Table<AdminUser> locale={{ emptyText: listError ? null : <PaintEmpty character="default" /> }}
         rowKey="id" dataSource={rows} size="middle" pagination={false}
         columns={[
           { title: "登录名", dataIndex: "username", width: 160, render: (v) => <Typography.Text code>{v}</Typography.Text> },

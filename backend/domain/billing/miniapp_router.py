@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 
+from backend.common.base_schema import BaseSchema
 from backend.domain.billing.service import DepositService
 from backend.domain.identity import guards
 from backend.domain.identity.auth import child_of_parent, get_current_parent
@@ -22,15 +23,19 @@ def my_deposit(child_id: int, auth: Any = Depends(get_current_parent)):
     return DepositService(db).my_deposit_view(child_id)
 
 
-class SupplementRequest(dict):
-    pass
+# P2-9（第九轮审查）：原先请求体是**裸 `dict`** + `int(body.get("child_id") or 0)`——
+# `{"child_id":"abc"}` 在 `int()` 处抛 ValueError 直落 500（实测复现）；
+# 且 OpenAPI 里 requestBody 无 schema，前端拿不到类型。改类型化模型 → 非法入参 **422**（与
+# 本仓 `BaseSchema` 口径一致：缺失/`null` 原本就是 422，只有"非数字串"漏成 500）。
+class SupplementRequest(BaseSchema):
+    child_id: int
 
 
 @router.post("/deposits/supplement-orders")
-def create_supplement_order(body: dict, auth: Any = Depends(get_current_parent)):
+def create_supplement_order(body: SupplementRequest, auth: Any = Depends(get_current_parent)):
     """家长端押金补缴（R-312：差额 = 标准额 − 可用余额；R-313：退会禁）。"""
     parent, db = auth
-    child = child_of_parent(db, parent.id, int(body.get("child_id") or 0))
+    child = child_of_parent(db, parent.id, body.child_id)
     guards.require_member_action(db, child, guards.DEPOSIT_SUPPLEMENT)
     import types
 

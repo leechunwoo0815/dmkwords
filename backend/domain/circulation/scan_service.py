@@ -179,9 +179,13 @@ class ScanService:
         )
         if holder:
             rec, owner = holder
+            # P3（第九轮审查）：文案判据从 `status == OVERDUE` 改成**按 due_at 实时判定**——
+            # 列表端点已不再惰性改状态（GET 不写库），状态列只在 `overdue_mark` 任务跑过之后
+            # 才推进；若照旧按状态判，任务间隔内会把已逾期的书说成"应还 <过去日期>"（文案与
+            # 事实脱节）。实时判定与"文案必须与判定同源"的老规矩一致。
             when = (
                 f"已逾期（应还 {rec.due_at:%Y-%m-%d}）"
-                if rec.status == BorrowRecord.STATUS_OVERDUE
+                if rec.due_at < datetime.now()
                 else f"应还 {rec.due_at:%Y-%m-%d}"
             )
             raise ConflictError(

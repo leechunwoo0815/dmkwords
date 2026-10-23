@@ -7,9 +7,10 @@
 口径（上线前审查 P2-7）：
   名字末段是**机器生成的令牌**（`{stem}_{内容指纹/随机 token}`）→ 文件写完就不再变
   （重传会生成新名字）→ `max-age=31536000, immutable`，CDN/端上长缓存安全；
-  其余媒体 → `no-cache`，必须回源复验（ETag 协商）。后者含两类：**就地覆盖**的
-  （如 `posters/poster_<child_id>.jpg`）与**无可判令牌**的（如评估报告图 `observation/child_N/<hex>.jpg`
-  ——它是 `<16位hex>.jpg`、不带下划线，判不出就保守走协商缓存，别为它放宽规则误伤 posters）。
+  其余媒体 → `no-cache`，必须回源复验（ETag 协商）。后者含两类：**URL 里没有令牌**的
+  （海报 `/circle/children/{id}/poster`——它的内容指纹只在**落盘文件名**上，不进 URL；
+  报告图 `reports/weekly_1.jpg`）与**判不出令牌**的（评估报告图 `observation/child_N/<hex>.jpg`
+  ——它是 `<16位hex>.jpg`、不带下划线，判不出就保守走协商缓存，别为它放宽规则误伤别的）。
 
 **带凭证的请求一律 `private`**（第八轮审查 P2-24）：
   `public` 的语义是"任何共享缓存都可以存下来给**别人**用"。而家长周报图

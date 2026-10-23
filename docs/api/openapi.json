@@ -4674,6 +4674,20 @@
         "title": "StaffUpdateRequest",
         "type": "object"
       },
+      "SupplementRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "child_id": {
+            "title": "Child Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "child_id"
+        ],
+        "title": "SupplementRequest",
+        "type": "object"
+      },
       "SystemConfigResponse": {
         "additionalProperties": false,
         "properties": {
@@ -7894,6 +7908,7 @@
     },
     "/api/admin/circulation/overdue": {
       "get": {
+        "description": "逾期催还名单（**只读**：状态推进由 `overdue_mark` 任务负责）。\n\nP2-44（第九轮 P3 补齐）：原先无上限，逾期积压时整表回传；现按最早到期取前 200 条，\n上限经响应头如实告知（`X-List-Limit` / `X-List-Truncated`）。",
         "operationId": "overdue_list_api_admin_circulation_overdue_get",
         "responses": {
           "200": {
@@ -9715,7 +9730,7 @@
     },
     "/api/admin/members/parents": {
       "get": {
-        "description": "家长搜索（W1：建档家长选择器远程搜索，姓名/手机号模糊匹配）。",
+        "description": "家长搜索（W1：建档家长选择器远程搜索，姓名/手机号模糊匹配）。\n\nP2-44（第九轮 P3 补齐）：服务层默认只回 20 条（选择器够用），但原先**静默截断**——\n同名家长多时运营以为\"就这 20 个\"。上限经响应头如实告知。",
         "operationId": "search_parents_api_admin_members_parents_get",
         "parameters": [
           {
@@ -12364,6 +12379,8 @@
             "required": false,
             "schema": {
               "default": 30,
+              "maximum": 100,
+              "minimum": 1,
               "title": "Limit",
               "type": "integer"
             }
@@ -12374,6 +12391,8 @@
             "required": false,
             "schema": {
               "default": 0,
+              "maximum": 10000,
+              "minimum": 0,
               "title": "Offset",
               "type": "integer"
             }
@@ -12705,6 +12724,7 @@
             "required": false,
             "schema": {
               "default": 1,
+              "minimum": 1,
               "title": "Page",
               "type": "integer"
             }
@@ -14175,9 +14195,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "title": "Body",
-                "type": "object"
+                "$ref": "#/components/schemas/SupplementRequest"
               }
             }
           },

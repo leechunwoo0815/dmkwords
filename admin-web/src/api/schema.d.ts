@@ -916,7 +916,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Overdue List */
+        /**
+         * Overdue List
+         * @description 逾期催还名单（**只读**：状态推进由 `overdue_mark` 任务负责）。
+         *
+         *     P2-44（第九轮 P3 补齐）：原先无上限，逾期积压时整表回传；现按最早到期取前 200 条，
+         *     上限经响应头如实告知（`X-List-Limit` / `X-List-Truncated`）。
+         */
         get: operations["overdue_list_api_admin_circulation_overdue_get"];
         put?: never;
         post?: never;
@@ -1546,6 +1552,9 @@ export interface paths {
         /**
          * Search Parents
          * @description 家长搜索（W1：建档家长选择器远程搜索，姓名/手机号模糊匹配）。
+         *
+         *     P2-44（第九轮 P3 补齐）：服务层默认只回 20 条（选择器够用），但原先**静默截断**——
+         *     同名家长多时运营以为"就这 20 个"。上限经响应头如实告知。
          */
         get: operations["search_parents_api_admin_members_parents_get"];
         put?: never;
@@ -6037,6 +6046,11 @@ export interface components {
             display_name?: string | null;
             /** Role */
             role?: string | null;
+        };
+        /** SupplementRequest */
+        SupplementRequest: {
+            /** Child Id */
+            child_id: number;
         };
         /** SystemConfigResponse */
         SystemConfigResponse: {
@@ -11521,9 +11535,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["SupplementRequest"];
             };
         };
         responses: {

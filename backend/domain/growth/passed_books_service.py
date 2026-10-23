@@ -17,6 +17,10 @@ from backend.domain.growth.models import QuizAttempt, WordsLedger
 class PassedBooksService:
     """已通过清单：词账枚举 + 每本取最高分 attempt。"""
 
+    #: 列表硬上限（P2-44：经响应头如实告知"可能还有更多"）。长期读者可能超过 200 本，
+    #: 但页签只做"最近通过"的浏览面——按 created_at 倒序，早的条目本就不会被翻到。
+    LIST_LIMIT = 200
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -32,6 +36,7 @@ class PassedBooksService:
                 Book.is_deleted == 0,
             )
             .order_by(WordsLedger.created_at.desc(), WordsLedger.id.desc())
+            .limit(self.LIST_LIMIT)
             .all()
         )
         book_ids = [b.id for _w, b in rows]

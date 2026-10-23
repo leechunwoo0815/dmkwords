@@ -38,12 +38,14 @@ export default function Reservations() {
   const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination();
   // P2-44：后端硬上限（200）——已达上限时提示"可能还有更多未显示"
   const [listLimit, setListLimit] = useState<number | null>(null);
+  // P2-11（第九轮审查）：取数失败不许渲染成空表（预约页空表 = "没人预约"的语义结论）
+  const [listError, setListError] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
     apiListReservations(status || undefined, keyword || undefined)
-      .then((r) => { setItems(r.items ?? []); setListLimit(r.limit); })
-      .catch((e: Error) => message.error(e.message))
+      .then((r) => { setItems(r.items ?? []); setListLimit(r.limit); setListError(""); })
+      .catch((e: Error) => setListError(e.message || "预约列表加载失败"))
       .finally(() => setLoading(false));
   }, [status, keyword, message]);
 
@@ -87,7 +89,13 @@ export default function Reservations() {
           家长在小程序发起预约后，副本锁定 {cfgNum(configs, "reservation_hours", 72)} 小时；到店取书时在此核销转借阅。
         </Typography.Text>
       </Space>
-      <Table<ReservationItem> locale={{ emptyText: <PaintEmpty character="bear" /> }}
+      {listError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+          {listError} · 本次刷新失败：列表可能不是最新的（不代表没有预约单）——请重试
+          <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
+        </Typography.Text>
+      )}
+      <Table<ReservationItem> locale={{ emptyText: listError ? null : <PaintEmpty character="bear" /> }}
         rowKey="id" loading={loading} dataSource={items.slice((page - 1) * pageSize, page * pageSize)} size="middle"
         pagination={false}
         columns={[

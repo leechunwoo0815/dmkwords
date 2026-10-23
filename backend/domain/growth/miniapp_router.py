@@ -3,13 +3,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from pydantic import Field
 from sqlalchemy.orm import Session
 
 from backend.common.base_schema import BaseSchema
 from backend.common.exceptions import ValidationError
 from backend.common.file_utils import image_media_type
+from backend.common.list_meta import stamp_list_meta
 from backend.database import get_db
 from backend.domain.growth.board_service import LeaderboardService, PassportService
 from backend.domain.growth.passed_books_service import PassedBooksService
@@ -66,20 +67,27 @@ def growth_summary(child_id: int, auth: Any = Depends(get_current_parent)):
 
 
 @router.get("/points")
-def points_ledger(child_id: int, auth: Any = Depends(get_current_parent)):
+def points_ledger(response: Response, child_id: int, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child = child_of_parent(db, parent.id, child_id)
     guards.require_member_action(db, child, guards.POINTS_VIEW)
-    return GrowthService(db).points_list(child_id)
+    rows = GrowthService(db).points_list(child_id)
+    # P2-44（第九轮 P3 补齐）：本页硬上限 100 经响应头如实告知——原先静默截断，
+    # 家长看到"就这些了"，实际更早的流水被无声吞掉。
+    stamp_list_meta(response, loaded=len(rows), limit=GrowthService.POINTS_LIST_LIMIT)
+    return rows
 
 
 @router.get("/growth/passed-books")
-def passed_books(child_id: int, auth: Any = Depends(get_current_parent)):
+def passed_books(response: Response, child_id: int, auth: Any = Depends(get_current_parent)):
     """已通过测验的书（书架「已通过」页签：封面 + 词数 + 最佳成绩）。"""
     parent, db = auth
     child = child_of_parent(db, parent.id, child_id)
     guards.require_member_action(db, child, guards.PASSPORT_VIEW)
-    return PassedBooksService(db).list_for(child_id)
+    rows = PassedBooksService(db).list_for(child_id)
+    # P2-44（第九轮 P3 补齐）：原先完全无上限，现已按"最近通过"取前 200 条——上限如实告知。
+    stamp_list_meta(response, loaded=len(rows), limit=PassedBooksService.LIST_LIMIT)
+    return rows
 
 
 @router.get("/leaderboard")
