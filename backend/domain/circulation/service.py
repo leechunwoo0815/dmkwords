@@ -26,7 +26,7 @@ from backend.domain.circulation.borrow_gate import (
 )
 from backend.domain.circulation.models import BorrowRecord
 from backend.domain.identity.models import Child, Parent
-from backend.domain.reading.reservation_ops import settle_orphans_after_copy_gone
+from backend.domain.reading.reservation_ops import settle_orphans_after_copy_gone_safe
 
 
 class CirculationService:
@@ -445,9 +445,15 @@ class CirculationService:
             # 顺带把这条预约锁着的**另一册**放回在馆：预约关了却还锁着书，是"鬼锁"——
             # 那册谁都借不走、预约管理页也不再显示它（同书另一副本被借走的场景）。
             if _r.copy_id and _r.copy_id != copy.id:
+                # B1/P2-3（第九轮审查）：**锁定读**——原先无锁快照读 + 条件外盲写
+                # （读到 RESERVED 后直接置 AVAILABLE）：与并发借出/改锁交错时会覆盖别人刚写下的状态。
+                # 锁序无环风险：本函数此时已持 Child → Reservation → 本册 copy，这里锁的是同一张表的
+                # 另一行（"reserved 副本"不可能同时被别的线程借走——借出侧要求 status=AVAILABLE）。
                 _locked = (
                     self.db.query(BookCopy)
                     .filter(BookCopy.id == _r.copy_id, BookCopy.is_deleted == 0)
+                    .with_for_update()
+                    .populate_existing()
                     .first()
                 )
                 if _locked and _locked.status == BookCopy.STATUS_RESERVED:
@@ -576,7 +582,11 @@ class CirculationService:
         self.db.commit()
         if condition in ("maintenance", "lost"):
             # 提交后行锁已释放 → 按漏斗锁序善后（正常路径零命中；实现归预约域，本文件受 800 行约束）
-            settle_orphans_after_copy_gone(self.db, copy_id=copy_id, admin=admin)
+            # B7/P2-2 残余（第九轮审查）：用**带兜底**的入口——善后自身失败不得把"书已还"报成
+            # 家长端 5xx（捕获/回滚/审计留痕都在 `reservation_ops` 实现，见其 docstring）。
+            settle_orphans_after_copy_gone_safe(
+                self.db, copy_id=copy_id, admin=admin, condition=condition
+            )
         return record
 
     # ---------- 续借 ----------

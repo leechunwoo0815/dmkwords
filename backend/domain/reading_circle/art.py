@@ -17,10 +17,13 @@
 
 from __future__ import annotations
 
+import logging
 import math
 import os
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+_log = logging.getLogger(__name__)
 
 SS = 3  # 超采样倍数
 
@@ -118,6 +121,9 @@ def font_cn(size: int) -> ImageFont.FreeTypeFont:
                 break
             except OSError:
                 continue
+        if f is None:
+            # B8（第九轮审查 P3 族）：候选字体全失败会**静默**降级到 PIL 默认字体（海报字形退化）
+            _log.warning("CN 字体全部加载失败，回退默认字体（海报字形会退化）")
         _font_cache[key] = f or ImageFont.load_default(size)
     return _font_cache[key]
 

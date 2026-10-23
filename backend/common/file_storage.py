@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 import struct
@@ -16,6 +17,8 @@ from io import BytesIO
 
 from backend.common.media_paths import is_within
 from backend.config import get_settings
+
+_log = logging.getLogger(__name__)
 
 ALLOWED_COVER_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
@@ -208,7 +211,9 @@ def remove_book_media(cover_path: str | None, audio_path: str | None) -> None:
             try:
                 os.remove(full)
             except OSError:
-                pass
+                # B8（第九轮审查 P3 族）：清理失败原为静默 pass——孤儿文件由媒体体检任务兜底，
+                # 但至少留一条可查日志（否则"到底清没清掉"永远无从判断）
+                _log.warning("清理文件失败（孤儿文件残留）：%s", full)
 
 
 def _check_ext(ext: str, what: str) -> None:

@@ -16,6 +16,7 @@ import json
 from datetime import datetime, timedelta
 
 from sqlalchemy import func, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.common.config_service import ConfigService
@@ -460,9 +461,16 @@ class CircleService:
         if existing and existing.is_deleted == 0:
             return {"post_id": post_id, "like_count": post.like_count, "liked": True}
         if existing:
-            existing.is_deleted = 0
-            existing.parent_id = parent.id
-            existing.liker_child_id = child.id  # 名义快照列与主体同值（downgrade 可回滚）
+            # B2/P2-4（第九轮审查）：复活走**条件 UPDATE**（`WHERE is_deleted=1`）——原先"读到软删行
+            # 就置 0 再 +1"，两个并发请求都读到软删行时会**各自 +1**（同一行不会撞唯一索引，
+            # 计数双增且不自愈）。现在只有真正把行从软删改成有效的那一个请求拿到 rowcount=1。
+            revived = self.db.execute(
+                update(CircleLike)
+                .where(CircleLike.id == existing.id, CircleLike.is_deleted == 1)
+                .values(is_deleted=0, parent_id=parent.id, liker_child_id=child.id)
+            ).rowcount
+            if not revived:  # 并发对手已复活该行 → 计数由它 +1，这里幂等返回
+                return {"post_id": post_id, "like_count": post.like_count, "liked": True}
         else:
             self.db.add(
                 CircleLike(
@@ -478,7 +486,14 @@ class CircleService:
             .where(CirclePost.id == post_id)
             .values(like_count=CirclePost.like_count + 1)
         )
-        self.db.flush()
+        try:
+            self.db.flush()
+        except IntegrityError:
+            # B2/P2-4：并发双击点赞 → 后到者撞 `uq_circle_like`（唯一索引不含 is_deleted）。
+            # 原先裸 500；现在整笔回滚（计数 +1 也一并回滚）并按"已点赞"幂等返回。
+            self.db.rollback()
+            fresh = self.db.query(CirclePost.like_count).filter(CirclePost.id == post_id).scalar()
+            return {"post_id": post_id, "like_count": fresh, "liked": True}
         # 被赞通知（同事务；自家帖不打扰——同一家长名下多孩互赞也不提醒）
         # fix44 R1 起本条判断对**家长端**恒真（上面的自赞守卫已拦）；保留为纵深防御：
         # 守卫口径若放宽（如未来引入馆内互赞场景），通知排除仍必须独立成立。

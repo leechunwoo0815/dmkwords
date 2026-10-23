@@ -219,3 +219,41 @@ def settle_orphans_after_copy_gone(db: Session, *, copy_id: int, admin) -> None:
         cause="原预约的副本在还书时被判定损坏或遗失",
     )
     db.commit()
+
+
+def settle_orphans_after_copy_gone_safe(
+    db: Session, *, copy_id: int, admin, condition: str = ""
+) -> None:
+    """`settle_orphans_after_copy_gone` 的**带兜底**入口（第九轮审查 B7/P2-2 残余）。
+
+    为什么必须有：调用方（`circulation.return_book`）是在**提交之后**调用善后的——善后自身
+    失败时异常会一路逃到家长端变成 5xx，而书其实已经还了（家长只会反复点"还书"）。
+    这里捕获异常、回滚善后事务、留响亮日志 + 审计行（`book_copy` 目标），**绝不把异常抛回调用方**。
+
+    不发管理待办是有意的：`AdminNotification` 无 `REF_COPY` 常量，拿预约 id 冒充会误导
+    待办墙的销项推导（`todo_service.resolve_many` 按 ref_type/ref_id 反查对象）。
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+    try:
+        settle_orphans_after_copy_gone(db, copy_id=copy_id, admin=admin)
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "还书带损后的预约善后失败（副本 #%s，还书已提交）——孤儿预约需人工跟进", copy_id
+        )
+        try:
+            publish_audit(
+                db,
+                admin=admin,
+                action="circulation.reservation_settle_failed",
+                target_type="book_copy",
+                target_id=str(copy_id),
+                detail={"trigger": "return_with_damage", "condition": condition},
+                reason="预约善后执行失败（还书已提交）——需人工复核该副本上的活跃预约",
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("善后失败后写审计也失败（副本 #%s）", copy_id)

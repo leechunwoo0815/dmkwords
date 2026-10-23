@@ -5,8 +5,9 @@
 - **校验权在我方**：网关（mock/阿里云/腾讯）生成并发送验证码，把 code 回传给我方，
   我方只存 `sha256(phone:code:SECRET_KEY)`——多 worker / 多副本下校验结果一致，
   换网关也不改校验口径（网关的 `verify_code` 一律不用）。
-- **三条闸门**：同号发送间隔（`sms_send_interval_seconds`）/ 每日上限（`sms_daily_limit`）/
-  校验失败次数上限（`sms_max_attempts`，超限即作废该码）。
+- **三条闸门**：同号发送间隔（`sms_send_interval_seconds`）/ 每日上限（`sms_daily_limit`；
+  **未建档手机号**取更紧档 `sms_daily_limit_unregistered`，第九轮 P2-1）/ 校验失败次数上限
+  （`sms_max_attempts`，超限即作废该码）。
 - **一次性**：校验通过立即写 `used_at`，同码不可复用。
 - **开发态**：`SMS_PROVIDER=mock` 时验证码打在日志里（`[MockSms]`），便于本地与模拟器联调；
   生产 `SMS_PROVIDER` 必须接真实网关（`validate_production` 把关）。
@@ -91,8 +92,29 @@ class SmsCodeService:
             )
             .count()
         )
-        if today_count >= daily_limit:
-            raise ConflictError(f"今日验证码发送已达上限（{daily_limit} 条），请明天再试")
+        # B6/P2-1（第九轮审查）：**未建档手机号按更紧档位**。原口径对"已建档家长"与"随机号码"
+        # 一视同仁（同号 10 条/日）——未认证方可拿任意号码刷短信（费用 + 签名被投诉封停 = 打断
+        # 全部家长短信登录），也能把受害者号码当天的额度烧光。
+        # 为什么**不**改成"未建档一律不发"：本端点是登录兜底通道（`sms/send` 兼作登录入口），
+        # 一票否决会把"新家长首次登录"整条路堵死——紧档位才是对的力度（`docs/04` S237 家族）。
+        # 已建档 = `parents` 表存在该手机号（未软删）。
+        registered = (
+            self.db.query(Parent.id).filter(Parent.phone == phone, Parent.is_deleted == 0).first()
+            is not None
+        )
+        effective_limit = daily_limit
+        if not registered:
+            unregistered_limit = self._cfg_int("sms_daily_limit_unregistered", 3)
+            effective_limit = min(daily_limit, max(1, unregistered_limit))
+            logger.warning(
+                "未建档手机号请求验证码：尾号 %s（用途 %s，来源 IP %s）——按紧档 %s 条/日限流",
+                phone[-4:],
+                purpose,
+                client_ip or "unknown",
+                effective_limit,
+            )
+        if today_count >= effective_limit:
+            raise ConflictError(f"今日验证码发送已达上限（{effective_limit} 条），请明天再试")
         # 2026-10-12 拍板（P2）：**单 IP 日上限**。原口径只按手机号计额度，任何人拿一个号
         # 反复调用就能把**受害者**当天的额度烧光（没绑微信的家长当天彻底登不进来，短信费还我们出）。
         # 这里再加一层"按来源 IP"的总量闸；被刷爆时微信登录链路完全不受影响（独立通道）。

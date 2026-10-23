@@ -22,6 +22,7 @@ from backend.domain.identity import refund_rules
 # import**（本行 ← wm10_service 底部的 `WithdrawalService` re-export）构成模块级循环导入，
 # 实测 `ImportError`，能跑只因 pytest 收集顺序恰好先导 wm10_service。
 from backend.domain.identity.guards import ensure_not_locked as _ensure_not_locked
+from backend.domain.identity.member_status import write_member_status
 from backend.domain.identity.models import (
     Child,
     Order,
@@ -546,7 +547,8 @@ class WithdrawalService:
             else:
                 req.assert_transition(WithdrawalRequest.STATUS_COMPLETED)
                 req.status = WithdrawalRequest.STATUS_COMPLETED
-                child.member_status = Child.MEMBER_WITHDRAWN
+                # B4/P2-6（第九轮审查）：走会员状态唯一写口（不再直赋——直赋会漏待评估时钟维护）
+                write_member_status(self.db, child, Child.MEMBER_WITHDRAWN)
                 child.withdraw_reason = "user_withdrawal"
                 child.operation_locked = 0
             publish_audit(

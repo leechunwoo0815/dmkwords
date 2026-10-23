@@ -121,10 +121,18 @@ class LeaderboardService:
                 for e in self._entries(last_start, active_only=True, end=this_start)
             }
             entries = []
+            # N-2/B5（第九轮专家复核 P2／第七轮 P2-3 结转）：**批量取孩子**——原先循环内
+            # `query(Child).filter(id==cid).first()` 是逐人一次 SELECT（榜上有 N 人就 N 条 SQL）。
+            # 口径与逐人版一致（不过滤 is_deleted；取不到的孩子照旧跳过）。
+            kids = (
+                {c.id: c for c in self.db.query(Child).filter(Child.id.in_(list(this_week))).all()}
+                if this_week
+                else {}
+            )
             for cid, cur in this_week.items():
                 delta = cur - last_week.get(cid, 0)
                 if delta >= min_increment:
-                    child = self.db.query(Child).filter(Child.id == cid).first()
+                    child = kids.get(cid)
                     if child:
                         entries.append(
                             {

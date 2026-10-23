@@ -21,6 +21,7 @@ from backend.common.exceptions import ConflictError, NotFoundError, ValidationEr
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity import refund_online, refund_rules
 from backend.domain.identity.guards import ensure_not_locked as _ensure_not_locked
+from backend.domain.identity.member_status import write_member_status
 from backend.domain.identity.models import (
     Child,
     Order,
@@ -596,7 +597,9 @@ class RefundService:
             )
             if w and w.source == WithdrawalRequest.SOURCE_NORMAL:
                 reason_code = "user_withdrawal"
-        child.member_status = Child.MEMBER_WITHDRAWN
+        # B4/P2-6（第九轮审查）：走**会员状态唯一写口**——直赋会漏掉待评估时钟维护
+        # （与押金连带动作；本处写 WITHDRAWN，押金复位只对"重新入会"生效故为无操作）。
+        write_member_status(self.db, child, Child.MEMBER_WITHDRAWN)
         child.withdraw_reason = reason_code
         # B-2/T22：此处不再解锁——主动退会可能有两笔结算退款单（会员费+押金），
         # 会员费 execute 成功即解锁会让押金单仍在途时孩子已解锁（状态语义不一致）。
@@ -678,7 +681,8 @@ class RefundService:
             child = self.db.query(Child).filter(Child.id == w.child_id).first()
             if child:
                 if child.member_status != Child.MEMBER_WITHDRAWN:
-                    child.member_status = Child.MEMBER_WITHDRAWN
+                    # B4/P2-6：唯一写口（同上；幂等守卫保留，避免重复触发连带动作查询）
+                    write_member_status(self.db, child, Child.MEMBER_WITHDRAWN)
                     child.withdraw_reason = "user_withdrawal"
                 child.operation_locked = 0
 

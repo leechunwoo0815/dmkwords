@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 
@@ -20,6 +21,36 @@ from backend.common.events import DomainEvent
 from backend.common.notification_models import Notification
 
 logger = logging.getLogger(__name__)
+
+
+def _record_writeback_dead_letter(notification_id: int, error: object) -> None:
+    """微信回写失败 → 落一条死信（B8，第九轮审查 P3 族）。
+
+    为什么必须有：回写失败原先只有一行日志，通知行的 `wechat_status` 永久停在 `queued`
+    ——「微信通道没写回」这件事在运营可见面上**不存在**（死信看板的语义正是"跨域副作用没发生"）。
+    落库用**独立 session**且整体吞异常：死信是兜底，不允许自己变成故障也不会影响调用方。
+    """
+    try:
+        from backend.common.notification_models import DeadLetter
+        from backend.database import get_session
+
+        session = get_session()
+        try:
+            session.add(
+                DeadLetter(
+                    event_type="notification.wechat_writeback",
+                    handler_name="_writeback",
+                    error=str(error)[:2000],
+                    payload=json.dumps({"notification_id": notification_id}, ensure_ascii=False),
+                    retry_count=0,
+                )
+            )
+            session.commit()
+        finally:
+            session.close()
+    except Exception:
+        logger.exception("死信落库失败（wechat writeback，通知 #%s）", notification_id)
+
 
 #: 回写等待"通知行可见"的上限与轮询间隔（P2-42，2026-10-20 第八轮大审查）。
 #:
@@ -194,7 +225,7 @@ class NotificationService:
                 if visible:
                     break
                 if time.monotonic() >= deadline:
-                    logger.warning(
+                    logger.error(
                         "wechat writeback 放弃：通知行 #%s 在 %.0f 秒内未提交"
                         "（发起方事务未提交或已回滚），状态维持 queued/none",
                         notification_id,
@@ -217,7 +248,15 @@ class NotificationService:
             session.commit()
         except Exception as exc:  # noqa: BLE001
             session.rollback()
-            logger.warning("wechat writeback 失败：%s", exc)
+            # B8（第九轮审查 P3 族）：原先只 warning 一行——通知行的 `wechat_status` 会**永远停在
+            # `queued`**，运营在日志/看板里都看不见"这条微信通道没写回"。改 error + 落死信
+            # （死信看板语义就是"跨域副作用没发生"，见 `admin/dead_letter_service`）。
+            logger.error(
+                "wechat writeback 失败（通知 #%s，wechat_status 维持 queued）：%s",
+                notification_id,
+                exc,
+            )
+            _record_writeback_dead_letter(notification_id, exc)
         finally:
             try:
                 session.close()

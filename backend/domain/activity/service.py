@@ -399,7 +399,9 @@ class ActivityService(ActivityCancelMixin):
         return {"enrollment_id": e.id, "status": e.status}
 
     # ---------- 报名（小程序） ----------
-    def _notify_enroll_manual(self, child: Child, a: Activity, e: ActivityEnrollment, fee) -> None:
+    def notify_enroll_manual(self, child: Child, a: Activity, e: ActivityEnrollment, fee) -> None:
+        """报名/造单的「活动报名待确认」通知（**跨域公开入口**：第九轮 B3——identity 侧原先
+        直调私有方法，域边界形同虚设）。"""
         """T6/R7：发【活动报名待确认】管理待办（双链复用：家长报名+管理端造单）。
 
         独立 ref_type=activity_enrollment（ref_id=enrollment_id）——防与
@@ -470,7 +472,9 @@ class ActivityService(ActivityCancelMixin):
             # 收费活动：先建订单（待人工收款确认）占名额
             from backend.domain.identity.service import OrderService
 
-            order = OrderService(self.db)._create_activity_order(child, a, fee)
+            # 第九轮 B3（跨域边界）：走 identity 的**公开入口**——原先直调其私有方法
+            # `_create_activity_order`（域边界形同虚设，改个签名就能悄悄弄坏调用方）。
+            order = OrderService(self.db).create_activity_order(child, a, fee)
             status = ActivityEnrollment.STATUS_PENDING_PAYMENT
         else:
             status = ActivityEnrollment.STATUS_ENROLLED
@@ -490,7 +494,7 @@ class ActivityService(ActivityCancelMixin):
         # T6/R7（插修 13/14）：付费报名（待人工收款确认）→ 管理待办【活动报名待确认】
         # （R7 抽方法双链复用：家长端报名+管理端造单同发；免费不发，无需运营动作）
         if order is not None:
-            self._notify_enroll_manual(child, a, e, fee)
+            self.notify_enroll_manual(child, a, e, fee)
         # WM11：报名成功通知家长
         # 第八轮审查 P2-10：openid 原先漏传 → 微信通道恒 skipped；跨域取用延迟 import
         from backend.domain.identity.wm_notify import parent_openid

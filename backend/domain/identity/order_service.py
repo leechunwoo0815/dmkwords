@@ -188,7 +188,7 @@ class OrderService(OrderGuardMixin):
             # R7（插修 14）：管理端造单同发【活动报名待确认】（T6 发送点抽方法双链）
             from backend.domain.activity.service import ActivityService
 
-            ActivityService(self.db)._notify_enroll_manual(child, a, e, amount)
+            ActivityService(self.db).notify_enroll_manual(child, a, e, amount)
         publish_audit(
             self.db,
             admin=admin,
@@ -209,7 +209,7 @@ class OrderService(OrderGuardMixin):
 
         return price_member_order(self.db, parent, child, order_type)
 
-    def _create_activity_order(self, child: Child, activity, fee) -> Order:
+    def create_activity_order(self, child: Child, activity, fee) -> Order:
         """活动报名订单（家长小程序发起；占名额待收款确认；不 commit 由调用方统一提交）。"""
         import types
         import uuid

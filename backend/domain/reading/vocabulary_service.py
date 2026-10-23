@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
@@ -68,7 +69,15 @@ class VocabularyService:
                 {_Vocab.lookup_count: _func.coalesce(_Vocab.lookup_count, 0) + 1},
                 synchronize_session=False,
             )
-        self.db.commit()
+        try:
+            self.db.commit()
+        except IntegrityError:
+            # B2/P2-4（第九轮审查）：并发双击/重放 → 后到者撞 `uq_vocab_child_word`（唯一索引
+            # 不含 is_deleted）→ 原先裸 500。整笔回滚后按"已收录"幂等返回；
+            # 代价：这一次的 `lookup_count` 累加随之回滚（两次并发查词只记 1 次）——比 500 好，
+            # 且"累计查词"另有 `summary()` 的服务端聚合口径兜底。
+            self.db.rollback()
+            recorded = False
         return {
             "word": entry.word,
             "phonetic": entry.phonetic,

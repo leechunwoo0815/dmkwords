@@ -14,6 +14,7 @@ CheckinStreakRecord/CircleRankSnapshot 聚合）→ card_data 快照 dict。
 from __future__ import annotations
 
 import json
+import logging
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import and_, func, or_
@@ -115,6 +116,8 @@ def _font(size: int):
             return ImageFont.truetype(path, size)
         except OSError:
             continue
+    # B8（第九轮审查 P3 族）：全候选失败会静默用默认字体（名片字形退化）——留一条可见记录
+    logging.getLogger(__name__).warning("名片字体全部加载失败，回退默认字体（字形会退化）")
     return ImageFont.load_default()
 
 

@@ -631,6 +631,223 @@ def check_import_cycles(errors: list[str]) -> None:
     errors.append(f"模块级导入环（顶层循环导入，换导入顺序即 ImportError）：{chain}")
 
 
+def _foreign_models(py: Path, dom: str) -> dict[str, str]:
+    """本文件从**其他域**的 `models` 导入的 `{类名: 目标域}`。"""
+    import ast
+
+    out: dict[str, str] = {}
+    try:
+        tree = ast.parse(py.read_text(encoding="utf-8"))
+    except SyntaxError:
+        return out
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.ImportFrom) and node.module):
+            continue
+        parts = node.module.split(".")
+        if len(parts) >= 4 and parts[:2] == ["backend", "domain"]:
+            tgt = parts[2]
+            if tgt != dom and parts[3] == "models":
+                for alias in node.names:
+                    out[alias.name] = tgt
+    return out
+
+
+#: 跨域写白名单：`(文件, 函数名, 目标域)` → 理由。**键不含行号**（行号会漂，语义不会）。
+#: 目标是逐条销项成"调对方域公开方法"（见 `docs/整改任务书-第九轮-20261022.md` §三 B3）。
+CROSS_DOMAIN_WRITE_WHITELIST: dict[tuple[str, str, str], str] = {
+    (
+        "backend/domain/circulation/service.py",
+        "borrow",
+        "catalog",
+    ): "借出：副本 -> BORROWED（同事务行锁内）",
+    (
+        "backend/domain/circulation/service.py",
+        "return_book",
+        "catalog",
+    ): "归还：副本 -> AVAILABLE/维护/遗失",
+    (
+        "backend/domain/reading/reservation_ops.py",
+        "handle_copy_unavailable",
+        "catalog",
+    ): "副本失效漏斗：改锁他册/转异常",
+    (
+        "backend/domain/reading/reservation_service.py",
+        "create",
+        "catalog",
+    ): "预约：副本 -> RESERVED",
+    (
+        "backend/domain/reading/reservation_service.py",
+        "cancel",
+        "catalog",
+    ): "取消预约：副本 -> AVAILABLE",
+    (
+        "backend/domain/reading/reservation_service.py",
+        "expire_due",
+        "catalog",
+    ): "超时释放：副本 -> AVAILABLE",
+    (
+        "backend/domain/reading/reservation_service.py",
+        "checkout",
+        "catalog",
+    ): "核销转借阅：副本 -> BORROWED",
+    (
+        "backend/domain/identity/wm10_service.py",
+        "_finalize_refund",
+        "billing",
+    ): "退款执行：押金 -> refunded + DepositLedger",
+    (
+        "backend/domain/identity/wm10_service.py",
+        "_complete_refund_withdrawal",
+        "billing",
+    ): "退会结算：押金 -> refunded",
+    (
+        "backend/domain/identity/wm10_withdrawal_service.py",
+        "review",
+        "billing",
+    ): "退会复核：押金 -> REFUNDING",
+    ("backend/domain/identity/transfer_service.py", "review", "billing"): "转让结算：押金退款链",
+    (
+        "backend/domain/identity/wm10_service.py",
+        "_refund_activity_enrollment",
+        "activity",
+    ): "活动单退款：报名行状态",
+    (
+        "backend/domain/activity/cancel_flow.py",
+        "cancel_activity",
+        "identity",
+    ): "活动取消：条件 UPDATE 作废未收款订单（2026-10-12 拍板 P4；待抽 identity 公开方法销项）",
+}
+
+
+def _scan_cross_domain_writes(backend: Path) -> set[tuple[str, str, str]]:
+    """域 A 的函数**直接写域 B 的表** / **跨域调私有方法** → `{(文件, 函数, 目标域)}`。
+
+    判据（AST，只认能静态判死的形态）：
+      · 外部域模型对象的属性赋值（`dep.status = ...`，变量由 `query(Deposit)` 绑定）；
+      · `db.add(外部域模型(...))`；
+      · `query(外部域模型).update()/.delete()`；
+      · 跨域调**私有**方法（`XxxService(self.db)._x(...)`，`XxxService` 定义在别的域）。
+    解析不出的形态（跨层传参、动态取属性）**不判红**——误报会逼出绕过。
+    """
+    import ast
+
+    service_domain: dict[str, str] = {}
+    for dom in DOMAINS:
+        for py in (backend / "domain" / dom).rglob("*.py"):
+            if "__pycache__" in py.parts:
+                continue
+            try:
+                tree = ast.parse(py.read_text(encoding="utf-8"))
+            except SyntaxError:
+                continue
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef) and node.name.endswith("Service"):
+                    service_domain[node.name] = dom
+
+    found: set[tuple[str, str, str]] = set()
+    for dom in DOMAINS:
+        for py in sorted((backend / "domain" / dom).rglob("*.py")):
+            if "__pycache__" in py.parts:
+                continue
+            foreign = _foreign_models(py, dom)
+            if not foreign:
+                continue
+            try:
+                tree = ast.parse(py.read_text(encoding="utf-8"))
+            except SyntaxError:
+                continue
+            rel = str(py.relative_to(ROOT)) if ROOT in py.parents else str(py)
+            for fn in ast.walk(tree):
+                if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                bound: dict[str, str] = {}
+                for node in ast.walk(fn):
+                    if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+                        src = ast.unparse(node.value)
+                        for cls, tgt in foreign.items():
+                            if f"query({cls})" in src or f"get({cls}" in src:
+                                if isinstance(node.targets[0], ast.Name):
+                                    bound[node.targets[0].id] = tgt
+                    elif isinstance(node, ast.For) and isinstance(node.target, ast.Name):
+                        src = ast.unparse(node.iter)
+                        for cls, tgt in foreign.items():
+                            if f"query({cls})" in src:
+                                bound[node.target.id] = tgt
+                for node in ast.walk(fn):
+                    tgt: str | None = None
+                    if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Attribute):
+                        recv = node.targets[0].value
+                        if isinstance(recv, ast.Name) and recv.id in bound:
+                            tgt = bound[recv.id]
+                    elif isinstance(node, ast.Call):
+                        src = ast.unparse(node)
+                        func = ast.unparse(node.func)
+                        if func.endswith((".add", ".delete")):
+                            for cls, t in foreign.items():
+                                if f"{cls}(" in src:
+                                    tgt = t
+                        elif "query(" in src and func.endswith((".update", ".delete")):
+                            for cls, t in foreign.items():
+                                if f"query({cls})" in src:
+                                    tgt = t
+                        elif isinstance(node.func, ast.Attribute) and node.func.attr.startswith(
+                            "_"
+                        ):
+                            # 跨域调私有方法：`XxxService(self.db)._x(...)`
+                            recv = node.func.value
+                            name = recv.id if isinstance(recv, ast.Name) else ast.unparse(recv)
+                            owner = name.split("(")[0].split(".")[-1].strip()
+                            t = service_domain.get(owner)
+                            if t and t != dom:
+                                found.add((rel, fn.name, t))
+                                continue
+                    if tgt:
+                        found.add((rel, fn.name, tgt))
+    return found
+
+
+def check_member_status_write_port(errors: list[str]) -> None:
+    """会员状态**唯一写口**（第九轮 P2-6；第七十五批 P1-1 防复发）。
+
+    判据：除写口本体（`identity/member_status.py`）与 `set_member_status`（`identity/models.py`）
+    之外，`backend/**` 不得出现 `x.member_status = <值>` 直赋——直赋绕过"待评估时钟 + 押金连带
+    动作"，而这两件连带动作**各丢过一次**（第七十五批 P1-1：押金复位只挂在观察期费路径）。
+    第九轮实测 4 处直赋散在退会/转让链上（该轮已收拢，本条防回归）。
+    """
+    for py in BACKEND.rglob("*.py"):
+        if "__pycache__" in py.parts or py.name == "member_status.py":
+            continue
+        if py.parent.name == "identity" and py.name == "models.py":
+            continue
+        for ln, line in enumerate(py.read_text(encoding="utf-8").splitlines(), 1):
+            if re.search(r"\.member_status\s*=\s*[^=]", line):
+                errors.append(
+                    f"{py.relative_to(ROOT)}:{ln}: 直赋 member_status —— 请走 write_member_status（唯一写口）"
+                )
+
+
+def check_cross_domain_writes(errors: list[str]) -> None:
+    """跨域直写必须**显式登记**（第九轮 P2-5/B3）。
+
+    为什么要有：域边界靠"约定 + 对方域公开方法"维持，直写对方表是**静默**的——
+    改签名/加不变量时没有任何机器提醒（第九轮实测 12 处，专家只抽了 4 处）。
+    登记制把"边界侵蚀"变成"明示的例外"，新增直写当场判红；白名单条目过期也判红。
+    """
+    found = _scan_cross_domain_writes(BACKEND)
+    for key in sorted(found - set(CROSS_DOMAIN_WRITE_WHITELIST)):
+        rel, fn, tgt = key
+        errors.append(
+            f"{rel}:{fn}() 直写 `{tgt}` 域的表或调其私有方法（跨域边界）——"
+            "改走对方域公开方法，或登记进 CROSS_DOMAIN_WRITE_WHITELIST 并写明理由"
+        )
+    for key in sorted(set(CROSS_DOMAIN_WRITE_WHITELIST) - found):
+        rel, fn, tgt = key
+        errors.append(
+            f"跨域白名单条目 `{rel}:{fn}() -> {tgt}` 已不再命中任何直写"
+            f"（理由：{CROSS_DOMAIN_WRITE_WHITELIST[key]}）——已销项请删除该条目"
+        )
+
+
 def self_test() -> int:
     """S1 注入自检：**每条规则各喂一个违例样本，必须全命中**。
 
@@ -640,8 +857,8 @@ def self_test() -> int:
     """
     import tempfile
 
-    global BACKEND, ROOT, DOMAINS, EVENT_CONTRACT_WHITELIST
-    saved = (BACKEND, ROOT, DOMAINS, EVENT_CONTRACT_WHITELIST)
+    global BACKEND, ROOT, DOMAINS, EVENT_CONTRACT_WHITELIST, CROSS_DOMAIN_WRITE_WHITELIST
+    saved = (BACKEND, ROOT, DOMAINS, EVENT_CONTRACT_WHITELIST, CROSS_DOMAIN_WRITE_WHITELIST)
     bad = 0
     try:
         with tempfile.TemporaryDirectory(prefix="arch-selftest-") as d:
@@ -737,6 +954,25 @@ def self_test() -> int:
 
             BACKEND, ROOT, DOMAINS = backend, root, ["identity"]
             EVENT_CONTRACT_WHITELIST = {"fx.whitelisted": "自证样本：白名单命中即不判红"}
+            CROSS_DOMAIN_WRITE_WHITELIST = {}
+            # ⑬ 会员状态直赋（第九轮 P2-6）：非写口模块里直赋 member_status → 必红
+            (backend / "domain/identity/status_bad.py").write_text(
+                "def bad(child):\n    child.member_status = 'withdrawn'\n",
+                encoding="utf-8",
+            )
+            # ⑫ 跨域直写（第九轮 B3）：identity 直写 rogue_domain 的模型 → 必红；
+            #     同文件的只读函数不得被判红（反向样本 ok_read）
+            (backend / "domain/identity/cross_bad.py").write_text(
+                "from backend.domain.rogue_domain.models import Widget\n"
+                "\n\n"
+                "def bad(db):\n"
+                "    w = db.query(Widget).first()\n"
+                "    w.name = 'x'\n"
+                "\n\n"
+                "def ok_read(db):\n"
+                "    return db.query(Widget).count()\n",
+                encoding="utf-8",
+            )
             errs: list[str] = []
             check_domain_list(errs)
             check_four_pieces(errs)
@@ -747,6 +983,8 @@ def self_test() -> int:
             check_import_whitelist(errs)
             check_like_escape(errs)
             check_import_cycles(errs)
+            check_cross_domain_writes(errs)
+            check_member_status_write_port(errs)
             check_event_contract(errs)
             joined = "\n".join(errs)
             needles = (
@@ -767,6 +1005,8 @@ def self_test() -> int:
                 ("事件契约死类", "fx.dead"),
                 ("订阅了不存在的事件类型", "fx.no_such_type"),
                 ("模块级导入环", "模块级导入环"),
+                ("跨域直写未登记", "cross_bad.py"),
+                ("会员状态直赋", "status_bad.py"),
             )
             for label, needle in needles:
                 if needle not in joined:
@@ -779,6 +1019,7 @@ def self_test() -> int:
                 ("字符串字面量订阅被误判为无订阅", "fx.literal_ok"),
                 ("白名单命中的死类仍被判红", "fx.whitelisted"),
                 ("函数内延迟导入被误判为导入环", "lazy_c.py"),
+                ("跨域文件里的只读函数被误判为直写", "ok_read"),
             ):
                 if needle in joined:
                     print(f"✗ S1 [{label}] 被误报")
@@ -830,6 +1071,18 @@ def self_test() -> int:
                 '    event_bus.subscribe("fx.literal_ok", handler)\n',
                 encoding="utf-8",
             )
+            # 跨域写的合法样本：只读对方域 → 不判红
+            (backend / "domain/identity/cross_bad.py").write_text(
+                "from backend.domain.rogue_domain.models import Widget\n"
+                "\n\n"
+                "def ok_read(db):\n"
+                "    return db.query(Widget).count()\n",
+                encoding="utf-8",
+            )
+            CROSS_DOMAIN_WRITE_WHITELIST = {}
+            (backend / "domain/identity/status_bad.py").write_text(
+                "def ok(child):\n    return child.member_status\n", encoding="utf-8"
+            )
             # 导入环的合法样本：把互导改成「一方延迟导入」→ 环消失
             (backend / "cyc_b.py").write_text(
                 "def bee():\n    from backend.cyc_a import aye\n    return aye()\n",
@@ -845,6 +1098,8 @@ def self_test() -> int:
             check_import_whitelist(clean)
             check_like_escape(clean)
             check_import_cycles(clean)
+            check_cross_domain_writes(clean)
+            check_member_status_write_port(clean)
             check_event_contract(clean)
             if clean:
                 print(f"✗ S1 合法样本被误报（检查器过严）: {clean}")
@@ -856,8 +1111,22 @@ def self_test() -> int:
             if not any("白名单条目" in e for e in rot):
                 print("✗ S1 事件契约白名单过期未判红（白名单不可腐烂）")
                 bad += 1
+            # 跨域白名单过期同样必须判红（指向一个已无直写的函数）
+            CROSS_DOMAIN_WRITE_WHITELIST = {
+                (
+                    "backend/domain/identity/cross_bad.py",
+                    "ok_read",
+                    "rogue_domain",
+                ): "自证样本：该条已无命中"
+            }
+            rot2: list[str] = []
+            check_cross_domain_writes(rot2)
+            if not any("已不再命中" in e for e in rot2):
+                print("✗ S1 跨域白名单过期未判红")
+                bad += 1
+            CROSS_DOMAIN_WRITE_WHITELIST = {}
     finally:
-        BACKEND, ROOT, DOMAINS, EVENT_CONTRACT_WHITELIST = saved
+        BACKEND, ROOT, DOMAINS, EVENT_CONTRACT_WHITELIST, CROSS_DOMAIN_WRITE_WHITELIST = saved
     if bad:
         print(f"✗ S1 注入自检失败 {bad} 项")
         return 1
@@ -876,6 +1145,8 @@ def main() -> int:
     check_import_whitelist(errors)
     check_like_escape(errors)
     check_import_cycles(errors)
+    check_cross_domain_writes(errors)
+    check_member_status_write_port(errors)
     event_summary = check_event_contract(errors)
 
     if errors:
@@ -887,7 +1158,7 @@ def main() -> int:
         "架构关 PASS：域列表与磁盘一致 / 四件套齐全 / Router 零违规（含 miniapp_router）"
         " / 锁定读均链 populate_existing（backend 全量）/ 行数达标"
         " / 无 sqlite（backend+scripts+alembic 严格、tests 判真实用法）/ import 白名单通过 / LIKE 全转义"
-        " / 模块级导入环 0（延迟导入不算）"
+        " / 模块级导入环 0（延迟导入不算）/ 跨域直写全量登记 / 会员状态零直赋"
         f" / 事件契约三向对账（{event_summary}）"
     )
     alerts = check_mutation_count_flush()

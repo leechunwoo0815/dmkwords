@@ -18,6 +18,7 @@ from backend.common.notification_models import Notification
 from backend.common.notifications import SCENE_OTHER_TRANSFER_RESULT, NotificationService
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.circulation.models import BorrowRecord
+from backend.domain.identity.member_status import write_member_status
 from backend.domain.identity.models import (
     Child,
     Order,
@@ -513,7 +514,8 @@ class TransferService:
             # ---- 同事务 12 步（R-305）----
             req.status = TransferRequest.STATUS_APPROVED
             # 1) 转出方退会（年费不退；历史阅读成果保留）
-            source.member_status = Child.MEMBER_WITHDRAWN
+            # B4/P2-6（第九轮审查）：走会员状态唯一写口（不再直赋——直赋会漏待评估时钟维护）
+            write_member_status(self.db, source, Child.MEMBER_WITHDRAWN)
             source.withdraw_reason = "membership_transfer"
             # 2026-10-12 拍板（P7）：转出方的年费订单标记「已随转让处置」——否则家长端还能对
             # 这笔单发起退款并执行（同一笔年费既转给受让方又在退）。年费类型见 Order.TYPE_FORMAL。
@@ -611,8 +613,7 @@ class TransferService:
             # 5) 受让方转正式会员，到期日继承
             # P1-1（2026-10-18 第七十五批）：改走**会员状态唯一写口**——受让方若是"已退会
             # （押金已退还）"的孩子，接权益后必须复位押金账户，否则永远缴不了押金。
-            from backend.domain.identity.member_status import write_member_status
-
+            # （B4/P2-6：同一 import 已上移到模块顶层，转出方退会复用同一个写口）
             write_member_status(self.db, target, Child.MEMBER_FORMAL)
             target.member_start = date.today()
             target.member_expire = source.member_expire

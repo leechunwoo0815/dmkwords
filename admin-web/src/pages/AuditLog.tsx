@@ -39,6 +39,7 @@ const ACTION_LABEL: Record<string, string> = {
   "circulation.borrow": "借书",
   "circulation.copy_unavailable_with_active_reservation": "副本不可用（有在用预约）",
   "circulation.renew": "续借",
+  "circulation.reservation_settle_failed": "预约善后失败（需人工跟进）",
   "circulation.return": "还书",
   "dead_letter.handle": "死信销项",
   "deposit.deduct": "押金扣除（赔偿）",

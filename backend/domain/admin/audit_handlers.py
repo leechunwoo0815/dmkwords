@@ -18,7 +18,11 @@ logger = logging.getLogger(__name__)
 
 def _handle_audit_requested(event: AuditRequestedEvent, db) -> None:
     if db is None:
-        logger.warning("audit.requested 事件缺少 db session，跳过")
+        # B8（第九轮审查 P3 族）：审计行**未落库**属合规缺口，不能只留 warning
+        logger.error(
+            "audit.requested 事件缺少 db session——审计行未落库（action=%s）",
+            event.action,
+        )
         return
     db.add(
         AuditLog(
