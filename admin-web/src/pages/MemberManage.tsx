@@ -151,6 +151,13 @@ export default function MemberManage() {
   const [parents, setParents] = useState<ParentRow[]>([]);
   const [parentTotal, setParentTotal] = useState(0);
   const [parentLoading, setParentLoading] = useState(false);
+  // D6 挂账收口（2026-10-24）：本页是**一页三列表**（孩子/订单/家长）。此前三处 catch 只弹
+  // toast（`message.error`），表格会回落成空态——后端故障时看起来像"库里没有这些数据"，
+  // 与 U10「禁假 0/假空」相反。检查器 A2 是**文件级**判据（页面里有一个失败态就算过），
+  // 所以本页长期假绿；这里**逐列表**留痕（各自 banner + 重试 + 失败时抑制空态）。
+  const [childListError, setChildListError] = useState("");
+  const [orderListError, setOrderListError] = useState("");
+  const [parentListError, setParentListError] = useState("");
   const [editParent, setEditParent] = useState<ParentRow | null>(null);
   const [parentEditForm] = Form.useForm();
   // WM3-B2 凭证：确认收款弹窗单图；查看凭证 / 选图前本地预览统一走全屏干净预览
@@ -219,8 +226,8 @@ export default function MemberManage() {
     (page: number) => {
       setLoading(true);
       apiListChildren({ page, page_size: childPg.pageSize, keyword: keyword || undefined, status: statusFilter })
-        .then((r) => { setChildren(r.items ?? []); setChildTotal(r.total); })
-        .catch((e: Error) => message.error(e.message))
+        .then((r) => { setChildren(r.items ?? []); setChildTotal(r.total); setChildListError(""); })
+        .catch((e: Error) => setChildListError(e.message || "列表加载失败"))
         .finally(() => setLoading(false));
     },
     [keyword, statusFilter, childPg.pageSize, message]
@@ -230,8 +237,8 @@ export default function MemberManage() {
     (page: number) => {
       setOrderLoading(true);
       apiListOrders({ page, page_size: orderPg.pageSize, status: orderStatus, order_by: orderBy, keyword: orderKeyword || undefined })
-        .then((r) => { setOrders(r.items ?? []); setOrderTotal(r.total); })
-        .catch((e: Error) => message.error(e.message))
+        .then((r) => { setOrders(r.items ?? []); setOrderTotal(r.total); setOrderListError(""); })
+        .catch((e: Error) => setOrderListError(e.message || "列表加载失败"))
         .finally(() => setOrderLoading(false));
     },
     [orderStatus, orderBy, orderKeyword, orderPg.pageSize, message]
@@ -378,8 +385,8 @@ export default function MemberManage() {
     (page: number) => {
       setParentLoading(true);
       apiListParentsPage({ page, page_size: childPg.pageSize })
-        .then((r) => { setParents(r.items ?? []); setParentTotal(r.total); })
-        .catch((e: Error) => message.error(e.message))
+        .then((r) => { setParents(r.items ?? []); setParentTotal(r.total); setParentListError(""); })
+        .catch((e: Error) => setParentListError(e.message || "列表加载失败"))
         .finally(() => setParentLoading(false));
     },
     [childPg.pageSize, message]
@@ -466,7 +473,13 @@ export default function MemberManage() {
               options={[{ value: "", label: "全部" }, ...Object.entries(MEMBER_LABEL).map(([value, label]) => ({ value, label }))]}
             />
           </Space>
-          <Table<Child> locale={{ emptyText: <PaintEmpty character="star" /> }}
+          {childListError && (
+            <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+              {childListError} · 本次刷新失败：列表可能不是最新的（不代表没有孩子档案）——请重试
+              <Typography.Link onClick={() => loadChildren(childPg.page)} style={{ marginLeft: 8 }}>重试</Typography.Link>
+            </Typography.Text>
+          )}
+          <Table<Child> locale={{ emptyText: childListError ? null : <PaintEmpty character="star" /> }}
             rowKey="id" loading={loading} dataSource={children} size="middle"
             pagination={false}
             columns={[
@@ -595,7 +608,13 @@ export default function MemberManage() {
               options={[{ value: "", label: "全部" }, ...Object.entries(ORDER_STATUS_LABEL).map(([value, label]) => ({ value, label }))]}
             />
           </Space>
-          <Table<Order> locale={{ emptyText: <PaintEmpty character="star" /> }}
+          {orderListError && (
+            <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+              {orderListError} · 本次刷新失败：列表可能不是最新的（不代表没有订单）——请重试
+              <Typography.Link onClick={() => loadOrders(orderPg.page)} style={{ marginLeft: 8 }}>重试</Typography.Link>
+            </Typography.Text>
+          )}
+          <Table<Order> locale={{ emptyText: orderListError ? null : <PaintEmpty character="star" /> }}
             rowKey="id" dataSource={orders} size="middle" loading={orderLoading}
             rowClassName={(r) => (r.enrollment_id != null && r.enrollment_id === orderHighlightId ? "wm13-highlight-row" : "")}
             pagination={false}
@@ -667,7 +686,13 @@ export default function MemberManage() {
 
       {tab === "parents" && (
         <>
-          <Table<ParentRow> locale={{ emptyText: <PaintEmpty character="star" /> }}
+          {parentListError && (
+            <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+              {parentListError} · 本次刷新失败：列表可能不是最新的（不代表没有家长账号）——请重试
+              <Typography.Link onClick={() => loadParents(childPg.page)} style={{ marginLeft: 8 }}>重试</Typography.Link>
+            </Typography.Text>
+          )}
+          <Table<ParentRow> locale={{ emptyText: parentListError ? null : <PaintEmpty character="star" /> }}
             rowKey="id" dataSource={parents} size="middle" loading={parentLoading}
             pagination={false}
             columns={[
