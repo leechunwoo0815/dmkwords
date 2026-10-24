@@ -1,9 +1,10 @@
 # scripts/load_test.py — **容量压测 5 组**（真实 HTTP + 真实 MySQL）
 """用法（**必须跑在一次性实例上，绝不动演示库**）：
 
-    # 1) 建独立压测库 + 迁表 + 播种管理员
+    # 1) 建独立压测库 + 迁表 + 播种管理员 **与业务配置**
     DB_NAME=dmkwords_loadtest .venv/bin/python -m alembic upgrade head
     DB_NAME=dmkwords_loadtest .venv/bin/python -m backend.seeds.seed_admin
+    DB_NAME=dmkwords_loadtest .venv/bin/python -m backend.seeds.seed_configs   # ← 2026-10-24 补：不播则 G1 造书 409
 
     # 2) 起一次性实例（**关限流**：压测量的是容量，限流另有 9 条用例 + BDD 守护）
     DB_NAME=dmkwords_loadtest SCHEDULER_ENABLED=false RATE_LIMIT_WRITE_PER_MINUTE=0 \
@@ -12,6 +13,10 @@
     # 3) 压测（DB_NAME 必须一起给：脚本据此**拒绝**打到演示库）
     DB_NAME=dmkwords_loadtest .venv/bin/python -m scripts.load_test \
       --base-url http://127.0.0.1:8003 --json /tmp/load.json
+
+    一次性库纪律（2026-10-24 F 批实测补充）：G5 会造 2000 书/2000 孩/6000 借阅/6 万词账，
+    **重跑前请 drop 重建**（`DROP DATABASE dmkwords_loadtest` → 重走 1 步）——虽然唯一键都带
+    运行 tag，但造量规模会让"重跑 = 在已有数据上再加一轮"，耗时与基线不可比。
 
 五组（对齐 `docs/审查任务书-第七轮…` W6）：
   G1 借还并发    —— ①同一副本被 10 个孩子并发借（**恰好 1 成功**）
@@ -524,7 +529,11 @@ def g4_import(base: str, h: dict, rows: int = 1000) -> dict:
     # 真没落库也看不出来）。这里按本次号段真查一遍库里落了几个书目。
     from backend.domain.catalog.models import Book
 
-    landed = _count(Book, Book.title.like(f"压测导入书{offset}%"))
+    # 2026-10-24（F 批实测修复）：原核对用 `title like "压测导入书{offset}%"` —— **前缀匹配**
+    # 只命中 offset 这一条（后一行是 offset+1，数字串不以 offset 开头），于是真落了 1000 本也判
+    # landed=1 → FAIL。改为**精确枚举本次号段**（1000 个 title 的 IN 查询）。
+    expected_titles = [f"压测导入书{offset + i}" for i in range(rows)]
+    landed = _count(Book, Book.title.in_(expected_titles))
     ok = r.status_code == 200 and body.get("success_count") == rows and landed >= rows
     return {
         f"导入{rows}行": {
@@ -693,12 +702,23 @@ def _seed_volume(
             ],
         )
         # 词账（榜单/横幅聚合的输入；分布到近 30 天，覆盖周/月榜窗口）
+        # 2026-10-24（F 批实测修复）：原实现 `cids[i % N] × bids[i % M]` **两列同时按 i 取模**
+        # → 组合周期 = lcm(N, M)，words=60000 时必然出现重复 (child_id, book_id)，撞
+        # `words_ledgers.uq_words_child_book` 唯一键（实测**新建库首跑即 IntegrityError 1062**）。
+        # 改为「孩子按 i 轮转、书按 i // len(cids) 推进」：前 len(cids)*len(bids) 行两两唯一；
+        # 超出容量直接拒绝，不静默截断。
+        pair_cap = len(cids) * len(bids)
+        if words > pair_cap:
+            raise SystemExit(
+                f"词账造量 {words} 超过唯一对容量 {pair_cap}（孩子 {len(cids)} × 书目 {len(bids)}）"
+                "——请调小 words 或加大 children/books"
+            )
         db.execute(
             insert(WordsLedger),
             [
                 {
                     "child_id": cids[i % len(cids)],
-                    "book_id": bids[i % len(bids)],
+                    "book_id": bids[(i // len(cids)) % len(bids)],
                     "word_count": 100 + (i % 400),
                     "source": "load",
                     "created_at": now - timedelta(days=i % 30),
