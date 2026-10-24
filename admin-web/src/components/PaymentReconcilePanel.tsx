@@ -2,7 +2,7 @@
 // 为什么放在任务看板：对账是"每天该有人看一眼"的东西——绿色就滑过去，有差异才要点开。
 // 口径：对账只报不改（绝不自作主张改单），所以这里只有"跑一轮"和"看差异"，没有"修复"按钮。
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
-import { App as AntdApp, Alert, Button, Card, Collapse, Empty, Input, Space, Table, Tag } from "antd";
+import { App as AntdApp, Alert, Button, Card, Collapse, Empty, Input, Space, Table, Tag, Typography } from "antd";
 import { ReloadOutlined, SyncOutlined } from "@ant-design/icons";
 
 import {
@@ -41,14 +41,18 @@ export default function PaymentReconcilePanel() {
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
   const [billDate, setBillDate] = useState("");
+  // 2026-10-24（A2 收紧后的实测缺口）：原先取数失败只弹 toast，列表回落成
+  // 「还没有对账记录」——把接口故障读成"确实没跑过对账"。留独立失败态。
+  const [listError, setListError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await apiPaymentReconciliations(10);
       setItems(res.items || []);
+      setListError("");
     } catch (e) {
-      message.error((e as Error).message);
+      setListError((e as Error).message || "列表加载失败");
     } finally {
       setLoading(false);
     }
@@ -74,7 +78,10 @@ export default function PaymentReconcilePanel() {
 
   if (!canRead) return null; // 读权限都没有 → 卡片不渲染（与后端 GET 同码）
   const latest = items[0];
-  const summary = latest
+  // 失败时汇总行**不许**写"还没有对账记录"（那是语义结论；真相是取数失败）
+  const summary = listError
+    ? "对账记录加载失败（不代表没跑过对账）"
+    : latest
     ? `${SOURCE_LABEL[latest.source] || latest.source} · ${latest.bill_date} · ${
         STATUS_TAG[latest.status]?.text || latest.status
       }${latest.diff_count ? `（${latest.diff_count} 条差异）` : ""}`
@@ -152,7 +159,15 @@ export default function PaymentReconcilePanel() {
           {
             key: "reports",
             label: "对账明细与历史",
-            children: items.length ? (
+            children: (
+              <>
+                {listError && (
+                  <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+                    {listError} · 本次刷新失败：列表可能不是最新的（不代表没跑过对账）——请重试
+                    <Typography.Link onClick={() => void load()} style={{ marginLeft: 8 }}>重试</Typography.Link>
+                  </Typography.Text>
+                )}
+                {items.length ? (
               <Table<PaymentReconcileReport>
                 size="small"
                 rowKey="id"
@@ -220,8 +235,10 @@ export default function PaymentReconcilePanel() {
                   { title: "完成时间", dataIndex: "finished_at", width: 150, render: fmtTime },
                 ]}
               />
-            ) : (
-              <Empty description="还没有对账记录（超管可点「跑一轮」）" />
+                ) : listError ? null : (
+                  <Empty description="还没有对账记录（超管可点「跑一轮」）" />
+                )}
+              </>
             ),
           },
         ]}

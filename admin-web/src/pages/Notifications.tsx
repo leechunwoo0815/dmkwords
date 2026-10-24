@@ -186,6 +186,10 @@ export default function Notifications() {
   const [parentLoaded, setParentLoaded] = useState(false);
   const [allCount, setAllCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  // 2026-10-24（A2 收紧后的实测缺口）：本页两个列表（家长通知 / 管理待办）此前只有 toast，
+  // 失败会回落成「暂无通知记录」——把接口故障读成"确实没有通知"。逐列表留失败态。
+  const [parentListError, setParentListError] = useState("");
+  const [inboxListError, setInboxListError] = useState("");
   // 管理待办（WM13）
   const [inbox, setInbox] = useState<AdminInboxItem[]>([]);
   const [inboxTotal, setInboxTotal] = useState(0);
@@ -237,8 +241,9 @@ export default function Notifications() {
       setUnreadCount(data.unread);
       setParentLoaded(true);
       setAllCount(data.all_count);
+      setParentListError("");
     } catch (e) {
-      message.error((e as Error).message);
+      setParentListError((e as Error).message || "列表加载失败");
     } finally {
       setLoading(false);
     }
@@ -262,8 +267,9 @@ export default function Notifications() {
       setInboxTotalAll(data.total_all ?? data.total);
       setInboxReadOnly(Boolean(data.read_only)); // T20g
       setInboxScanLimit(data.scan_limit ?? null);
+      setInboxListError("");
     } catch (e) {
-      message.error((e as Error).message);
+      setInboxListError((e as Error).message || "列表加载失败");
     } finally {
       setInboxLoading(false);
     }
@@ -587,12 +593,18 @@ export default function Notifications() {
           }}
         />
       </div>
+      {parentListError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+          {parentListError} · 本次刷新失败：列表可能不是最新的（不代表没有通知记录）——请重试
+          <Typography.Link onClick={() => void loadParent()} style={{ marginLeft: 8 }}>重试</Typography.Link>
+        </Typography.Text>
+      )}
       <Table<AdminNotification>
         rowKey="id"
         size="small"
         loading={loading}
         dataSource={items}
-        locale={{ emptyText: <PaintEmpty message="暂无通知记录" /> }}
+        locale={{ emptyText: parentListError ? null : <PaintEmpty message="暂无通知记录" /> }}
         pagination={false}
         expandable={{
           expandedRowRender: expandContent,
@@ -702,13 +714,20 @@ export default function Notifications() {
           </Typography.Text>
         </div>
       )}
+      {inboxListError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+          {inboxListError} · 本次刷新失败：列表可能不是最新的（不代表没有待办）——请重试
+          <Typography.Link onClick={() => void loadInbox()} style={{ marginLeft: 8 }}>重试</Typography.Link>
+        </Typography.Text>
+      )}
       <Table<AdminInboxItem>
         rowKey="id"
         size="small"
         loading={inboxLoading}
         dataSource={inbox}
         locale={{
-          emptyText: (
+          // 失败时抑制空态：否则「没有待处理的申请，一切安好」会把接口故障读成"真没有待办"
+          emptyText: inboxListError ? null : (
             <PaintEmpty
               message={
                 adminTab === "todo"

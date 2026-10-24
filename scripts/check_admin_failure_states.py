@@ -14,10 +14,15 @@
       把失败**直接变成空值**，连提示都没有。允许同行或上一行写 `// A1-ok: <理由>` 登记
       （例如"降级为 config_key 原文，不构成假 0"这类已论证的兜底）。
   **A2 列表页必须有失败态**：含 `<Table` 且文件内直接调 `apiXxx(` 的文件，必须出现
-      `*Error` 失败态 state（或 `type="warning"` / `type="error"` 提示条）。
-      ⚠️ **已知局限（如实说明）**：A2 是**文件级**判据——一个文件里有多个独立列表时，
-      只要其中一个有失败态就通过。多列表页面（当前只有 `MemberManage`）按挂账处理，
-      由人工验收 S258 覆盖，不以机器判据冒充。
+      **错误态 state 声明**（`const [xxxError | xxxFailed, setXxx] = useState(...)`）。
+      2016-10-24 收紧前它接受任意 `type="warning"`——实测**假阴性**：`Notifications`
+      的「截断提示条」和 `PaymentReconcilePanel` 的「差异条数」都被当成失败态，
+      而这两个页面的两个列表实际只有 toast（已在本批补齐）。
+      确有理由不补的，写文件级 `// A2-ok: <理由>` 登记（会随文件残留而保留）。
+      ⚠️ **仍有的局限（如实说明）**：A2 是**文件级**判据——一个文件里有多个独立列表时，
+      只要存在**一个**错误态 state 就通过。逐表格化需按 JSX 结构解析，留待单独批；
+      多列表页（`MemberManage` 3 个 / `Notifications` 2 个 / `PaymentReconcilePanel` 2 个）
+      本轮已**逐个补齐并浏览器实测**，不以机器判据冒充。
 
 自证：
   · S1 注入自检：A1 三种吞法必须命中、`A1-ok` 登记与注释行不得误报；
@@ -43,8 +48,12 @@ THROWAWAY_CATCH_RE = re.compile(
 )
 #: A1 登记逃生口（同行或上一行）
 A1_OK_RE = re.compile(r"//\s*A1-ok\s*[:：]\s*\S+")
-#: A2：文件级失败态标记（失败态 state 名 或 提示条 Alert/Text）
-FAILURE_STATE_RE = re.compile(r"\w*(?:Error|Failed)\b|type=\"(?:warning|error)\"")
+#: A2：失败态**必须是错误态 state 声明**（2026-10-24 收紧，见 docstring）
+ERROR_STATE_DECL_RE = re.compile(
+    r"const\s*\[\s*\w*(?:Error|Failed)\w*\s*,\s*set\w+\s*\]\s*=\s*useState"
+)
+#: A2 文件级逃生口（写入理由）
+A2_OK_RE = re.compile(r"//\s*A2-ok\s*[:：]\s*\S+")
 TABLE_RE = re.compile(r"<Table\b")
 API_CALL_RE = re.compile(r"\bapi[A-Z]\w+\(")
 
@@ -65,8 +74,13 @@ def scan_file(text: str) -> list[str]:
         if A1_OK_RE.search(line) or A1_OK_RE.search(prev):
             continue
         problems.append(f"A1 失败吞成空：{stripped[:100]}")
-    if TABLE_RE.search(text) and API_CALL_RE.search(text) and not FAILURE_STATE_RE.search(text):
-        problems.append("A2 列表页没有任何失败态（*Error state / warning 提示条）")
+    if (
+        TABLE_RE.search(text)
+        and API_CALL_RE.search(text)
+        and not ERROR_STATE_DECL_RE.search(text)
+        and not A2_OK_RE.search(text)
+    ):
+        problems.append("A2 列表页没有错误态 state（const [xxxError|Failed, setXxx] = useState）")
     return problems
 
 
@@ -115,6 +129,15 @@ def self_test() -> int:
         bad += 1
     if scan_file("<Table />\n// 纯展示表格，数据由 props 传入\n"):
         print("✗ A2 误报：无文件内取数的展示表格被拦")
+        bad += 1
+    # 2026-10-24 收紧回归：只有业务警示（type="warning"）但无错误态 state → 必须命中
+    if not scan_file(
+        '<Table />\napiListX().then(setRows);\n<Typography type="warning">差异 3 条</Typography>\n'
+    ):
+        print('✗ A2 未命中：只有 type="warning" 业务警示、无错误态 state')
+        bad += 1
+    if scan_file("<Table />\napiListX().then(setRows);\n// A2-ok: 表格数据由父组件注入\n"):
+        print("✗ A2 误报：已登记 A2-ok 的文件被拦")
         bad += 1
     # S2 空扫描
     with tempfile.TemporaryDirectory(prefix="admin-failure-selftest-") as d:
