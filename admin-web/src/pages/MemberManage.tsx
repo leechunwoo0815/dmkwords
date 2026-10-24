@@ -146,7 +146,13 @@ export default function MemberManage() {
   const [orderKeyword, setOrderKeyword] = useState<string>(() => readUrl().get("okeyword") ?? ""); // WM3-A5
   const [orderLoading, setOrderLoading] = useState(false); // W6
   const [orderBy, setOrderBy] = useState<string | undefined>(); // W7
-  const [orderCounts, setOrderCounts] = useState<{ pending_manual_confirm: number; total: number }>({ pending_manual_confirm: 0, total: 0 }); // W3
+  // W6-D4（第十轮 P2，2026-10-24）：初值 0 让"还没取到/取失败"与"真值 0"不可区分——
+  // 人工收款确认队列（资金域）会显示「待确认 0」→ 漏确认/漏收款。改成 `null` = **未知**，
+  // label 渲染「—」而不是 0（同仓 Layout/Notifications/CircleManage 的"失败不假 0"范式）。
+  const [orderCounts, setOrderCounts] = useState<{
+    pending_manual_confirm: number | null;
+    total: number | null;
+  }>({ pending_manual_confirm: null, total: null }); // W3
   // WM3-B1 家长管理 tab
   const [parents, setParents] = useState<ParentRow[]>([]);
   const [parentTotal, setParentTotal] = useState(0);
@@ -215,6 +221,9 @@ export default function MemberManage() {
   const [readingChild, setReadingChild] = useState<Child | null>(null);
   const [readingProfile, setReadingProfile] = useState<ChildReadingProfile | null>(null);
   const [readingLoading, setReadingLoading] = useState(false);
+  // W6-D3（第十轮 P2，2026-10-24）：阅读档案抽屉取数失败原先只有 toast → 抽屉里**只剩标题**
+  // （与 GrowthManage 的成长档案同族）。改为抽屉内失败态 + 重试。
+  const [readingError, setReadingError] = useState("");
   const [orderForm] = Form.useForm();
   // R3/FEAT-080：活动单下拉数据源（创建订单弹窗打开时拉一次）
   const [activityOptions, setActivityOptions] = useState<{ value: number; label: string }[]>([]);
@@ -372,10 +381,17 @@ export default function MemberManage() {
   const openReadingProfile = useCallback((child: Child) => {
     setReadingChild(child);
     setReadingProfile(null);
+    setReadingError("");
     setReadingLoading(true);
     apiGetChildReading(child.id)
-      .then(setReadingProfile)
-      .catch((e: Error) => message.error(e.message))
+      .then((d) => {
+        setReadingProfile(d);
+        setReadingError("");
+      })
+      .catch((e: Error) => {
+        message.error(e.message);
+        setReadingError(e.message || "阅读档案加载失败");
+      })
       .finally(() => setReadingLoading(false));
   }, [message]);
   useEffect(() => { if (tab === "orders") loadOrders(orderPg.page); }, [loadOrders, orderPg.page, tab]);
@@ -401,7 +417,9 @@ export default function MemberManage() {
   const refreshOrderCounts = useCallback(() => {
     apiOrderCounts()
       .then((c) => setOrderCounts({ pending_manual_confirm: c.pending_manual_confirm, total: c.total }))
-      .catch(() => { /* 静默：计数失败不阻塞列表 */ });
+      // A1-ok: 计数失败置 **null（未知）**——label 随之显示「—」而非 0，属可见未知态而非"假 0"；
+      // 整页列表另有各自失败态，计数不阻塞列表（W6-D4：原实现是静默保留初值 0）
+      .catch(() => setOrderCounts({ pending_manual_confirm: null, total: null }));
   }, []);
   useEffect(() => { refreshOrderCounts(); }, [refreshOrderCounts, tab]);
 
@@ -445,8 +463,11 @@ export default function MemberManage() {
           // WM3-D1：待确认数 M>0 时红底白字胶囊（M=0 保持原样避免满屏红）
           label: (
             <>
-              订单（{orderCounts.total || orderTotal} · 待确认{" "}
-              {orderCounts.pending_manual_confirm > 0 ? (
+              订单（{orderCounts.total ?? (orderTotal || "—")} · 待确认{" "}
+              {orderCounts.pending_manual_confirm === null ? (
+                // W6-D4：未取到 = 未知，显式写「—」（不许 0 —— 那是"确认队列空"的错误结论）
+                <Typography.Text type="warning">—（未取到）</Typography.Text>
+              ) : orderCounts.pending_manual_confirm > 0 ? (
                 <span style={{ background: "#ff4d4f", color: "#fff", borderRadius: 10, padding: "0 6px" }}>
                   {orderCounts.pending_manual_confirm}
                 </span>
@@ -1012,9 +1033,19 @@ export default function MemberManage() {
       <Drawer
         title={readingChild ? `${readingChild.name} 的阅读档案` : "阅读档案"}
         width={520} open={!!readingChild}
-        onClose={() => { setReadingChild(null); setReadingProfile(null); }}
+        onClose={() => { setReadingChild(null); setReadingProfile(null); setReadingError(""); }}
       >
         {readingLoading && <Typography.Text type="secondary">加载中…</Typography.Text>}
+        {!readingLoading && readingError && (
+          <Typography.Text type="warning" style={{ display: "block" }}>
+            {readingError} · 阅读档案未加载（不代表这个孩子没有阅读数据）——请重试
+            {readingChild && (
+              <Typography.Link onClick={() => openReadingProfile(readingChild)} style={{ marginLeft: 8 }}>
+                重试
+              </Typography.Link>
+            )}
+          </Typography.Text>
+        )}
         {readingProfile && (
           <>
             <Descriptions column={2} size="small" bordered style={{ marginBottom: 16 }}>

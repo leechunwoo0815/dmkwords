@@ -75,6 +75,7 @@ Page({
     total: 0,
     loading: true,
     error: false,
+    listError: '',
     expandedId: null,
   },
 
@@ -104,6 +105,12 @@ Page({
     this.load(true)
   },
 
+  // W7-01：刷新/翻页失败后点提示重试（页码已在 onReachBottom 里 +1，重试即重拉该页；
+  // 行内提示场景下列表非空，语义与"加载更多"一致）
+  onRetryMore() {
+    this.load(this.data.list.length === 0)
+  },
+
   async toggleExpand(e) {
     const id = e.currentTarget.dataset.id
     const expanding = this.data.expandedId !== id
@@ -122,7 +129,7 @@ Page({
   },
 
   async load(reset) {
-    this.setData({ loading: true, error: false })
+    this.setData({ loading: true, error: false, listError: '' })
     try {
       const r = await api.notifications(this._page, PAGE_SIZE, this.data.activeCat)
       const items = decorate(reset ? r.items : this.data.list.concat(r.items))
@@ -133,7 +140,19 @@ Page({
         loading: false,
       })
     } catch (e) {
-      this.setData({ loading: false, error: !reset })
+      // W7-01（第十轮 P2，2026-10-24）：原先写的是 `error: !reset`——**判据取反**：
+      // 首屏/切分类（reset=true）失败会置 `error=false` → 渲染成「暂无消息」（把故障说成"没消息"）；
+      // 翻页失败（reset=false）反而置 `error=true`，而 wxml 的失败分支要求 `list.length===0`
+      // → 翻到底失败时**永不显示**（用户零反馈）。现在：reset 失败且列表为空 → 整页失败态；
+      // 列表已有数据时 → 行内「刷新/加载更多失败」提示（不清空已有数据）。
+      if (reset && this.data.list.length === 0) {
+        this.setData({ loading: false, error: true })
+      } else {
+        this.setData({
+          loading: false,
+          listError: reset ? '列表刷新失败' : '加载更多失败',
+        })
+      }
     }
   },
 

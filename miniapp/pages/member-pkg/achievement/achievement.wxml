@@ -1,4 +1,10 @@
 <view class="page-bg x-cb307e">
+  <!-- W7-03（第十轮 P2，2026-10-24）：取数失败必须有可见态——原先两个接口都静默 catch →
+       level 卡被 wx:if 藏掉、积分区落到「还没有积分记录」，看起来像等级/积分被清零 -->
+  <error-view wx:if="{{loadError}}" type="network" title="成长数据加载失败"
+    desc="{{loadError}}（不是「没有积分记录」，请重试）" bind:onRetry="onRetryLoad" />
+
+  <block wx:else>
   <view class="level-card" wx:if="{{summary}}">
     <view class="level-shield">
       <image class="level-shield-img" src="/icons/badges/level_template.png" mode="aspectFit" />
@@ -53,6 +59,8 @@
       </view>
       <view class="tl-desc x-f31427">+{{item.points}}</view>
     </view>
-    <view class="x-a0f80c" wx:if="{{!points.length}}">还没有积分记录</view>
+    <!-- W7-03：空态只在「成功且确实为空」时出现（失败已由上方 error-view 表达） -->
+    <view class="x-a0f80c" wx:if="{{!points.length && !loadError}}">还没有积分记录</view>
   </view>
+  </block>
 </view>

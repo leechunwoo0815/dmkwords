@@ -10,15 +10,20 @@ Page({
     showWrong: false,
     // WM14-A：本次提交可晒且未晒的成就卡（null=不显示「晒成就」按钮）
     shareTarget: null,
+    // W7-05：取不到成绩单（网络/5xx）时的可见失败态
+    loadError: '',
   },
 
   async onLoad(options) {
+    this._options = options
     const childId = Number(options.child_id)
     const bookId = options.book_id ? Number(options.book_id) : null
     let result = null
     // R9（插修9）：per-book 缓存键（quiz.js 提交时写入）——绝不再读旧单键
     // （跨书污染实锤：点 A 书金卡显示 B 书成绩）
-    try { result = JSON.parse(wx.getStorageSync(`quiz_result_${childId}:${bookId}`) || 'null') } catch (e) { /* ignore */ }
+    try { result = JSON.parse(wx.getStorageSync(`quiz_result_${childId}:${bookId}`) || 'null') } catch (e) {
+      // 降级：本机缓存不可读（写坏/被清）→ 走下面的服务端兜底，不是"没有记录"
+    }
     if (!result && bookId) {
       // 无缓存兜底（换设备/清缓存）：getQuiz 服务端数据构造只读成绩单——
       // 显示该书历史最佳，不带本次作答明细；拿不到才回退"没有测验记录"
@@ -41,7 +46,21 @@ Page({
           points_detail: q.points_added ? [{ points: q.points_added }] : [],
           wrong: [],
         }
-      } catch (e) { /* 落"没有测验记录"分支 */ }
+      } catch (e) {
+        // W7-05（第十轮 P2，2026-10-24）：**区分"确实没有记录"与"取不到"**。
+        // 原先所有异常一律落 `!result` → toast「没有测验记录」+ 800ms 自动返回上一页：
+        // 网络/5xx 故障被说成"孩子没有测验记录"（账上其实有成绩），且自动返回让人无法重试。
+        // 只有 422/404（后端明确说"没有"）才算真无记录；0（网络）/5xx → 失败态 + 重试。
+        const code = (e && e.statusCode) || 0
+        if (code !== 422 && code !== 404) {
+          this.setData({
+            loadError: (e && e.message) || '成绩单加载失败',
+            childId,
+            childName: decodeURIComponent(options.child_name || ''),
+          })
+          return
+        }
+      }
     }
     if (!result) {
       wx.showToast({ title: '没有测验记录', icon: 'none' })
@@ -92,6 +111,12 @@ Page({
   },
 
   toggleWrong() { this.setData({ showWrong: !this.data.showWrong }) },
+
+  // W7-05：失败态里的重试（重跑本页加载，不自动返回）
+  onRetryLoad() {
+    this.setData({ loadError: '' })
+    return this.onLoad(this._options || {})
+  },
 
   // WM14-A（Q5 裁决）：结果页「晒成就」——跳晒卡页并定位到本次可晒的成就卡
   onShare() {

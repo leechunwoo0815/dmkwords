@@ -16,6 +16,12 @@
   </block>
 
   <block wx:else>
+    <!-- W7-06（第十轮 P2，2026-10-24）：取数失败/无孩子必须有可见态——
+         原先失败渲染成「还没有可晒的新成就」+(0)(0)，无参时永久骨架屏 -->
+    <error-view wx:if="{{loadError}}" type="network" title="成就卡加载失败"
+      desc="{{loadError}}（不是「没有可晒的成就」，请重试）" bind:onRetry="onRetryLoad" />
+
+    <block wx:else>
     <view class="child-bar">
       <image class="child-emoji" src="/icons/ui/child.png" mode="aspectFit" />
       <text class="child-name">{{childName}} 的成就</text>
@@ -53,6 +59,7 @@
           <view class="ach-action shared-action">已晒 ✓</view>
         </view>
       </view>
+    </block>
     </block>
   </block>
 </view>

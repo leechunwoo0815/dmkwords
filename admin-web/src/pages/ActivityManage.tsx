@@ -192,7 +192,10 @@ export default function ActivityManage() {
         title: v.title, start_at: v.start_at.toISOString(), location: v.location,
         max_quota: v.max_quota, fee: v.fee ?? 0, description: v.description,
         member_only: v.member_only ?? false,
-        enroll_deadline: v.enroll_deadline ? v.enroll_deadline.toISOString() : undefined,
+        // W6-D5（第十轮 P2，2026-10-24）：与创建路径（`:96`，P2-60 口径）**完全一致**送显式 null。
+        // 原先送 `undefined` → `JSON.stringify` 丢键 → 后端 `model_dump(exclude_unset=True)`
+        // 视为"不改" → 旧报名截止继续生效（运营以为已取消，家长端仍在旧时间点关闭报名）。
+        enroll_deadline: v.enroll_deadline ? v.enroll_deadline.toISOString() : null,
       });
       message.success(editTarget.status === "draft" ? "活动已更新" : "活动已更新（member_only/fee 仅影响新报名）");
       setCreateOpen(false);

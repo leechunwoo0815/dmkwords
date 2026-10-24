@@ -90,6 +90,11 @@ export default function BookDetail() {
   const [bookError, setBookError] = useState("");
   const [copies, setCopies] = useState<BookCopy[]>([]);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  // W6-D2（第十轮 P2，2026-10-24）：副本/题目两个子列表失败原先只有 toast，页面照旧渲染成
+  // 「这里空空如也～」+「副本：0 本」+「取前 0 道作为正式题」——馆员会据此**重复加副本 /
+  // 重复录题**。逐列表留痕（各自横幅 + 失败时抑制空态 + 不显示假 0）。
+  const [copiesError, setCopiesError] = useState("");
+  const [questionsError, setQuestionsError] = useState("");
   const [coverProgress, setCoverProgress] = useState<number | null>(null);
   const [audioProgress, setAudioProgress] = useState<number | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -138,11 +143,23 @@ export default function BookDetail() {
       .then((b) => { setBook(b); setBookError(""); })
       .catch((e: Error) => { message.error(e.message); setBookError(e.message); });
     apiListCopies(bookId)
-      .then(setCopies)
-      .catch(() => message.error("副本列表加载失败，请刷新重试"));
+      .then((list) => {
+        setCopies(list);
+        setCopiesError("");
+      })
+      .catch((e: Error) => {
+        message.error("副本列表加载失败，请刷新重试");
+        setCopiesError(e.message || "副本列表加载失败");
+      });
     apiListQuestions(bookId)
-      .then(setQuestions)
-      .catch(() => message.error("题目列表加载失败，请刷新重试"));
+      .then((list) => {
+        setQuestions(list);
+        setQuestionsError("");
+      })
+      .catch((e: Error) => {
+        message.error("题目列表加载失败，请刷新重试");
+        setQuestionsError(e.message || "题目列表加载失败");
+      });
   };
 
   useEffect(load, [bookId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -253,7 +270,7 @@ export default function BookDetail() {
           <span>ISBN/编号：<Typography.Text code>{book.isbn ?? book.internal_code}</Typography.Text></span>
           <span>总词数：<Typography.Text strong>{book.word_count.toLocaleString()}</Typography.Text></span>
           <span>AR 值：{book.ar_level ?? <Tag color="orange">待配置</Tag>}</span>
-          <span>副本：{copies.length} 本</span>
+          <span>副本：{copiesError ? "—（未加载）" : `${copies.length} 本`}</span>
         </Space>
       </Card>
 
@@ -348,7 +365,13 @@ export default function BookDetail() {
           <Button size="small" icon={<PlusOutlined />} onClick={() => setAddCopiesOpen(true)}>增加副本</Button>
         }
       >
-        <Table<BookCopy> locale={{ emptyText: <PaintEmpty character="bookworm" /> }}
+        {copiesError && (
+          <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+            {copiesError} · 副本列表未加载（不是"这本书没有副本"，请勿据此重复加副本）——请重试
+            <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
+          </Typography.Text>
+        )}
+        <Table<BookCopy> locale={{ emptyText: copiesError ? null : <PaintEmpty character="bookworm" /> }}
           rowKey="id" dataSource={copies} size="small" pagination={false}
           columns={[
             { title: "副本码", dataIndex: "copy_code", width: 160, render: (v) => <Typography.Text code>{v}</Typography.Text> },
@@ -395,7 +418,11 @@ export default function BookDetail() {
 
       {/* 测验题目 */}
       <Card
-        title={`测验题目（取前 ${Math.min(cfgNum(configs, "quiz_questions_per_book", 5), questions.filter((q) => q.is_active === 1).length)} 道作为正式题；多余备用）`}
+        title={
+          questionsError
+            ? "测验题目（题目未加载，正式题数暂不可知）"
+            : `测验题目（取前 ${Math.min(cfgNum(configs, "quiz_questions_per_book", 5), questions.filter((q) => q.is_active === 1).length)} 道作为正式题；多余备用）`
+        }
         size="small"
         extra={<Button size="small" icon={<PlusOutlined />} onClick={() => {
           qForm.resetFields();
@@ -406,7 +433,13 @@ export default function BookDetail() {
           setQuestionOpen(true);
         }}>添加题目</Button>}
       >
-        <Table<QuizQuestion> locale={{ emptyText: <PaintEmpty character="bookworm" /> }}
+        {questionsError && (
+          <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+            {questionsError} · 题目列表未加载（不是"这本书没有题"，请勿据此重复录题）——请重试
+            <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
+          </Typography.Text>
+        )}
+        <Table<QuizQuestion> locale={{ emptyText: questionsError ? null : <PaintEmpty character="bookworm" /> }}
           rowKey="id" dataSource={questions} size="small" pagination={false}
           columns={[
             { title: "#", dataIndex: "sort_order", width: 50 },

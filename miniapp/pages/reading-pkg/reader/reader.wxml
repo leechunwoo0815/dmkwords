@@ -20,7 +20,8 @@
     <view class="playback-controls">
       <view class="ctrl-skip" bindtap="onSkipBack">↺ 15s</view>
       <view class="ctrl-play" bindtap="onTogglePlay">{{playing ? '⏸' : '▶'}}</view>
-      <view class="ctrl-skip x-aa01b4">15s ↻</view>
+      <!-- W7-07（第十轮 P2，2026-10-24）：右侧快进原先漏了 bindtap（只有样式 + :active 按压高亮）= 死控件 -->
+      <view class="ctrl-skip x-aa01b4" bindtap="onSkipForward">15s ↻</view>
     </view>
 
     <view class="speed-row">

@@ -21,6 +21,10 @@ Page({
     selected: null,
     showConfirm: false,
     submitting: false,
+    // W7-04（第十轮 P2，2026-10-24）：取数失败原先静默 catch → status/题目都为空，
+    // 页面落到答题区渲染成「第 1 题」+ 空题干 + 空选项 + 「下一题」（点了只提示"先选一个答案"）
+    // = 死界面、无重试。现在失败落可见态（error-view + 重试）。
+    loadError: '',
   },
 
   async onLoad(options) {
@@ -35,6 +39,8 @@ Page({
     this.load()
   },
 
+  onRetryLoad() { this.load() },
+
   async load() {
     const { bookId, childId } = this.data
     try {
@@ -42,8 +48,16 @@ Page({
       this.setData({
         status: q.status, attemptsLeft: q.attempts_left, bestScore: q.best_score,
         questions: q.questions || [], answers: [], current: 0, selected: null,
+        loadError: '',
       })
-    } catch (e) { /* request.js 已 toast */ }
+    } catch (e) {
+      // W7-04：失败必须落到 error-view（"测验加载失败" + 重试），
+      // 并清空 status/questions —— 否则页面会渲染成"第 1 题"的假题面
+      this.setData({
+        loadError: (e && e.message) || '测验加载失败',
+        status: '', questions: [], answers: [], current: 0, selected: null,
+      })
+    }
   },
 
   goBack() { wx.navigateBack({ delta: 1 }) },

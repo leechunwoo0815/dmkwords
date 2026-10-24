@@ -284,30 +284,9 @@
   background: var(--accent-hover);
 }
 
-/* Toast */
-.toast {
-  position: fixed;
-    box-sizing: border-box;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(var(--fg-rgb), 0.8);
-  padding: 28rpx 48rpx;
-  border-radius: 32rpx;
-  font-size: 28rpx;
-  font-weight: 500;
-  color: var(--surface);
-  box-sizing: border-box;
-  z-index: 100;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.toast.show {
-  opacity: 1;
-}
-
+/* 第十轮 B2（2026-10-24）：删掉 `.toast` / `.toast.show` 死样式——
+   它此前被 JS 里一句 `/* request.js 已 toast */` 注释里的 "toast" 字样"保护"着，
+   检查器 R16a 一直当它被引用（命令式注释掩盖死类名）。 */
 /* Tip */
 .tip {
   text-align: center;

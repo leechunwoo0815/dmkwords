@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""小程序接线检查（2026-10-09，A1-11）——两条"现有七查读不到"的类。
+"""小程序接线检查（2026-10-09，A1-11）——W1~W7，覆盖"现有七查读不到"的类。
 
 为什么新增（上线前审查 P0-2 / P2-14；错误记忆库 §一百零七 同族）：
 
@@ -87,27 +87,56 @@ SILENT_EMPTY_CATCH_RE = re.compile(
 #: **逃生口**：catch 块内写明「降级」二字的注释 = 有意的次级功能降级（如 circle.js 的点赞
 #: 通知条失败不显示条、信息流照常）——与 `check_fake_assertions` 的"同行注释才是逃生口"同款。
 CATCH_BLOCK_RE = re.compile(r"catch\s*\([^)]*\)\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}", re.S)
+#: W4c 用：只认 catch 头，块体交给 `brace_body` 配平（`CATCH_BLOCK_RE` 处理不了嵌套花括号，
+#: catch 里只要有 `if/else` 或注释里的 `{{…}}` 就整段漏配——第十轮 B2 变异实测的假阴性来源）。
+CATCH_HEAD_RE = re.compile(r"\bcatch\s*\([^)]*\)\s*\{")
 SILENT_EMPTY_IN_CATCH_RE = re.compile(r"setData\(\s*\{[^}]*:\s*\[\s*\]")
 FAILURE_MARK_RE = re.compile(r"loadError|noChild|error|toast|message|showToast|降级")
 
-#: W4 **第三形态**（2026-10-24 第一百三十五批，IDE 实测抓到）：**资金/记录类页面的加载函数**里，
+#: W4 **第三形态**（2026-10-24 第一百三十五批，IDE 实测抓到）：**失败=空会直接误导家长**的页面里，
 #: catch 必须落到**可见失败态**（`loadError|listError|condError|noChild|…Error:`），
 #: "什么都不做（只靠 request.js 的 toast）"或"只把 loading 置 false"都算违例。
 #:
-#: 为什么只扫这 6 页：前两形态只认"吞成空数据"，而押金页的真实形态是
+#: 为什么只扫这些页：前两形态只认"吞成空数据"，而押金页的真实形态是
 #: `catch (e) { /* 已 toast */ }`——toast 几秒后消失，页面显示「暂无流水记录」，
 #: 与"确实没有流水"长得一模一样（退款申请页同款：显示「没有可退款的订单」）。
 #: 全仓铺开不行的原因：`index`/`circle`/`book-detail` 等处大量静默 catch 是**有意的次级
 #: 功能降级**（轮播、点赞通知条、预检放行），一刀切会制造几十处噪音改动。
-#: 判据只覆盖"失败=空会直接误导家长的钱/记录"的页面；**新增加这类页面时把路径加进来**。
-MONEY_RECORD_PAGES = {
+#:
+#: **第十轮 B2 扩面（2026-10-24 第一百三十九批）**：原清单只有 6 个资金/记录页，
+#: 而同一形态在**消息中心/阅读护照/等级勋章/线上测验/测验结果/晒成就**六个页面同样存在
+#: （W7-01…06 独立发现，离线注入实测：失败被渲染成「暂无消息」「还没有积分记录」
+#: 「还没有可晒的新成就」「第 1 题」空题面/整页空白）——即清单漏项 = 检查器假阴性。
+#: 现在把"失败=空会直接误导家长（钱 / 记录 / 成绩 / 成就）"的页面都列进来；
+#: **新增加这类页面时把路径加进来**。
+FAILURE_STATE_PAGES = {
+    # 资金与记录（第一百三十五批）
     "miniapp/pages/order-pkg/deposit/deposit.js",
     "miniapp/pages/order-pkg/order-history/order-history.js",
     "miniapp/pages/order-pkg/refund-apply/refund-apply.js",
     "miniapp/pages/order-pkg/reservation/reservation.js",
     "miniapp/pages/order-pkg/withdrawal/withdrawal.js",
     "miniapp/pages/order-pkg/benefit-transfer/benefit-transfer.js",
+    # 消息 / 成绩 / 成就（第十轮 B2：W7-01…06 实测同族）
+    "miniapp/pages/order-pkg/messages/messages.js",
+    "miniapp/pages/member-pkg/profile-card/profile-card.js",
+    "miniapp/pages/member-pkg/achievement/achievement.js",
+    "miniapp/pages/reading-pkg/quiz/quiz.js",
+    "miniapp/pages/reading-pkg/quiz-result/quiz-result.js",
+    "miniapp/pages/circle/share.js",
 }
+#: W7 死控件判据面：**人工确认是控件区**的容器（wxml 相对路径, 容器 class）。
+#: 容器内每个直接子 `<view>` 必须有 `bindtap`（见 scan_dead_controls 的 why）。
+CONTROL_CONTAINERS: tuple[tuple[str, str], ...] = (
+    ("miniapp/pages/reading-pkg/reader/reader.wxml", "playback-controls"),
+)
+CONTAINER_OPEN_RE = re.compile(r'<view[^>]*class="[^"]*\b{}\b[^"]*"[^>]*>')
+CONTAINER_OPEN_TPL = r'<view[^>]*class="[^"]*\b%s\b[^"]*"[^>]*>'
+CHILD_VIEW_RE = re.compile(r"<view\b[^>]*>")
+VIEW_OPEN_RE = re.compile(r"<view\b[^>]*>")
+VIEW_CLOSE_RE = re.compile(r"</view>")
+
+
 #: 加载路径的函数名（onShow 会同步调 load()；onLoad 直接拉数的页面也在内）
 LOAD_FN_RE = re.compile(
     r"^\s*(?:async\s+)?(load\w*|onShow|onLoad|onRetry\w*)\s*\([^)]*\)\s*\{", re.M
@@ -431,12 +460,13 @@ def load_function_bodies(text: str):
 
 
 def scan_load_catch_state(js_files: list[Path], pages: set[str] | None = None) -> list[str]:
-    """W4c：资金/记录类页面的**加载函数**里，catch 必须落到可见失败态（见 MONEY_RECORD_PAGES）。
+    """W4c：失败=空会误导家长的页面（见 FAILURE_STATE_PAGES）的**加载函数**里，
+    catch 必须落到可见失败态。
 
     只扫加载路径：`onCancel` / `onSubmit` 这类**动作**的 catch 弹 toast 是合理 UX，
     不在此判据内（把它们一起判红会逼着给所有动作加常驻横幅）。
     """
-    pages = MONEY_RECORD_PAGES if pages is None else pages
+    pages = FAILURE_STATE_PAGES if pages is None else pages
     problems: list[str] = []
     for js in js_files:
         try:
@@ -447,17 +477,99 @@ def scan_load_catch_state(js_files: list[Path], pages: set[str] | None = None) -
             continue
         text = js.read_text(encoding="utf-8", errors="ignore")
         for fn_name, body, fn_line in load_function_bodies(text):
-            for m in CATCH_BLOCK_RE.finditer(body):
-                block = m.group(1)
-                if ERROR_STATE_MARK_RE.search(block) or "降级" in block:
+            masked = mask_js_comments(body)
+            found = 0
+            # 块体用 `brace_body` **配平**取（不用 CATCH_BLOCK_RE）：后者处理不了嵌套花括号——
+            # catch 里只要有 `if/else` 或注释里的 `{{…}}`，整段就匹配不上（catch 被静默跳过，
+            # 比"看注释"更隐蔽的漏检；第十轮 B2 变异实测）。
+            for head in CATCH_HEAD_RE.finditer(masked):
+                found += 1
+                open_idx = head.end() - 1
+                block = brace_body(masked, open_idx)
+                raw_block = body[open_idx + 1 : open_idx + 1 + len(block)]
+                # 判据分两半：
+                # ① **失败态标记必须在真代码里**——在"掩掉注释"的块上匹配（注释写 loadError 不算数）；
+                # ② 「降级」逃生口仍看**原文块**（它本来就要求写明理由，是注释形态）。
+                if ERROR_STATE_MARK_RE.search(block) or "降级" in raw_block:
                     continue
-                line = fn_line + body[: m.start()].count("\n")
+                line = fn_line + body[:open_idx].count("\n")
                 problems.append(
                     f"W4 {rel}:{line}: 加载函数 `{fn_name}()` 的 catch 没落到可见失败态——"
                     f"失败会被渲染成「没有数据」（toast 一过就没人知道出过错）；"
                     f"补 `loadError` + error-view + 重试；确属次级功能降级请写明「降级」"
                 )
+            # 扫描面守卫（S2 同族）：函数体里数得出 catch，就必须每个都被扫到——
+            # 静默跳过 = 覆盖面塌缩（本轮就是这么漏的）。
+            n_catch = len(re.findall(r"\bcatch\s*\(", masked))
+            if n_catch != found:
+                problems.append(
+                    f"W4 {rel}:{fn_line}: 扫描面异常——函数体里 {n_catch} 个 catch，只解析到 {found} 个"
+                    f"（检查器正则漏配；这属于检查器缺陷，不是页面缺陷）"
+                )
     return problems
+
+
+def scan_dead_controls(wxml_files: list[Path]) -> list[str]:
+    """W7：**声明为控件的容器**里，每个直接子 `<view>` 必须有 `bindtap`（死控件判据）。
+
+    为什么单列（第十轮 W7-07，2026-10-24）：听书页右侧「15s ↻」是个 `view`，套着和左侧
+    「↺ 15s」**同一套 `.ctrl-skip` 样式（含 `:active` 按压高亮）**，却没有 `bindtap`——
+    孩子按下去有视觉反馈、播放位置不动，于是反复点。**W1 管不到这个方向**：它检查的是
+    "wxml 里写了 bind* → js 里有对应方法"，而"控件压根没接线"在 W1 眼里等于没有绑定可查
+    （变异实测：删掉该 bindtap，W1 依然全绿）。故这里对**明确是控件**的容器加一条正向判据。
+
+    为什么只扫声明清单而不到处铺开：页面里大量 `view` 是纯展示块（`class="tip"`/`"divider"`），
+    按"类名像按钮"去判会有几十处假阳性。清单里的容器是**人工确认的控件区**，
+    新增这类容器时把 `(wxml 相对路径, 容器 class)` 加进来。
+    """
+    problems: list[str] = []
+    rel_all = {}
+    for wxml in wxml_files:
+        try:
+            rel_all[wxml.relative_to(ROOT).as_posix()] = wxml
+        except ValueError:  # 自检样本在临时目录
+            rel_all[wxml.as_posix()] = wxml
+    for (rel, container), path in ((k, rel_all.get(k[0])) for k in CONTROL_CONTAINERS):
+        if path is None:
+            problems.append(f"W7 {rel}: 控件容器清单指向不存在的文件（覆盖面静默缩小）")
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        m = re.search(CONTAINER_OPEN_TPL % re.escape(container), text)
+        if not m:
+            problems.append(f"W7 {rel}: 找不到控件容器 .{container}（清单过期？）")
+            continue
+        inner = _container_inner(text, m.end())
+        idx = 0
+        for child in CHILD_VIEW_RE.finditer(inner):
+            idx += 1
+            if "bindtap" not in child.group(0):
+                line = text[: m.start()].count("\n") + inner[: child.start()].count("\n") + 1
+                problems.append(
+                    f"W7 {rel}:{line}: 控件容器 .{container} 内的第 {idx} 个控件没有 bindtap"
+                    f"（有按压样式却点了没反应 = 死控件；补 handler 或去掉该控件）"
+                )
+    return problems
+
+
+def _container_inner(text: str, start: int) -> str:
+    """取 `<view …>…</view>` 的内层（按标签深度配平，忽略自闭合标签）。"""
+    depth = 1
+    i = start
+    while i < len(text):
+        open_m = VIEW_OPEN_RE.search(text, i)
+        close_m = VIEW_CLOSE_RE.search(text, i)
+        if close_m is None:
+            break
+        if open_m is not None and open_m.start() < close_m.start():
+            if not open_m.group(0).rstrip().endswith("/>"):
+                depth += 1
+            i = open_m.end()
+            continue
+        depth -= 1
+        if depth == 0:
+            return text[start : close_m.start()]
+        i = close_m.end()
+    return text[start:]
 
 
 def util_exports(util_dir: Path | None = None) -> dict[str, list[Path]]:
@@ -471,6 +583,54 @@ def util_exports(util_dir: Path | None = None) -> dict[str, list[Path]]:
         for name in exports_from_source(text):
             out.setdefault(name, []).append(path.resolve())
     return out
+
+
+def mask_js_comments(text: str) -> str:
+    r"""把注释**原地换成等长空格**（换行保留）——偏移量与原文一致，供"先掩注释再扫括号"用。
+
+    为什么需要它（第十轮 B2 变异实测，两处假阴性同源）：W4c 原先直接对**原文**跑 catch 块正则，
+    而该正则 `catch\s*\([^)]*\)\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}` **不能处理嵌套花括号**——
+    注释里写一句 `<error-view wx:if="{{loadError}}">` 就带两层 `{}`，于是**整个 catch 都没被匹配**
+    （catch 被静默跳过 = 比"看注释"更隐蔽的漏检）。掩掉注释后花括号只可能来自真代码。
+    """
+    out: list[str] = []
+    i = 0
+    quote = ""
+    while i < len(text):
+        ch = text[i]
+        if quote:
+            out.append(ch)
+            if ch == "\\" and i + 1 < len(text):
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if ch == quote:
+                quote = ""
+            i += 1
+            continue
+        if ch in "\"'`":
+            quote = ch
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and i + 1 < len(text) and text[i + 1] == "/":
+            while i < len(text) and text[i] != "\n":
+                out.append(" ")
+                i += 1
+            continue
+        if ch == "/" and i + 1 < len(text) and text[i + 1] == "*":
+            while i < len(text) and not (
+                text[i] == "*" and i + 1 < len(text) and text[i + 1] == "/"
+            ):
+                out.append("\n" if text[i] == "\n" else " ")
+                i += 1
+            if i < len(text):
+                out.append("  ")
+                i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def strip_js_comments(text: str) -> str:
@@ -931,6 +1091,43 @@ def selftest() -> list[str]:
         nested_page.write_text("Page({\n  onLoad() { targetCallName() },\n})\n", encoding="utf-8")
         if not scan_missing_util_require([nested_page], nested_exports):
             fails.append("S1: W6 嵌套导出样本未命中（旧解析器在这里是假绿）")
+        # W4c 假阴性（第十轮 B2 变异实测）：catch 里**只有注释**提到 loadError
+        # ——真代码没写失败态，必须报出来（原实现直接在原文上匹配 → 注释就能骗过检查器）
+        comment_only = base / "comment_only.js"
+        comment_only.write_text(
+            "Page({\n  async load() {\n    try {\n      this.setData({ rows: await api.list() })\n"
+            "    } catch (e) {\n      // 失败要落到 loadError（这行只是注释，不是赋值）\n"
+            "      /* loadError */\n    }\n  },\n})\n",
+            encoding="utf-8",
+        )
+        if not scan_load_catch_state([comment_only], {comment_only.as_posix()}):
+            fails.append("S1: W4c 注释冒充失败态未命中（检查器在看注释而不是代码）")
+        # W7 死控件：控件容器内子 view 无 bindtap 必须命中；全部接线不得误报
+        dead_wxml = base / "ctrl_dead.wxml"
+        dead_wxml.write_text(
+            '<view class="playback-controls">\n  <view class="ctrl-skip" bindtap="onBack">↺ 15s</view>\n'
+            '  <view class="ctrl-skip">15s ↻</view>\n</view>\n',
+            encoding="utf-8",
+        )
+        live_wxml = base / "ctrl_live.wxml"
+        live_wxml.write_text(
+            '<view class="playback-controls">\n  <view class="ctrl-skip" bindtap="onBack">↺ 15s</view>\n'
+            '  <view class="ctrl-skip" bindtap="onForward">15s ↻</view>\n</view>\n',
+            encoding="utf-8",
+        )
+        saved = CONTROL_CONTAINERS
+        try:
+            globals()["CONTROL_CONTAINERS"] = ((dead_wxml.as_posix(), "playback-controls"),)
+            if not scan_dead_controls([dead_wxml]):
+                fails.append("S1: W7 死控件未命中（无 bindtap 的子控件没被抓出）")
+        finally:
+            globals()["CONTROL_CONTAINERS"] = saved
+        try:
+            globals()["CONTROL_CONTAINERS"] = ((live_wxml.as_posix(), "playback-controls"),)
+            if scan_dead_controls([live_wxml]):
+                fails.append("S1: W7 误报（全部子控件都接了 bindtap）")
+        finally:
+            globals()["CONTROL_CONTAINERS"] = saved
     return fails
 
 
@@ -954,6 +1151,7 @@ def main() -> int:
         + scan_remote_img_fallback(wxml_files)
         + scan_missing_util_require(js_files)
         + scan_load_catch_state(js_files)
+        + scan_dead_controls(wxml_files)
     )
     print(f"扫描面: {len(wxml_files)} 个 wxml（pages + components）+ {len(js_files)} 个 js")
     print(f"W1 bind*/catch* handler 缺失: {sum(1 for p in problems if p.startswith('W1'))}")
@@ -962,15 +1160,18 @@ def main() -> int:
     print(f"W4 失败吞成空数据/加载函数无失败态: {sum(1 for p in problems if p.startswith('W4'))}")
     print(f"W5 远程图缺 binderror 兜底: {sum(1 for p in problems if p.startswith('W5'))}")
     print(f"W6 调 utils 导出但未 require: {sum(1 for p in problems if p.startswith('W6'))}")
+    print(
+        f"W7 死控件（控件容器内的子控件没有 bindtap）: {sum(1 for p in problems if p.startswith('W7'))}"
+    )
     if problems:
         print("\n违例明细：")
         for p in problems:
             print("  ✗", p)
-        print("\nFAIL: 接线检查不通过（W1~W6 必须为 0）")
+        print("\nFAIL: 接线检查不通过（W1~W7 必须为 0）")
         return 1
     print(
-        "PASS: 小程序接线六条规则全零（handler 存在 / 插值类名可解析 / reader 入口传 id / "
-        "失败不吞成空（含资金页加载失败态）/ 远程图带兜底 / utils 符号先 require）✓"
+        "PASS: 小程序接线七条规则全零（handler 存在 / 插值类名可解析 / reader 入口传 id / "
+        "失败不吞成空（含资金页加载失败态）/ 远程图带兜底 / utils 符号先 require / 控件容器无死控件）✓"
     )
     return 0
 
@@ -983,8 +1184,8 @@ if __name__ == "__main__":
             print("FAIL(S1): " + "；".join(_fails))
             sys.exit(1)
         print(
-            "✓ S1 注入自检通过（W1~W6 违例命中 + 冒号式/单引号绑定命中 + "
-            "本地资产/注释/已带兜底/已 require 正例零误报）"
+            "✓ S1 注入自检通过（W1~W7 违例命中 + 冒号式/单引号绑定命中 + 注释冒充失败态/W7 死控件命中 + "
+            "本地资产/注释/已带兜底/已 require/控件全接线 正例零误报）"
         )
         sys.exit(0)
     sys.exit(main())

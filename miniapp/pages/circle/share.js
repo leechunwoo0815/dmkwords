@@ -2,6 +2,7 @@
 const api = require('../../utils/api')
 const media = require('../../utils/media')
 const img = require('../../utils/img')
+const session = require('../../utils/session')
 
 Page({
   // P3（第一百一十六批）：晒出的卡片图加载失败兜底（清空该字段 → 走同页失败占位分支）
@@ -14,6 +15,10 @@ Page({
     shared: [],
     loading: true,
     sharing: false,
+    // W7-06（第十轮 P2，2026-10-24）：① 取数失败原先静默 catch → 渲染成「还没有可晒的新成就」
+    // 且两个 tab 显示 (0)(0)（把故障说成"没有成就"）；② 无 child_id 时 `Number(undefined)=NaN`
+    // → onShow 的 `if (this.data.childId)` 为假 → 永不 load → 永久骨架。两者都补可见态。
+    loadError: '',
     // 事件触发点定位（Q5：quiz-result「晒成就」跳来时把该卡置顶）
     focusType: '',
     focusRef: null,
@@ -23,7 +28,8 @@ Page({
 
   onLoad(options) {
     this.setData({
-      childId: Number(options.child_id),
+      // W7-06：无参不再落 NaN（那会让页面永久停在骨架屏）——统一解析 + 走可见态
+      childId: session.resolveChildId(options),
       childName: decodeURIComponent(options.child_name || ''),
       // Q5：事件触发点带卡定位（quiz-result「晒成就」→ 该卡置顶便于直接晒）
       focusType: options.focus_type || '',
@@ -32,18 +38,27 @@ Page({
   },
 
   onShow() {
-    if (this.data.childId) this.load()
+    if (!this.data.childId) {
+      this.setData({ loading: false, loadError: '没有选择孩子（请先在「我的」里添加或选择孩子）' })
+      return
+    }
+    this.load()
   },
 
+  onRetryLoad() { this.load() },
+
   async load() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, loadError: '' })
     try {
       const res = await api.circleMyCards(this.data.childId)
       this.setData({
         available: this._focusFirst(res.available || []),
         shared: res.shared || [],
       })
-    } catch (e) { /* request.js 已 toast */ }
+    } catch (e) {
+      // W7-06：失败必须落到可见失败态（"还没有可晒的新成就"是误导）
+      this.setData({ available: [], shared: [], loadError: (e && e.message) || '成就卡加载失败' })
+    }
     finally { this.setData({ loading: false }) }
   },
 

@@ -284,6 +284,18 @@ Page({
     audio.seek(target)
   },
 
+  // W7-07（第十轮 P2，2026-10-24）：右侧「15s ↻」原先**没有 bindtap**——wxml 里只是个带
+  // `.ctrl-skip`（含 `:active` 按压高亮）的 view → 孩子按下去有反馈却没反应，反复点。
+  // 现在与左侧同源实现快进（seek 前先上报区间，口径与 onSkipBack / 拖动一致）。
+  onSkipForward() {
+    const audio = this._audio
+    if (!audio) return
+    this._reportNow()
+    const dur = audio.duration || this.data.duration || 0
+    const target = (audio.currentTime || 0) + 15
+    audio.seek(dur > 0 ? Math.min(dur, target) : target)
+  },
+
   onSliderChanging(e) {
     // 拖动中先上报当前区间（防刷：seek 前的位置区间如实入账）
     if (this._sessionStart !== null && this._audio && this.data.playing) {

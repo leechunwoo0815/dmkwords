@@ -39,6 +39,10 @@ export default function GrowthManage() {
   const [keyword, setKeyword] = useState("");
   const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination();
   const [growth, setGrowth] = useState<ChildGrowth | null>(null);
+  // W6-D3（第十轮 P2，2026-10-24）：抽屉取数失败原先只有 toast，`loading` 落 false 后
+  // `growth` 仍为 null → 抽屉里**只剩标题**（实测 0 字正文）。馆员会读成"这个孩子没有成长数据"，
+  // 且只能关掉重开才能重试。改为抽屉内失败态 + 重试。
+  const [growthError, setGrowthError] = useState("");
   const [growChild, setGrowChild] = useState<Child | null>(null);
   const [loading, setLoading] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -84,10 +88,17 @@ export default function GrowthManage() {
   const openGrowth = (c: Child) => {
     setGrowChild(c);
     setGrowth(null);
+    setGrowthError("");
     setLoading(true);
     apiGetChildGrowth(c.id)
-      .then(setGrowth)
-      .catch((e: Error) => message.error(e.message))
+      .then((d) => {
+        setGrowth(d);
+        setGrowthError("");
+      })
+      .catch((e: Error) => {
+        message.error(e.message);
+        setGrowthError(e.message || "成长档案加载失败");
+      })
       .finally(() => setLoading(false));
   };
 
@@ -209,9 +220,19 @@ export default function GrowthManage() {
       <Drawer
         title={growChild ? `${growChild.name} 的成长档案` : "成长档案"}
         width={640} open={!!growChild}
-        onClose={() => { setGrowChild(null); setGrowth(null); }}
+        onClose={() => { setGrowChild(null); setGrowth(null); setGrowthError(""); }}
       >
         {loading && <Typography.Text type="secondary">加载中…</Typography.Text>}
+        {!loading && growthError && (
+          <Typography.Text type="warning" style={{ display: "block" }}>
+            {growthError} · 成长档案未加载（不代表这个孩子没有成长数据）——请重试
+            {growChild && (
+              <Typography.Link onClick={() => openGrowth(growChild)} style={{ marginLeft: 8 }}>
+                重试
+              </Typography.Link>
+            )}
+          </Typography.Text>
+        )}
         {growth && (
           <>
             <Descriptions column={3} size="small" bordered style={{ marginBottom: 16 }}>

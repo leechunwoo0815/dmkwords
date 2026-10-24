@@ -123,7 +123,11 @@ export function apiUpdateActivity(
   id: number,
   body: Partial<{
     title: string; start_at: string; location: string; max_quota: number;
-    fee: number; description: string; member_only: boolean; enroll_deadline?: string;
+    fee: number; description: string; member_only: boolean;
+    // W6-D5（第十轮 P2）：必须允许 `null`——清空「报名截止」要送**显式 null**
+    // （后端 `model_dump(exclude_unset=True)` 只对"出现在 payload 里的键"赋值）；
+    // 类型上禁 null 会逼调用方送 `undefined` → JSON.stringify 丢键 → 清空静默不生效。
+    enroll_deadline?: string | null;
   }>,
 ): Promise<{ id: number; title: string; status: string }> {
   return request(`/api/admin/activities/${id}`, { method: "PUT", body: JSON.stringify(body) });

@@ -1,3 +1,8 @@
+<!-- W7-05（第十轮 P2，2026-10-24）：取不到成绩单（网络/5xx）必须说"加载失败 + 重试"，
+     不许说成「没有测验记录」并自动返回上一页（账上其实有成绩） -->
+<error-view wx:if="{{loadError}}" type="network" title="成绩单加载失败"
+  desc="{{loadError}}（不是「没有测验记录」，请重试）" bind:onRetry="onRetryLoad" />
+
 <view class="result-page" wx:if="{{result}}">
   <view class="level-up-banner" wx:if="{{result.level_up}}">
     <image class="level-up-emoji" src="/icons/ui/party.png" mode="aspectFit" />

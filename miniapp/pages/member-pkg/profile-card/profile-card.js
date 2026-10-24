@@ -36,6 +36,11 @@ Page({
     milestones: [],
     unlockedCount: 0,
     nextHint: '',
+    // W7-02（第十轮 P2，2026-10-24）：这两个可见失败态原先只在 setData 里出现过、**没在 data 里声明**，
+    // 而 catch 分支从头到尾没有写过 `loadError`（wxml 的 `<error-view wx:if="{{loadError}}">` 是死标记）
+    // → 取数失败时两个 wx:if 都不成立 = 除导航栏外整页空白（会被读成"孩子没有成就"）。补声明 + 补赋值。
+    noChild: false,
+    loadError: '',
   },
 
   onLoad(options) {
@@ -79,7 +84,11 @@ Page({
           ? `下一枚 ${next.label} · 还差 ${fmtWords(Math.max(0, next.node - (p.words_total || 0)))}词`
           : '六枚里程碑全部解锁，太厉害了',
       })
-    } catch (e) { /* request.js 已 toast */ }
+    } catch (e) {
+      // W7-02：失败必须落到 `<error-view wx:if="{{loadError}}">`（"名片加载失败" + 重试），
+      // 不许让页面停在"两个 wx:if 都不成立"的空白态
+      this.setData({ loadError: (e && e.message) || '名片加载失败' })
+    }
   },
 
   onShareAppMessage() {

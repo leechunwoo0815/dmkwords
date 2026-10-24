@@ -12,7 +12,13 @@
     </view>
   </view>
 
-  <view wx:if="{{status === 'locked'}}" class="feedback">
+  <!-- W7-04（第十轮 P2，2026-10-24）：取数失败必须有可见态。原先静默 catch → status 空、questions 空，
+       落到下面的 wx:else 答题区：显示「第 1 题」+ 空题干 + 空选项 + 「下一题」（点了只提示"先选一个答案"）
+       = 死界面。现在失败态优先于全部状态分支。 -->
+  <error-view wx:if="{{loadError}}" type="network" title="测验加载失败"
+    desc="{{loadError}}（不是「测验不可用」，请重试）" bind:onRetry="onRetryLoad" />
+
+  <view wx:elif="{{status === 'locked'}}" class="feedback">
     <image class="feedback-icon" src="/icons/ui/lock.png" mode="aspectFit" />
     <text class="feedback-text">先去把这本书听完（{{cfg.audio_finish_threshold_percent}}%），测验就会解锁啦</text>
     <view class="feedback-btn" bindtap="goBack">去听书</view>
@@ -44,7 +50,7 @@
   <!-- 2026-09-16：底栏只在「答题中」出现。原来这里只排除 locked/failed，
        status=passed 时上方已显示「已通过 + 选下一本」，底栏却还挂着「提交测验」——
        两个互相矛盾的动作同屏（用户报障「按钮自相矛盾」）。 -->
-  <view class="quiz-footer" wx:if="{{status !== 'locked' && status !== 'failed' && status !== 'passed'}}">
+  <view class="quiz-footer" wx:if="{{!loadError && status !== 'locked' && status !== 'failed' && status !== 'passed'}}">
     <view wx:if="{{current > 0}}" class="next-btn x-dc4dd1" bindtap="onPrev">上一题</view>
     <view class="next-btn" bindtap="onNext">
       {{current === questions.length - 1 ? '提交测验' : '下一题'}}

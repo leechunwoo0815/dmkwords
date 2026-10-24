@@ -193,6 +193,11 @@ export default function Dashboard() {
   const { message } = AntdApp.useApp(); // F-L4/T34：App context 化（禁静态 message）
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
+  // W6-D1（第十轮 P2，2026-10-24）：取数失败原先只有 ~3s toast，页面照旧渲染成
+  // 「最近配置变更：暂无变更记录」+ 经营看板全「—」+ 图形区整块消失——与"确实没有数据"
+  // 长得一模一样（超管首屏据此误判经营数据）。改为**页面级失败态**（横幅 + 重试），
+  // 空态只在"取到了且确实为空"时出现（`overview !== null`）。
+  const [overviewError, setOverviewError] = useState("");
   const { counts, failed, reload } = useTodoCounts();
   const { permissions } = useAuth();
   const isSuper = hasPermission(permissions, "audit.view");
@@ -200,9 +205,15 @@ export default function Dashboard() {
   const load = () => {
     setLoading(true);
     apiDashboardOverview()
-      .then(setOverview)
+      .then((d) => {
+        setOverview(d);
+        setOverviewError("");
+      })
       // F-M8 族/T26：仪表盘 fetch 失败必须报错——静默 = 管理员对着空看板误判经营数据
-      .catch((e: Error) => message.error(e.message))
+      .catch((e: Error) => {
+        setOverviewError(e.message || "概览加载失败");
+        message.error(e.message);
+      })
       .finally(() => setLoading(false));
   };
 
@@ -240,8 +251,18 @@ export default function Dashboard() {
         门店运营实时数据；经营看板覆盖藏书/借阅/会员/测验/里程碑，支持 Excel 导出。
       </Typography.Paragraph>
 
+      {overviewError && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 12 }}>
+          {overviewError} · 本次取数失败：下方数字与图形未加载（不代表经营数据为 0/无变更）——请重试
+          <Typography.Link onClick={load} style={{ marginLeft: 8 }}>
+            重试
+          </Typography.Link>
+        </Typography.Text>
+      )}
+
       {/* 图形区（2026-09-21 用户需求：仪表盘要有"很酷炫的图"，且要投到店外电视上）。
-          用既有 /api/admin/dashboard 的数据渲染，不改后端；数字卡片按用户裁定照旧留在下方。 */}
+          用既有 /api/admin/dashboard 的数据渲染，不改后端；数字卡片按用户裁定照旧留在下方。
+          W6-D1：取数失败时不再"整块消失"，用同一条横幅解释为什么没有图。 */}
       {overview && <DashboardCharts data={overview} />}
 
       <TodoCard counts={counts} failed={failed} reload={reload} isSuper={isSuper} />
@@ -305,7 +326,8 @@ export default function Dashboard() {
           最近配置变更
         </Typography.Title>
         <Card size="small" styles={{ body: { padding: "4px 16px" } }}>
-          {(overview?.recent_config_changes ?? []).length === 0 ? (
+          {/* W6-D1：空态只对"取到了且确实为空"成立——失败时由上方横幅说明，这里不再说「暂无」 */}
+          {overview !== null && (overview.recent_config_changes ?? []).length === 0 ? (
             <Typography.Text type="secondary">暂无变更记录</Typography.Text>
           ) : (
             (overview?.recent_config_changes ?? []).map((c, i) => (

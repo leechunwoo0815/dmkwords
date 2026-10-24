@@ -41,5 +41,8 @@
     </view>
   </view>
 
+  <!-- W7-01（第十轮 P2）：刷新/翻页失败的行内提示（列表还在、不清空；原先这种情况**零反馈**） -->
+  <view wx:if="{{listError}}" class="load-error" bindtap="onRetryMore">{{listError}}，点此重试</view>
+
   <view wx:if="{{list.length > 0 && list.length >= total}}" class="load-end">— 没有更多了 —</view>
 </view>

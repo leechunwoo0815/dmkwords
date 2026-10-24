@@ -151,3 +151,6 @@
 }
 
 .list-error { text-align: center; padding: 80rpx 32rpx; color: var(--accent); font-size: 28rpx; }
+
+/* W7-01（第十轮 P2）：翻页（加载更多）失败的行内提示——可点重试，不清空已加载的消息 */
+.load-error { text-align: center; padding: 24rpx 32rpx; color: var(--accent); font-size: 26rpx; }
