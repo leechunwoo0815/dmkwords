@@ -18,7 +18,9 @@
         <view class="reservation-title">{{item.title}}</view>
         <view class="reservation-author">{{item.author || '佚名'}}</view>
         <!-- P3（第一百一十三批）：`expires_at` 是**到期时间**，原写「预约于」语义相反 -->
-        <view class="reservation-time">保留至 {{item.expires_at}}</view>
+        <!-- 第一百三十五批：只对**锁定中/已超时**显示「保留至」——已借出/已取消/副本异常
+             再挂时间会被读成"还在保留"（状态由下方徽标表达） -->
+        <view wx:if="{{item.status === 'active' || item.status === 'expired'}}" class="reservation-time">保留至 {{item.expires_at}}</view>
         <view wx:if="{{item.remainText}}" class="countdown-row">
           <text class="countdown">{{item.remainText}}</text>
         </view>

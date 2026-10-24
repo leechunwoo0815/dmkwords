@@ -90,6 +90,35 @@ CATCH_BLOCK_RE = re.compile(r"catch\s*\([^)]*\)\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*
 SILENT_EMPTY_IN_CATCH_RE = re.compile(r"setData\(\s*\{[^}]*:\s*\[\s*\]")
 FAILURE_MARK_RE = re.compile(r"loadError|noChild|error|toast|message|showToast|降级")
 
+#: W4 **第三形态**（2026-10-24 第一百三十五批，IDE 实测抓到）：**资金/记录类页面的加载函数**里，
+#: catch 必须落到**可见失败态**（`loadError|listError|condError|noChild|…Error:`），
+#: "什么都不做（只靠 request.js 的 toast）"或"只把 loading 置 false"都算违例。
+#:
+#: 为什么只扫这 6 页：前两形态只认"吞成空数据"，而押金页的真实形态是
+#: `catch (e) { /* 已 toast */ }`——toast 几秒后消失，页面显示「暂无流水记录」，
+#: 与"确实没有流水"长得一模一样（退款申请页同款：显示「没有可退款的订单」）。
+#: 全仓铺开不行的原因：`index`/`circle`/`book-detail` 等处大量静默 catch 是**有意的次级
+#: 功能降级**（轮播、点赞通知条、预检放行），一刀切会制造几十处噪音改动。
+#: 判据只覆盖"失败=空会直接误导家长的钱/记录"的页面；**新增加这类页面时把路径加进来**。
+MONEY_RECORD_PAGES = {
+    "miniapp/pages/order-pkg/deposit/deposit.js",
+    "miniapp/pages/order-pkg/order-history/order-history.js",
+    "miniapp/pages/order-pkg/refund-apply/refund-apply.js",
+    "miniapp/pages/order-pkg/reservation/reservation.js",
+    "miniapp/pages/order-pkg/withdrawal/withdrawal.js",
+    "miniapp/pages/order-pkg/benefit-transfer/benefit-transfer.js",
+}
+#: 加载路径的函数名（onShow 会同步调 load()；onLoad 直接拉数的页面也在内）
+LOAD_FN_RE = re.compile(
+    r"^\s*(?:async\s+)?(load\w*|onShow|onLoad|onRetry\w*)\s*\([^)]*\)\s*\{", re.M
+)
+#: 可见失败态标记（**不含 toast**——瞬时提示不算"页面当前状态"）。
+#: 两种形态都认：`setData({ loadError: … })`（页面级 Banner）与 `settlementError = true`
+#: （行级标记，由 wxml 逐行渲染「明细取不到」——withdrawal 页的实际做法）。
+ERROR_STATE_MARK_RE = re.compile(
+    r"loadError|listError|condError|listFailed|noChild|\w*[Ee]rror\s*[:=]"
+)
+
 #: W5 **远程图必须带加载失败兜底**（2026-10-22 第一百一十六批；第八轮 P3 实测）：
 #: 全仓 135 个 `<image>` 里 `binderror` 出现 **0 次**。封面/活动封面/帖子配图/二维码这些
 #: `src` 来自后端（URL 由 `utils/media.fullUrl` 拼 baseURL + token），一旦文件被运维删了、
@@ -370,6 +399,67 @@ def scan_silent_empty_catch(js_files: list[Path]) -> list[str]:
     return problems
 
 
+def load_function_bodies(text: str):
+    """产出加载路径的 `(函数名, 函数体, 起始行号)`（函数名见 `LOAD_FN_RE`）。
+
+    函数体用**花括号配平**取（跳过引号内的括号，避免把字符串里的 `{` 算进去）——
+    正则版 `[^{}]*` 一遇到嵌套对象就断，取不到整段 catch。
+    """
+    for m in LOAD_FN_RE.finditer(text):
+        start = m.end() - 1  # 指向函数体的 `{`
+        depth = 0
+        i = start
+        quote = ""
+        while i < len(text):
+            ch = text[i]
+            if quote:
+                if ch == "\\":
+                    i += 2
+                    continue
+                if ch == quote:
+                    quote = ""
+            elif ch in "'\"`":
+                quote = ch
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    yield m.group(1), text[start + 1 : i], text[:start].count("\n") + 1
+                    break
+            i += 1
+
+
+def scan_load_catch_state(js_files: list[Path], pages: set[str] | None = None) -> list[str]:
+    """W4c：资金/记录类页面的**加载函数**里，catch 必须落到可见失败态（见 MONEY_RECORD_PAGES）。
+
+    只扫加载路径：`onCancel` / `onSubmit` 这类**动作**的 catch 弹 toast 是合理 UX，
+    不在此判据内（把它们一起判红会逼着给所有动作加常驻横幅）。
+    """
+    pages = MONEY_RECORD_PAGES if pages is None else pages
+    problems: list[str] = []
+    for js in js_files:
+        try:
+            rel = js.relative_to(ROOT).as_posix()
+        except ValueError:  # 自检样本在临时目录
+            rel = js.as_posix()
+        if rel not in pages:
+            continue
+        text = js.read_text(encoding="utf-8", errors="ignore")
+        for fn_name, body, fn_line in load_function_bodies(text):
+            for m in CATCH_BLOCK_RE.finditer(body):
+                block = m.group(1)
+                if ERROR_STATE_MARK_RE.search(block) or "降级" in block:
+                    continue
+                line = fn_line + body[: m.start()].count("\n")
+                problems.append(
+                    f"W4 {rel}:{line}: 加载函数 `{fn_name}()` 的 catch 没落到可见失败态——"
+                    f"失败会被渲染成「没有数据」（toast 一过就没人知道出过错）；"
+                    f"补 `loadError` + error-view + 重试；确属次级功能降级请写明「降级」"
+                )
+    return problems
+
+
 def util_exports(util_dir: Path | None = None) -> dict[str, list[Path]]:
     """`{导出名: [所属 utils 文件, …]}`——只收长度 ≥ 5 且非全大写的标识符。"""
     util_dir = util_dir or UTIL_DIR
@@ -647,6 +737,44 @@ def selftest() -> list[str]:
         )
         if scan_missing_util_require([local_def], fake_exports):
             fails.append("S1: W6 正例（本文件自己定义）被误报")
+
+        # W4 第三形态：资金/记录页的**加载函数** catch 必须落到可见失败态
+        money_bad = base / "money_bad.js"
+        money_bad.write_text(
+            "Page({\n  async load() {\n    try {\n      this.setData({ rows: await api.list() })\n"
+            "    } catch (e) { /* toast 已弹 */ }\n  },\n})\n",
+            encoding="utf-8",
+        )
+        money_good = base / "money_good.js"
+        money_good.write_text(
+            "Page({\n  async load() {\n    try {\n      this.setData({ rows: await api.list() })\n"
+            "    } catch (e) { this.setData({ loadError: e.message, rows: [] }) }\n  },\n})\n",
+            encoding="utf-8",
+        )
+        money_degrade = base / "money_degrade.js"
+        money_degrade.write_text(
+            "Page({\n  async load() {\n    try {\n      this.setData({ rows: await api.list() })\n"
+            "    } catch (e) {\n      // 降级：次级卡片失败不影响主列表\n      this.setData({ rows: [] })\n    }\n  },\n})\n",
+            encoding="utf-8",
+        )
+        money_action = base / "money_action.js"
+        money_action.write_text(
+            "Page({\n  async onCancel() {\n    try {\n      await api.cancel(1)\n"
+            "    } catch (e) { /* toast 已弹（动作类，不需要常驻横幅） */ }\n  },\n})\n",
+            encoding="utf-8",
+        )
+        money_pages = {money_bad.as_posix(), money_good.as_posix()}
+        money_pages |= {money_degrade.as_posix(), money_action.as_posix()}
+        if not any(p.startswith("W4") for p in scan_load_catch_state([money_bad], money_pages)):
+            fails.append("S1: W4 第三形态未命中注入样本（加载函数里 catch 什么都不做）")
+        for sample, why in (
+            (money_good, "带 loadError"),
+            (money_degrade, "写明「降级」"),
+            (money_action, "动作类 catch"),
+        ):
+            hits = scan_load_catch_state([sample], money_pages)
+            if hits:
+                fails.append(f"S1: W4 第三形态正例（{why}）被误报：{hits}")
     return fails
 
 
@@ -669,12 +797,13 @@ def main() -> int:
         + scan_silent_empty_catch(js_files)
         + scan_remote_img_fallback(wxml_files)
         + scan_missing_util_require(js_files)
+        + scan_load_catch_state(js_files)
     )
     print(f"扫描面: {len(wxml_files)} 个 wxml（pages + components）+ {len(js_files)} 个 js")
     print(f"W1 bind*/catch* handler 缺失: {sum(1 for p in problems if p.startswith('W1'))}")
     print(f"W2 插值类名无样式定义: {sum(1 for p in problems if p.startswith('W2'))}")
     print(f"W3 reader 入口传整对象: {sum(1 for p in problems if p.startswith('W3'))}")
-    print(f"W4 失败吞成空数据: {sum(1 for p in problems if p.startswith('W4'))}")
+    print(f"W4 失败吞成空数据/加载函数无失败态: {sum(1 for p in problems if p.startswith('W4'))}")
     print(f"W5 远程图缺 binderror 兜底: {sum(1 for p in problems if p.startswith('W5'))}")
     print(f"W6 调 utils 导出但未 require: {sum(1 for p in problems if p.startswith('W6'))}")
     if problems:
@@ -685,7 +814,7 @@ def main() -> int:
         return 1
     print(
         "PASS: 小程序接线六条规则全零（handler 存在 / 插值类名可解析 / reader 入口传 id / "
-        "失败不吞成空 / 远程图带兜底 / utils 符号先 require）✓"
+        "失败不吞成空（含资金页加载失败态）/ 远程图带兜底 / utils 符号先 require）✓"
     )
     return 0
 

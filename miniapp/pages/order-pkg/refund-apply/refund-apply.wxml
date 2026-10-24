@@ -5,7 +5,11 @@
 
   <view wx:if="{{loading}}" class="loading-state">加载中…</view>
 
-  <view class="selector-card" wx:if="{{!loading}}">
+  <!-- 第一百三十五批：失败态显式呈现（原先 toast 一过就显示「没有可退款的订单」） -->
+  <error-view wx:if="{{loadError}}" type="network" title="可退订单加载失败"
+    desc="{{loadError}}（订单未加载，不代表没有可退订单）" bind:onRetry="onRetryLoad" />
+
+  <view class="selector-card" wx:if="{{!loading && !loadError}}">
     <view class="card-h3">选择要退的订单（已支付）</view>
     <view wx:if="{{!orders.length}}" class="empty-text x-4fdf3d">
       没有可退款的订单

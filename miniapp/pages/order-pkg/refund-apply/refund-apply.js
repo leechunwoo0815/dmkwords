@@ -11,18 +11,24 @@ Page({
     selected: null,
     preview: null,
     reason: '',
+    loadError: '',   // 第一百三十五批：加载失败必须成态（原先只靠 request.js 瞬时 toast →
+                     // toast 一过页面就显示「没有可退款的订单」，把故障读成"确实没单可退"）
     loading: true,
   },
 
   onLoad(options) {
-    this.setData({ childName: decodeURIComponent(options.child_name || '') })
-    this._childId = Number(options.child_id)
+    const child = session.getCurrentChild() || {}
+    this.setData({ childName: decodeURIComponent(options.child_name || '') || child.name || '' })
+    // P3 统一解析（第一百三十五批补齐）：原先 `Number(options.child_id)` 缺参即 NaN → 请求 422
+    this._childId = session.resolveChildId(options)
   },
 
   onShow() { this.load() },
 
+  onRetryLoad() { this.load() },
+
   async load() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, loadError: '' })
     try {
       const [orders, refunds] = await Promise.all([
         api.myOrders(this._childId),
@@ -44,7 +50,13 @@ Page({
         refunds: refunds || [],
         selected: null, preview: null,
       })
-    } catch (e) { /* toast 已弹 */ }
+    } catch (e) {
+      // 失败不许伪装成"没有可退款的订单"：清旧数据 + 落失败态（金额页，必须可见）
+      this.setData({
+        orders: [], refunds: [], selected: null, preview: null,
+        loadError: (e && e.message) || '可退订单加载失败',
+      })
+    }
     finally { this.setData({ loading: false }) }
   },
 
