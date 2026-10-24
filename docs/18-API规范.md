@@ -83,8 +83,13 @@ Router 只照搬——**回调必须永远有明确应答**，抛异常等于让
 
 - 通道：`BusinessException(message, code, error_code=...)` → 响应多一个 `error_code` 字段，
   前端据此触发专用交互（区别于纯文案 toast）。
-- **现状实测（2026-09-03）**：机制就绪、**全库零实际 raise 点**。注释中的
-  `consent_required`（隐私协议未同意场景）为预定用例，尚未接线。
+- **现状实测（2026-10-24，第九轮 E 批订正）**：机制就绪，**已有生产方**——
+  `backend/domain/identity/guards.py::require_audio_access` 在 403 时抛
+  `error_code=f"audio.{reason}"`（`audio.off_shelf` 等），小程序在
+  `miniapp/utils/request.js` 按 `error_code` 分流（带码的 403 交给调用方做 UX、不弹通用 toast）；
+  第九轮 A 批的 `check_event_contract` 同族对账亦覆盖该面。
+  **历史沿革**：原写「全库零实际 raise 点」是 2026-09-03 的实测，2026-10-15 大审查 P1 #12 接线后该表述已过期。
+- 预定码：`consent_required`（隐私协议未同意场景）仍未接线（FEAT-006 挂账）。
 - **纪律：新增结构化码必须先在本节登记**（码名 + 触发场景 + 前端预期行为），
   禁止直接裸写——错误码是前后端契约，登记即生效。
 

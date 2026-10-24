@@ -31,7 +31,9 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 DOC_GLOBS = ["docs/**/*.md", "PRD/**/*.md", "error_list/**/*.md"]
-DOC_FILES = ["CLAUDE.md", "AGENTS.md"]
+# 2026-10-24（第九轮 E 批）：补 `README.md`——它是仓库门面，之前**不在**扫描面，
+# 于是"89 项 Feature / R1-R14 / @draft=待开发"三处漂移长期无人拦（第九轮 P3 实测）。
+DOC_FILES = ["CLAUDE.md", "AGENTS.md", "README.md"]
 SKIP_PARTS = ("legacy-attic",)
 
 # 反引号里可能出现的"非本项目符号"（标准库/ORM/CSS/前端内置）——不算断链

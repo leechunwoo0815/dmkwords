@@ -192,9 +192,13 @@ class CheckInEvent(DomainEvent):
     """打卡事件
 
     发布者：ReadingService.checkin()
-    订阅者：
-      - child: 更新连续打卡天数
-      - achievement: 检查打卡成就
+    订阅者：growth 打卡周期积分（`growth/growth_handlers.py::_handle_checkin`
+    以**字符串字面量** `"reading.checkin"` 订阅，`main.py` 启动时 register_growth_handlers 注册）
+    → 调 `GrowthService.on_checkin()` 发周期奖（每 7 天 +10 / 每 30 天 +50）。
+
+    2026-10-24（第九轮 E 批·N-7）订正：原 docstring 写「订阅者：child 更新连续打卡天数 /
+    achievement 检查打卡成就」——全仓无这两处订阅，**是谎报**；streak 与成就走同步直调，
+    本事件的唯一订阅者是 growth 周期积分。
     """
 
     event_type: str = "reading.checkin"

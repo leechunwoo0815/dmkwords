@@ -200,9 +200,13 @@ active = query(BorrowRecord).filter(child_id=..., status in (BORROWING, OVERDUE)
 if active >= max_borrow: raise ValidationError(友好文案)
 ```
 所有"以 child 为主体的写操作"（借书/预约取书/缴款 F-066）都遵守同一把锁，天然互斥。
-**测试背书**：`test_borrow_service.py`、`test_concurrency.py`、MySQL 实证
+**测试背书**：旧项目 `test_borrow_service.py`、`test_concurrency.py`、MySQL 实证
 `verify_mysql_concurrency.py`（注意：with_for_update 在 SQLite 是 no-op，
 并发验证必须真 MySQL）。
+〔**2026-10-24 订正（第九轮 E 批）**〕上面三个文件名都是**旧项目路径，本仓不存在**（旧代码本体不在本仓，见文件头）。
+本仓的对应物：并发用例 = `tests/unit/test_wm10_concurrency.py` + **LOCK WAIT 探针范式**
+（`tests/unit/test_audit8_a7_cancel_locking_20261019.py` / `test_audit8_d2_notify_pool_20261020.py`：
+后者用 `lock_wait_query()` 断言"对方确实在等锁"而不是靠 `sleep` 猜时序）+ `tests/unit/test_p0b2_t21_renew_lock.py` 等 P0 族。
 
 ### P11 SQL 原子库存更新（不锁不查，一条 UPDATE）
 
@@ -404,9 +408,12 @@ C 端用户报错带行动指引（下一步做什么）。
 | P3 回调幂等 | test_f12_refund_callback_guard.py、test_f084_duplicate_refund.py |
 | P8 并发防重 | test_loop4_a_p1_6_upgrade_concurrency.py、test_f053_cancel_order_lock.py |
 | P9 退款闸门 | test_refund_service.py |
-| P10 超借 | test_borrow_service.py + scripts/verify_mysql_concurrency.py（真 MySQL） |
+| P10 超借 | test_borrow_service.py + verify_mysql_concurrency.py（旧项目脚本；真 MySQL） |
 | P12 副本 | test_bookcopy_status.py、test_b5_f091_f115_uniqueness.py |
 | P16 级联删除 | test_child_deletion.py、test_f024_voice_delete_traversal.py |
 
 > 验证口径提醒（来自项目宪法）：with_for_update 在 SQLite 是 no-op，
-> 所有 P10/P11 类并发断言必须用 `verify_mysql_concurrency.py` 在真实 MySQL 上实证。
+> 所有 P10/P11 类并发断言必须在**真实 MySQL** 上实证。
+> 〔**2026-10-24 订正**〕本表左列全是**旧项目文件名（本仓不存在）**；上句原写"必须用 `verify_mysql_concurrency.py`"——
+> 该脚本是旧项目的，本仓没有。本仓做法：并发用例放 `tests/unit/`（见 P10 条上方的本仓对应物清单），
+> 且**判据必须是确定性的**（LOCK WAIT 探针 / `threading.Condition`，禁止 `sleep` 猜时序）。

@@ -50,8 +50,12 @@ server {
     # 后端 API 响应也带同一组头（backend/middleware/security_headers.py），这里补的是
     # **SPA 的 HTML/静态资源**那一半（HTML 不经后端，只有 nginx 能给它戴帽子）。
     # 注意 nginx 的 `add_header` 继承规则：**子 location 里只要有一条 add_header，
-    # 服务器级的全部失效**——所以下面每个 location 都显式 `include` 这份片段，
-    # 而不是靠继承（否则将来有人给某个 location 加一条 add_header，安全头会静默全丢）。
+    # 服务器级的全部失效**。本文件当前**靠继承**成立（4 个 location——`/api/`、`= /health`、
+    # `/`、`= /favicon.ico`——都没有自己的 add_header，2026-10-24 第九轮 E 批实测复查）；
+    # 一旦有人给任何 location 加一条 add_header，本组安全头会**静默全丢**——
+    # 那时必须把上面这几行抽成片段文件，并在每个 location 里 `include` 它。
+    # 2026-10-24 订正：原注释写"下面每个 location 都显式 include 这份片段"，与文件实况
+    # （全文零 include）不符，属**自述谎报**，按实况改写（口径以本段为准）。
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "DENY" always;
     add_header Referrer-Policy "no-referrer" always;

@@ -20,7 +20,7 @@ bash scripts/dev.sh        # 一键启动：MySQL + 后端(:8002) + 管理后台
 ## 质量门禁（唯一完成判据）
 
 ```bash
-bash scripts/gate.sh full   # 退出码 0 = 通过（9 步：1 lint / 2 单测+覆盖率 / 3 BDD / 4 架构关 / 5 契约与反假绿（假绿断言+小程序断链+文档对齐+RBAC 对账+风格检查器 R1-R14+媒体纪律）/ 6 迁移一致性 / 7 tsc / 8 契约快照（export_openapi --check + 前端类型 pnpm gen:api --check）/ 9 交付完整性）
+bash scripts/gate.sh full   # 退出码 0 = 通过（9 步：1 lint / 2 单测+覆盖率 / 3 BDD / 4 架构关 / 5 契约与反假绿（假绿断言+小程序断链+文档对齐+RBAC 对账+风格检查器 R1-R16+媒体纪律+管理端失败态）/ 6 迁移一致性 / 7 tsc / 8 契约快照（export_openapi --check + 前端类型 pnpm gen:api --check）/ 9 交付完整性）
 ```
 
 ## 项目结构与文档索引
@@ -31,7 +31,9 @@ backend/            FastAPI + SQLAlchemy（9 域分层架构）
   domain/{identity,catalog,circulation,billing,reading,growth,activity,reading_circle}/  后续模块域
 admin-web/          React 18 + TS + Vite + AntD（绘本风视觉系统，docs/15）
 miniapp/            微信小程序（家长端，原生）
-features/           behave 中文 Gherkin（测试即规格；@draft = 待对应模块开发）
+features/           behave 中文 Gherkin（测试即规格；`@draft` = 挂起场景，不进 gate，
+                    集合与理由唯一事实源 = features/bdd_baseline.json，改动须走
+                    `python -m scripts.check_bdd_baseline --update` 并在 LEDGER 留痕）
 tests/              pytest（真实 MySQL 链路）
 scripts/            gate.sh 门禁 / verify_architecture 架构关 / dev.sh
 ```
@@ -41,7 +43,7 @@ scripts/            gate.sh 门禁 / verify_architecture 架构关 / dev.sh
 | [CLAUDE.md](CLAUDE.md) | 项目宪法（最高法，每次会话必读） |
 | [docs/01-顶层规划.md](docs/01-顶层规划.md) | 阶段目标与里程碑 |
 | [docs/02-架构蓝图.md](docs/02-架构蓝图.md) | 系统架构与 ADR |
-| [docs/03-Feature全量清单.md](docs/03-Feature全量清单.md) | 89 项 Feature 索引（状态按代码实测重算） |
+| [docs/03-Feature全量清单.md](docs/03-Feature全量清单.md) | 90 项 Feature 索引（状态按代码实测重算） |
 | [docs/04-模块交付顺序与手动验收手册.md](docs/04-模块交付顺序与手动验收手册.md) | WM1–WM15 交付顺序与手动测试步骤 |
 | [docs/07-按图施工手册.md](docs/07-按图施工手册.md) | 后续开发施工标准 + 第十二章 UX 增强基线 |
 | [docs/LEDGER.md](docs/LEDGER.md) | 任务台账（唯一进度事实源） |
