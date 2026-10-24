@@ -466,7 +466,7 @@ export default function BookDetail() {
           }
         }}
         onCancel={() => confirmDiscardIfDirty(form.isFieldsTouched(), () => setEditOpen(false))}
-        okText="保存" cancelText="取消" destroyOnClose
+        okText="保存" cancelText="取消" destroyOnHidden
       >
         <Form form={form} layout="vertical">
           <Form.Item name="isbn" label="ISBN（可留空或修改；清空后自动转为内部编号）">
@@ -600,7 +600,7 @@ export default function BookDetail() {
         title={qEditing ? "编辑题目" : "添加测验题目"} open={questionOpen}
         onOk={onQuestionSubmit}
         onCancel={() => confirmDiscardIfDirty(isQDirty(), () => setQuestionOpen(false))}
-        okText={qEditing ? "保存" : "添加"} cancelText="取消" destroyOnClose
+        okText={qEditing ? "保存" : "添加"} cancelText="取消" destroyOnHidden
       >
         <Form form={qForm} layout="vertical" initialValues={{ question_type: "single" }}>
           <Form.Item name="question_type" label="题型">

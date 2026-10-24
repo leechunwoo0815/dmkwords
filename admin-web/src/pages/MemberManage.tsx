@@ -717,7 +717,7 @@ export default function MemberManage() {
 
       {/* 新建家长 */}
       <Modal
-        title="新建家长账号" open={parentOpen} okText="创建" cancelText="取消" destroyOnClose
+        title="新建家长账号" open={parentOpen} okText="创建" cancelText="取消" destroyOnHidden
         onOk={async () => {
           const v = await parentForm.validateFields();
           try {
@@ -751,7 +751,7 @@ export default function MemberManage() {
 
       {/* 为孩子建档 */}
       <Modal
-        title="为孩子建档" open={childOpen} okText="创建" cancelText="取消" destroyOnClose
+        title="为孩子建档" open={childOpen} okText="创建" cancelText="取消" destroyOnHidden
         onOk={async () => {
           const v = await childForm.validateFields();
           try {
@@ -798,7 +798,7 @@ export default function MemberManage() {
 
       {/* 创建订单 */}
       <Modal
-        title="创建订单" open={orderOpen} okText="创建" cancelText="取消" destroyOnClose
+        title="创建订单" open={orderOpen} okText="创建" cancelText="取消" destroyOnHidden
         onOk={async () => {
           const v = await orderForm.validateFields();
           try {
@@ -883,7 +883,7 @@ export default function MemberManage() {
       {/* 确认收款 */}
       <Modal
         title={`确认收款：${confirmOrder ? ORDER_TYPE_LABEL[confirmOrder.order_type] ?? confirmOrder.order_type : ""}`}
-        open={confirmOrder !== null} okText="确认收款" cancelText="取消" destroyOnClose
+        open={confirmOrder !== null} okText="确认收款" cancelText="取消" destroyOnHidden
         onOk={async () => {
           if (!confirmOrder) return;
           const v = await confirmForm.validateFields();
@@ -955,7 +955,7 @@ export default function MemberManage() {
 
       <Modal
         title={obsChild ? `为 ${obsChild.name} 上传评估报告` : ""}
-        open={!!obsChild} okText="上传" cancelText="取消" destroyOnClose
+        open={!!obsChild} okText="上传" cancelText="取消" destroyOnHidden
         onOk={onUploadObservation}
         onCancel={() => confirmDiscardIfDirty(
           obsFileList.length > 0 || obsRemark.trim() !== "",
@@ -1021,7 +1021,7 @@ export default function MemberManage() {
         open={!!editChild}
         okText="保存"
         cancelText="取消"
-        destroyOnClose
+        destroyOnHidden
         onOk={async () => {
           if (!editChild) return;
           try {
@@ -1093,7 +1093,7 @@ export default function MemberManage() {
         open={!!editParent}
         okText="保存"
         cancelText="取消"
-        destroyOnClose
+        destroyOnHidden
         onOk={async () => {
           if (!editParent) return;
           try {

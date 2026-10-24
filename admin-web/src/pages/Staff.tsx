@@ -135,7 +135,7 @@ export default function Staff() {
           <PaintHScrollbar auto />
 
       <Modal title="新建员工" open={createOpen} okText="创建" cancelText="取消"
-        onOk={doCreate} onCancel={() => setCreateOpen(false)} destroyOnClose>
+        onOk={doCreate} onCancel={() => setCreateOpen(false)} destroyOnHidden>
         <Form form={form} layout="vertical" initialValues={{ role: "staff" }}>
           <Form.Item name="username" label="登录名" rules={[{ required: true, message: "必填" }, { pattern: /^[A-Za-z0-9_.-]+$/, message: "仅字母数字_.-", min: 2 }]}>
             <Input placeholder="staff02" />
@@ -153,7 +153,7 @@ export default function Staff() {
       </Modal>
 
       <Modal title={`编辑员工：${editing?.username ?? ""}`} open={!!editing} okText="保存" cancelText="取消"
-        onOk={doEdit} onCancel={() => setEditing(null)} destroyOnClose>
+        onOk={doEdit} onCancel={() => setEditing(null)} destroyOnHidden>
         <Form form={editForm} layout="vertical">
           <Form.Item name="display_name" label="显示名" rules={[{ required: true, message: "必填" }]}>
             <Input />
@@ -165,7 +165,7 @@ export default function Staff() {
       </Modal>
 
       <Modal title={`重置密码：${resetTarget?.username ?? ""}`} open={!!resetTarget} okText="确认重置" cancelText="取消"
-        onOk={doReset} onCancel={() => setResetTarget(null)} destroyOnClose>
+        onOk={doReset} onCancel={() => setResetTarget(null)} destroyOnHidden>
         <Input.Password value={newPwd} onChange={(e) => setNewPwd(e.target.value)} placeholder="新密码（至少 8 位）" />
       </Modal>
     </div>

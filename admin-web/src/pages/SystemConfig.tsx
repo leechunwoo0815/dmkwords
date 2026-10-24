@@ -190,7 +190,7 @@ export default function SystemConfigPage() {
         confirmLoading={saving}
         okText="保存"
         cancelText="取消"
-        destroyOnClose
+        destroyOnHidden
       >
         {editing && (
           <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>

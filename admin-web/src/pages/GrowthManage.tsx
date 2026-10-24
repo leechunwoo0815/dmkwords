@@ -332,7 +332,7 @@ export default function GrowthManage() {
       </Modal>
 
       <Modal
-        title="积分人工调整" open={adjustOpen} okText="确认调整" cancelText="取消" destroyOnClose
+        title="积分人工调整" open={adjustOpen} okText="确认调整" cancelText="取消" destroyOnHidden
         onOk={onAdjust} onCancel={() => setAdjustOpen(false)}
       >
         <Form form={adjustForm} layout="vertical">
@@ -347,7 +347,7 @@ export default function GrowthManage() {
 
       <Modal
         title={resetTarget ? `重置《${resetTarget.title}》测验次数` : ""}
-        open={!!resetTarget} okText="确认重置" cancelText="取消" destroyOnClose
+        open={!!resetTarget} okText="确认重置" cancelText="取消" destroyOnHidden
         onOk={onReset} onCancel={() => setResetTarget(null)}
       >
         <Typography.Paragraph type="secondary">

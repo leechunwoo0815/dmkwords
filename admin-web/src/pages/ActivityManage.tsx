@@ -438,7 +438,7 @@ export default function ActivityManage() {
 
       <Modal
         title={editTarget ? "编辑活动" : "发布活动"} open={createOpen}
-        okText={editTarget ? "保存" : "发布"} cancelText="取消" destroyOnClose
+        okText={editTarget ? "保存" : "发布"} cancelText="取消" destroyOnHidden
         onOk={editTarget ? onEditSave : onCreate}
         onCancel={() => { setCreateOpen(false); setEditTarget(null); }} width={720}
       >

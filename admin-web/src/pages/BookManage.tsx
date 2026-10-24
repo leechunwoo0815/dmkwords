@@ -393,7 +393,7 @@ export default function BookManage() {
         }}
         okText="入库"
         cancelText="取消"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical">
           <Form.Item name="isbn" label="ISBN（没有可留空，系统自动编号）">
@@ -446,7 +446,7 @@ export default function BookManage() {
           setImportOpen(false);
           setImportResult(null);
         }}
-        destroyOnClose
+        destroyOnHidden
       >
         <Typography.Paragraph type="secondary">
           列顺序：ISBN、书名、作者、AR 值、总词数、主题、适读阶段、副本数量。

@@ -71,6 +71,7 @@ export default function DeadLetterPanel() {
           <span style={MUTED}>只看未处理</span>
           <Switch
             size="small"
+            aria-label="只看未处理"
             checked={unresolvedOnly}
             onChange={(v) => {
               setUnresolvedOnly(v);

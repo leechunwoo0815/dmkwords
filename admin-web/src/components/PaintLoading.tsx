@@ -1,5 +1,7 @@
 import { Spin } from "antd";
 
+import { inkLight } from "../theme-paint";
+
 type Character = "bookworm" | "star" | "bear" | "rabbit" | "cat" | "rainbow" | "bird";
 
 const LOADING_SVGS: Record<Character, JSX.Element> = {
@@ -74,9 +76,14 @@ interface PaintLoadingProps {
 }
 
 export default function PaintLoading({ character = "bookworm", message = "正在加载..." }: PaintLoadingProps) {
+  // 2026-10-24（无障碍轴实测修复）：原先 `<Spin tip={message} />` 在**非 nest/fullscreen** 用法下
+  // AntD **直接忽略 tip**（控制台警告 `[antd: Spin] tip only work in nest or fullscreen pattern`）——
+  // 即「正在加载…」文案从来没被渲染过。现自己渲染文案，并补 role="status" + aria-live：
+  // 读屏器会播报加载态（WCAG 4.1.3 状态消息）。
   return (
-    <div style={{ textAlign: "center", padding: "40px 0" }}>
-      <Spin indicator={LOADING_SVGS[character]} tip={message} />
+    <div style={{ textAlign: "center", padding: "40px 0" }} role="status" aria-live="polite">
+      <Spin indicator={LOADING_SVGS[character]} />
+      <div style={{ marginTop: 8, color: inkLight, fontSize: 13 }}>{message}</div>
     </div>
   );
 }

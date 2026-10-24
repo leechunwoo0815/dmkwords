@@ -24,6 +24,25 @@ import { useTodoCounts } from "../hooks/useTodoCounts";
 
 const { Sider, Header, Content } = AntLayout;
 
+/** 路由 → 页面名（document.title 用；与侧边栏 label 同口径）。 */
+const PAGE_TITLES: Record<string, string> = {
+  "/": "仪表盘",
+  "/books": "图书管理",
+  "/members": "会员管理",
+  "/deposits": "押金与赔偿",
+  "/circulation": "借阅操作台",
+  "/reservations": "预约管理",
+  "/growth": "成长与测验",
+  "/activities": "线下活动",
+  "/refund-center": "退款中心",
+  "/circle": "阅读圈",
+  "/notifications": "通知中心",
+  "/tasks": "任务看板",
+  "/staff": "员工管理",
+  "/configs": "系统配置",
+  "/audit-logs": "审计日志",
+};
+
 export default function Layout() {
   const { user, permissions, logout } = useAuth();
   const navigate = useNavigate();
@@ -32,6 +51,13 @@ export default function Layout() {
   // L3 双保险（Q10 裁定）：路由变化也触发待办刷新（审核完成主动 dispatch 之外的兜底）
   useEffect(() => {
     window.dispatchEvent(new Event("wm13-todo-refresh"));
+  }, [location.pathname]);
+  // WCAG 2.4.2（页面有标题）：此前所有路由共用「DmkWords 管理后台」一个 document.title，
+  // 读屏器/浏览器历史/收藏都无法区分页面（2026-10-24 无障碍轴实测）。
+  useEffect(() => {
+    const detail = location.pathname.startsWith("/books/") ? "图书详情" : "";
+    const name = PAGE_TITLES[location.pathname] ?? detail;
+    document.title = name ? `${name} · DmkWords 管理后台` : "DmkWords 管理后台";
   }, [location.pathname]);
   // 徽标计数 = 管理待办全部待处理（与通知中心管理待办 tab 同口径）；
   // 拉取失败或未拉到 → 不渲染徽标（U10 禁假 0），count=0 时 Badge 自动隐藏

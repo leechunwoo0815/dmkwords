@@ -213,7 +213,7 @@ export default function DepositManage() {
 
       <Modal
         title={`赔偿登记 — ${deductChild?.child_name ?? ""}（可用余额 ￥${deductChild ? Number(deductChild.available_amount).toLocaleString() : 0}）`}
-        open={deductChild !== null} okText="登记赔偿" cancelText="取消" destroyOnClose
+        open={deductChild !== null} okText="登记赔偿" cancelText="取消" destroyOnHidden
         onOk={async () => {
           if (!deductChild) return;
           const v = await deductForm.validateFields();
