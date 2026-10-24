@@ -8,12 +8,19 @@
 `uvicorn.access` 的过滤器管不到它。
 
 口径与 uvicorn 侧一致：**脱敏而不是关日志**——保留 host/path/状态码可查，只抹参数值。
+
+**第十轮 W4-D1（2026-10-24）修的是什么**：httpx 打日志时传进 `record.args` 的是
+**`httpx.URL` 对象**，不是 `str`；旧过滤器只对 `isinstance(a, str)` 的 arg 做替换 →
+真实调用路径**一个字符都没抹**（单测却绿，因为它手搓了一个字符串 arg，形状与线上不同）。
+后果实测：`gate-runs/**/gate-*.log` 里躺着 18 个仍未过期的家长 JWT 明文（`?token=eyJ...`）。
+现在非数值 arg 一律先 `str()` 再脱敏，形状差异不再是漏点。
 """
 
 from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Mapping
 
 #: 需要抹值的 query 参数名（微信系主凭据 + 项目自身习惯的 token 类参数）
 SENSITIVE_QUERY_KEYS: tuple[str, ...] = (
@@ -36,6 +43,25 @@ def redact_sensitive(text: str) -> str:
     return _REDACT_RE.sub(lambda m: f"{m.group(1)}=[REDACTED]", text)
 
 
+def _redact_arg(value: object) -> object:
+    """把单个日志 arg 脱敏。
+
+    **非数值一律 `str()` 后脱敏**（W4-D1）：httpx 传 `httpx.URL` 对象，
+    旧实现只认 `str` → 真实路径静默漏。数值保留原类型（`%d` 占位不受影响），
+    映射/序列**保形**（`%(k)s` 占位靠"单元素 tuple 里放 mapping"生效，
+    把它 str 掉会让 `msg % args` 直接抛 TypeError）。
+    """
+    if value is None or isinstance(value, (int, float, bytes)):
+        return value
+    if isinstance(value, str):
+        return redact_sensitive(value)
+    if isinstance(value, Mapping):
+        return {k: _redact_arg(v) for k, v in value.items()}
+    if isinstance(value, (tuple, list)):
+        return type(value)(_redact_arg(v) for v in value)
+    return redact_sensitive(str(value))
+
+
 class RedactSensitiveLogFilter(logging.Filter):
     """把记录里的 `msg` 与 `args` 都过一遍脱敏（httpx 用的是 %s 占位 + args 传 URL）。"""
 
@@ -43,13 +69,11 @@ class RedactSensitiveLogFilter(logging.Filter):
         if isinstance(record.msg, str):
             record.msg = redact_sensitive(record.msg)
         if isinstance(record.args, tuple):
-            record.args = tuple(
-                redact_sensitive(a) if isinstance(a, str) else a for a in record.args
-            )
-        elif isinstance(record.args, dict):
-            record.args = {
-                k: redact_sensitive(v) if isinstance(v, str) else v for k, v in record.args.items()
-            }
+            record.args = tuple(_redact_arg(a) for a in record.args)
+        elif isinstance(record.args, Mapping):
+            record.args = {k: _redact_arg(v) for k, v in record.args.items()}
+        elif record.args:
+            record.args = _redact_arg(record.args)
         return True
 
 

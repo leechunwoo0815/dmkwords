@@ -31,6 +31,14 @@ ANOMALY_PER_MINUTE = 60
 _anomaly_stamps: deque[float] = deque()
 _anomaly_lock = threading.Lock()
 
+#: 「无业务对象可定位」的异常用的**固定**业务键（第十轮 W4-D4，2026-10-24）。
+#: 原先这类异常拿**请求体 sha1 摘要**当 `ref_id`（`anomaly:{digest}`）→ 匿名者换一个 body
+#: 就换一个键 = 一张待办，待办表可被无认证请求按 60/min 持续灌入。
+#: 现在同族异常共用固定键（幂等：只留一条，处理过之后按 `ignore_handled` 复活），
+#: `reason` 也只用固定 token，不再回显请求体内容。
+UNVERIFIED_BODY_REF = "anomaly:unverified_body"
+DECRYPT_FAILED_REF = "anomaly:decrypt_failed"
+
 
 def reset_anomaly_budget() -> None:
     """清空滑动窗口（测试基建：每个用例独立；与 `RateLimiter` 的重置同款）。"""
@@ -63,11 +71,18 @@ class PaymentNotifyMixin:
 
         data = self._decrypt(gateway, envelope)
         if data is None:
-            self._audit_anomaly("退款回调解密失败", reason=event_type)
+            # W4-D4：`reason` 不再回显请求体里的 `event_type`（匿名可写内容不该进审计）
+            self._audit_anomaly(
+                "退款回调解密失败", target_id=DECRYPT_FAILED_REF, reason="decrypt_failed"
+            )
             return 400, {"code": "FAIL", "message": "回调数据无法解密"}
         out_refund_no = (data.out_refund_no or "").strip()
         if not out_refund_no:
-            self._audit_anomaly("退款回调缺商户退款单号", reason=event_type)
+            self._audit_anomaly(
+                "退款回调缺商户退款单号",
+                target_id=UNVERIFIED_BODY_REF,
+                reason="missing_out_refund_no",
+            )
             return 400, {"code": "FAIL", "message": "缺少退款单号"}
         req = refund_online.find_by_out_refund_no(self.db, out_refund_no)
         # P2 #22（2026-10-16，第三轮大审查）：**先判 None 再解引用**。原实现下面立刻读
@@ -217,6 +232,11 @@ class PaymentNotifyMixin:
         """异常/演练留痕（**不抛错**：回调路径的任何异常都不能变成"无应答"）。
 
         资金相关异常必须留痕，否则出问题时只能看到"钱少了"而查不到经过。
+
+        **调用边界（第十轮 W4-D4）**：验签**之前**的分支（验签异常/验签不通过）不再走这里
+        ——未认证请求的内容不可信，也不该获得写库能力（那里只 `logger.warning`）。
+        本函数只服务"验签通过之后"的异常；无业务对象可定位时用**固定**键
+        （`UNVERIFIED_BODY_REF` / `DECRYPT_FAILED_REF`），不再拿请求体摘要当键。
         """
         logger.warning("支付异常留痕: %s | %s", message, reason)
         # 第八轮审查 P1-3：留痕的**落库副作用有界**（超预算只进进程日志，不写审计/待办）

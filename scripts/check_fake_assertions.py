@@ -88,6 +88,8 @@ SOURCE_ASSERT_ALLOWLIST: dict[str, str] = {
     "features/": "BDD 场景文件本身即产品口径数据，断言其内容 = 断言口径，不是断言实现",
     "scripts/": "门禁脚本自身的结构断言（防回退）；其行为面无法在 pytest 里安全模拟",
     "docker-compose": "生产编排模板无运行时：只能读文本核对部署纪律（端口只绑回环/binlog/卷名）",
+    ".dockerignore": "构建上下文白名单无运行时（不实跑 docker build：拉基础镜像与 apt 包的网络/时间"
+    "不可控）：只能读文本核对密钥面（.env/certs/backups/uploads）是否真被排除（第十轮 W3-02）",
     #: `inspect.getsource(...)` 没有磁盘路径：验的是"实现形状"（如必须用 inserted_primary_key）。
     #: 这类只能是弱证据，登记时必须写明"为什么构造不出可区分的运行时场景"。
     "<getsource>": "断言实现形状（无路径可登记）：须在用例注释写清为什么造不出可区分的运行时场景",

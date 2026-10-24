@@ -41,19 +41,25 @@ def _post_bad(client: TestClient, i: int) -> int:
 
 
 def test_anomaly_writes_are_bounded_per_minute(client: TestClient):
-    """70 次未验签回调：响应全 401（语义不变），但**落库增量被预算截断**。
+    """70 次未验签回调：响应全 4xx（语义不变），落库增量被**两层**截断。
 
-    RED（还原修复：不判预算）：审计与待办各 +70。
+    第十轮 W4-D4 之后是两层：
+      ① 待办：无业务对象的异常用**固定 ref_id**（不再按报文摘要）→ 70 个不同 body 只坍缩成 1 条；
+      ② 审计：仍走 `ANOMALY_PER_MINUTE` 分钟预算 → 最多 60 行。
+    RED（还原修复：去掉预算判断 + 把固定键换回报文摘要）→ 审计与待办各 +70。
     """
     a0, n0 = _counts()
     codes = [_post_bad(client, i) for i in range(70)]
     a1, n1 = _counts()
 
     # 响应语义必须不变（微信只认 200；非 2xx 才会重试）。单测走 mock 网关（验签恒放行），
-    # 因此实际落在"报文无法解析"分支 → 400；真通道是"验签不通过" → 401。两者都走同一留痕函数。
+    # 因此实际落在"报文无法解析"分支 → 400；真通道是"验签不通过" → 401（W4-D4 收口后不落库）。
     assert len(set(codes)) == 1 and 400 <= codes[0] < 500, f"必须是同一个 4xx：{set(codes)}"
     assert a1 - a0 == ANOMALY_PER_MINUTE, f"审计落库应有界，实际 +{a1 - a0}"
-    assert n1 - n0 == ANOMALY_PER_MINUTE, f"待办落库应有界，实际 +{n1 - n0}"
+    assert n1 - n0 == 1, (
+        f"同族异常待办必须坍缩为 1 条（固定键），实际 +{n1 - n0}"
+        "——RED=ref_id 取报文摘要，换 body 就换行"
+    )
 
 
 def test_single_anomaly_still_recorded(client: TestClient):

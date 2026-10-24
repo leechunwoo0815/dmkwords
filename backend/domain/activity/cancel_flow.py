@@ -12,7 +12,7 @@ from decimal import Decimal
 from sqlalchemy import func
 
 from backend.common.batch import fetch_by_ids
-from backend.common.exceptions import ValidationError
+from backend.common.exceptions import NotFoundError, ValidationError
 from backend.common.notification_models import Notification
 from backend.common.notifications import SCENE_ACTIVITY_CANCEL, NotificationService
 from backend.domain.activity.models import Activity, ActivityEnrollment
@@ -30,6 +30,12 @@ class ActivityCancelMixin:
             .populate_existing()  # E-5/T17：取消全程锁活动行，与 enroll 活动锁串行化
             .first()
         )
+        if a is None:
+            # 第十轮 FE-1/W4-D2（专家独立复现 + 主审动态复现）：原先直接 `a.status`，
+            # 对不存在/已物理删除的 activity_id 抛 `AttributeError` → 未处理 500
+            # （且 500 响应丢全部安全头，见 security_headers）。同 id 的 GET 是正常 404，
+            # 说明"资源不存在"本可表达；陈旧 id（活动被他人删、前端列表未刷新）可达。
+            raise NotFoundError("活动不存在")
         if a.status != Activity.STATUS_PUBLISHED and not (a.status == Activity.STATUS_CANCELLED):
             raise ValidationError("活动状态不可取消")
         # T31 断点续跑幂等：活动已 cancelled（历史半程失败后重跑）且仍有 ENROLLED

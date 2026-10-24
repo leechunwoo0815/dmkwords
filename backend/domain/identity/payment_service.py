@@ -41,7 +41,11 @@ from backend.common.gateways.payment.types import PaymentOrderRequest, yuan_to_c
 from backend.config import get_settings
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, Order, Parent
-from backend.domain.identity.payment_notify import PaymentNotifyMixin
+from backend.domain.identity.payment_notify import (
+    DECRYPT_FAILED_REF,
+    UNVERIFIED_BODY_REF,
+    PaymentNotifyMixin,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -453,15 +457,28 @@ class PaymentService(PaymentNotifyMixin):
             )
         except Exception as exc:
             logger.error("支付回调验签异常: %s", exc, exc_info=True)
-            self._audit_anomaly("支付回调验签异常", reason=str(exc)[:200])
+            # 第十轮 W4-D4（P3）：**验签环节不落库，只进进程日志**。
+            # 理由：验签之前的请求都是**未认证**的——匿名者可以拿畸形签名头/畸形 body 让这条
+            # 分支反复执行，而 `_audit_anomaly` 每次都会写 1 行 audit_logs（`ref_id` 还能被
+            # body 摘要控制 → 换 body 就换行）；process log 已经带了完整异常与堆栈，够定位。
+            # 真资金异常（金额不符/找不到订单/重复流水/已取消订单收到成功回调）都在**验签之后**，
+            # 照旧逐条留痕 + 待办——那道留痕并没有被这次收口削弱。
+            logger.warning("支付回调验签不可用（未认证请求，按 W4-D4 不落库）")
             return 401, {"code": "FAIL", "message": "验签不可用"}
         if not verified:
-            self._audit_anomaly("支付回调验签不通过", reason="signature_invalid")
+            logger.warning("支付回调验签不通过（未认证请求，按 W4-D4 不落库）")
             return 401, {"code": "FAIL", "message": "签名验证失败"}
 
         envelope = self._parse_envelope(body)
         if envelope is None:
-            self._audit_anomaly("支付回调报文无法解析", reason=body[:200])
+            # W4-D4：`reason` 原先回显 `body[:200]` = **匿名请求可决定审计内容**；键也改成固定值
+            # （原 `ref_id=anomaly:{body sha1}` 等于给攻击者发了行号发号器：换 body 就多一行待办）。
+            # 保留留痕（生产里这条分支在验签之后才可达 = 报文由微信签名背书，属于真实集成异常）。
+            self._audit_anomaly(
+                "支付回调报文无法解析",
+                target_id=UNVERIFIED_BODY_REF,
+                reason="unparseable_body",
+            )
             return 400, {"code": "FAIL", "message": "报文格式错误"}
 
         event_type = str(envelope.get("event_type") or "").upper()
@@ -472,7 +489,13 @@ class PaymentService(PaymentNotifyMixin):
 
         data = self._decrypt(gateway, envelope)
         if data is None:
-            self._audit_anomaly("支付回调解密失败", reason=event_type)
+            # W4-D4：`reason` 原先直接放 `event_type`（来自请求体、匿名可写）；键同样固定，
+            # 避免"换一份畸形密文就多一行待办"。生产里本分支在验签之后才可达。
+            self._audit_anomaly(
+                "支付回调解密失败",
+                target_id=DECRYPT_FAILED_REF,
+                reason="decrypt_failed",
+            )
             return 400, {"code": "FAIL", "message": "回调数据无法解密"}
 
         if data.trade_state != "SUCCESS":

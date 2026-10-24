@@ -2,15 +2,16 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from backend.common.exceptions import BusinessException, business_exception_handler
 from backend.config import get_settings, is_production_env
 from backend.middleware.body_limit import BodySizeLimitMiddleware
 from backend.middleware.media_cache import MediaCacheMiddleware
 from backend.middleware.rate_limit import WriteRateLimitMiddleware
-from backend.middleware.security_headers import SecurityHeadersMiddleware
+from backend.middleware.security_headers import SecurityHeadersMiddleware, apply_security_headers
 
 
 class _RedactQueryString(logging.Filter):
@@ -111,6 +112,21 @@ app.add_middleware(SecurityHeadersMiddleware)
 # 回环直连（无 nginx）与无凭证回调（/api/pay/**，必须 await request.body()）都靠它兜底。
 app.add_middleware(BodySizeLimitMiddleware)
 app.add_exception_handler(BusinessException, business_exception_handler)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """未处理异常 → JSON 500，**并补上安全头**（第十轮 FE-4/W4-D3）。
+
+    为什么必须有这个处理器：Starlette 的 `ServerErrorMiddleware` 位于**用户中间件外层**，
+    未处理异常由它直接生成裸文本 500 → `SecurityHeadersMiddleware` 的补头代码不执行
+    （实测 401/403/404/429 各 6/6 头，500 = 0/6）。安全头是**下限**（见该中间件 docstring
+    "已有则覆盖"），错误页同样会被第三方 iframe 嵌入，不能只在正常路径兑现。
+    体统一为 JSON，前端（管理端/小程序）的 `detail` 解析口径才一致。
+    """
+    response = JSONResponse(status_code=500, content={"detail": "服务器内部错误"})
+    apply_security_headers(request, response)
+    return response
 
 
 @app.get("/health")

@@ -77,7 +77,10 @@ class DictionaryWord(BaseModel):
 
     __tablename__ = "dictionary_words"
 
-    word = Column(String(64), nullable=False, index=True, comment="词条（小写）")
+    # unique=True（第十轮 W3-03）：`scripts/import_ecdict.py` 靠 `INSERT IGNORE` 去重，
+    # 而 INSERT IGNORE 只在**存在可冲突的唯一键**时才跳过重复——原先是 non_unique 普通索引，
+    # "保留已有词 / 可重跑续传"的自述因此物理上不成立（重跑 = 整库再插 340 万词）。
+    word = Column(String(64), nullable=False, unique=True, index=True, comment="词条（小写）")
     phonetic = Column(String(128), nullable=True, comment="音标")
     definition = Column(Text, nullable=True, comment="英文释义")
     translation = Column(Text, nullable=True, comment="中文翻译")

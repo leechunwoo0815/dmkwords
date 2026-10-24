@@ -98,10 +98,15 @@ def _rows(scene: str) -> list[tuple]:
 def test_three_distinct_payment_anomalies_each_get_todo(client: TestClient):
     """三类资金异常各留一条待办（修前：`ref_id="-"` + 默认键 → 全系统共 1 条）。
 
-    期望键值**钉死**（两套机制各自可被单独证伪）：`dedup_key=evt:{异常类型}`、
-    无对象时 `ref_id=anomaly:{报文 sha1 前 12 位}`。
+    期望键值**钉死**（两套机制各自可被单独证伪）：`dedup_key=evt:{异常类型}`；
+    `ref_id` 按 W4-D4（第十轮）分两档——
+      · **无业务对象**的两类（报文无法解析 / 解密失败）→ **固定** ref（不再拿请求体 sha1 当键：
+        匿名者换一个 body 就换一行待办，等于发号器）；
+      · **有业务标识**的一类（找不到订单）→ 仍用报文指纹，便于反查是哪一笔。
     """
     import hashlib
+
+    from backend.domain.identity.payment_notify import DECRYPT_FAILED_REF, UNVERIFIED_BODY_REF
 
     for body in (BODY_UNPARSABLE, BODY_DECRYPT_FAIL, BODY_ORDER_MISSING):
         _notify(client, body)
@@ -116,15 +121,26 @@ def test_three_distinct_payment_anomalies_each_get_todo(client: TestClient):
         "evt:支付回调解密失败",
         "evt:支付回调找不到订单",
     }, f"去重键必须是 `evt:异常类型`：{sorted(by_key)}"
-    for body, key in (
-        (BODY_UNPARSABLE, "evt:支付回调报文无法解析"),
-        (BODY_DECRYPT_FAIL, "evt:支付回调解密失败"),
-        (BODY_ORDER_MISSING, "evt:支付回调找不到订单"),
+    for key, expected in (
+        ("evt:支付回调报文无法解析", UNVERIFIED_BODY_REF),
+        ("evt:支付回调解密失败", DECRYPT_FAILED_REF),
+        (
+            "evt:支付回调找不到订单",
+            "anomaly:" + hashlib.sha1(BODY_ORDER_MISSING.encode()).hexdigest()[:12],
+        ),
     ):
-        expected = "anomaly:" + hashlib.sha1(body.encode()).hexdigest()[:12]
         assert by_key[key] == expected, (
-            f"无对象异常应按**报文指纹**各自成键：期望 {expected}，实际 {by_key[key]}"
+            f"ref_id 与口径不符（W4-D4 固定键 / 有对象时按报文指纹）："
+            f"期望 {expected}，实际 {by_key[key]}"
         )
+
+    # W4-D4 反增殖（比修前更严）：换 body 不再换行——同类再来两份不同报文，待办仍是 3 条
+    _notify(client, BODY_UNPARSABLE + " ")
+    _notify(client, _envelope("another-garbage-ciphertext"))
+    rows2 = _rows(SCENE_ANOMALY)
+    assert len(rows2) == 3, (
+        f"换 body 不得增殖待办（匿名可决定键 = 可刷表）：{[(r[2], r[3]) for r in rows2]}"
+    )
 
 
 def test_anomaly_todo_revives_after_handled(client: TestClient):

@@ -1,11 +1,44 @@
+# Dockerfile — DmkWords 后端镜像（第十轮 W3-02 修复，2026-10-24）
+#
+# 旧版两个硬伤（P2）：
+#   ① `COPY requirements.txt .` —— 项目早已迁 `uv`/`pyproject.toml`，仓库里**没有**
+#      requirements.txt ⇒ `docker build` 必挂（`COPY failed: file not found`）。
+#   ② 全仓无 `.dockerignore` ⇒ `COPY . .` 一旦可执行，会把 `.env`（DB 密码/密钥/支付凭据）、
+#      `certs/server.key`（HTTPS 私钥）、`backups/*.sql.gz`（真实业务数据 dump）打进镜像层。
+# 现在：依赖走 `pyproject.toml` + `uv.lock`（`--frozen` 保证与门禁同一套锁），
+#       构建上下文由 `.dockerignore` 收口，容器以非 root 用户运行，并带 `/health` 健康检查。
+#
+# 说明：当前生产部署路径是 `deploy/start-backend.sh`（原生 uvicorn，见 docs/20 §一/§四），
+# 本镜像不是关键路径——但"写着却必然构建失败"本身是缺陷，故修到可用。
+
 FROM python:3.13-slim
-RUN apt-get update && apt-get install -y \
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    UV_PROJECT_ENVIRONMENT=/app/.venv
+
+# 运行期系统依赖：Pillow 海报渲染需要 pango/cairo/gdk-pixbuf + 中文字体；
+# curl 供 HEALTHCHECK 使用。
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev \
     fonts-noto-cjk fonts-wqy-microhei \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir uv
+
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# 先只拷依赖清单 → 业务代码改动不会让依赖层失效
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
+
 COPY . .
+RUN useradd --create-home --uid 10001 app \
+    && chown -R app:app /app
+USER app
+
 EXPOSE 8002
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8002"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8002/health || exit 1
+
+CMD ["uv", "run", "--no-dev", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8002"]

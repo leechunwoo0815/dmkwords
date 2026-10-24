@@ -1007,20 +1007,31 @@ def _ensure_demo_wm3_states(db: Session) -> None:
         db.flush()
     today = datetime.now().date()
 
-    def ensure_child(name: str, status: str, expire) -> Child:
+    def ensure_child(name: str, status: str, expire, clock_days_ago: int = 0) -> Child:
         c = (
             db.query(Child)
             .filter(Child.parent_id == parent.id, Child.name == name, Child.is_deleted == 0)
             .first()
         )
         if not c:
-            c = Child(parent_id=parent.id, name=name, member_status=status, member_expire=expire)
+            c = Child(parent_id=parent.id, name=name, member_expire=expire)
             db.add(c)
             db.flush()
+        # 第十轮 W3-05（P2）：会员状态必须走**唯一写口** `set_member_status`——原先直构
+        # `Child(member_status=...)` 会留下 `pending_evaluation_at=NULL` 的"时钟为空"行，
+        # 而周名单/待办判据含 `pending_evaluation_at IS NOT NULL`
+        # （`identity/service.py::pending_evaluation_weekly`）→ 演示孩**永远**不出现在
+        # 「待评估超过 N 天」名单与馆员待办里，且不会自愈（状态不变则时钟不写）。
+        c.set_member_status(status)
+        c.member_expire = expire
+        if clock_days_ago and c.pending_evaluation_at:
+            # 演示可见性：阈值 `pending_evaluation_remind_days` 默认 7 天，时钟取"当下"的话
+            # 这条能力要等一周才看得见 → 回拨到阈值之外（内容会写"待评估已 N 天"）。
+            c.pending_evaluation_at = datetime.now() - timedelta(days=clock_days_ago)
         return c
 
     obs = ensure_child("观察期孩", Child.MEMBER_OBSERVATION, today + timedelta(days=30))
-    pend = ensure_child("待评估孩", Child.MEMBER_PENDING_EVALUATION, None)
+    pend = ensure_child("待评估孩", Child.MEMBER_PENDING_EVALUATION, None, clock_days_ago=8)
     expired = ensure_child("过期孩", Child.MEMBER_FORMAL, today - timedelta(days=1))
     # WM3-D2：临期孩（formal + today+3，相对日期每次 seed 都新鲜）——验收第 19 步橙字「剩 3 天」
     expiring = ensure_child("临期孩", Child.MEMBER_FORMAL, today + timedelta(days=3))

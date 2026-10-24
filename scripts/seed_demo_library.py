@@ -4,7 +4,8 @@
   词数 80-6000 / 8 类主题，支撑图书馆筛选、书架、详情、测验全链路视觉验收（2000 本规模预演）。
 - Pillow 生成绘本风封面图（uploads/cover/{isbn前4}/），封面路径入 book.cover_path。
 - 每本书 5 道测验题（4 单选 + 1 判断，书名嵌入题干），满足上架强校验的测验题≥5 口径。
-- 音频复用 uploads 现有 6 个演示音频。按 ISBN 幂等可重跑。
+- 音频复用 uploads 现有 6 个演示音频。按 ISBN 幂等可重跑（**含软删行复活**：第十轮 W3-04——
+  `ix_books_isbn` 是单列唯一索引，软删书后若裸插同号会撞 1062 让 `dev.sh restart` 失败）
 用法：python -m scripts.seed_demo_library
 """
 
@@ -787,6 +788,12 @@ def main() -> int:
             if db.query(Book).filter(Book.isbn == isbn, Book.is_deleted == 0).first():
                 skipped += 1
                 continue
+            # 第十轮 W3-04（P2）：`ix_books_isbn` 是**单列**唯一索引（不含 is_deleted），
+            # 而上面只按 `is_deleted == 0` 判重 → 演示书被软删后再跑 seed 会裸插同号行，
+            # 撞 `IntegrityError: 1062` → `dev.sh restart` 的 seed 步失败退出
+            # （门禁后现场恢复链断：docs/19 的标准动作就是 dev.sh restart）。
+            # 与 `CatalogService.create_book`（第十轮 P1-4）同口径：命中软删行就地**复活**。
+            revived = db.query(Book).filter(Book.isbn == isbn).first()
             audio_isbn = AUDIO_ISBNS[idx % len(AUDIO_ISBNS)]
             audio_rel = f"book_audio/{audio_isbn}/audio.mp3"
             try:
@@ -795,34 +802,49 @@ def main() -> int:
             except OSError:
                 duration = 90
                 audio_rel = None
-            book = Book(
-                isbn=isbn,
-                title=title,
-                author=author,
-                word_count=words,
-                ar_level=ar,
-                grade=GRADES[gidx],
-                topic=topic,
-                description=f"{title} —— {topic}类经典童书演示数据。",
-                status=Book.STATUS_ON,
-                audio_path=audio_rel,
-                audio_duration_seconds=duration,
-            )
+            book = revived if revived is not None else Book(isbn=isbn)
+            if revived is not None:
+                # 软删时 `remove_book_media` 已删掉封面/音频**文件**：路径留着会骗过上架完整性
+                # 检查（只判字段非空），故先清空再重画。
+                book.is_deleted = 0
+                book.cover_path = None
+            book.isbn = isbn
+            book.title = title
+            book.author = author
+            book.word_count = words
+            book.ar_level = ar
+            book.grade = GRADES[gidx]
+            book.topic = topic
+            book.description = f"{title} —— {topic}类经典童书演示数据。"
+            book.status = Book.STATUS_ON
+            book.audio_path = audio_rel
+            book.audio_duration_seconds = duration
             db.add(book)
             db.flush()
             book.cover_path = store_cover(book, gen_cover(title, author, idx, topic))
-            for seq in (1, 2):
-                db.add(
-                    BookCopy(
-                        book_id=book.id,
-                        copy_code=f"DEMO-{isbn}-{seq}",
-                        status=BookCopy.STATUS_AVAILABLE,
+            # 副本/题目按"该 book_id 是否已有"判断：复活行身上仍挂着老副本与老题
+            # （软删只翻 books.is_deleted，`uq_copy_code(copy_code,is_deleted)` 会拒绝重插）。
+            if not db.query(BookCopy).filter(BookCopy.book_id == book.id).count():
+                for seq in (1, 2):
+                    db.add(
+                        BookCopy(
+                            book_id=book.id,
+                            copy_code=f"DEMO-{isbn}-{seq}",
+                            status=BookCopy.STATUS_AVAILABLE,
+                        )
                     )
-                )
-            db.add_all(make_questions(book))
+            if (
+                not db.query(QuizQuestion)
+                .filter(QuizQuestion.book_id == book.id, QuizQuestion.is_active == 1)
+                .count()
+            ):
+                db.add_all(make_questions(book))
             db.flush()
             added += 1
-            print(f"+ {title} (AR {ar}, {words} words, cover ok)", flush=True)
+            print(
+                f"{'+' if revived is None else '↺'} {title} (AR {ar}, {words} words, cover ok)",
+                flush=True,
+            )
         # 旧 6 本若缺封面也补上（seed_wm11_demo 建书时无封面）
         from backend.domain.catalog.models import Book as B
 

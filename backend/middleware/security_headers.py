@@ -47,13 +47,27 @@ def is_https(request: Request) -> bool:
     return request.headers.get("x-forwarded-proto", "").lower() == "https"
 
 
+def apply_security_headers(request: Request, response) -> None:
+    """给一个响应补安全头（**单一口径**：中间件与未处理异常处理器共用这一份）。
+
+    为什么单抽（第十轮 FE-4/W4-D3）：Starlette 的 `ServerErrorMiddleware` 在**用户中间件之外**，
+    未处理异常由它生成 500，`SecurityHeadersMiddleware.dispatch` 的补头代码根本不会执行
+    （实测 401/403/404/429 = 6/6 头、500 = 0/6 头）。裸 500 也照样能被第三方 iframe 嵌。
+    """
+    for key, value in SECURITY_HEADERS.items():
+        response.headers[key] = value
+    if is_https(request):
+        response.headers["Strict-Transport-Security"] = HSTS_VALUE
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """给每个响应补安全头（含 4xx/5xx —— 错误页同样会被嵌）。"""
+    """给每个响应补安全头（含 4xx/5xx —— 错误页同样会被嵌）。
+
+    注意：**未处理异常**（裸 500）走不到这里（异常在 `call_next` 处抛出）→ 由
+    `backend.main` 注册的全局 `Exception` 处理器补同一份头（`apply_security_headers`）。
+    """
 
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
-        for key, value in SECURITY_HEADERS.items():
-            response.headers[key] = value
-        if is_https(request):
-            response.headers["Strict-Transport-Security"] = HSTS_VALUE
+        apply_security_headers(request, response)
         return response

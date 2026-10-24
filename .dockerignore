@@ -1,0 +1,46 @@
+# .dockerignore — 构建上下文收口（第十轮 W3-02，2026-10-24）
+#
+# 为什么必须有：`.gitignore` 排除了 `.env` / `certs/` / `backups/` / `uploads/`，但
+# **Docker 不读 .gitignore** —— 没有本文件时 `COPY . .` 会把这些真实存在于工作区的
+# 敏感物打进镜像层：`.env`（DB 密码 / SECRET_KEY / 支付与短信凭据）、`certs/server.key`
+# （HTTPS 私钥）、`backups/*.sql.gz`（业务数据全量 dump）。镜像层删不掉，只能重建。
+#
+# 纪律：新增敏感目录时**同时**改这里与 `.gitignore`。
+
+# 密钥与凭据
+.env
+.env.*
+certs/
+*.pem
+*.key
+
+# 真实业务数据 / 落盘产物（容器里应挂卷，不烘进镜像）
+backups/
+uploads/
+gate-runs/
+.dev-logs/
+*.log
+
+# 依赖与构建缓存（镜像内由 uv sync 重建）
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+admin-web/node_modules/
+admin-web/dist/
+miniapp/node_modules/
+
+# 版本库与本地工具状态
+.git/
+.gitignore
+.github/
+
+# 前端源码与文档（后端镜像不需要；前端产物由 nginx 侧独立构建）
+admin-web/
+miniapp/
+docs/
+error_list/
+PRD/
+gate-runs/
+*.md
