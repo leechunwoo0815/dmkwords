@@ -8,6 +8,7 @@ re-export，既有 import 写法不变。
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -15,6 +16,7 @@ from sqlalchemy.orm import Session
 from backend.common.config_service import ConfigService
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
 from backend.common.file_utils import book_cover_url
+from backend.common.gateways.payment.types import yuan_to_cents
 from backend.common.notification_models import Notification
 from backend.common.notifications import (
     SCENE_RESERVATION_EXPIRING,
@@ -22,6 +24,7 @@ from backend.common.notifications import (
 )
 from backend.common.sql_utils import escape_like
 from backend.domain.catalog.models import Book, BookCopy
+from backend.domain.circulation.borrow_gate import deposit_block_reason
 from backend.domain.circulation.models import BorrowRecord
 from backend.domain.identity.models import Child, Parent
 from backend.domain.reading.models import CheckIn, ReadingProgress, Reservation
@@ -66,25 +69,22 @@ class ReservationService:
             .filter(Deposit.child_id == child.id, Deposit.is_deleted == 0)
             .first()
         )
-        if (
-            not dep
-            or dep.status == Deposit.STATUS_UNPAID
-            or dep.status == Deposit.STATUS_FULLY_DEDUCTED
-            or (dep.unpaid_balance or 0) > 0
-        ):
-            # B-12（第二批 T12）：押金扣光/有未结清赔偿款与未缴纳同险；预约为
-            # 线上自助操作，硬拦截无人工放行（宪法三类硬拦截例外）
-            # 2026-10-13（第五十一轮·BDD 押金解封首轮实证）：**欠款优先**——与
-            # `circulation/borrow_gate.deposit_gate` 同步改序：超扣实现必然把状态置为
-            # fully_deducted，原顺序让"有未结清赔偿款"不可达，家长端只看到"押金已扣光"。
-            if dep and (dep.unpaid_balance or 0) > 0:
-                block_reason = f"有未结清赔偿款 {dep.unpaid_balance} 元"
-            elif not dep or dep.status == Deposit.STATUS_UNPAID:
-                block_reason = "押金未缴纳"
-            elif dep.status == Deposit.STATUS_FULLY_DEDUCTED:
-                block_reason = "押金已扣光"
-            else:
-                block_reason = f"押金状态为 {dep.status}（非已缴，需重新缴纳）"
+        # B-12（第二批 T12）：押金扣光/有未结清赔偿款与未缴纳同险；预约为线上自助操作，
+        # 硬拦截无人工放行（宪法三类硬拦截例外）。
+        # **第十轮 W1-1（P2，2026-10-25）**：判据改为调用借书闸的**同一份**
+        # `borrow_gate.deposit_block_reason`（白名单：`paid`/`partially_deducted` 且无欠款才放行）。
+        # 原实现在这里**又写了一遍**黑名单，漏掉 `refunding`/`refunded`：
+        # 押金退款在途或已退未复位的孩子仍能自助预约并锁住副本 72h，到店核销时才被
+        # `deposit_gate` 拦下（家长白约、别的孩子借不到）。同一判定写两遍必然漂移。
+        block_reason = deposit_block_reason(
+            deposit_status=dep.status if dep else None,
+            deposit_unpaid_balance=(
+                yuan_to_cents(dep.unpaid_balance or Decimal("0")) if dep else 0
+            ),
+            unpaid_status=Deposit.STATUS_UNPAID,
+            fully_deducted_status=Deposit.STATUS_FULLY_DEDUCTED,
+        )
+        if block_reason:
             raise ValidationError(f"{block_reason}，不能预约")
         now = datetime.now()
         # 2026-09-21 甲方口径：逾期不拦截（全端统一）——原先此处对"有逾期未还"硬拦

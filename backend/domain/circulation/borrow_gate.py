@@ -75,6 +75,46 @@ def member_gate(
     return GateResult("expired", "", OVERRIDABLE)
 
 
+def deposit_block_reason(
+    *,
+    deposit_status: str | None,
+    deposit_unpaid_balance: int,
+    unpaid_status: str,
+    fully_deducted_status: str,
+    paid_status: str = "paid",
+    partially_deducted_status: str = "partially_deducted",
+) -> str | None:
+    """押金是否拦截、拦的原因（**单一来源**：借书闸与预约入口共用这一份）。
+
+    B-12/T12 白名单口径：押金必须在账（`paid` / `partially_deducted`，后者是扣过赔偿但仍有余额）
+    且无未结清赔偿款才放行。返回 `None` = 通过；否则返回中文原因（**不含**"可人工放行"后缀，
+    调用方按自己的语义拼）。
+
+    为什么抽出来（第十轮 W1-1，P2）：预约入口把同一判据**又写了一遍**，而那一遍漏了
+    `refunding`/`refunded`（外层 if 不含这两个状态，内层 `else` 文案"押金状态为 X（非已缴）"
+    因此**不可达**）→ 押金退款在途 / 已退押金未复位的孩子仍能自助预约并锁住副本 72h，
+    到店核销时才被 `deposit_gate` 拦下（家长白约、别的孩子借不到）。同一判定写两遍必然漂移，
+    现在只留一份。
+    """
+    if deposit_status in (paid_status, partially_deducted_status) and deposit_unpaid_balance <= 0:
+        return None
+    # 2026-10-13（第五十一轮·BDD 押金解封首轮实证）：**欠款优先**。原顺序把
+    # `fully_deducted` 判在前面，而"扣到超额"的实现必然把状态置为 fully_deducted
+    # （billing `deduct_for_compensation`：over>0 → STATUS_FULLY_DEDUCTED），于是
+    # "有未结清赔偿款"这一支**永远不可达**——馆员在借还台只看到"押金已扣光"，
+    # 看不到"还欠多少"，与 PRD §3.6"持续提醒馆员待结清"的意图背离。
+    # 欠款是更可执行的事实（补缴额 = 标准额 − 可用 + 待结清），故先判欠款并带上金额。
+    if deposit_unpaid_balance > 0:
+        return (
+            f"有未结清赔偿款 {(Decimal(deposit_unpaid_balance) / 100).quantize(Decimal('0.01'))} 元"
+        )
+    if deposit_status is None or deposit_status == unpaid_status:
+        return "押金未缴纳"
+    if deposit_status == fully_deducted_status:
+        return "押金已扣光"
+    return f"押金状态为 {deposit_status}（非已缴，需重新缴纳）"
+
+
 def deposit_gate(
     *,
     deposit_status: str | None,
@@ -92,28 +132,25 @@ def deposit_gate(
     原黑名单只拦 `unpaid`/`fully_deducted`/未结清，于是 `refunded`（退会结算后的终态）与
     `refunding`（在途退款）**被当成合格**：孩子退会后重新入会（WITHDRAWN→OBSERVATION 在允许
     矩阵内）即可**零押金借书**——全仓没有任何把押金写回 `unpaid` 的复位路径，这个洞一直是开的。
+
+    第十轮 W1-1：判据体已抽到 `deposit_block_reason`（预约入口共用同一份），本函数只负责
+    把它包成"可放行"的 `GateResult`。
     """
-    if deposit_status not in (paid_status, partially_deducted_status) or deposit_unpaid_balance > 0:
-        # 2026-10-13（第五十一轮·BDD 押金解封首轮实证）：**欠款优先**。原顺序把
-        # `fully_deducted` 判在前面，而"扣到超额"的实现必然把状态置为 fully_deducted
-        # （billing `deduct_for_compensation`：over>0 → STATUS_FULLY_DEDUCTED），于是
-        # "有未结清赔偿款"这一支**永远不可达**——馆员在借还台只看到"押金已扣光"，
-        # 看不到"还欠多少"，与 PRD §3.6"持续提醒馆员待结清"的意图背离。
-        # 欠款是更可执行的事实（补缴额 = 标准额 − 可用 + 待结清），故先判欠款并带上金额。
-        if deposit_unpaid_balance > 0:
-            block_reason = f"有未结清赔偿款 {(Decimal(deposit_unpaid_balance) / 100).quantize(Decimal('0.01'))} 元"
-        elif deposit_status is None or deposit_status == unpaid_status:
-            block_reason = "押金未缴纳"
-        elif deposit_status == fully_deducted_status:
-            block_reason = "押金已扣光"
-        else:
-            block_reason = f"押金状态为 {deposit_status}（非已缴，需重新缴纳）"
-        if not override_reason:
-            return GateResult(
-                f"deposit_{block_reason}", f"{block_reason}（可人工放行并填写原因）", OVERRIDABLE
-            )
-        return GateResult(f"deposit_{block_reason}", "", OVERRIDABLE)
-    return _PASS
+    block_reason = deposit_block_reason(
+        deposit_status=deposit_status,
+        deposit_unpaid_balance=deposit_unpaid_balance,
+        unpaid_status=unpaid_status,
+        fully_deducted_status=fully_deducted_status,
+        paid_status=paid_status,
+        partially_deducted_status=partially_deducted_status,
+    )
+    if block_reason is None:
+        return _PASS
+    if not override_reason:
+        return GateResult(
+            f"deposit_{block_reason}", f"{block_reason}（可人工放行并填写原因）", OVERRIDABLE
+        )
+    return GateResult(f"deposit_{block_reason}", "", OVERRIDABLE)
 
 
 def first_block(*results: GateResult) -> GateResult | None:
