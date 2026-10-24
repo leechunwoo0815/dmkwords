@@ -468,12 +468,145 @@ def util_exports(util_dir: Path | None = None) -> dict[str, list[Path]]:
         return out
     for path in sorted(util_dir.glob("*.js")):
         text = path.read_text(encoding="utf-8", errors="ignore")
-        for block in EXPORT_BLOCK_RE.findall(text):
-            for name in EXPORT_IDENT_RE.findall(block):
-                if len(name) < 5 or name.isupper() or name in JS_KEYWORDS:
-                    continue
-                out.setdefault(name, []).append(path.resolve())
+        for name in exports_from_source(text):
+            out.setdefault(name, []).append(path.resolve())
     return out
+
+
+def strip_js_comments(text: str) -> str:
+    """去掉 `//` 行注释与 `/* */` 块注释（字符串内的 `//` 不动）。
+
+    为什么要剥：`utils/api.js` 的导出块里夹着大段中文说明，里面有 `openid`/`need_bind`
+    这类词——不剥注释会把**注释里的词**当成导出名（W6 首版就是这么报出 6 个假导出的）。
+    """
+    out: list[str] = []
+    i = 0
+    quote = ""
+    while i < len(text):
+        ch = text[i]
+        if quote:
+            out.append(ch)
+            if ch == "\\" and i + 1 < len(text):
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if ch == quote:
+                quote = ""
+            i += 1
+            continue
+        if ch in "'\"`":
+            quote = ch
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and i + 1 < len(text) and text[i + 1] == "/":
+            j = text.find("\n", i)
+            i = len(text) if j < 0 else j
+            continue
+        if ch == "/" and i + 1 < len(text) and text[i + 1] == "*":
+            j = text.find("*/", i + 2)
+            i = len(text) if j < 0 else j + 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def brace_body(clean: str, open_index: int) -> str:
+    """取 `open_index` 处 `{` 起、配平到对应 `}` 的**对象体**。
+
+    参数必须是**已 `strip_js_comments` 的文本**：两边索引必须同一坐标系——首版在函数内
+    现剥一份、却用原文的索引去切，结果切到错位置（导出名解析直接归零，自检当场抓到）。
+    """
+    depth = 0
+    i = open_index
+    while i < len(clean):
+        ch = clean[i]
+        if ch in "'\"`":
+            quote = ch
+            i += 1
+            while i < len(clean):
+                if clean[i] == "\\":
+                    i += 2
+                    continue
+                if clean[i] == quote:
+                    break
+                i += 1
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return clean[open_index + 1 : i]
+        i += 1
+    return clean[open_index + 1 :]
+
+
+def object_top_level_keys(body: str) -> list[str]:
+    """对象体里**顶层**的键名（跳过嵌套对象/数组/函数体里的名字）。
+
+    为什么必须按顶层切：非贪心正则遇到第一个 `}` 就停 —— `utils/api.js` 的导出块
+    13866 字符只能取到 257 字符（77 个导出只收录 6 个，**判据塌缩**，2026-10-24 W8 包实测）。
+    """
+    keys: list[str] = []
+    depth = 0
+    quote = ""
+    seg: list[str] = []
+    segs: list[str] = []
+
+    def flush(buf: list[str]) -> None:
+        m = re.match(
+            r"\s*(?:async\s+)?(?:function\s+)?([A-Za-z_$][\w$]*)\s*(?::|\(|,|$)", "".join(buf)
+        )
+        if m:
+            keys.append(m.group(1))
+
+    i = 0
+    while i < len(body):
+        ch = body[i]
+        if quote:
+            seg.append(ch)
+            if ch == "\\":
+                if i + 1 < len(body):
+                    seg.append(body[i + 1])
+                    i += 2
+                    continue
+            elif ch == quote:
+                quote = ""
+            i += 1
+            continue
+        if ch in "'\"`":
+            quote = ch
+            seg.append(ch)
+        elif ch in "{[(":
+            depth += 1
+            seg.append(ch)
+        elif ch in "}])":
+            depth -= 1
+            seg.append(ch)
+        elif ch == "," and depth == 0:
+            segs.append("".join(seg))
+            seg = []
+        else:
+            seg.append(ch)
+        i += 1
+    segs.append("".join(seg))
+    for s in segs:
+        flush([s])
+    return keys
+
+
+def exports_from_source(text: str) -> list[str]:
+    """从源码里取 `module.exports = { … }` 的**顶层导出名**（长度 ≥5、非全大写、非关键字）。"""
+    names: list[str] = []
+    clean = strip_js_comments(text)
+    for m in re.finditer(r"module\.exports\s*=\s*\{", clean):
+        body = brace_body(clean, m.end() - 1)
+        for name in object_top_level_keys(body):
+            if len(name) < 5 or name.isupper() or name in JS_KEYWORDS:
+                continue
+            names.append(name)
+    return sorted(set(names))
 
 
 def js_defines_name(text: str, name: str) -> bool:
@@ -775,6 +908,29 @@ def selftest() -> list[str]:
             hits = scan_load_catch_state([sample], money_pages)
             if hits:
                 fails.append(f"S1: W4 第三形态正例（{why}）被误报：{hits}")
+
+        # W6 解析面：「嵌套对象之后的导出」必须收录。首版非贪心正则取到第一个 `}` 就停，
+        # `utils/api.js` 的 78 个导出只收录 6 个（判据塌缩，2026-10-24 W8 包实测）。
+        nested_utils = base / "nested_utils"
+        nested_utils.mkdir(exist_ok=True)
+        (nested_utils / "extra.js").write_text(
+            "module.exports = {\n"
+            "  // 说明文字里的词 commentOnlyWord 不该被当成导出\n"
+            "  inner() { return { a: 1 } },\n"
+            "  deepKey: { nested: { x: 1 } },\n"
+            "  targetCallName() { return 1 },\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        nested_exports = util_exports(nested_utils)
+        if "targetCallName" not in nested_exports:
+            fails.append("S1: W6 嵌套导出解析塌缩（`targetCallName` 未收录）")
+        if "commentOnlyWord" in nested_exports:
+            fails.append("S1: W6 把注释里的词当成了导出名")
+        nested_page = base / "nested_page.js"
+        nested_page.write_text("Page({\n  onLoad() { targetCallName() },\n})\n", encoding="utf-8")
+        if not scan_missing_util_require([nested_page], nested_exports):
+            fails.append("S1: W6 嵌套导出样本未命中（旧解析器在这里是假绿）")
     return fails
 
 
