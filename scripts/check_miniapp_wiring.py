@@ -37,10 +37,14 @@
     `bindtap="switchTab"` 与 `{{list}}/{{selected}}/{{circleDot}}` 全在盲区里。
 
 判据与自证：
-  · 四类违例都必须为 0（新规则不设基线）；
+  · 六类违例都必须为 0（新规则不设基线）；
   · S1 注入自检：内置违例样本必须被检出（防检查器自身假绿）——含 P2-70 新增的
     冒号式/单引号样本，正例（旧式绑定 + handler 存在）不得误报；
   · S2 空扫描自检：扫到 0 个 wxml = FAIL（防"路径写错→全绿"的盲区形状）。
+
+**W6（2026-10-24 第一百三十四批，IDE 实测抓到）**：调用 `utils/*` 的导出符号但本文件没有
+`require` ⇒ 模块顶层 `ReferenceError`，**整个分包页面注册失败**（reading 分包 5 页全打不开）。
+前七查（W1–W5 + bindings + style + media）一条都覆盖不到"用了但没导入"。
 """
 
 from __future__ import annotations
@@ -110,6 +114,66 @@ REMOTE_IMG_FIELDS = (
 )
 IMAGE_TAG_RE = re.compile(r"<image\b[^>]*?>", re.S)
 HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+
+#: W6 **共享 utils 的导出符号必须先 require 才能用**（2026-10-24 第一百三十四批；
+#: 微信开发者工具实测抓到，前七查全部为绿）：
+#:
+#: `pages/reading-pkg/reader/reader.js` 在 `data` 里调用 `getConfigs()`，却从未
+#: `require('../../../utils/configs')`（2026-10-21 E5 批次改动漏了 import）。
+#: 结果是 **整个 reading 分包**（reader / book-detail / quiz / quiz-result / vocabulary）
+#: 在模块加载阶段抛 `ReferenceError: getConfigs is not defined` → 分包 bundle 注册失败，
+#: 五个页面**全部打不开**（IDE console 只有 "Page ... has not been registered yet"）。
+#: 静态检查器当时一条都没报：W1 看 wxml 的 handler、W2 看类名、W3 看 reader 入参、
+#: W4 看吞错、W5 看图片兜底——**没有人看"用了但没导入"**。
+#:
+#: 判据：从 `miniapp/utils/*.js` 的 `module.exports = { … }` 提取导出名（只取
+#: 长度 ≥ 5 且非全大写的标识符，避免 `get`/`post`/常量这类通用名误报）；页面/组件
+#: 文件里出现 `名字(` 调用、跨文件未 require、本文件也没有本地定义 ⇒ 违例。
+#: 已知盲区（如实登记）：拼接调用 `obj[name](…)`、解构后的别名、只当值用不当函数调用的
+#: 符号都不在判据内——本规则只覆盖"整包挂掉"这一类最常见形状。
+UTIL_DIR = MINIAPP / "utils"
+EXPORT_BLOCK_RE = re.compile(r"module\.exports\s*=\s*\{(.*?)\}", re.S)
+EXPORT_IDENT_RE = re.compile(r"[A-Za-z_$][\w$]*")
+REQUIRE_PATH_RE = re.compile(r"""require\(\s*['"]([^'"]+)['"]\s*\)""")
+#: `module.exports = { … }` 里会出现 `get(path) { return request(…) }` 这类**函数体**，
+#: 逐词扫描会把 `return`/`function` 当成导出名（主流程首跑就报了 `return()` 假阳性）——
+#: 关键字与内建一律剔除，只留真正的导出标识符。
+JS_KEYWORDS = {
+    "async",
+    "await",
+    "break",
+    "case",
+    "catch",
+    "const",
+    "continue",
+    "default",
+    "delete",
+    "else",
+    "exports",
+    "false",
+    "finally",
+    "for",
+    "function",
+    "if",
+    "in",
+    "instanceof",
+    "let",
+    "module",
+    "new",
+    "null",
+    "of",
+    "return",
+    "switch",
+    "this",
+    "throw",
+    "true",
+    "try",
+    "typeof",
+    "undefined",
+    "var",
+    "void",
+    "while",
+}
 
 
 def js_defines(js_text: str, name: str) -> bool:
@@ -306,6 +370,73 @@ def scan_silent_empty_catch(js_files: list[Path]) -> list[str]:
     return problems
 
 
+def util_exports(util_dir: Path | None = None) -> dict[str, list[Path]]:
+    """`{导出名: [所属 utils 文件, …]}`——只收长度 ≥ 5 且非全大写的标识符。"""
+    util_dir = util_dir or UTIL_DIR
+    out: dict[str, list[Path]] = {}
+    if not util_dir.is_dir():
+        return out
+    for path in sorted(util_dir.glob("*.js")):
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for block in EXPORT_BLOCK_RE.findall(text):
+            for name in EXPORT_IDENT_RE.findall(block):
+                if len(name) < 5 or name.isupper() or name in JS_KEYWORDS:
+                    continue
+                out.setdefault(name, []).append(path.resolve())
+    return out
+
+
+def js_defines_name(text: str, name: str) -> bool:
+    """本文件里是否自己定义了这个名字（函数声明 / 变量 / 对象方法 / 对象键）。"""
+    patterns = (
+        rf"function\s+{re.escape(name)}\b",
+        rf"\b(?:const|let|var)\s+{re.escape(name)}\b",
+        rf"^\s*{re.escape(name)}\s*[:=]",
+        rf"^\s*(?:async\s+)?{re.escape(name)}\s*\([^)]*\)\s*\{{",
+    )
+    return any(re.search(p, text, re.M) for p in patterns)
+
+
+def scan_missing_util_require(
+    js_files: list[Path], exports: dict[str, list[Path]] | None = None
+) -> list[str]:
+    """W6：调用了 `utils/*` 的导出符号，却没有 require 它所属的模块（见上方说明）。
+
+    运行时后果不是"少个功能"，而是 `ReferenceError` 打在**模块顶层**——同一分包的所有
+    页面一起注册失败。所以这里按"必违例"处理，不设基线。
+    """
+    exports = util_exports() if exports is None else exports
+    problems: list[str] = []
+    util_root = UTIL_DIR.resolve()
+    for js in js_files:
+        if js.resolve().parent == util_root:
+            continue  # utils 内部互相 require 不在判据内（它们本来就在同一目录）
+        text = js.read_text(encoding="utf-8", errors="ignore")
+        required: set[Path] = set()
+        for raw in REQUIRE_PATH_RE.findall(text):
+            base = (js.parent / raw).resolve()
+            required.add(base.with_suffix("") if base.suffix else base)
+        for name, owners in exports.items():
+            m = re.search(rf"(?<![\w.]){re.escape(name)}\s*\(", text)
+            if not m or in_comment(text, m.start()):
+                continue
+            if js_defines_name(text, name):
+                continue
+            if any(owner.with_suffix("") in required for owner in owners):
+                continue
+            try:
+                rel = js.relative_to(ROOT)
+            except ValueError:
+                rel = js
+            line = text[: m.start()].count("\n") + 1
+            mods = "、".join(sorted({f"utils/{o.stem}" for o in owners}))
+            problems.append(
+                f"W6 {rel}:{line}: 调用了 `{name}()` 但本文件没有 require（对应 {mods}）——"
+                f"运行时会抛 ReferenceError，且**同分包页面全部注册失败**"
+            )
+    return problems
+
+
 def in_comment(text: str, pos: int) -> bool:
     """`pos` 是否落在注释里（行注释 `//` 或块注释 `/* */`）。
 
@@ -482,6 +613,40 @@ def selftest() -> list[str]:
         w5_good = scan_remote_img_fallback([good_img])
         if w5_good:
             fails.append(f"S1: W5 正例被误报（本地资产/注释/已带兜底）：{w5_good}")
+
+        # W6：调 utils 导出但没 require 必须命中；require 过 / 本文件自己定义 必须零命中
+        fake_utils = base / "utils"
+        fake_utils.mkdir()
+        (fake_utils / "configs.js").write_text(
+            "module.exports = { loadConfigs, getConfigs }\n", encoding="utf-8"
+        )
+        fake_exports = util_exports(fake_utils)
+        bad_require = base / "bad_require.js"
+        bad_require.write_text(
+            "Page({\n  data: { cfg: getConfigs() },\n  onLoad() { loadConfigs() },\n})\n",
+            encoding="utf-8",
+        )
+        w6_hits = scan_missing_util_require([bad_require], fake_exports)
+        for want in ("getConfigs", "loadConfigs"):
+            if not any(want in p for p in w6_hits):
+                fails.append(f"S1: W6 未命中注入样本（{want}）")
+        ok_require = base / "ok_require.js"
+        ok_require.write_text(
+            "const { loadConfigs, getConfigs } = require('./utils/configs')\n"
+            "Page({\n  data: { cfg: getConfigs() },\n  onLoad() { loadConfigs() },\n})\n",
+            encoding="utf-8",
+        )
+        if scan_missing_util_require([ok_require], fake_exports):
+            fails.append(
+                f"S1: W6 正例（已 require）被误报：{scan_missing_util_require([ok_require], fake_exports)}"
+            )
+        local_def = base / "local_def.js"
+        local_def.write_text(
+            "function getConfigs() { return {} }\nPage({\n  data: { cfg: getConfigs() },\n})\n",
+            encoding="utf-8",
+        )
+        if scan_missing_util_require([local_def], fake_exports):
+            fails.append("S1: W6 正例（本文件自己定义）被误报")
     return fails
 
 
@@ -503,6 +668,7 @@ def main() -> int:
         + scan_reader_entry(js_files)
         + scan_silent_empty_catch(js_files)
         + scan_remote_img_fallback(wxml_files)
+        + scan_missing_util_require(js_files)
     )
     print(f"扫描面: {len(wxml_files)} 个 wxml（pages + components）+ {len(js_files)} 个 js")
     print(f"W1 bind*/catch* handler 缺失: {sum(1 for p in problems if p.startswith('W1'))}")
@@ -510,15 +676,16 @@ def main() -> int:
     print(f"W3 reader 入口传整对象: {sum(1 for p in problems if p.startswith('W3'))}")
     print(f"W4 失败吞成空数据: {sum(1 for p in problems if p.startswith('W4'))}")
     print(f"W5 远程图缺 binderror 兜底: {sum(1 for p in problems if p.startswith('W5'))}")
+    print(f"W6 调 utils 导出但未 require: {sum(1 for p in problems if p.startswith('W6'))}")
     if problems:
         print("\n违例明细：")
         for p in problems:
             print("  ✗", p)
-        print("\nFAIL: 接线检查不通过（W1~W5 必须为 0）")
+        print("\nFAIL: 接线检查不通过（W1~W6 必须为 0）")
         return 1
     print(
-        "PASS: 小程序接线五条规则全零（handler 存在 / 插值类名可解析 / reader 入口传 id / "
-        "失败不吞成空 / 远程图带兜底）✓"
+        "PASS: 小程序接线六条规则全零（handler 存在 / 插值类名可解析 / reader 入口传 id / "
+        "失败不吞成空 / 远程图带兜底 / utils 符号先 require）✓"
     )
     return 0
 
@@ -531,8 +698,8 @@ if __name__ == "__main__":
             print("FAIL(S1): " + "；".join(_fails))
             sys.exit(1)
         print(
-            "✓ S1 注入自检通过（W1~W5 违例命中 + 冒号式/单引号绑定命中 + "
-            "本地资产/注释/已带兜底正例零误报）"
+            "✓ S1 注入自检通过（W1~W6 违例命中 + 冒号式/单引号绑定命中 + "
+            "本地资产/注释/已带兜底/已 require 正例零误报）"
         )
         sys.exit(0)
     sys.exit(main())

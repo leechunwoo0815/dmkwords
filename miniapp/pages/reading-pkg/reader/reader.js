@@ -3,6 +3,7 @@
 // 客户端如实上报连续段区间 [session_start, position]；seek 段由服务端区间并集排除。
 const api = require('../../../utils/api')
 const media = require('../../../utils/media')
+const { loadConfigs, getConfigs } = require('../../../utils/configs')
 
 const HEARTBEAT_SEC = 10
 const SPEEDS = [0.75, 1.0, 1.25, 1.5, 2.0]

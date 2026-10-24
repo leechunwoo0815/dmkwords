@@ -60,7 +60,11 @@
     </view>
   </view>
 
-  <view class="records-section" wx:if="{{records.length}}">
+  <!-- 第一百三十四批：转让记录加载失败必须可见（原先静默丢列表 = 与"没有记录"同形） -->
+  <error-view wx:if="{{listError}}" type="network" title="转让记录加载失败"
+    desc="{{listError}}（记录未加载，不代表没有转让记录）" bind:onRetry="onRetryList" />
+
+  <view class="records-section" wx:if="{{!listError && records.length}}">
     <view class="records-heading">转让记录</view>
     <view wx:for="{{records}}" wx:key="id" class="record-item">
       <view class="record-header">

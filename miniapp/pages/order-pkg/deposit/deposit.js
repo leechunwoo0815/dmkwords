@@ -1,5 +1,6 @@
 // pages/order-pkg/deposit/deposit.js — 押金（R-312：家长端查看/补缴；R-313：退会禁）
 const api = require('../../../utils/api')
+const session = require('../../../utils/session')
 
 const STATUS_TEXT = {
   unpaid: '还未缴纳',
@@ -20,14 +21,18 @@ Page({
     entryTexts: ENTRY_TEXT,
     dep: null,
     ledger: [],
+    loadError: '',     // 第一百三十四批：原先 catch 只靠 request.js 的瞬时 toast，toast 一过
+                       // 页面就渲染成"暂无流水记录"——把故障读成"没有押金流水"（禁假空）
     supplementDisabled: false,
     supplementHint: '',
     loading: false,
   },
 
   onLoad(options) {
-    this.setData({ childName: decodeURIComponent(options.child_name || '') })
-    this._childId = Number(options.child_id)
+    const child = session.getCurrentChild() || {}
+    this.setData({ childName: decodeURIComponent(options.child_name || '') || child.name || '' })
+    // P3 统一解析（第一百三十四批补齐）：原先 `Number(options.child_id)` 缺参即 NaN → 整页空白
+    this._childId = session.resolveChildId(options)
     // R-313：退会/未入会置灰（后端守卫为准，前端镜像提示）
     const status = options.member_status || ''
     if (status === 'withdrawn' || status === 'none') {
@@ -40,9 +45,11 @@ Page({
 
   onShow() { this.load() },
 
+  onRetryLoad() { this.load() },
+
   async load() {
     if (!this._childId) return
-    this.setData({ loading: true })
+    this.setData({ loading: true, loadError: '' })
     try {
       const d = await api.myDeposit(this._childId)
       const ledger = (d.ledger || []).map((r) => ({
@@ -54,7 +61,14 @@ Page({
         ledger,
         statusText: STATUS_TEXT[d.status] || d.status,
       })
-    } catch (e) { /* request.js 已 toast */ }
+    } catch (e) {
+      // 失败**不许伪装成空**：清掉旧数据 + 落失败态（金额页尤其不能说成"没有流水"）
+      this.setData({
+        dep: null,
+        ledger: [],
+        loadError: (e && e.message) || '押金信息加载失败',
+      })
+    }
     this.setData({ loading: false })
   },
 

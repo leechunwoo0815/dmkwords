@@ -23,12 +23,14 @@ Page({
     historyLimit: 0,
   },
 
-  async onLoad(options) {
-    const { configs } = await loadConfigs()
-    this.setData({ cfg: configs })
+  onLoad(options) {
     this.setData({ childName: options.child_name ? decodeURIComponent(options.child_name) : '' })
     // P3（第一百一十三批）：走统一解析（URL 参数合法才用，否则回落当前孩子）
+    // **必须在 await 之前赋值**：onShow 紧随 onLoad 触发并调用 load()，冷启动时
+    // loadConfigs() 是真请求（首个页面未缓存）→ 若等它回来再设 `_childId`，load()
+    // 先跑一步就落进「还没有选择孩子」，且此后无人重拉（第一百三十四批 IDE 实测）。
     this._childId = session.resolveChildId(options)
+    loadConfigs().then(({ configs }) => this.setData({ cfg: configs }))
   },
 
   onShow() {

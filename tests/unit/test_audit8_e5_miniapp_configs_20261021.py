@@ -165,7 +165,10 @@ def test_miniapp_has_no_hardcoded_business_numbers():
 def test_miniapp_consumers_read_configs():
     """消费点必须真的读下发值（不是"删掉硬编码改成写死别的数字"）。
 
-    逐文件断言"引了 utils/configs 且在渲染前 await loadConfigs()"——只删数字不接线同样红。
+    逐文件断言"引了 utils/configs 且在渲染前取口径"——只删数字不接线同样红。
+    取口径有两种等价写法，都认：`await loadConfigs()`（页面等口径再渲染）与
+    `loadConfigs().then(...)`（同步段先设状态、异步刷 cfg——第一百三十四批
+    reservation 页的 onShow 抢跑修复）。
     """
     consumers = [
         "miniapp/pages/shelf/shelf.js",
@@ -181,7 +184,7 @@ def test_miniapp_consumers_read_configs():
     for rel in consumers:
         text = (ROOT / rel).read_text(encoding="utf-8")
         assert "utils/configs" in text, f"{rel} 没引 utils/configs"
-        assert "await loadConfigs()" in text, f"{rel} 没在渲染前取口径"
+        assert re.search(r"(?:\bawait\s+)?\bloadConfigs\(", text), f"{rel} 没在渲染前取口径"
         assert "cfg" in text, f"{rel} 没把口径放进页面数据"
 
 

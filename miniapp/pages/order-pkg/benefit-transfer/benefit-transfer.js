@@ -14,6 +14,8 @@ Page({
     allOk: false,
     condError: '',   // P2-16（第九轮审查）：条件查询失败原因（原先失败与"条件不全"同渲染）
     records: [],
+    listError: '',   // 第一百三十四批：转让记录加载失败（原先 catch 只把 loading 置 false，
+                     // 页面等于静默丢列表——失败与"没有转让记录"同形）
     loading: true,
   },
 
@@ -30,14 +32,20 @@ Page({
     const children = session.getChildren().map(
       c => ({ ...c, memberLabel: memberStatusText(c.member_status) })
     )
-    this.setData({ loading: true, children })
+    this.setData({ loading: true, children, listError: '' })
     try {
       const records = await api.myTransfers()
       this.setData({ records: records || [], loading: false })
     } catch (e) {
-      this.setData({ loading: false })
+      this.setData({
+        records: [],
+        loading: false,
+        listError: (e && e.message) || '转让记录加载失败',
+      })
     }
   },
+
+  onRetryList() { this.load() },
 
   onPickSource(e) {
     const id = Number(e.currentTarget.dataset.id)

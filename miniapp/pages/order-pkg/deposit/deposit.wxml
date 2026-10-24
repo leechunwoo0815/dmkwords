@@ -4,6 +4,11 @@
     <text class="dp-status">{{statusText}}</text>
   </view>
 
+  <!-- 第一百三十四批：失败态显式呈现（原先仅靠 request.js 的瞬时 toast → toast 一过
+       页面就显示「暂无流水记录」，把故障读成"没有押金流水"） -->
+  <error-view wx:if="{{loadError}}" type="network" title="押金信息加载失败"
+    desc="{{loadError}}（押金未加载，不代表没有缴纳记录）" bind:onRetry="onRetryLoad" />
+
   <view class="section-card x-c92966" wx:if="{{dep}}">
     <view class="dp-amounts">
       <view class="dp-amt">
@@ -30,7 +35,7 @@
     <view wx:if="{{supplementHint}}" class="dp-hint">{{supplementHint}}</view>
   </view>
 
-  <view class="section-card x-c92966">
+  <view class="section-card x-c92966" wx:if="{{!loadError}}">
     <view class="section-title">押金流水</view>
     <view wx:if="{{ledger.length === 0}}" class="dp-empty">暂无流水记录</view>
     <view wx:for="{{ledger}}" wx:key="index" class="dp-row">
