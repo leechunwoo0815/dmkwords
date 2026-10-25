@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from pydantic import ValidationError as PydanticValidationError
 
 from backend.common.exceptions import ValidationError
 from backend.domain.activity.admin_service import AdminActivityService
@@ -25,9 +26,9 @@ from backend.domain.admin.models import AdminUser
 
 def test_update_request_rejects_overflow_fee():
     """金额上界必须在**入参层**拦（与 create 同口径），不能靠数据库报错。"""
-    with pytest.raises(Exception):  # pydantic ValidationError（不 import 其私有类）
+    with pytest.raises(PydanticValidationError):
         ActivityUpdateRequest(fee=Decimal("99999999999999.99"))
-    with pytest.raises(Exception):
+    with pytest.raises(PydanticValidationError):
         ActivityUpdateRequest(fee=Decimal("50.005"))  # 超过 2 位小数
     ActivityUpdateRequest(fee=Decimal("50.00"))  # 合法值
 
