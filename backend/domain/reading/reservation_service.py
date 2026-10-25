@@ -256,8 +256,14 @@ class ReservationService:
                 ),
                 db=self.db,
             )
-        if due and commit:
-            self.db.commit()
+        if due:
+            if commit:
+                self.db.commit()
+            else:
+                # **必须 flush**（`SessionLocal(autoflush=False)`，教训 41 同族）：不提交也要让
+                # **同一事务内的后续查询**看得到本次释放，否则下面按 `status == active` 的判据
+                # 仍读到旧值——`commit=False` 会退化成"释放了但没人看得见"，建单照旧被顶回。
+                self.db.flush()
         return len(due)  # 扫描数（跳过的并发核销单不在内，幂等语义不变）
 
     def expire_remind(self) -> int:
