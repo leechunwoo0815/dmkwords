@@ -278,6 +278,7 @@ class ActivityService(ActivityCancelMixin):
         if a.status != Activity.STATUS_PUBLISHED:
             raise ValidationError("活动已取消或结束")
         child = self.db.query(Child).filter(Child.id == e.child_id).first()
+        e.assert_transition(ActivityEnrollment.STATUS_CHECKED_IN)
         e.status = ActivityEnrollment.STATUS_CHECKED_IN
         e.checked_in_at = datetime.now()
         e.checked_in_by = admin.id
@@ -364,6 +365,7 @@ class ActivityService(ActivityCancelMixin):
             raise ValidationError("未找到关联的统一退款申请（台账断链，请检查数据）")
         RefundService(self.db).review(admin, rr.id, approve, remark)
         if not approve:
+            e.assert_transition(ActivityEnrollment.STATUS_ENROLLED)
             e.status = ActivityEnrollment.STATUS_ENROLLED
             e.cancel_reason = None
         publish_audit(
@@ -524,6 +526,7 @@ class ActivityService(ActivityCancelMixin):
         if not e:
             raise NotFoundError("该订单没有关联的活动报名")
         if e.status == ActivityEnrollment.STATUS_PENDING_PAYMENT:
+            e.assert_transition(ActivityEnrollment.STATUS_ENROLLED)
             e.status = ActivityEnrollment.STATUS_ENROLLED
         return e
 
@@ -535,6 +538,7 @@ class ActivityService(ActivityCancelMixin):
             .first()
         )
         if e and e.status == ActivityEnrollment.STATUS_PENDING_PAYMENT:
+            e.assert_transition(ActivityEnrollment.STATUS_CANCELLED)
             e.status = ActivityEnrollment.STATUS_CANCELLED
             e.cancel_reason = "订单超时未支付，自动取消"
 
@@ -655,6 +659,7 @@ class ActivityService(ActivityCancelMixin):
                 .scalar()
             )
             if active_cnt == 0:
+                a.assert_transition(Activity.STATUS_FINISHED)
                 a.status = Activity.STATUS_FINISHED
                 finished += 1
         if finished:
@@ -688,6 +693,7 @@ class ActivityService(ActivityCancelMixin):
             raise ValidationError("付费活动请走退款流程（报名费原路退回）")
         if a.start_at <= datetime.now():
             raise ValidationError("活动已开始，不能取消（请联系馆员）")
+        e.assert_transition(ActivityEnrollment.STATUS_CANCELLED)
         e.status = ActivityEnrollment.STATUS_CANCELLED
         e.cancel_reason = "家长取消"
         self.db.commit()
@@ -716,6 +722,7 @@ class ActivityService(ActivityCancelMixin):
         cutoff_block = refund_rules.activity_cutoff_block(self.db, a.start_at)
         if cutoff_block:
             raise ValidationError(cutoff_block)
+        e.assert_transition(ActivityEnrollment.STATUS_REFUND_PENDING)
         e.status = ActivityEnrollment.STATUS_REFUND_PENDING
         e.cancel_reason = "家长申请退款（活动未开始）"
         # 统一台账：RefundRequest(pending) + order.refund_status=pending + 管理待办通知

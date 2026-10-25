@@ -80,6 +80,7 @@ class DepositService:
             received = (order.amount or Decimal("0")).quantize(Decimal("0.01"))
             dep.amount = received
             dep.available_amount = received
+            dep.assert_transition(Deposit.STATUS_PAID)
             dep.status = Deposit.STATUS_PAID
             self._ledger(dep, DepositLedger.ENTRY_PAY, received, "押金缴纳", admin)
         else:  # deposit_supplement 补缴（R-312：补至全额；E-20260909-03：金额含待结清）
@@ -107,10 +108,13 @@ class DepositService:
                 Decimal("0.01")
             )
             if dep.unpaid_balance > 0:
+                dep.assert_transition(Deposit.STATUS_FULLY_DEDUCTED)
                 dep.status = Deposit.STATUS_FULLY_DEDUCTED
             elif dep.available_amount < standard:
+                dep.assert_transition(Deposit.STATUS_PARTIALLY_DEDUCTED)
                 dep.status = Deposit.STATUS_PARTIALLY_DEDUCTED
             else:
+                dep.assert_transition(Deposit.STATUS_PAID)
                 dep.status = Deposit.STATUS_PAID
             reason = "押金补缴至全额" if settle <= 0 else f"押金补缴至全额（含结清待结清 {settle}）"
             self._ledger(dep, DepositLedger.ENTRY_SUPPLEMENT, order.amount, reason, admin)
@@ -179,6 +183,7 @@ class DepositService:
         )
         if dep is None or dep.status != Deposit.STATUS_REFUNDED:
             return
+        dep.assert_transition(Deposit.STATUS_UNPAID)
         dep.status = Deposit.STATUS_UNPAID
         dep.amount = Decimal("0")
         dep.available_amount = Decimal("0")
@@ -208,10 +213,13 @@ class DepositService:
             return
         standard = dep.amount or Decimal("0")
         if (dep.unpaid_balance or Decimal("0")) > 0:
+            dep.assert_transition(Deposit.STATUS_FULLY_DEDUCTED)
             dep.status = Deposit.STATUS_FULLY_DEDUCTED
         elif dep.available_amount < standard:
+            dep.assert_transition(Deposit.STATUS_PARTIALLY_DEDUCTED)
             dep.status = Deposit.STATUS_PARTIALLY_DEDUCTED
         else:
+            dep.assert_transition(Deposit.STATUS_PAID)
             dep.status = Deposit.STATUS_PAID
 
     def create_deposit_order(self, admin, child_id: int) -> Order:
@@ -348,8 +356,14 @@ class DepositService:
         dep.deducted_amount = (dep.deducted_amount + deduct).quantize(Decimal("0.01"))
         if over > 0:
             dep.unpaid_balance = (dep.unpaid_balance + over).quantize(Decimal("0.01"))
+            dep.assert_transition(Deposit.STATUS_FULLY_DEDUCTED)
             dep.status = Deposit.STATUS_FULLY_DEDUCTED
         else:
+            dep.assert_transition(
+                Deposit.STATUS_FULLY_DEDUCTED
+                if dep.available_amount == 0
+                else Deposit.STATUS_PARTIALLY_DEDUCTED
+            )
             dep.status = (
                 Deposit.STATUS_FULLY_DEDUCTED
                 if dep.available_amount == 0

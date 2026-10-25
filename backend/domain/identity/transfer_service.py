@@ -271,6 +271,7 @@ class TransferService:
 
     def cancel(self, parent, transfer_id: int) -> dict:
         req = self._pending_of(parent, transfer_id)
+        req.assert_transition(TransferRequest.STATUS_CANCELLED)
         req.status = TransferRequest.STATUS_CANCELLED
         self._unlock_both(req)
         # WM13 L2 回写：家长撤销 → 该单管理待办审计标注来源（幂等）
@@ -491,6 +492,7 @@ class TransferService:
         if not req or req.status != TransferRequest.STATUS_PENDING:
             raise ValidationError("转让申请不存在或已处理")
         if req.expires_at < datetime.now():
+            req.assert_transition(TransferRequest.STATUS_EXPIRED)
             req.status = TransferRequest.STATUS_EXPIRED
             self._unlock_both(req)
             self.db.commit()
@@ -521,6 +523,7 @@ class TransferService:
             if failed:
                 raise ValidationError("审核时条件不满足：" + "；".join(failed))
             # ---- 同事务 12 步（R-305）----
+            req.assert_transition(TransferRequest.STATUS_APPROVED)
             req.status = TransferRequest.STATUS_APPROVED
             # 1) 转出方退会（年费不退；历史阅读成果保留）
             # B4/P2-6（第九轮审查）：走会员状态唯一写口（不再直赋——直赋会漏待评估时钟维护）
@@ -581,6 +584,7 @@ class TransferService:
                 self.db.add(rr)
                 self.db.flush()
                 deposit_refund_id = rr.id
+                dep.assert_transition(Deposit.STATUS_REFUNDING)
                 dep.status = Deposit.STATUS_REFUNDING
             # 3) 转出方退会记录（WM10-04：生成 WithdrawalRequest，状态随押金退款流程）
             w_req = WithdrawalRequest(
@@ -647,6 +651,7 @@ class TransferService:
         else:
             if not remark or not remark.strip():
                 raise ValidationError("拒绝转让必须填写原因（家长可见）")
+            req.assert_transition(TransferRequest.STATUS_REJECTED)
             req.status = TransferRequest.STATUS_REJECTED
             self._unlock_both(req)
         req.review_remark = remark or None

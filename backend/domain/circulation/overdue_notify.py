@@ -82,6 +82,7 @@ def mark_and_notify(db: Session, overdue: list[BorrowRecord]) -> int:
             )
             if result.rowcount == 0:
                 continue  # 已被并发方还书/推进，跳过（不误发逾期通知）
+            rec.assert_transition(BorrowRecord.STATUS_OVERDUE)
             rec.status = BorrowRecord.STATUS_OVERDUE
             marked += 1
         child = kids.get(rec.child_id)

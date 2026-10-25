@@ -27,6 +27,30 @@ class BorrowRecord(BaseModel):
     STATUS_RETURNED = "returned"  # 已还
     STATUS_LOST = "lost"  # 遗失
 
+    #: 状态转移矩阵（第十轮 W1-4，2026-10-25）：只列**真实存在的边**（写点清单见 docs/09 第一百一十五批）。
+    #: 同值写（幂等写回）由 `assert_transition` 放行，不进矩阵。
+    ALLOWED_TRANSITIONS = {
+        STATUS_ACTIVE: {STATUS_OVERDUE, STATUS_RETURNED, STATUS_LOST},
+        # 逾期可回到 active（续借顺延到期日）
+        STATUS_OVERDUE: {STATUS_ACTIVE, STATUS_RETURNED, STATUS_LOST},
+        STATUS_RETURNED: set(),
+        STATUS_LOST: set(),
+    }
+
+    def can_transition(self, new_status: str) -> bool:
+        return new_status in self.ALLOWED_TRANSITIONS.get(self.status, set())
+
+    def assert_transition(self, new_status: str) -> None:
+        """转移断言（红线：改状态机先画矩阵）。非法边抛 ConflictError；同值写放行。"""
+        from backend.common.exceptions import ConflictError
+
+        if new_status == self.status:
+            return
+        if not self.can_transition(new_status):
+            raise ConflictError(
+                f"{type(self).__name__} 当前状态 {self.status} 不允许转到 {new_status}"
+            )
+
     child_id = Column(Integer, nullable=False, index=True)
     copy_id = Column(Integer, nullable=False, index=True)
     book_id = Column(Integer, nullable=False, index=True)

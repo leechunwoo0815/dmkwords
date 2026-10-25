@@ -538,6 +538,7 @@ class WithdrawalService:
                 else:
                     deposit_refund_id = rr.id
                     dep = self.db.query(Deposit).filter(Deposit.id == it["deposit_id"]).first()
+                    dep.assert_transition(Deposit.STATUS_REFUNDING)
                     dep.status = Deposit.STATUS_REFUNDING
                 refund_ids.append(rr.id)
             # 3) 有退款单 → refunding；无可退 → 直接 completed + withdrawn

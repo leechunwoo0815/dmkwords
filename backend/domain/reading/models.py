@@ -65,6 +65,30 @@ class Reservation(BaseModel):
     STATUS_CHECKED_OUT = "checked_out"  # 核销转借阅
     STATUS_EXCEPTION = "exception"  # 副本异常
 
+    #: 状态转移矩阵（第十轮 W1-4，2026-10-25）：只列**真实存在的边**（写点清单见 docs/09 第一百一十五批）。
+    #: 同值写（幂等写回）由 `assert_transition` 放行，不进矩阵。
+    ALLOWED_TRANSITIONS = {
+        STATUS_ACTIVE: {STATUS_EXPIRED, STATUS_CANCELLED, STATUS_CHECKED_OUT, STATUS_EXCEPTION},
+        STATUS_EXPIRED: set(),
+        STATUS_CANCELLED: set(),
+        STATUS_CHECKED_OUT: set(),
+        STATUS_EXCEPTION: set(),
+    }
+
+    def can_transition(self, new_status: str) -> bool:
+        return new_status in self.ALLOWED_TRANSITIONS.get(self.status, set())
+
+    def assert_transition(self, new_status: str) -> None:
+        """转移断言（红线：改状态机先画矩阵）。非法边抛 ConflictError；同值写放行。"""
+        from backend.common.exceptions import ConflictError
+
+        if new_status == self.status:
+            return
+        if not self.can_transition(new_status):
+            raise ConflictError(
+                f"{type(self).__name__} 当前状态 {self.status} 不允许转到 {new_status}"
+            )
+
     child_id = Column(Integer, nullable=False, index=True)
     book_id = Column(Integer, nullable=False, index=True)
     copy_id = Column(Integer, nullable=False)

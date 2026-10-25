@@ -534,6 +534,7 @@ class CirculationService:
 
         prev_status = copy.status  # P2 #15：判断"这次归还是否**新**引入损坏/遗失"
         was_overdue = record.due_at < datetime.now()
+        record.assert_transition(BorrowRecord.STATUS_RETURNED)
         record.status = BorrowRecord.STATUS_RETURNED
         record.returned_at = datetime.now()
         record.returned_condition = condition
@@ -544,6 +545,7 @@ class CirculationService:
             # P3-3：预约善后不在锁内做（漏斗按预约→副本取锁）——见 settle_orphans_after_copy_gone
             copy.status = BookCopy.STATUS_MAINTENANCE
         else:  # lost
+            record.assert_transition(BorrowRecord.STATUS_LOST)
             record.status = BorrowRecord.STATUS_LOST
             copy.status = BookCopy.STATUS_LOST
         self.db.flush()
@@ -655,6 +657,7 @@ class CirculationService:
             # ① 新到期日的到期提醒**永远不发**；② 再次逾期时**二轮逾期通知也丢失**（状态还是 overdue，
             # 不会被重新标记/通知）；③ 借阅台永久显示红色「逾期」（而同屏"其中逾期"计数按 `due_at`
             # 算却是 0，两个数互相矛盾）。续借后的新到期日 = 办理时刻 + N 天，必然在未来，故回 ACTIVE 是准确的。
+            record.assert_transition(BorrowRecord.STATUS_ACTIVE)
             record.status = BorrowRecord.STATUS_ACTIVE
         self.db.flush()
         return record, is_overdue, overdue_days

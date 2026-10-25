@@ -53,6 +53,7 @@ class ActivityCancelMixin:
             if not remaining:
                 raise ValidationError("活动已取消（无待处理报名）")
         else:
+            a.assert_transition(Activity.STATUS_CANCELLED)
             a.status = Activity.STATUS_CANCELLED
         # P2-9（2026-10-20）：**锁定读全部报名行**。原先裸读 + 循环内无条件赋值状态——
         # 家长端并发取消/申请退款（`_my_enrollment` 现在也是锁定读）会被这里的旧快照覆盖：
@@ -86,6 +87,7 @@ class ActivityCancelMixin:
         orders = {o.id: o for o in fetch_by_ids(self.db, Order, enroll_order_ids)}
         for e in enrollments:
             if e.status == ActivityEnrollment.STATUS_PENDING_PAYMENT:
+                e.assert_transition(ActivityEnrollment.STATUS_CANCELLED)
                 e.status = ActivityEnrollment.STATUS_CANCELLED
                 e.cancel_reason = "活动取消"
                 cancel_cnt += 1
@@ -120,6 +122,7 @@ class ActivityCancelMixin:
                 if e.order_id:
                     # T16/B-9：付费报名 → 退款待审 + 统一台账 RefundRequest
                     # （活动取消为馆员批量路径，skip_lock_check 不被转让/退会锁阻断）
+                    e.assert_transition(ActivityEnrollment.STATUS_REFUND_PENDING)
                     e.status = ActivityEnrollment.STATUS_REFUND_PENDING
                     e.cancel_reason = "活动取消，待退款审核"
                     refund_cnt += 1
@@ -138,6 +141,7 @@ class ActivityCancelMixin:
                         refund_amounts.append(Decimal(str(o.amount)))
                 else:
                     # 免费报名无款可退：直接取消（与 T14/B-6 对称口径）
+                    e.assert_transition(ActivityEnrollment.STATUS_CANCELLED)
                     e.status = ActivityEnrollment.STATUS_CANCELLED
                     e.cancel_reason = "活动取消"
                     cancel_cnt += 1

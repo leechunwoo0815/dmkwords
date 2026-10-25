@@ -501,9 +501,9 @@ class RefundService:
                         )
 
                         publish_deposit_overdraft(self.db, admin=admin, req=req, dep=dep)
+                    dep.assert_transition(Deposit.STATUS_REFUNDED)
                     dep.status = Deposit.STATUS_REFUNDED
-                    # B-4/T24：先扣减再记账——balance_after 取实扣后余额
-                    # （当前全额退结果同为 0；未来部分退款台账不再断链）
+                    # B-4/T24：先扣减再记账——balance_after 取实扣后余额（当前全额退同为 0）
                     dep.available_amount = dep.available_amount - req.amount
                     from backend.domain.billing.models import DepositLedger
 
@@ -639,6 +639,7 @@ class RefundService:
             )
             self.db.add(dep_rr)
             self.db.flush()
+            dep.assert_transition(Deposit.STATUS_REFUNDING)
             dep.status = Deposit.STATUS_REFUNDING
 
     def _advance_withdrawal(self, refund_request_id: int) -> None:
@@ -761,6 +762,7 @@ class RefundService:
             ActivityEnrollment.STATUS_ENROLLED,
             ActivityEnrollment.STATUS_REFUND_PENDING,
         ):
+            e.assert_transition(ActivityEnrollment.STATUS_REFUNDED)
             e.status = ActivityEnrollment.STATUS_REFUNDED
             # WM13 L2 回写（T16 随动微调）：execute 联动翻终态后，该活动已无
             # refund_pending 报名 → 聚合待办回写（T16 前由 review_refund approve

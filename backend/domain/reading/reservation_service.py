@@ -187,6 +187,7 @@ class ReservationService:
         )
         if not res or res.status != Reservation.STATUS_ACTIVE:
             raise ValidationError("预约不存在或状态不可取消")
+        res.assert_transition(Reservation.STATUS_CANCELLED)
         res.status = Reservation.STATUS_CANCELLED
         copy = (
             self.db.query(BookCopy)
@@ -227,6 +228,7 @@ class ReservationService:
             )
             if not res or res.status != Reservation.STATUS_ACTIVE:
                 continue
+            res.assert_transition(Reservation.STATUS_EXPIRED)
             res.status = Reservation.STATUS_EXPIRED
             copy = (
                 self.db.query(BookCopy)
@@ -481,6 +483,7 @@ class ReservationAdminService:
             raise ConflictError("预约副本状态异常（可能已被释放）")
         # 副本 reserved→available 后走标准借书（borrow 内部 commit，一并提交预约状态）
         copy.status = BookCopy.STATUS_AVAILABLE
+        res.assert_transition(Reservation.STATUS_CHECKED_OUT)
         res.status = Reservation.STATUS_CHECKED_OUT
         self.db.flush()
         from backend.domain.circulation.service import CirculationService

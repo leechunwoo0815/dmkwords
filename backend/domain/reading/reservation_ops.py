@@ -119,6 +119,7 @@ def handle_copy_unavailable(
             )
             continue
 
+        res.assert_transition(Reservation.STATUS_EXCEPTION)
         res.status = Reservation.STATUS_EXCEPTION
         db.flush()
         out["excepted"].append(res.id)

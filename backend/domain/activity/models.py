@@ -25,6 +25,28 @@ class Activity(BaseModel):
     STATUS_CANCELLED = "cancelled"
     STATUS_FINISHED = "finished"
 
+    #: 状态转移矩阵（第十轮 W1-4，2026-10-25）：published 是初始态；取消/结束都是终态。
+    #: 同值写（幂等写回）由 `assert_transition` 放行，不进矩阵。
+    ALLOWED_TRANSITIONS = {
+        STATUS_PUBLISHED: {STATUS_CANCELLED, STATUS_FINISHED},
+        STATUS_CANCELLED: set(),
+        STATUS_FINISHED: set(),
+    }
+
+    def can_transition(self, new_status: str) -> bool:
+        return new_status in self.ALLOWED_TRANSITIONS.get(self.status, set())
+
+    def assert_transition(self, new_status: str) -> None:
+        """转移断言（红线：改状态机先画矩阵）。非法边抛 ConflictError；同值写放行。"""
+        from backend.common.exceptions import ConflictError
+
+        if new_status == self.status:
+            return
+        if not self.can_transition(new_status):
+            raise ConflictError(
+                f"{type(self).__name__} 当前状态 {self.status} 不允许转到 {new_status}"
+            )
+
     TYPE_OPTIONS = (
         "lecture",
         "book_club",
@@ -86,6 +108,37 @@ class ActivityEnrollment(BaseModel):
     STATUS_CANCELLED = "cancelled"
     STATUS_REFUND_PENDING = "refund_pending"
     STATUS_REFUNDED = "refunded"
+
+    #: 状态转移矩阵（第十轮 W1-4，2026-10-25）：只列**真实存在的边**（写点清单见 docs/09 第一百一十五批）。
+    #: 同值写（幂等写回）由 `assert_transition` 放行，不进矩阵。
+    ALLOWED_TRANSITIONS = {
+        STATUS_PENDING_PAYMENT: {STATUS_ENROLLED, STATUS_CANCELLED},
+        STATUS_ENROLLED: {
+            STATUS_CHECKED_IN,
+            STATUS_CANCELLED,
+            STATUS_REFUND_PENDING,
+            STATUS_REFUNDED,  # 退款执行完直接落终态（wm10._refund_activity_enrollment，实测边）
+        },
+        STATUS_CHECKED_IN: {STATUS_CANCELLED, STATUS_REFUND_PENDING, STATUS_REFUNDED},
+        # 退款被拒 → 退回 enrolled（人还在名单里）；退款执行完 → refunded
+        STATUS_REFUND_PENDING: {STATUS_ENROLLED, STATUS_REFUNDED},
+        STATUS_CANCELLED: set(),
+        STATUS_REFUNDED: set(),
+    }
+
+    def can_transition(self, new_status: str) -> bool:
+        return new_status in self.ALLOWED_TRANSITIONS.get(self.status, set())
+
+    def assert_transition(self, new_status: str) -> None:
+        """转移断言（红线：改状态机先画矩阵）。非法边抛 ConflictError；同值写放行。"""
+        from backend.common.exceptions import ConflictError
+
+        if new_status == self.status:
+            return
+        if not self.can_transition(new_status):
+            raise ConflictError(
+                f"{type(self).__name__} 当前状态 {self.status} 不允许转到 {new_status}"
+            )
 
     ACTIVE_STATUSES = (
         STATUS_PENDING_PAYMENT,
