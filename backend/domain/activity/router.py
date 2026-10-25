@@ -31,7 +31,9 @@ class ActivityUpdateRequest(BaseSchema):
     start_at: datetime | None = None
     location: str | None = Field(None, max_length=200)
     max_quota: int | None = Field(None, gt=0, le=1000)
-    fee: Decimal | None = Field(None, ge=0)
+    # 第十一轮 R11-08：列是 Numeric(10,2)，编辑入参原先只有 ge=0 → 越界 500 / 静默截断。
+    # 与 ActivityCreateRequest 逐字对齐（同一列两个入口边界必须一致）。
+    fee: Decimal | None = Field(None, ge=0, max_digits=10, decimal_places=2)
     description: str | None = Field(None, max_length=2000)
     member_only: bool | None = None
     enroll_deadline: datetime | None = None

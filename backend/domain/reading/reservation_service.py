@@ -92,7 +92,9 @@ class ReservationService:
         # （`reserved`）与孩子的借阅额度——家长约不到别的书、别的孩子也借不到那本，
         # 而本方法下面的"同书进行中"判据与额度计数都只看 `status`，于是**建单被无理由拒绝**。
         # 故在计数与锁副本之前就地释放到期单：与调度器**同一个函数**（单一来源），重复调用幂等。
-        self.expire_due()
+        # ⚠️ 必须 `commit=False`：本行处在 Child 行锁**之内**，让 expire_due 自己 commit 会把锁提前放掉
+        # （第十一轮复核抓到的回归——锁一放，下面的 dup/额度判据就退化成无锁读，双击可落两条预约）。
+        self.expire_due(commit=False)
         # 2026-09-21 甲方口径：逾期不拦截（全端统一）——原先此处对"有逾期未还"硬拦
         # （raise "有逾期未还图书，请先归还"）已按裁定移除；逾期只占借阅额度里的一个名额
         # （见 PRD §5.4 现行口径与 CLAUDE.md §二 借阅并发红线）。
@@ -201,8 +203,15 @@ class ReservationService:
         self.db.commit()
         return res
 
-    def expire_due(self) -> int:
-        """预约超时释放（FEAT-019/PRD §4）：expired + 副本回 available + 通知家长。幂等。"""
+    def expire_due(self, *, commit: bool = True) -> int:
+        """预约超时释放（FEAT-019/PRD §4）：expired + 副本回 available + 通知家长。幂等。
+
+        `commit=False`（第十一轮复核发现，2026-10-25）：**把提交权交回调用方**。
+        为什么必须给这个开关：`create()` 先 `with_for_update()` 锁 Child 行做并发串行化，
+        随后调本函数做懒过期；若本函数在这里 `commit()`，**Child 行锁会被提前释放**，
+        后面的"同书进行中预约"判据与额度计数就退化成无锁读 → 并发双击可落下两条 active 预约
+        （各锁一册副本、额度双扣）。调度器路径保持默认 `commit=True`（既有行为不变）。
+        """
         from backend.common.events import ReservationExpiredEvent, event_bus
 
         now = datetime.now()
@@ -247,7 +256,7 @@ class ReservationService:
                 ),
                 db=self.db,
             )
-        if due:
+        if due and commit:
             self.db.commit()
         return len(due)  # 扫描数（跳过的并发核销单不在内，幂等语义不变）
 

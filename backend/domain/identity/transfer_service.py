@@ -103,6 +103,10 @@ class TransferService:
             .filter(
                 Reservation.child_id == cid,
                 Reservation.status == Reservation.STATUS_ACTIVE,
+                # 第十一轮：**过期未释放**的不算"进行中"（与 FE-3 读路径同口径）——
+                # 原先只看 status，调度器停摆时一条到期预约会让转让申请/审核双双报
+                # "转出方没有进行中的预约"，馆员无法自助解封。
+                Reservation.expires_at > datetime.now(),
                 Reservation.is_deleted == 0,
             )
             .scalar()

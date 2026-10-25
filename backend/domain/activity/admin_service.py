@@ -90,6 +90,19 @@ class AdminActivityService(ActivityService):
         if a.start_at <= datetime.now():
             raise ValidationError("活动已开始，不可编辑")
         data = req.model_dump(exclude_unset=True)
+        # 第十一轮 R11-08：编辑路径必须复跑建单的两条时间不变量（否则可把活动改成"过去开始"，
+        # 而 update 首行的 `a.start_at <= now` 会立刻把整条编辑锁死——运营无法自救），
+        # 以及"报名截止不得晚于开始时间"。判据与 ActivityService.create 同源同文案。
+        new_start = data.get("start_at") or a.start_at
+        if (
+            "start_at" in data
+            and data["start_at"] is not None
+            and data["start_at"] <= datetime.now()
+        ):
+            raise ValidationError("开始时间必须晚于当前时间")
+        new_deadline = data["enroll_deadline"] if "enroll_deadline" in data else a.enroll_deadline
+        if new_deadline is not None and new_deadline > new_start:
+            raise ValidationError("报名截止时间不能晚于活动开始时间")
         if "max_quota" in data and data["max_quota"] is not None:
             used = self._quota_used(a.id)
             if data["max_quota"] < used:
