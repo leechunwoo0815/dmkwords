@@ -1225,7 +1225,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Deposit */
+        /**
+         * Get Deposit
+         * @description 孩子押金账户摘要。
+         *
+         *     第十轮 W2-D5（P3，2026-10-25）：**区分"孩子不存在"与"孩子存在但还没有押金账户"**——
+         *     原先两者都返回 `200 + null`，与同族端点（`/children/{id}` 404、`/children/{id}/growth` 404）
+         *     口径不一：管理端拿 null 无法判断是"ID 打错"还是"这孩子没缴过押金"，
+         *     于是把"打错 ID"当"未缴"处理（典型误操作是照着错号去收第二笔）。
+         */
         get: operations["get_deposit_api_admin_deposits_children__child_id__get"];
         put?: never;
         post?: never;
@@ -2299,6 +2307,11 @@ export interface paths {
          *     **人工上传且不可再生**）也**不再从这里下发**——原先只挡 `.trash`，任意 `book.manage`
          *     管理员拿到路径即可读；现在走**目录白名单**：受保护目录各自有带归属校验的专用端点
          *     （凭证 `/api/admin/members/orders/{id}/voucher-image`、评估图 `/api/miniapp/observation-images/`）。
+         *
+         *     W2-D6（第十轮 P3，2026-10-25）：**双通道**——`Authorization` 头（主）与 `?token=`
+         *     （`<img src>`/`innerAudioContext` 之类带不了头的下行场景），与同族媒体端点
+         *     （小程序封面/音频/评估图）口径一致。两条通道共用同一套加载/撤销校验
+         *     （`_load_active_admin` 含 `token_generation`），权限判据同一份。
          */
         get: operations["serve_upload_api_admin_uploads__path__get"];
         put?: never;
@@ -3129,6 +3142,10 @@ export interface paths {
         /**
          * Leaderboard
          * @description 五榜单（周期榜仅有效会员可见；总榜含历史学员）。
+         *
+         *     W2-D8（第十轮 P3，2026-10-25）：`child_id` 缺省时给出**参数语义**的报错。原先把默认值 0
+         *     直接喂给归属校验 → "孩子不存在"（422），家长/客服据此以为"孩子数据没了"，
+         *     实际只是少传了一个参数（排行榜的榜单口径与查看者身份有关，必须知道是哪个孩子）。
          */
         get: operations["leaderboard_api_miniapp_leaderboard_get"];
         put?: never;
