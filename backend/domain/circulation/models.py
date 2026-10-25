@@ -33,7 +33,9 @@ class BorrowRecord(BaseModel):
         STATUS_ACTIVE: {STATUS_OVERDUE, STATUS_RETURNED, STATUS_LOST},
         # 逾期可回到 active（续借顺延到期日）
         STATUS_OVERDUE: {STATUS_ACTIVE, STATUS_RETURNED, STATUS_LOST},
-        STATUS_RETURNED: set(),
+        # 归还登记在**同一事务内**先写 returned 再按 condition 覆盖为 lost（`CirculationService.return_book`；
+        # 只有最终值会提交）。这条边是实测出来的形状——理想写法是"只写一次"，属后续清理项。
+        STATUS_RETURNED: {STATUS_LOST},
         STATUS_LOST: set(),
     }
 

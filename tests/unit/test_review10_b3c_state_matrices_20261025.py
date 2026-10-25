@@ -95,7 +95,8 @@ def test_key_legal_edges_are_frozen():
     B = BorrowRecord
     assert B.STATUS_OVERDUE in B.ALLOWED_TRANSITIONS[B.STATUS_ACTIVE]
     assert B.STATUS_ACTIVE in B.ALLOWED_TRANSITIONS[B.STATUS_OVERDUE], "续借顺延可回 active"
-    assert B.ALLOWED_TRANSITIONS[B.STATUS_RETURNED] == set()
+    # 归还登记在同一事务内先写 returned 再按 condition 覆盖为 lost（实测边，见模型注释）
+    assert B.ALLOWED_TRANSITIONS[B.STATUS_RETURNED] == {B.STATUS_LOST}
 
     E = ActivityEnrollment
     assert E.STATUS_ENROLLED in E.ALLOWED_TRANSITIONS[E.STATUS_PENDING_PAYMENT]
