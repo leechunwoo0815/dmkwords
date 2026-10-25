@@ -442,7 +442,8 @@
 
 /* ===== 2026-09-13 内联样式迁移（机械生成，勿手改） ===== */
 .x-691250 { color: var(--success); }
-.x-aa01b4 { opacity: 0.3; }
+/* .x-aa01b4 { opacity: 0.3; }  ← 2026-10-25 删除：该控件（听书页右侧「15s ↻」）接活后
+   仍被这条搬来的灰化规则渲染成"禁用样"；同名标记类已从 reader.wxml 一并摘除。 */
 .x-e83e61 { color: var(--muted); font-size: 24rpx; }
 .x-f15519 { color: var(--error); }
 

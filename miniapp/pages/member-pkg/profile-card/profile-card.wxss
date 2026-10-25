@@ -285,8 +285,11 @@
 }
 
 /* 第十轮 B2（2026-10-24）：删掉 `.toast` / `.toast.show` 死样式——
-   它此前被 JS 里一句 `/* request.js 已 toast */` 注释里的 "toast" 字样"保护"着，
-   检查器 R16a 一直当它被引用（命令式注释掩盖死类名）。 */
+   它此前被 JS 里一句说明「request.js 已 toast」的注释里的 "toast" 字样"保护"着，
+   检查器 R16a 一直当它被引用（命令式注释掩盖死类名）。
+   ⚠️ 本条注释曾"注释里再写注释"，WXSS 注释**不可嵌套**：内层的注释终结符让本注释提前
+   结束，残文被当成 CSS，微信编译器报 unexpected → 整个 member-pkg 分包 8 页白屏。
+   判据见 scripts/check_miniapp_style.py 的 R17。 */
 /* Tip */
 .tip {
   text-align: center;

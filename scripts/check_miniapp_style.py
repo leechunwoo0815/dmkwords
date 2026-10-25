@@ -36,8 +36,15 @@
                  `class:` 的值）必须在本页 wxss 作用域内有定义 → 否则端上**静默不生效**。
                  专治 R12 的反方向盲区：订单图标 JS 给 `type1`、WXSS 写 `.order-icon-type1`
                  → 底色从上线起从未生效、且无任何报错（错误库 §一百）。
+  R17 注释完整性: wxss **注释不可嵌套**——注释体里再出现注释开头符，内层终结符会让本注释
+                 提前结束，残文被当成 CSS 规则（R8 查属性名、R9 查花括号配平，都看不见这种
+                 「看起来闭合了、残文里又没有花括号」的形态）。同时禁止注释/字符串外出现反引号
+                 （不是合法 WXSS 记号，编译器报 unexpected 并让**整个分包**渲染失败）。
+                 2026-10-25 实锤：B2 批给 profile-card.wxss 写说明注释时嵌了一句完整注释，
+                 member-pkg 分包 8 页全白屏，而当时门禁全绿。
   ↑ R1–R7 为最初七条；R8–R11 为后续插修补入；R12/R13 为 2026-09-16 两批补入；R14 为 2026-09-20 补入；
-    R16 为 2026-09-23 补入（G2 定标：先立 docs/15 §15.8 规范，再设门禁）。
+    R16 为 2026-09-23 补入（G2 定标：先立 docs/15 §15.8 规范，再设门禁）；R17 为 2026-10-25 补入
+    （第十轮 B2 补丁：分包整包白屏而门禁全绿的形态）。
     **以 main() 实际打印的规则清单为准**（历史教训：docstring 只列七条、实现已十一条，
     2026-09-20 又发现漏列 R13——文档与代码不同步是这类检查器的惯犯，改规则必改本清单）。
 
@@ -560,6 +567,119 @@ def scan_brace_structure(wxss: list[Path], base: Path = MINIAPP):
         else:
             if depth != 0:
                 out.append((rel, 0, f"未闭合 '{{' × {depth}"))
+    return out
+
+
+def _wxss_comment_spans(text: str) -> list[tuple[int, int, str, bool]]:
+    """R17 辅助：按 CSS 词法扫注释区间（字符串里的注释开头符不算）。
+
+    返回 `[(注释起始行号, 注释起始下标, 注释体, 是否未闭合), ...]`。
+    """
+    spans: list[tuple[int, int, str, bool]] = []
+    i, n, line = 0, len(text), 1
+    while i < n:
+        c = text[i]
+        if c == "\n":
+            line += 1
+            i += 1
+            continue
+        if c == "/" and i + 1 < n and text[i + 1] == "*":
+            j = text.find("*/", i + 2)
+            end = n if j < 0 else j
+            spans.append((line, i, text[i + 2 : end], j < 0))
+            if j < 0:
+                line += text.count("\n", i, n)
+                i = n
+            else:
+                line += text.count("\n", i, j + 2)
+                i = j + 2
+            continue
+        if c in "\"'":
+            q = c
+            j = i + 1
+            while j < n and text[j] != q:
+                if text[j] == "\\":
+                    j += 2
+                    continue
+                j += 1
+            line += text.count("\n", i, j)
+            i = j + 1
+            continue
+        i += 1
+    return spans
+
+
+def _mask_wxss_comments_and_strings(text: str) -> str:
+    """长度保持地把注释与字符串**内容**换成空格（行号因此不错位）。
+
+    用途：判定"注释外/字符串外有没有某个记号"。字符串在 CSS 里可以合法包含反引号
+    （`content: "`"` 这类），所以只挖掉内容、留下的引号本身不参与记号扫描。
+    """
+    out = list(text)
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == "/" and i + 1 < n and text[i + 1] == "*":
+            j = text.find("*/", i + 2)
+            end = n if j < 0 else j + 2
+            for k in range(i, end):
+                if out[k] != "\n":
+                    out[k] = " "
+            i = end
+            continue
+        if c in "\"'":
+            q = c
+            j = i + 1
+            while j < n and text[j] != q:
+                if text[j] == "\\":
+                    j += 2
+                    continue
+                j += 1
+            for k in range(i + 1, min(j, n)):
+                if out[k] != "\n":
+                    out[k] = " "
+            i = j + 1
+            continue
+        i += 1
+    return "".join(out)
+
+
+def scan_wxss_comment_integrity(wxss: list[Path], base: Path = MINIAPP):
+    """R17: wxss 注释不可嵌套 + 注释/字符串外禁反引号（第十轮 B2 补丁，2026-10-25）。
+
+    E-20261025 事故（真发生、且当时门禁全绿）：B2 批给 `profile-card.wxss` 写说明注释时，
+    正文里嵌了一句完整的「注释里再写注释」。**CSS/WXSS 注释不可嵌套**——内层的注释终结符
+    让外层注释提前结束，剩下的残文（里面有反引号）被当成 CSS 规则，微信编译器直接报
+    `unexpected ...` → **member-pkg 整个分包 8 个页面全部白屏**。
+    原先看不见的原因：R8 查属性名损坏、R9 查花括号配平与"注释未闭合"，而这里注释
+    **看起来是闭合的**、残文里连一个花括号都没有（`.m { ... }` 自己配平）→ 两条判据都判绿。
+    判据只认"结构性事实"（注释体里还有注释开头符 / 记号不在注释与字符串内），不做语义猜测。
+    """
+    out = []
+    for f in wxss:
+        rel = str(f.relative_to(base))
+        text = f.read_text(encoding="utf-8")
+        for start_line, _start, body, unclosed in _wxss_comment_spans(text):
+            if unclosed or "/*" not in body:
+                continue
+            nested_line = start_line + body[: body.index("/*")].count("\n")
+            out.append(
+                (
+                    rel,
+                    nested_line,
+                    "注释体里又出现注释开头符（wxss 注释不可嵌套：内层终结符会让本注释提前"
+                    "结束，残文被当 CSS → 整个分包渲染失败）",
+                )
+            )
+        masked = _mask_wxss_comments_and_strings(text)
+        for m in re.finditer("`", masked):
+            out.append(
+                (
+                    rel,
+                    masked[: m.start()].count("\n") + 1,
+                    "注释/字符串外出现反引号 `（不是合法 wxss 记号，编译器报 unexpected）",
+                )
+            )
     return out
 
 
@@ -1129,6 +1249,20 @@ def self_test(tokens: set[str]) -> list[str]:
         (tmp / "pages/selvar.wxss").write_text(
             ".podium-card.var(--gold) { color: red; }\n", encoding="utf-8"
         )
+        # R17 注入样本（2026-10-25 第十轮 B2 补丁）：注释里再写注释 = wxss 注释嵌套，
+        #   内层终结符让注释提前结束，残文（这里还带反引号）被当 CSS —— 真事故就是这个形状。
+        #   comment-ok.wxss 是**反例**：正常闭合的注释里出现类名/反引号，一律不该报。
+        (tmp / "pages/comment.wxss").write_text(
+            ".k { color: var(--accent); }\n"
+            "/* 坏：这里嵌了一句 /* 内层 */ 注释，残文里还有反引号 ` 残留 */\n"
+            ".m { color: var(--accent); }\n",
+            encoding="utf-8",
+        )
+        (tmp / "pages/comment-ok.wxss").write_text(
+            ".n { color: var(--accent); }\n"
+            "/* 正常注释：提到 `.toast` 类名、也提到「注释里再写注释」这种说法，都不该报 */\n",
+            encoding="utf-8",
+        )
         # R12 注入样本：demo.wxss 只定义了 .a/.b，wxml 里故意用 .ghost（悬空）+ .a（正常）
         # 自证夹具里放一个真实存在的图标资产：同时验证"存在的别误报 / 不存在的必须报"
         (tmp / "icons" / "ui").mkdir(parents=True, exist_ok=True)
@@ -1241,6 +1375,19 @@ def self_test(tokens: set[str]) -> list[str]:
             failures.append("S1 非法选择器漏检")
         if not br:
             failures.append("S1 花括号结构失衡漏检")
+        # R17 自证：坏样本两种形状都要命中（嵌套注释 / 注释外反引号），好样本不许误报。
+        # 真事故里这两条是**同一个文件里的同一处**（嵌套 → 残文里的反引号），故必须分开断言，
+        # 否则只修好一半（比如只去掉反引号、仍留嵌套）时自证照样绿。
+        r17 = scan_wxss_comment_integrity(
+            [tmp / "pages/comment.wxss", tmp / "pages/comment-ok.wxss"], base=tmp
+        )
+        r17_bad = [d for f, _l, d in r17 if f.endswith("comment.wxss")]
+        if not any("嵌套" in d for d in r17_bad):
+            failures.append(f"S1 注释嵌套漏检（R17）: {r17}")
+        if not any("反引号" in d for d in r17_bad):
+            failures.append(f"S1 注释外反引号漏检（R17）: {r17}")
+        if any(f.endswith("comment-ok.wxss") for f, _l, _d in r17):
+            failures.append(f"S1 注释完整性误报（R17：正常注释不该报）: {r17}")
         if len(syn8) < 2:
             failures.append(f"S1 语法健康漏检: {syn8}")
     finally:
@@ -1280,6 +1427,7 @@ def main() -> int:
     forb = scan_forbidden(wxss, app_wxss)
     syntax = scan_syntax(wxss)
     braces = scan_brace_structure(wxss)
+    comment_bad = scan_wxss_comment_integrity(wxss)
     nofb = scan_component_fallback(wxss)
     selv = scan_selector_var(wxss)
     undef_new, undef_base = scan_undefined_classes()
@@ -1356,6 +1504,7 @@ def main() -> int:
     dump("R7 禁项", forb)
     dump("R8 样式语法", syntax)
     dump("R9 花括号结构", braces)
+    dump("R17 注释完整性（注释嵌套/注释外反引号 → 整包渲染失败）", comment_bad)
     dump("R10 组件缺字面兜底", nofb)
     dump("R11 非法选择器", selv)
     dump("R12 悬空类名（新违规，必须修）", undef_new)
@@ -1372,6 +1521,8 @@ def main() -> int:
 
     for f, ln, d in braces:
         errors.append(f"R9 {f}:{ln} 结构非法 {d}")
+    for f, ln, d in comment_bad:
+        errors.append(f"R17 {f}:{ln} {d}")
     for f, ln, d in selv:
         errors.append(f"R11 {f}:{ln} 非法选择器（选择器位置出现 var）: {d}")
     for f, ln, d in undef_new:
@@ -1432,7 +1583,7 @@ if __name__ == "__main__":
             print("FAIL(S1): " + "；".join(_fails))
             sys.exit(1)
         print(
-            "✓ S1 注入自检通过（色值/内联/同义/孤儿/禁项/悬空类名/语法/花括号/选择器/WXML 结构全命中）"
+            "✓ S1 注入自检通过（色值/内联/同义/孤儿/禁项/悬空类名/语法/花括号/注释完整性/选择器/WXML 结构全命中）"
         )
         sys.exit(0)
     sys.exit(main())
