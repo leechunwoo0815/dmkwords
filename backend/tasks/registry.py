@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from backend.common.notification_models import TaskRunLog
+from backend.tasks.task_guard import run_with_task_lock, schedule_retry
 
 logger = logging.getLogger(__name__)
 
@@ -344,11 +345,19 @@ def _audit_manual_run(
 
 
 def run_task(task_name: str, manual: bool = False, admin=None) -> dict:
-    """执行单个任务（调度器与手动触发共用入口）：记 TaskRunLog + 失败捕获。
-    manual=True（馆员手动触发）写审计 task.manual_run（F3/C39）。"""
+    """执行单个任务（调度器与手动触发共用入口）：记 TaskRunLog + 失败捕获；
+    manual=True 写审计 task.manual_run（F3/C39）；W2-D4：执行期由任务级互斥锁罩住
+    （`task_guard.run_with_task_lock`，抢不到锁时手动报错 / 自动跳过本轮）。
+    """
     spec = TASKS.get(task_name)
     if not spec:
         raise KeyError(f"任务不存在: {task_name}")
+    body = lambda: _run_task_locked(task_name, spec, manual=manual, admin=admin)  # noqa: E731
+    return run_with_task_lock(task_name, spec.display_name, body, manual=manual)
+
+
+def _run_task_locked(task_name: str, spec, *, manual: bool, admin) -> dict:
+    """`run_task` 的加锁执行体（调用方须已持有任务级锁）。"""
     from backend.database import get_session
 
     session = get_session()
@@ -508,15 +517,21 @@ def ensure_scheduler_lock() -> bool:
     return _acquire_scheduler_lock()
 
 
-def guarded_run(task_name: str) -> dict | None:
-    """调度器路径的统一入口：跑前复核单实例锁。
+def guarded_run(task_name: str, is_retry: bool = False) -> dict | None:
+    """调度器路径入口：复核单实例锁 + 失败后**自动重试一次**（W2-D4）。
 
-    看板手动触发走 `run_task`（人按的按钮必须响应，不受锁限制），这里只拦"自动调度"。
+    手动触发走 `run_task` 不受锁；任务级互斥锁在 `run_task` 里（两条路径共用）。
+    `is_retry=True` 的那次再失败不排队，避免无限重试。
     """
     if not ensure_scheduler_lock():
         logger.warning("调度器单实例锁被其它进程持有，本次跳过: %s", task_name)
         return None
-    return run_task(task_name)
+    result = run_task(task_name)
+    if not is_retry and result is not None and result.get("status") == "failed":
+        grace = CRON_MISFIRE_GRACE_SECONDS
+        if schedule_retry(_scheduler, task_name, guarded_run, misfire_grace=grace):
+            logger.warning("任务失败，已排程一次重试: %s", task_name)
+    return result
 
 
 #: 非持锁副本的**抢锁看护**重试间隔（秒）。第八轮审查 P1-11：持锁副本退出（滚动发布 /

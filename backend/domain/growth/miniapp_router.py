@@ -92,8 +92,15 @@ def passed_books(response: Response, child_id: int, auth: Any = Depends(get_curr
 
 @router.get("/leaderboard")
 def leaderboard(period: str = "week", child_id: int = 0, auth: Any = Depends(get_current_parent)):
-    """五榜单（周期榜仅有效会员可见；总榜含历史学员）。"""
+    """五榜单（周期榜仅有效会员可见；总榜含历史学员）。
+
+    W2-D8（第十轮 P3，2026-10-25）：`child_id` 缺省时给出**参数语义**的报错。原先把默认值 0
+    直接喂给归属校验 → "孩子不存在"（422），家长/客服据此以为"孩子数据没了"，
+    实际只是少传了一个参数（排行榜的榜单口径与查看者身份有关，必须知道是哪个孩子）。
+    """
     parent, db = auth
+    if not child_id:
+        raise ValidationError("缺少 child_id 参数（排行榜需要知道查看者是哪个孩子）")
     viewer = child_of_parent(db, parent.id, child_id)
     if not viewer.is_active_member and period != "total":
         raise ValidationError("入会后可查看排行榜")

@@ -17,6 +17,7 @@ import os
 from sqlalchemy.orm import Session
 
 from backend.common.exceptions import NotFoundError
+from backend.common.media_paths import is_within
 from backend.domain.reading_circle.models import CirclePost
 
 # 卡片类型 → 吉祥物（每类卡一个动物，形成系列感；与头像库同一套美术语言）
@@ -234,7 +235,10 @@ def ensure_circle_thumbs(db: Session) -> dict:
             # 2026-09-23：内容寻址后"重渲结果与旧文件同名"是常态（内容没变）——
             # 必须比对路径，否则会把刚写好的文件删掉，post.thumb_path 指向空气。
             old_full = os.path.abspath(os.path.join(root, old_rel))
-            if old_full.startswith(circle_dir) and os.path.isfile(old_full):
+            # 第十轮 W1-8（P3，2026-10-25）：守卫由**裸前缀**改 `is_within`（全仓最后一处收口）。
+            # 裸 `startswith(circle_dir)` 会把兄弟目录也算进来——`uploads/circle-old/xxx.jpg`
+            # 以 `…/uploads/circle` 开头 ⇒ 命中 ⇒ **删掉别的目录里的真实文件**（目录名共用前缀是常态）。
+            if is_within(circle_dir, old_full) and os.path.isfile(old_full):
                 try:
                     os.remove(old_full)
                 except OSError:

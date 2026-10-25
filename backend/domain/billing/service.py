@@ -246,6 +246,21 @@ class DepositService:
         )
         self.db.add(order)
         self.db.flush()
+        # 第十轮 W1-3（P3，2026-10-25）：**补审计留痕**。同域的补缴单（`create_supplement_order`）
+        # 一直写 `deposit.supplement_order`，而"馆员给孩子建全额押金单"这条路
+        # （`POST /api/admin/deposits/children/{id}/orders`）只 add/flush/commit：资金类动作
+        # 没有 actor/时间/原因可回溯（`admin` 参数原先甚至未被使用）。与补缴单同款写法。
+        from backend.domain.catalog.audit_events import publish_audit
+
+        publish_audit(
+            self.db,
+            admin=admin,
+            action="deposit.create_order",
+            target_type="deposit",
+            target_id=str(dep.id),
+            detail={"amount": str(amount), "order_no": order.order_no, "child_id": child.id},
+            reason="押金单创建",
+        )
         self.db.commit()
         return order
 
@@ -490,6 +505,16 @@ class DepositService:
         total = q.count()
         rows = q.order_by(Deposit.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
         return rows, total
+
+    def ensure_child(self, child_id: int) -> None:
+        """孩子存在性校验（W2-D5，2026-10-25）：router 不许碰 ORM，存在性判定放服务层。
+
+        为什么要有：`GET /deposits/children/{id}` 原先把"孩子不存在"和"存在但没押金账户"
+        都回 `200 + null`，与同族端点（404）口径不一；判定逻辑放这里，router 只负责翻成 HTTP。
+        """
+        exists = self.db.query(Child.id).filter(Child.id == child_id, Child.is_deleted == 0).first()
+        if not exists:
+            raise NotFoundError("孩子不存在")
 
     def get_child_deposit_summary(self, child_id: int) -> tuple[Deposit | None, str]:
         dep, _ = self.get_by_child(child_id)

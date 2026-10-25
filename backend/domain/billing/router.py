@@ -89,7 +89,16 @@ def get_deposit(
     admin: Any = Depends(require_perm("member.manage")),
     db: Session = Depends(get_db),
 ):
-    dep, child_name = DepositService(db).get_child_deposit_summary(child_id)
+    """孩子押金账户摘要。
+
+    第十轮 W2-D5（P3，2026-10-25）：**区分"孩子不存在"与"孩子存在但还没有押金账户"**——
+    原先两者都返回 `200 + null`，与同族端点（`/children/{id}` 404、`/children/{id}/growth` 404）
+    口径不一：管理端拿 null 无法判断是"ID 打错"还是"这孩子没缴过押金"，
+    于是把"打错 ID"当"未缴"处理（典型误操作是照着错号去收第二笔）。
+    """
+    service = DepositService(db)
+    service.ensure_child(child_id)
+    dep, child_name = service.get_child_deposit_summary(child_id)
     if not dep:
         return None
     return DepositResponse(

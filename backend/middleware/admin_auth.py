@@ -16,6 +16,9 @@ from backend.domain.admin.models import AdminUser
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
+#: `auto_error=False` 版：缺头时返回 None 而不是抛 401——供"头或 query token 双通道"的
+#: 下行媒体端点使用（`<img>`/`innerAudioContext` 无法携带头；第十轮 W2-D6）。
+security_optional = HTTPBearer(auto_error=False)
 
 
 def _load_active_admin(db: Session, payload: dict) -> AdminUser:
@@ -54,6 +57,24 @@ def validate_admin_payload(db: Session, payload: dict) -> AdminUser:
     if payload.get("type") != "admin":
         raise UnauthorizedError("非管理端凭证")
     return _load_active_admin(db, payload)
+
+
+def admin_from_query_token(token: str, db: Session) -> AdminUser:
+    """query token → AdminUser（下行媒体端点的第二通道；第十轮 W2-D6，2026-10-25）。
+
+    为什么需要：`/api/admin/uploads/{path}` 原先只认 `Authorization` 头，而同族媒体端点
+    （小程序封面/音频/评估图）都提供 `?token=`——因为 `<img src>`、`innerAudioContext`
+    这类浏览器/组件发起的下行请求**没法带头**。管理端要直链显示上传图时只能整包下载，
+    或者绕到别的端点。这里与 `get_current_admin` 共用同一套加载/撤销判定（`_load_active_admin`
+    里含 token_generation 校验），只是入口凭证从"头"换成"query"。
+    """
+    from backend.common.security import decode_admin_token
+
+    try:
+        payload = decode_admin_token(token)
+    except jwt.PyJWTError as e:
+        raise UnauthorizedError("Token无效或已过期") from e
+    return validate_admin_payload(db, payload)
 
 
 async def get_current_admin(

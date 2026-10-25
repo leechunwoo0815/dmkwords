@@ -631,6 +631,30 @@ class PaymentReconcileService:
         # WM12 压测加固：diffs 只落**样本**（按字节预算）+ 分类计数 + 截断标记——
         # 真实总数看 diff_count 列；不截断会让大差异日的 INSERT 超 TEXT 上限、整轮写不进去。
         sample, by_kind = self._sample_diffs(diffs)
+        # 第十轮 W2-D3（P3，2026-10-25）：**按 (bill_date, source) 幂等**。原先每次 `_record`
+        # 都新增一行——同一天手动重跑一次就多一条（管理端列表出现同日多条、导出 CSV 也跟着重复），
+        # 审计者无法区分"两次对账结果不同"与"同一次结果记了两遍"。现在命中即**原地更新**
+        # （金额类无影响，本条不动钱），并在 detail 里用 `run_count` 保留"跑过几轮"的事实。
+        existing = (
+            self.db.query(PaymentReconciliation)
+            .filter(
+                PaymentReconciliation.bill_date == day,
+                PaymentReconciliation.source == source,
+                PaymentReconciliation.is_deleted == 0,
+            )
+            .order_by(PaymentReconciliation.id.desc())
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+        run_count = 1
+        if existing is not None:
+            try:
+                prev = json.loads(existing.detail or "{}")
+                if isinstance(prev, dict):
+                    run_count = int(prev.get("run_count", 1) or 1) + 1
+            except (ValueError, TypeError):
+                run_count = 2  # 旧行 detail 不是本模块写的形状（脏数据）→ 仍按"这是第 2 轮"记
         detail = json.dumps(
             {
                 "diffs": sample,
@@ -638,9 +662,20 @@ class PaymentReconcileService:
                 "diff_by_kind": by_kind,
                 "truncated": len(sample) < len(diffs),
                 "note": note,
+                "run_count": run_count,
             },
             ensure_ascii=False,
         )
+        if existing is not None:
+            existing.status = status
+            existing.checked_count = checked
+            existing.diff_count = len(diffs)
+            existing.detail = detail
+            existing.trigger = trigger
+            existing.actor_id = getattr(actor, "id", None)
+            existing.finished_at = datetime.now()
+            self.db.commit()
+            return self._view(existing)
         row = PaymentReconciliation(
             bill_date=day,
             source=source,

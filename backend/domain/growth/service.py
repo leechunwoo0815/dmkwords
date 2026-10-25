@@ -648,7 +648,7 @@ class QuizService:
         max_attempts = int(ConfigService(self.db).get_value("quiz_max_attempts"))
         used = self._attempts_used(child.id, book_id)
         if used >= max_attempts:
-            raise ValidationError("测验机会已用完（3 次）")
+            raise ValidationError(f"测验机会已用完（{max_attempts} 次）")
 
         pass_percent = int(ConfigService(self.db).get_value("quiz_pass_percent"))
 

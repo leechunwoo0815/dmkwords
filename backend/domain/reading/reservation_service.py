@@ -87,6 +87,12 @@ class ReservationService:
         if block_reason:
             raise ValidationError(f"{block_reason}，不能预约")
         now = datetime.now()
+        # 第十轮 FE-3（P3，2026-10-25）：**懒过期兜底**。超时释放原先只有调度器一条路
+        # （`expire_due` 由 tasks registry 定期跑）；调度器停摆时，到期单会一直占着副本
+        # （`reserved`）与孩子的借阅额度——家长约不到别的书、别的孩子也借不到那本，
+        # 而本方法下面的"同书进行中"判据与额度计数都只看 `status`，于是**建单被无理由拒绝**。
+        # 故在计数与锁副本之前就地释放到期单：与调度器**同一个函数**（单一来源），重复调用幂等。
+        self.expire_due()
         # 2026-09-21 甲方口径：逾期不拦截（全端统一）——原先此处对"有逾期未还"硬拦
         # （raise "有逾期未还图书，请先归还"）已按裁定移除；逾期只占借阅额度里的一个名额
         # （见 PRD §5.4 现行口径与 CLAUDE.md §二 借阅并发红线）。
@@ -311,8 +317,13 @@ class ReservationService:
             q = q.order_by(Reservation.id.desc()).limit(self.HISTORY_LIMIT)
         else:
             # 书架"预约中"只显示有效锁定态（见 docstring）
-            q = q.filter(Reservation.status == Reservation.STATUS_ACTIVE).order_by(
-                Reservation.id.desc()
+            # 第十轮 FE-3（P3）：**已过期但还没被释放**的单子不算"预约中"——原先只看 status，
+            # 调度器停摆时家长会看到"预约中"却到店取不到书（读路径不许装活）。这里按时间判，
+            # 不必写库（写库交给 `create` 与调度器）。
+            q = (
+                q.filter(Reservation.status == Reservation.STATUS_ACTIVE)
+                .filter(Reservation.expires_at > datetime.now())
+                .order_by(Reservation.id.desc())
             )
         out = []
         for res, book in q.all():

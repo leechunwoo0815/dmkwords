@@ -42,6 +42,7 @@ const ACTION_LABEL: Record<string, string> = {
   "circulation.reservation_settle_failed": "预约善后失败（需人工跟进）",
   "circulation.return": "还书",
   "dead_letter.handle": "死信销项",
+  "deposit.create_order": "创建押金单",
   "deposit.deduct": "押金扣除（赔偿）",
   "deposit.pay": "押金收款确认",
   "deposit.refund_overdraft": "押金超额退款",
@@ -91,6 +92,7 @@ const ACTION_COLOR: Record<string, string> = {
   "config.update": "blue",
   // 资金族红、状态机紫、内容族绿、系统族灰（只影响观感，未知 action 走 default）
   "deposit.pay": "red", "deposit.deduct": "red", "deposit.supplement_order": "red",
+  "deposit.create_order": "red",
   "order.confirm_payment": "red", "order.payment_callback": "red", "refund.execute": "red",
   "refund.review": "red", "order.refund_apply": "red", "activity.refund_review": "red",
   "withdrawal.approve": "purple", "transfer.approve": "purple", "child.evaluate_approve": "purple",

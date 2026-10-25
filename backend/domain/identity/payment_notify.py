@@ -203,7 +203,6 @@ class PaymentNotifyMixin:
         return envelope if isinstance(envelope, dict) else None
 
     @staticmethod
-    @staticmethod
     def _decrypt(gateway, envelope: dict):
         resource = envelope.get("resource") or {}
         ciphertext = str(resource.get("ciphertext") or "")

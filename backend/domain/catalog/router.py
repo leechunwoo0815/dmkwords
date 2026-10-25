@@ -37,7 +37,10 @@ from backend.domain.catalog.service import (
     QuizQuestionService,
     build_import_template,
 )
-from backend.middleware.admin_rbac import require_perm
+from backend.middleware.admin_rbac import (
+    require_perm,
+    require_perm_or_query_token,
+)
 
 router = APIRouter(tags=["catalog"])
 
@@ -370,7 +373,10 @@ def import_books_excel(
 
 
 @router.get("/uploads/{path:path}")
-def serve_upload(path: str, admin: Any = Depends(require_perm("book.manage"))):
+def serve_upload(
+    path: str,
+    admin: Any = Depends(require_perm_or_query_token("book.manage")),
+):
     """上传文件访问（鉴权下发；封面后续小程序端另行开放只读路由）。
 
     回收站目录**不下发**（2026-09-23，docs/15 §22.2 第 4 道防线）——已判定孤儿的文件在回收站里
@@ -380,6 +386,11 @@ def serve_upload(path: str, admin: Any = Depends(require_perm("book.manage"))):
     **人工上传且不可再生**）也**不再从这里下发**——原先只挡 `.trash`，任意 `book.manage`
     管理员拿到路径即可读；现在走**目录白名单**：受保护目录各自有带归属校验的专用端点
     （凭证 `/api/admin/members/orders/{id}/voucher-image`、评估图 `/api/miniapp/observation-images/`）。
+
+    W2-D6（第十轮 P3，2026-10-25）：**双通道**——`Authorization` 头（主）与 `?token=`
+    （`<img src>`/`innerAudioContext` 之类带不了头的下行场景），与同族媒体端点
+    （小程序封面/音频/评估图）口径一致。两条通道共用同一套加载/撤销校验
+    （`_load_active_admin` 含 `token_generation`），权限判据同一份。
     """
     from backend.common.media_paths import is_protected, is_trash_path, norm_rel
 

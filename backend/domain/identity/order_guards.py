@@ -133,6 +133,8 @@ class OrderGuardMixin:
            （两个管理员同时确认 / 两笔回调同时到）会各按旧到期日算 `base+365` 覆盖写（两笔钱只加
            一次时长）。锁定读 + `populate_existing` 后整段结算复用这一份 child。
         """
+        # W1-2：结算前置里加矩阵判定（原本 _settle_paid 直赋 paid，取消/支付并发即可越权结算）
+        assert_settle_transition(order)
         if order.order_type == Order.TYPE_FIRST_ACTIVITY:
             self.assert_first_activity_eligible(order)
         self._assert_child_collectable(order)
@@ -147,3 +149,18 @@ class OrderGuardMixin:
         )
         self._assert_child_collectable(order, child=locked_child)
         return locked_child
+
+
+def assert_settle_transition(order: Order) -> None:
+    """结算前的**订单转移矩阵**判定（第十轮 W1-2，2026-10-25）：不合法即抛，无返回值。
+
+    为什么放在这里：`prepare_settle` 已经收着"钱动之前"的全部前置（99 元资格 / 冻结期 /
+    锁孩子行），矩阵判定属于同一族。原先 `_settle_paid` 无条件直赋 `paid`，而
+    `Order.ALLOWED_TRANSITIONS[STATUS_CANCELLED] = set()`——取消与支付并发时（家长点了取消 /
+    超时单被清，同时回调或 mock 即时通道到达）`cancelled` 单会被结算成 `paid`：钱入账、
+    会员/押金/报名联动全跑，而矩阵认为这条边不存在。
+    """
+    if order.status == Order.STATUS_PAID:
+        raise ConflictError("订单已结算为已支付，不能重复结算（调用方应先判 status 幂等）")
+    if not order.can_transition(Order.STATUS_PAID):
+        raise ConflictError(f"订单当前状态为 {order.status}，不能结算为已支付（需人工处理）")

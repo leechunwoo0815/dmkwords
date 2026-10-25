@@ -73,13 +73,12 @@ class DomainEvent:
 class QuizPassedEvent(DomainEvent):
     """测验通过事件
 
-    发布者：QuizService.submit_answers()
+    发布者：`growth/quiz_events.py`（测验提交后发布）
     订阅者：
-      - advancement: 更新 ChildLevel.quizzes_passed_at_level
-      - child: 更新 Child.total_words_read
-      - bookshelf: 自动还书（V2 兼容，V3.1 后由 borrow 域处理）
-      - borrow: 标记 BorrowRecord.quiz_passed=1（V3.1）
-      - achievement: 检查是否授予成就
+      - `tasks/notify_handlers.py::_on_quiz_passed`（站内信 / 微信模板消息）
+    W2-D2（第十轮 P3，2026-10-25）订正：原文列的 advancement/child/bookshelf/borrow/
+    achievement 五个订阅者**全仓都不存在**，`ChildLevel.quizzes_passed_at_level` 这个符号
+    也不存在——照它找接线点会白找一遍。现在只写核实过的真实订阅者。
     """
 
     event_type: str = "quiz.passed"
@@ -92,7 +91,12 @@ class QuizPassedEvent(DomainEvent):
 
 @dataclass
 class QuizFailedEvent(DomainEvent):
-    """测验未通过事件"""
+    """测验未通过事件
+
+    发布者：`growth/quiz_events.py`（测验提交后发布）
+    订阅者：
+      - `tasks/notify_handlers.py::_on_quiz_failed`（站内信 / 微信模板消息）
+    """
 
     event_type: str = "quiz.failed"
     child_id: int = 0
@@ -108,10 +112,11 @@ class QuizFailedEvent(DomainEvent):
 class BookReturnedEvent(DomainEvent):
     """还书事件
 
-    发布者：BorrowService.return_book() 或 BookshelfService（V2兼容）
+    发布者：`circulation/service.py::CirculationService`（还书时发布）
     订阅者：
-      - book: 恢复 BookCopy 状态 + 释放库存
-      - achievement: 检查"还书达人"成就
+      - `tasks/notify_handlers.py::_on_book_returned`（站内信 / 微信模板消息）
+    W2-D2（第十轮 P3，2026-10-25）订正：原文的 `BorrowService`/`BookshelfService` 与
+    "book/achievement 订阅者"全仓不存在。
     """
 
     event_type: str = "book.returned"
@@ -126,10 +131,11 @@ class BookReturnedEvent(DomainEvent):
 class BookBorrowedEvent(DomainEvent):
     """借书事件
 
-    发布者：BorrowService.borrow_book()
+    发布者：`circulation/service.py::CirculationService`（借出时发布）
     订阅者：
-      - book: 更新 BookCopy 状态
-      - achievement: 检查"阅读起步"成就
+      - `tasks/notify_handlers.py::_on_book_borrowed`（站内信 / 微信模板消息）
+    W2-D2（第十轮 P3，2026-10-25）订正：原文的 `BorrowService` 与"book/achievement 订阅者"
+    全仓不存在（真实写口是 `CirculationService`，库存状态在**同事务**里改，不走事件）。
     """
 
     event_type: str = "book.borrowed"
@@ -143,11 +149,11 @@ class BookBorrowedEvent(DomainEvent):
 class LevelAdvancedEvent(DomainEvent):
     """晋级事件
 
-    发布者：AdvancementService.check_and_advance()
+    发布者：`growth/service.py`（等级重算后发布，见 `_recalc_level` 调用点）
     订阅者：
-      - achievement: 授予晋级成就
-      - certificate: 生成晋级证书
-      - notification: 发送晋级通知
+      - `tasks/notify_handlers.py::_on_level_up`（站内信 / 微信模板消息）
+    W2-D2（第十轮 P3，2026-10-25）订正：原文的 `AdvancementService.check_and_advance` 与
+    "achievement/certificate 订阅者"全仓不存在（晋级成就与证书都随等级同事务落库）。
     """
 
     event_type: str = "level.advanced"
@@ -160,8 +166,10 @@ class LevelAdvancedEvent(DomainEvent):
 class MilestoneAchievedEvent(DomainEvent):
     """里程碑达成事件（WM11 新增：勋章达成即时通知家长与馆员）
 
-    发布者：growth QuizService.submit（on_quiz_passed 返回 new_milestones 时）
-    订阅者：notification（达成里程碑）
+    发布者：`growth/service.py`（里程碑判定）
+    订阅者：
+      - `tasks/notify_handlers.py::_on_milestone_achieved`
+    W2-D2（第十轮 P3，2026-10-25）核实：原文的订阅者清单与实现不符，现按真实订阅者订正（同批核对：事件面 16 类 / 发布 12 / 订阅 12）。
     """
 
     event_type: str = "milestone.achieved"
@@ -173,11 +181,10 @@ class MilestoneAchievedEvent(DomainEvent):
 class OrderPaidEvent(DomainEvent):
     """订单支付成功事件
 
-    发布者：OrderService.handle_payment_callback()
+    发布者：`OrderService`（人工确认收款 / 线上回调结算）
     订阅者：
-      - child: 更新会员状态
-      - deposit: 更新押金状态
-      - notification: 发送支付成功通知
+      - `tasks/notify_handlers.py::_on_order_paid`
+    W2-D2（第十轮 P3，2026-10-25）核实：原文的订阅者清单与实现不符，现按真实订阅者订正（同批核对：事件面 16 类 / 发布 12 / 订阅 12）。
     """
 
     event_type: str = "order.paid"
@@ -210,10 +217,10 @@ class CheckInEvent(DomainEvent):
 class DepositPaidEvent(DomainEvent):
     """押金支付成功事件
 
-    发布者：DepositService.on_deposit_order_paid()（管理端确认收款 / 线上回调）
+    发布者：`billing/service.py`（押金收款确认）
     订阅者：
-      - child: 更新 deposit_status
-      - notify: 押金到账通知（去重键取 `order_id`，文案取 `is_supplement`）
+      - `tasks/notify_handlers.py::_on_deposit_paid`
+    W2-D2（第十轮 P3，2026-10-25）核实：原文的订阅者清单与实现不符，现按真实订阅者订正（同批核对：事件面 16 类 / 发布 12 / 订阅 12）。
     """
 
     event_type: str = "deposit.paid"
@@ -230,9 +237,10 @@ class DepositPaidEvent(DomainEvent):
 class ReservationCreatedEvent(DomainEvent):
     """预约创建事件
 
-    发布者：ReservationService.create()
+    发布者：`reading/reservation_service.py::ReservationService.create`
     订阅者：
-      - book: 锁定库存
+      - `tasks/notify_handlers.py::_on_reservation_created`
+    W2-D2（第十轮 P3，2026-10-25）核实：原文的订阅者清单与实现不符，现按真实订阅者订正（同批核对：事件面 16 类 / 发布 12 / 订阅 12）。
     """
 
     event_type: str = "reservation.created"
@@ -245,10 +253,11 @@ class ReservationCreatedEvent(DomainEvent):
 class ReservationFulfilledEvent(DomainEvent):
     """预约取书事件
 
-    发布者：ReservationService.fulfill()
-    订阅者：
-      - borrow: 创建借阅记录
-      - book: 更新库存
+    发布者：无（当前无发布点）
+    订阅者：无
+    W2-D2（第十轮 P3，2026-10-25）核实：**本事件当前既无发布者也无订阅者**（未接线事件，清单见 `docs/09` 挂账「N-8 四个死事件类」）。
+    保留类定义是为了不阻断「先定契约后接线」的写法；接线或删除由甲方裁定。
+
     """
 
     event_type: str = "reservation.fulfilled"
@@ -263,9 +272,11 @@ class ReservationFulfilledEvent(DomainEvent):
 class ReservationCancelledEvent(DomainEvent):
     """预约取消事件
 
-    发布者：ReservationService.cancel_reservation()
-    订阅者：
-      - book: 释放库存
+    发布者：无（当前无发布点；取消路径**同事务**直接释放副本，不走事件）
+    订阅者：无
+    W2-D2（第十轮 P3，2026-10-25）核实：**本事件当前既无发布者也无订阅者**（未接线事件，清单见 `docs/09` 挂账「N-8 四个死事件类」）。
+    保留类定义是为了不阻断「先定契约后接线」的写法；接线或删除由甲方裁定。
+
     """
 
     event_type: str = "reservation.cancelled"
@@ -278,9 +289,10 @@ class ReservationCancelledEvent(DomainEvent):
 class ReservationExpiredEvent(DomainEvent):
     """预约过期事件
 
-    发布者：定时任务 reservation_expire.check()
+    发布者：`reading/reservation_service.py::ReservationService.expire_due`
     订阅者：
-      - book: 释放库存
+      - `tasks/notify_handlers.py::_on_reservation_released`
+    W2-D2（第十轮 P3，2026-10-25）核实：原文的订阅者清单与实现不符，现按真实订阅者订正（同批核对：事件面 16 类 / 发布 12 / 订阅 12）。
     """
 
     event_type: str = "reservation.expired"
@@ -293,9 +305,11 @@ class ReservationExpiredEvent(DomainEvent):
 class ReadingBookFinishedEvent(DomainEvent):
     """阅读完成一本书事件
 
-    发布者：ReadingService.save_progress()
-    订阅者：
-      - advancement: increment_books_read + check_and_advance
+    发布者：无（当前无发布点）
+    订阅者：无
+    W2-D2（第十轮 P3，2026-10-25）核实：**本事件当前既无发布者也无订阅者**（未接线事件，清单见 `docs/09` 挂账「N-8 四个死事件类」）。
+    保留类定义是为了不阻断「先定契约后接线」的写法；接线或删除由甲方裁定。
+
     """
 
     event_type: str = "reading.book_finished"
@@ -308,9 +322,11 @@ class ReadingBookFinishedEvent(DomainEvent):
 class ReadingSessionCompletedEvent(DomainEvent):
     """阅读会话结束事件
 
-    发布者：ReadingService.end_session()
-    订阅者：
-      - child: update_reading_stats (阅读时长累计)
+    发布者：无（当前无发布点）
+    订阅者：无
+    W2-D2（第十轮 P3，2026-10-25）核实：**本事件当前既无发布者也无订阅者**（未接线事件，清单见 `docs/09` 挂账「N-8 四个死事件类」）。
+    保留类定义是为了不阻断「先定契约后接线」的写法；接线或删除由甲方裁定。
+
     """
 
     event_type: str = "reading.session_completed"

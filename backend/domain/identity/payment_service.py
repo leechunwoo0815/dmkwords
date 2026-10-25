@@ -378,6 +378,11 @@ class PaymentService(PaymentNotifyMixin):
         fresh = self._locked_by_order_no(order.order_no)
         if fresh.status == Order.STATUS_PAID:
             return self._pay_result(fresh, already_paid=True)
+        # W1-2（第十轮 P3，2026-10-25）：Phase 2 在事务外调网关（无锁），回来后订单可能已被
+        # 取消——原先只判 paid，于是真实通道会把"已取消单"的 pay_params 交给家长（付了才被拒），
+        # mock 即时通道更会直接把它结算成 paid（`cancelled` 在矩阵里没有出边）。
+        if not fresh.can_transition(Order.STATUS_PAID):
+            raise ConflictError(f"订单当前状态为 {fresh.status}，无法继续支付（需人工处理）")
 
         if getattr(gateway, "supports_instant_payment", False):
             # mock/沙箱通道即时到账：走**与真实回调同一条结算链**
