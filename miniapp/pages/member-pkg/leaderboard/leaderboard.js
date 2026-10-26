@@ -32,7 +32,8 @@ Page({
   },
 
   onPeriod(e) {
-    this.setData({ period: e.currentTarget.dataset.key })
+    // R11-d2/M3：切榜先清旧榜——原先失败时 board 仍是上一周期数据，挂在新标签下
+    this.setData({ period: e.currentTarget.dataset.key, board: [], loadError: '' })
     this.load()
   },
 
@@ -49,7 +50,7 @@ Page({
       this.setData({ board: b })
     } catch (e) {
       // P3（第一百一十三批）：失败必须可见（原先 catch 空转 + board 为 null → 白屏）
-      this.setData({ loadError: (e && e.message) || '榜单加载失败' })
+      this.setData({ board: [], loadError: (e && e.message) || '榜单加载失败' })
     } finally { this.setData({ loading: false }) }
   },
 })

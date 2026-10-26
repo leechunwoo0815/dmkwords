@@ -26,11 +26,17 @@ const FALLBACK = {
 
 let _configs = null
 let _failed = false
+let _failedAt = 0
 let _inflight = null
 
 // 取一次并缓存（同一会话内不重复请求；force=true 可强制刷新）
+// R11-d2/M7：失败后不再"整场钉死"——60 秒冷却后自动重试（原先只有调用方传 force 才会重试，
+// 而全仓没有一处传 force；网络恢复后页面仍用兜底口径跑完整个会话）。
 function loadConfigs(force) {
-  if (!force && _configs) return Promise.resolve({ configs: _configs, failed: _failed })
+  const staleFailure = _failed && Date.now() - _failedAt > 60 * 1000
+  if (!force && _configs && !staleFailure) {
+    return Promise.resolve({ configs: _configs, failed: _failed })
+  }
   if (!force && _inflight) return _inflight
   _inflight = api
     .getConfigs()
@@ -44,6 +50,7 @@ function loadConfigs(force) {
       console.warn('[configs] 口径下发失败，暂用兜底值', e)
       _configs = Object.assign({}, FALLBACK)
       _failed = true
+      _failedAt = Date.now()
       return { configs: _configs, failed: true }
     })
     .then((r) => {

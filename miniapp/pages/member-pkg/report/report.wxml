@@ -49,10 +49,13 @@
 
   <view class="section-card x-c92966" wx:if="{{!loadError}}">
     <view class="section-title">报告图片</view>
-    <image wx:if="{{imageUrl}}" class="rp-image" src="{{imageUrl}}" mode="widthFix"
-      show-menu-by-longpress="true" bindtap="onPreviewReport"
-      data-img-path="imageUrl" binderror="onImgError" />
-    <view class="rp-hint" wx:if="{{imageUrl}}">点图可放大看细节 · 长按可保存到相册</view>
+    <error-view wx:if="{{imgError}}" type="network" title="报告图片加载失败"
+      desc="图片没有生成成功（不是「正在生成」），可重试" bind:onRetry="onRetryLoad" />
+    <block wx:elif="{{imageUrl}}">
+      <image class="rp-image" src="{{imageUrl}}" mode="widthFix"
+        show-menu-by-longpress="true" bindtap="onPreviewReport" binderror="onImgError" />
+      <view class="rp-hint">点图可放大看细节 · 长按可保存到相册</view>
+    </block>
     <view wx:else class="rp-loading">生成中，请稍后……</view>
   </view>
 </view>

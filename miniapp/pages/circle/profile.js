@@ -80,8 +80,17 @@ Page({
     wx.showLoading({ title: '生成名片中…' })
     const url = media.fullUrl(api.circleChildPosterUrl(this.data.childId), true)
     this.setData({ posterUrl: url })
-    wx.hideLoading()
-    wx.previewImage({ urls: [url] })
+    // R11-d2/M8：原先 hideLoading 在 previewImage 之前、且 previewImage 无 fail——
+    // 图 404/401 时加载提示先消失，家长看不到任何反馈。
+    try {
+      await new Promise((resolve, reject) => {
+        wx.previewImage({ urls: [url], success: resolve, fail: reject })
+      })
+    } catch (e) {
+      wx.showToast({ title: '名片生成失败，请重试', icon: 'none' })
+    } finally {
+      wx.hideLoading()
+    }
   },
 
   onPreviewPost(e) {

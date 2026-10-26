@@ -100,7 +100,8 @@ Page({
   switchCat(e) {
     const key = e.currentTarget.dataset.key
     if (key === this.data.activeCat) return
-    this.setData({ activeCat: key })
+    // R11-d2/M4：切分类先清列表——原先失败时旧分类消息挂在新分类下
+    this.setData({ activeCat: key, list: [], total: 0, listError: '' })
     this._page = 1
     this.load(true)
   },

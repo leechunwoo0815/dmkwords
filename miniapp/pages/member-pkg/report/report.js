@@ -1,18 +1,18 @@
 // pages/member-pkg/report/report.js — 周报/月报（WM8/C1）
 const api = require('../../../utils/api')
 const session = require('../../../utils/session')
-const img = require('../../../utils/img')
 
 Page({
-  // P3（第一百一十六批）：封面/配图加载失败兜底——清空该字段 → 走同页既有占位分支
-  // （实现与用法见 utils/img.js；`data-img-path` 标的就是这里 setData 的路径）
-  onImgError(e) { img.onImgError.call(this, e) },
+  // R11-d2/M6：图片级失败原先清空 URL 后落入"生成中"（假空且永不重试）。
+  // 现在落 imgError → wxml 显示失败态 + 重试。
+  onImgError() { this.setData({ imageUrl: '', imgError: true }) },
   data: {
     childName: '',
     kind: 'weekly',
     kindLabel: '周报',
     report: null,
     imageUrl: '',
+    imgError: false,  // R11-d2/M6：报告图加载失败（与 loadError 区分：数据在、图没出来）
     loadError: '',  // P2-45：失败态（原先失败静默 → 永久"生成中"）
   },
 
@@ -45,7 +45,7 @@ Page({
       return
     }
     // P2-45：切换周/月报失败时**清空旧数据**（否则月报 tab 挂着周报的数字与图）
-    this.setData({ loadError: '', report: null, imageUrl: '', noChild: false })
+    this.setData({ loadError: '', report: null, imageUrl: '', imgError: false, noChild: false })
     try {
       const r = await api.report(this.data.kind, this._childId)
       const imgUrl = api.reportImageUrl(this.data.kind, this._childId)

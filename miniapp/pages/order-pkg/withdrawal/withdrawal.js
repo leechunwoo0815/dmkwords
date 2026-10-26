@@ -19,7 +19,7 @@ Page({
 
   onLoad(options) {
     this.setData({ childName: decodeURIComponent(options.child_name || '') })
-    this._childId = Number(options.child_id)
+    this._childId = session.resolveChildId(options)
   },
 
   onShow() {

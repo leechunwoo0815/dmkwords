@@ -50,7 +50,7 @@ Page({
 
   onLoad(options) {
     // options 优先；缺失时回落到本地 currentChildId（登录/切孩子时已写入）
-    const childId = Number(options.child_id || wx.getStorageSync('currentChildId') || 0)
+    const childId = session.resolveChildId(options)
     this.setData({
       childId,
       childName: decodeURIComponent(options.child_name || ''),

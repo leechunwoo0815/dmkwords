@@ -17,12 +17,20 @@ const DEV_BASE_URL =
     : 'https://192.168.18.162:8443')
 const BASE_URL = _envVersion === 'develop' ? DEV_BASE_URL : PROD_BASE_URL
 
+const session = require('./utils/session')
+
 App({
   globalData: {
     baseURL: BASE_URL,
     token: '',
     userInfo: null,
     currentChild: null,
+  },
+
+  onShow() {
+    // R11-d2/M11：与 session.js 注释承诺一致——每次前台刷新孩子列表（会员状态/头像）。
+    // 原先 App 没有 onShow，首页直接读冷启动快照，后台改了会员态长期不更新。
+    if (this.globalData.token) session.refreshChildren()
   },
 
   onLaunch() {

@@ -167,11 +167,25 @@ Page({
     // `sms_send_interval_seconds`，种子 90 秒）——原先写死 60：家长 60 秒后点发送
     // 必被服务端拒（"发送太频繁"），看起来像 bug。口径由 /api/miniapp/configs 下发。
     this.setData({ countdown: this.data.cfg.sms_send_interval_seconds })
-    const timer = setInterval(() => {
+    // R11-d2/M12：定时器存到实例上并在 onUnload 清理（原先局部 timer，离页后继续跑）
+    if (this._countdownTimer) clearInterval(this._countdownTimer)
+    this._countdownTimer = setInterval(() => {
       const next = this.data.countdown - 1
-      if (next <= 0) { clearInterval(timer); this.setData({ countdown: 0 }); return }
+      if (next <= 0) {
+        clearInterval(this._countdownTimer)
+        this._countdownTimer = null
+        this.setData({ countdown: 0 })
+        return
+      }
       this.setData({ countdown: next })
     }, 1000)
+  },
+
+  onUnload() {
+    if (this._countdownTimer) {
+      clearInterval(this._countdownTimer)
+      this._countdownTimer = null
+    }
   },
 
   goServiceAgreement() {

@@ -1,5 +1,6 @@
 // pages/reading-pkg/book-detail/book-detail.js — 详情 v5：决策页（真实借阅状态 + 简介 + 状态化按钮）
 const api = require('../../../utils/api')
+const session = require('../../../utils/session')
 const { loadConfigs, getConfigs, configsFailed } = require('../../../utils/configs')
 const media = require('../../../utils/media')
 const img = require('../../../utils/img')
@@ -58,7 +59,7 @@ Page({
       if (!book.id && book.book_id) book.id = Number(book.book_id)
     }
     book = media.formatBook(book)
-    const childId = options.child_id ? Number(options.child_id) : null
+    const childId = session.resolveChildId(options)
     this.setData({
       book,
       childId,

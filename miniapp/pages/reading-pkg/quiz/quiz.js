@@ -8,6 +8,7 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F']
 Page({
   data: {
     cfg: getConfigs(),  // 业务口径（后端下发；见 utils/configs.js）
+    letters: LETTERS,   // R11-d2/M10：选项字母（后端允许 6 项，原先 wxml 硬编码 A–D）
     bookId: null,
     bookTitle: '',
     childId: null,
@@ -33,7 +34,7 @@ Page({
     this.setData({
       bookId: Number(options.book_id),
       bookTitle: decodeURIComponent(options.book_title || ''),
-      childId: Number(options.child_id),
+      childId: session.resolveChildId(options),
       childName: decodeURIComponent(options.child_name || ''),
     })
     this.load()
@@ -94,6 +95,8 @@ Page({
   onCancelSubmit() { this.setData({ showConfirm: false }) },
 
   async onConfirmSubmit() {
+    // R11-d2/M5：在途守卫——原 `submitting` 是死字段，双击确认会再落一次测验记录、再耗一次机会
+    if (this.data.submitting) return
     const { bookId, childId, questions, answers } = this.data
     if (answers.filter((a) => a !== null && a !== undefined).length < questions.length) {
       wx.showToast({ title: '还有题没答完', icon: 'none' })

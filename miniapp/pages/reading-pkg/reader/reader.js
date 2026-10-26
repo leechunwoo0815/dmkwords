@@ -4,6 +4,7 @@
 const api = require('../../../utils/api')
 const media = require('../../../utils/media')
 const { loadConfigs, getConfigs } = require('../../../utils/configs')
+const session = require('../../../utils/session')
 
 const HEARTBEAT_SEC = 10
 const SPEEDS = [0.75, 1.0, 1.25, 1.5, 2.0]
@@ -60,7 +61,7 @@ Page({
     this.setData({
       book,
       bookId: book.id || null,
-      childId: options.child_id ? Number(options.child_id) : null,
+      childId: session.resolveChildId(options),
       childName: options.child_name ? decodeURIComponent(options.child_name) : '',
       duration,
       displayDuration: fmt(duration),

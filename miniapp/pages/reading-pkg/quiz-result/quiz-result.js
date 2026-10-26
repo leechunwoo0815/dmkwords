@@ -1,5 +1,6 @@
 // pages/reading-pkg/quiz-result/quiz-result.js — 测验结果（WM7）
 const api = require('../../../utils/api')
+const session = require('../../../utils/session')
 
 Page({
   data: {
@@ -16,9 +17,10 @@ Page({
 
   async onLoad(options) {
     this._options = options
-    const childId = Number(options.child_id)
+    const childId = session.resolveChildId(options)
     const bookId = options.book_id ? Number(options.book_id) : null
     let result = null
+    let noRecordMsg = ''
     // R9（插修9）：per-book 缓存键（quiz.js 提交时写入）——绝不再读旧单键
     // （跨书污染实锤：点 A 书金卡显示 B 书成绩）
     try { result = JSON.parse(wx.getStorageSync(`quiz_result_${childId}:${bookId}`) || 'null') } catch (e) {
@@ -52,7 +54,12 @@ Page({
         // 网络/5xx 故障被说成"孩子没有测验记录"（账上其实有成绩），且自动返回让人无法重试。
         // 只有 422/404（后端明确说"没有"）才算真无记录；0（网络）/5xx → 失败态 + 重试。
         const code = (e && e.statusCode) || 0
-        if (code !== 422 && code !== 404) {
+        // R11-d2/M9：422 也可能是"未入会/书下架"等守卫，不能一律说成"没有测验记录"；
+        // 只有 404 或文案明确"没有记录"才走真无记录分支。
+        const msg = (e && e.message) || ''
+        noRecordMsg = msg
+        const trulyMissing = code === 404 || (code === 422 && /没有|暂无|未.*记录/.test(msg))
+        if (!trulyMissing) {
           this.setData({
             loadError: (e && e.message) || '成绩单加载失败',
             childId,
@@ -63,7 +70,7 @@ Page({
       }
     }
     if (!result) {
-      wx.showToast({ title: '没有测验记录', icon: 'none' })
+      wx.showToast({ title: noRecordMsg || '没有测验记录', icon: 'none' })
       setTimeout(() => wx.navigateBack(), 800)
       return
     }

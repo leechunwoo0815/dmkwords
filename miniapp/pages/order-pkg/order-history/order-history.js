@@ -1,5 +1,6 @@
 // pages/order-pkg/order-history/order-history.js — 我的订单（插修4-X7 补齐幽灵页）
 const api = require('../../../utils/api')
+const session = require('../../../utils/session')
 const labels = require('../../../utils/labels')
 const { isIOS } = require('../../../utils/platform')
 
@@ -57,7 +58,7 @@ Page({
   },
 
   onLoad(options) {
-    this._childId = Number(options.child_id || 0)
+    this._childId = session.resolveChildId(options)
     // WM12-C（审查 P0-3，用户裁定）：线上支付只允许**已绑微信**的家长
     // （`parent.wechat_bound` 来自登录载荷；老缓存没有该字段 → 按未绑处理，安全侧倒）
     const parent = wx.getStorageSync('parent') || {}

@@ -22,3 +22,14 @@
   （修复前 await 前就推进 → 变成 20，这一段永久丢失）。
 - 诚实边界：**成功腿**未在端上跑（需要真实播放 + 有效登录态与会员资格）；成功时推进起点由代码
   顺序保证，并由 `check_miniapp_wiring` + tsc 兜底。失败腿是本条缺陷的原始复现路径，已实测。
+
+## R11-d2b 追加（2026-10-26）
+
+- **M6 报告图**：开页 `pages/member-pkg/report/report?child_id=1`，截图 `M6_report_page.jpg`
+  ——数据与报告图正常渲染（`imgError=false` 分支未误伤）；图片加载失败时走新增的
+  `<error-view>` 分支（可重试），不再落入"生成中"。
+- **M10 选项字母**：开页 `pages/reading-pkg/quiz/quiz?book_id=3&child_id=1`，探针实测
+  `page.data.letters = ["A","B","C","D","E","F"]`（后端 options 允许 6 项；原先 wxml 硬编码
+  A–D，第 5/6 项空白）。该书未解锁（`status:"locked"`），题面未展示，故以 data 探针为准。
+- 其余 M3/M4/M5/M7/M8/M9/M11/M12 为代码路径修复，由 `node --check` + 小程序四检查器兜底；
+  端上复跑步骤见 `docs/04` §七十三。
