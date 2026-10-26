@@ -46,12 +46,21 @@ class BookService:
                     continue
         return best
 
-    def _audit(self, admin, action: str, target: str, detail: dict, reason: str = "") -> None:
+    def _audit(
+        self,
+        admin,
+        action: str,
+        target: str,
+        detail: dict,
+        reason: str = "",
+        *,
+        target_type: str = "book",
+    ) -> None:
         publish_audit(
             self.db,
             admin=admin,
             action=action,
-            target_type="book",
+            target_type=target_type,
             target_id=target,
             detail=detail,
             reason=reason or "图书管理",
@@ -552,6 +561,7 @@ class BookService:
             str(copy.id),
             {"old": old, "new": new_status, "copy_code": copy.copy_code},
             reason,
+            target_type="book_copy",
         )
         self.db.commit()
         return copy
@@ -603,6 +613,7 @@ class BookService:
             str(copy.id),
             {"old": old, "new": target, "kind": kind, "copy_code": copy.copy_code},
             reason,
+            target_type="book_copy",
         )
         self.db.commit()
         return copy

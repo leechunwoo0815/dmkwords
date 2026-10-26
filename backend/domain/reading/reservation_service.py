@@ -240,6 +240,7 @@ class ReservationService:
             )
             .all()
         )
+        expired = 0
         for item in due:
             # P1-F4：逐条锁定读（锁序 Reservation → copy，与核销/取消一致）+
             # 状态守卫——已被并发核销（checked_out）的预约跳过，防把已借出副本改回 available
@@ -255,6 +256,7 @@ class ReservationService:
                 continue
             res.assert_transition(Reservation.STATUS_EXPIRED)
             res.status = Reservation.STATUS_EXPIRED
+            expired += 1
             copy = (
                 self.db.query(BookCopy)
                 .filter(BookCopy.id == res.copy_id)
@@ -280,7 +282,9 @@ class ReservationService:
                 # **同一事务内的后续查询**看得到本次释放，否则下面按 `status == active` 的判据
                 # 仍读到旧值——`commit=False` 会退化成"释放了但没人看得见"，建单照旧被顶回。
                 self.db.flush()
-        return len(due)  # 扫描数（跳过的并发核销单不在内，幂等语义不变）
+        # R11-c/B6：返回**真正释放**的数量——原返回扫描数，与 docstring "跳过的不在内"相反，
+        # 扫描后恰有并发核销/取消时看板数字虚高。
+        return expired
 
     def expire_remind(self) -> int:
         """预约即将到期提醒（距 expires_at ≤ remind_hours 且未过；每次预约一条）。"""

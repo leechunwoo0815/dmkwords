@@ -748,7 +748,7 @@ class CirculationService:
         return marked
 
     # ---------- 逾期列表 ----------
-    def overdue_list(self) -> list[tuple[BorrowRecord, Child, Parent, Book]]:
+    def overdue_list(self) -> list[tuple[BorrowRecord, Child, Parent, Book, BookCopy]]:
         """逾期催还名单（**只读**；状态推进只由任务 `overdue_mark` 负责）。
 
         P3（第九轮审查，GET 不得写库）：原先本方法在列表里逐行条件 UPDATE 把 ACTIVE 改成
@@ -761,10 +761,11 @@ class CirculationService:
         """
         now = datetime.now()
         rows = (
-            self.db.query(BorrowRecord, Child, Parent, Book)
+            self.db.query(BorrowRecord, Child, Parent, Book, BookCopy)
             .join(Child, BorrowRecord.child_id == Child.id)
             .join(Parent, Child.parent_id == Parent.id)
             .join(Book, BorrowRecord.book_id == Book.id)
+            .join(BookCopy, BorrowRecord.copy_id == BookCopy.id)
             .filter(
                 BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
                 BorrowRecord.due_at < now,
@@ -776,7 +777,10 @@ class CirculationService:
             .limit(self.OVERDUE_LIST_LIMIT)
             .all()
         )
-        kept: list[tuple[BorrowRecord, Child, Parent, Book]] = []
+        # R11-c/B8：截断信号必须按**原始取数**判——下面会剔除并发已还的行，
+        # 用剔除后的条数 < limit 会误报"未截断"（且第 201 条以后永远进不了名单）。
+        self.overdue_truncated = len(rows) >= self.OVERDUE_LIST_LIMIT
+        kept: list[tuple[BorrowRecord, Child, Parent, Book, BookCopy]] = []
         for row in rows:
             record = row[0]
             # 锁定读（当前读）：只读列，不入 identity map；主键等值 → 只锁该行，无间隙锁面。

@@ -305,16 +305,17 @@ def save_activity_detail_image(activity_id: int, data: bytes, ext: str, policy: 
     rel = os.path.join("activity_detail", f"{activity_id}_{secrets.token_hex(6)}.jpg")
     abs_path = os.path.join(_uploads_root(), rel)
     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+    # R11-c/C3：先规范化再开文件——校验失败时不留 0 字节孤儿（activity_detail/voucher
+    # 都在清理脚本"绝不清理"的保护名单里，孤儿会永久占盘）。
+    norm = normalize_image(
+        data,
+        max_edge=policy.max_edge,
+        quality=policy.quality,
+        max_input_bytes=policy.max_input_bytes,
+        max_output_bytes=policy.max_output_bytes,
+    )
     with open(abs_path, "wb") as f:
-        f.write(
-            normalize_image(
-                data,
-                max_edge=policy.max_edge,
-                quality=policy.quality,
-                max_input_bytes=policy.max_input_bytes,
-                max_output_bytes=policy.max_output_bytes,
-            )
-        )
+        f.write(norm)
     return rel.replace(os.sep, "/")
 
 
@@ -348,16 +349,17 @@ def save_voucher_jpg(order_no: str, data: bytes, ext: str, policy: ImagePolicy) 
     rel = os.path.join("voucher", f"{order_no}_{secrets.token_hex(6)}.jpg")
     abs_path = os.path.join(_uploads_root(), rel)
     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+    # R11-c/C3：先规范化再开文件——校验失败时不留 0 字节孤儿（activity_detail/voucher
+    # 都在清理脚本"绝不清理"的保护名单里，孤儿会永久占盘）。
+    norm = normalize_image(
+        data,
+        max_edge=policy.max_edge,
+        quality=policy.quality,
+        max_input_bytes=policy.max_input_bytes,
+        max_output_bytes=policy.max_output_bytes,
+    )
     with open(abs_path, "wb") as f:
-        f.write(
-            normalize_image(
-                data,
-                max_edge=policy.max_edge,
-                quality=policy.quality,
-                max_input_bytes=policy.max_input_bytes,
-                max_output_bytes=policy.max_output_bytes,
-            )
-        )
+        f.write(norm)
     return rel.replace(os.sep, "/")
 
 
@@ -422,10 +424,15 @@ def _mp3_duration(data: bytes) -> int:
     if xing == -1:
         xing = data.find(b"Info", idx + 4)
     if xing != -1 and xing - idx < 200:
-        flags = struct.unpack(">I", data[xing + 4 : xing + 8])[0]
-        if flags & 0x01:  # frames flag
-            frames = struct.unpack(">I", data[xing + 8 : xing + 12])[0]
-            return _frames_to_seconds(frames, samples_per_frame, sample_rate)
+        # R11-c/C2：截断/伪造文件里 "Xing" 之后可能不足 8/12 字节——struct.unpack 抛
+        # struct.error 会变成 500；这里按"解析不出时长"处理（上层转 422）。
+        try:
+            flags = struct.unpack(">I", data[xing + 4 : xing + 8])[0]
+            if flags & 0x01:  # frames flag
+                frames = struct.unpack(">I", data[xing + 8 : xing + 12])[0]
+                return _frames_to_seconds(frames, samples_per_frame, sample_rate)
+        except struct.error:
+            return 0
     # CBR 估算：从同步字起算（剔除前面的 ID3 头）
     bitrate = bitrate_table[bitrate_idx] * 1000
     if bitrate > 0:

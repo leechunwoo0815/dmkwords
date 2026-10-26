@@ -76,6 +76,10 @@ class ActivityCancelMixin:
         from backend.domain.identity.wm10_service import RefundService
 
         refund_svc = RefundService(self.db)
+        # R11-c/G5：只通知**本次被处理**的家庭（pending_payment/enrolled）。原先按全部报名家庭
+        # 的家长发通知，已退/已取消的家庭也收到"已付费用将进入退款审核"——无条件承诺退款。
+        active_parents: set[int] = set()
+        paid_parents: set[int] = set()
         # P2-41（2026-10-20 第八轮）：**消 N+1**（原先每个报名各查一次 Child、每个已付报名
         # 各查一次 Order、通知阶段又各查一次 Child/Parent）。这里保持**整场单事务**不拆分块：
         # 活动取消是一条原子业务（活动行已 `with_for_update` 锁住，半场取消=既没活动也没退款），
@@ -91,6 +95,9 @@ class ActivityCancelMixin:
                 e.status = ActivityEnrollment.STATUS_CANCELLED
                 e.cancel_reason = "活动取消"
                 cancel_cnt += 1
+                pending_parent = kids.get(e.child_id)
+                if pending_parent:
+                    active_parents.add(pending_parent.parent_id)
                 # 2026-10-12 拍板（P4）：**关联订单一并作废**。原先只翻报名状态，订单还挂在
                 # "待确认收款/待支付"里——收银台 48 小时内点确认照样能把钱收进来（活动没了、
                 # 名额没了、无退款单、无提醒）。条件 UPDATE：只作废"未收款"的单，已收款的不动。
@@ -128,6 +135,8 @@ class ActivityCancelMixin:
                     refund_cnt += 1
                     child = kids.get(e.child_id)
                     if child:
+                        active_parents.add(child.parent_id)
+                        paid_parents.add(child.parent_id)
                         refund_svc.apply(
                             child,
                             e.order_id,
@@ -145,11 +154,14 @@ class ActivityCancelMixin:
                     e.status = ActivityEnrollment.STATUS_CANCELLED
                     e.cancel_reason = "活动取消"
                     cancel_cnt += 1
+                    free_parent = kids.get(e.child_id)
+                    if free_parent:
+                        active_parents.add(free_parent.parent_id)
             # checked_in / refund_pending / refunded / cancelled 不动
         # WM11：活动取消通知已报名家庭（每家庭一条，去重）
         from backend.domain.identity.models import Parent
 
-        parent_ids: set[int] = {c.parent_id for c in kids.values() if c}
+        parent_ids: set[int] = active_parents
         parents = {p.id: p for p in fetch_by_ids(self.db, Parent, list(parent_ids))}
         for pid in parent_ids:
             p = parents.get(pid)
@@ -157,7 +169,11 @@ class ActivityCancelMixin:
                 parent_id=pid,
                 scene=SCENE_ACTIVITY_CANCEL,
                 title="活动取消",
-                content=f"《{a.title}》活动已取消，已付费用将进入退款审核流程。",
+                content=(
+                    f"《{a.title}》活动已取消，已付费用将进入退款审核流程。"
+                    if pid in paid_parents
+                    else f"《{a.title}》活动已取消，本次报名无需退款。"
+                ),
                 category=Notification.CATEGORY_ACTIVITY,
                 ref_type="activity",
                 ref_id=str(activity_id),

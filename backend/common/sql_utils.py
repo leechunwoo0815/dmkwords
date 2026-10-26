@@ -27,5 +27,18 @@ def add_with_unique_fallback(db: Session, obj: object) -> bool:
         with db.begin_nested():
             db.add(obj)
         return True
-    except IntegrityError:
-        return False
+    except IntegrityError as exc:
+        # R11-c/C5：只有**唯一键冲突**（并发重复）才静默跳过；FK / NOT NULL 等违约
+        # 照抛——原先宽捕获会把"数据本身不合法"误报成"已存在"。
+        if _is_duplicate_key(exc):
+            return False
+        raise
+
+
+def _is_duplicate_key(exc: IntegrityError) -> bool:
+    """MySQL ER_DUP_ENTRY=1062；其它后端报 UNIQUE constraint 时按文本兜底。"""
+    code = getattr(getattr(exc, "orig", None), "args", [None])[0]
+    if code == 1062:
+        return True
+    text = str(exc)
+    return "Duplicate entry" in text or "UNIQUE constraint failed" in text

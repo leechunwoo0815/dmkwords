@@ -124,10 +124,11 @@ def dashboard_charts(
 
 @router.get("/dashboard", response_model=DashboardOverviewResponse)
 def dashboard_overview(
+    fresh: bool = Query(False, description="true=跳过 30s 缓存，强制重算"),
     admin: AdminUser = Depends(require_perm("dashboard.view")),
     db: Session = Depends(get_db),
 ):
-    return DashboardOverviewResponse.model_validate(DashboardService(db).overview())
+    return DashboardOverviewResponse.model_validate(DashboardService(db).overview(fresh=fresh))
 
 
 # ---------- WM11 通知中心 / 定时任务看板 / 导出 ----------

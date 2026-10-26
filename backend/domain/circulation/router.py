@@ -308,20 +308,27 @@ def overdue_list(
     P2-44（第九轮 P3 补齐）：原先无上限，逾期积压时整表回传；现按最早到期取前 200 条，
     上限经响应头如实告知（`X-List-Limit` / `X-List-Truncated`）。
     """
-    rows = CirculationService(db).overdue_list()
+    service = CirculationService(db)
+    rows = service.overdue_list()
     now = datetime.now()
     out = []
-    for record, child, parent, book in rows:
+    for record, child, parent, book, copy in rows:
         out.append(
             OverdueItemResponse(
                 record_id=record.id,
                 child_name=child.name,
                 parent_phone=parent.phone,
                 book_title=book.title,
-                copy_code="",
+                copy_code=copy.copy_code,
                 due_at=record.due_at,
                 days_overdue=max(0, (now - record.due_at).days),
             )
         )
-    stamp_list_meta(response, loaded=len(out), limit=CirculationService.OVERDUE_LIST_LIMIT)
+    # 截断按原始取数判（见 service.overdue_list）：达上限时 loaded 传 limit 让响应头报 true
+    loaded = (
+        CirculationService.OVERDUE_LIST_LIMIT
+        if getattr(service, "overdue_truncated", False)
+        else len(out)
+    )
+    stamp_list_meta(response, loaded=loaded, limit=CirculationService.OVERDUE_LIST_LIMIT)
     return out

@@ -56,15 +56,21 @@ def limit_for(path: str, content_type: str) -> int:
 
 
 async def _send_json(send, status: int, detail: str) -> None:
+    # R11-c/C1：413 由本中间件**直接发**（绕开内层 SecurityHeadersMiddleware），
+    # 必须在这里补齐同一份安全头（否则最大的请求反而拿到 0 头）。
+    from backend.middleware.security_headers import SECURITY_HEADERS
+
     payload = json.dumps({"detail": detail}, ensure_ascii=False).encode()
+    headers = [
+        (b"content-type", b"application/json"),
+        (b"content-length", str(len(payload)).encode()),
+    ]
+    headers += [(k.lower().encode(), v.encode()) for k, v in SECURITY_HEADERS.items()]
     await send(
         {
             "type": "http.response.start",
             "status": status,
-            "headers": [
-                (b"content-type", b"application/json"),
-                (b"content-length", str(len(payload)).encode()),
-            ],
+            "headers": headers,
         }
     )
     await send({"type": "http.response.body", "body": payload})

@@ -32,7 +32,8 @@ class ReportService:
             this_monday = today - timedelta(days=today.weekday())
             start = datetime.combine(this_monday - timedelta(days=7), datetime.min.time())
             end = datetime.combine(this_monday, datetime.min.time())
-            label = f"{start:%Y年%m月%d日} - {end:%m月%d日}"
+            # R11-c/G9：end 是**排他上界**（本周一），label 直接用会显示成 8 个日历日。
+            label = f"{start:%Y年%m月%d日} - {end - timedelta(days=1):%m月%d日}"
         elif kind == "monthly":
             first_this_month = today.replace(day=1)
             end = datetime.combine(first_this_month, datetime.min.time())

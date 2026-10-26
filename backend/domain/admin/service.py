@@ -183,8 +183,10 @@ class DashboardService:
         self.config_repo = SystemConfigRepository(db)
         self.audit_repo = AuditLogRepository(db)
 
-    def overview(self) -> dict:
-        """仪表盘总览（走 30 秒 TTL 缓存；`?fresh=1` 或写后调 `invalidate_dashboard_cache()`）。"""
+    def overview(self, *, fresh: bool = False) -> dict:
+        """仪表盘总览（走 30 秒 TTL 缓存；`?fresh=1` 强制刷新）。"""
+        if fresh:
+            _overview_cache.clear()
         return _overview_cache.get_or_compute("overview", self._overview_uncached)
 
     def _overview_uncached(self) -> dict:

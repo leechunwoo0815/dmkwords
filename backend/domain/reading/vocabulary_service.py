@@ -40,6 +40,12 @@ class VocabularyService:
         )
         if not entry:
             raise NotFoundError(f"词库里没有「{w}」（第一期支持精确查询）")
+        # R11-c/B10：book_id 必须指向真实书目——原先直接落库，summary 的"来源书目"
+        # 会统计到不存在的书（列表 source_title 为空）。
+        if book_id is not None and not (
+            self.db.query(Book.id).filter(Book.id == book_id, Book.is_deleted == 0).first()
+        ):
+            raise NotFoundError("图书不存在")
         # 自动收录（同词唯一；重复查更新来源书记录但不重复）
         # 含软删行一起查：唯一索引 uq_vocab_child_word 不含 is_deleted，
         # 软删行会挡住重新 INSERT（C50：删词后再查同词曾 500）
@@ -288,7 +294,12 @@ class FavoriteService:
             self.db.commit()
             return {"book_id": book_id, "title": book.title}
         self.db.add(Favorite(child_id=child.id, book_id=book_id))
-        self.db.commit()
+        try:
+            self.db.commit()
+        except IntegrityError:
+            # R11-c/B9：并发双击/重放 → 后到者撞 uq_fav_child_book（唯一索引不含 is_deleted）。
+            # 原先裸 500；整笔回滚后按"已收藏"幂等返回（与 like/lookup 同款）。
+            self.db.rollback()
         return {"book_id": book_id, "title": book.title}
 
     def remove(self, child: Child, book_id: int) -> None:

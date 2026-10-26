@@ -77,7 +77,9 @@ class ActivityService(ActivityCancelMixin):
             .filter(
                 Activity.is_deleted == 0,
                 Activity.status == Activity.STATUS_PUBLISHED,
-                Activity.start_at >= datetime.now() - timedelta(hours=2),
+                # R11-c/G6：与往期共用 PAST_AFTER_HOURS——原先近期 2h、往期 24h，
+                # 活动开始后 2–24h 两个 tab 都不显示（家长看不到进行中的活动）。
+                Activity.start_at >= datetime.now() - timedelta(hours=PAST_AFTER_HOURS),
             )
             .order_by(Activity.start_at)
             .limit(self.UPCOMING_LIMIT)

@@ -11,7 +11,7 @@ import json
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from backend.common.exceptions import ValidationError
+from backend.common.exceptions import NotFoundError, ValidationError
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.catalog.models import QuizQuestion
 from backend.domain.catalog.repository import QuizQuestionRepository
@@ -34,7 +34,15 @@ class QuizQuestionService:
             reason="测验题库",
         )
 
+    def _ensure_book(self, book_id: int) -> None:
+        """R11-c/G7：题目必须挂在真实书目上——否则可造孤儿题（无 FK），列表还回 200 []。"""
+        from backend.domain.catalog.models import Book
+
+        if not self.db.query(Book.id).filter(Book.id == book_id, Book.is_deleted == 0).first():
+            raise NotFoundError("图书不存在")
+
     def list_by_book(self, book_id: int) -> list[QuizQuestion]:
+        self._ensure_book(book_id)
         return self.question_repo.list_by_book(book_id, active_only=False)
 
     def _validate_question(self, question_type: str, options: list[str], answer: str) -> list[str]:
@@ -50,6 +58,7 @@ class QuizQuestionService:
         return answer
 
     def create(self, admin, book_id: int, req) -> QuizQuestion:
+        self._ensure_book(book_id)
         self._validate_question(req.question_type, req.options, req.answer)
         # C29：序号由服务端分配（max(sort_order)+1），前端不再传（避免删除后重号）
         max_sort = (

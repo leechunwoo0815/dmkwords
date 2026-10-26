@@ -120,7 +120,9 @@ def get_deposit_ledgers(
     admin: Any = Depends(require_perm("member.manage")),
     db: Session = Depends(get_db),
 ):
-    _, ledgers = DepositService(db).get_by_child(child_id)
+    service = DepositService(db)
+    service.ensure_child(child_id)
+    _, ledgers = service.get_by_child(child_id)
     out = []
     for entry in ledgers:
         item = DepositLedgerResponse.model_validate(entry)

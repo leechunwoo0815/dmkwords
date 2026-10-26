@@ -104,6 +104,7 @@ class AdminNotifyService:
                         AdminNotification.applicant_name: applicant_name,
                         AdminNotification.amount: amount,
                         AdminNotification.created_at: datetime.now(),
+                        AdminNotification.extra: None,
                     },
                     synchronize_session=False,
                 )
