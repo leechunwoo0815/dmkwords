@@ -17,6 +17,8 @@ certs/
 # 真实业务数据 / 落盘产物（容器里应挂卷，不烘进镜像）
 backups/
 uploads/
+# 词库 812MB（data/ecdict.db 851,288,064 字节）——运行期挂 volume，不打进构建上下文
+data/
 gate-runs/
 .dev-logs/
 *.log
@@ -42,5 +44,6 @@ miniapp/
 docs/
 error_list/
 PRD/
+外部专家意见/
 gate-runs/
 *.md

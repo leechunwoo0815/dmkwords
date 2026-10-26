@@ -8,19 +8,29 @@
 # 现在：依赖走 `pyproject.toml` + `uv.lock`（`--frozen` 保证与门禁同一套锁），
 #       构建上下文由 `.dockerignore` 收口，容器以非 root 用户运行，并带 `/health` 健康检查。
 #
-# 说明：当前生产部署路径是 `deploy/start-backend.sh`（原生 uvicorn，见 docs/20 §一/§四），
-# 本镜像不是关键路径——但"写着却必然构建失败"本身是缺陷，故修到可用。
+# 说明（R11-01，2026-10-26）：
+#   ① **定位 = 非生产**。当前生产部署路径是 `deploy/start-backend.sh`（原生 uvicorn，见 docs/20
+#      §一/§四/§八）；本镜像用于本地构建/预演。是否把镜像接进生产路径**待甲方裁定**——
+#      裁定前不得据此镜像部署生产（生产 compose 里也没有后端服务）。
+#   ② **时区钉死 `TZ=Asia/Shanghai`**（并安装 tzdata）：容器默认 UTC 会让业务日边界整体偏 8 小时
+#      （打卡/到期/周月报/"今日"统计 —— A18-0022 红线）。与 `deploy/start-backend.sh` 同源。
+#   ③ **禁止用 `DEBUG=true` 换可用性**：`config.py::validate_production` 的早退门是
+#      `not is_production_env(APP_ENV) and DEBUG` —— 打开它会跳过全部生产红线
+#      （固定验证码 1234 + mock 支付可结单），镜像因此在生产上必须保持 `DEBUG=false`。
 
 FROM python:3.13-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    UV_PROJECT_ENVIRONMENT=/app/.venv
+    UV_PROJECT_ENVIRONMENT=/app/.venv \
+    TZ=Asia/Shanghai
 
 # 运行期系统依赖：Pillow 海报渲染需要 pango/cairo/gdk-pixbuf + 中文字体；
-# curl 供 HEALTHCHECK 使用。
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# curl 供 HEALTHCHECK 使用；tzdata 必须显式装（slim 基础镜像不保证有 /usr/share/zoneinfo，
+# 缺它时 `TZ` 环境变量会被静默忽略 → 仍按 UTC 走）。
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev \
+    tzdata \
     fonts-noto-cjk fonts-wqy-microhei \
     curl \
     && rm -rf /var/lib/apt/lists/*

@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from backend.common.notification_models import TaskRunLog
+from backend.tasks.run_log import finalize_failed_run
 from backend.tasks.task_guard import run_with_task_lock, schedule_retry
 
 logger = logging.getLogger(__name__)
@@ -361,12 +362,13 @@ def _run_task_locked(task_name: str, spec, *, manual: bool, admin) -> dict:
     from backend.database import get_session
 
     session = get_session()
-    log = TaskRunLog(
-        task_name=task_name, started_at=datetime.now(), status=TaskRunLog.STATUS_RUNNING
-    )
+    started_at = datetime.now()
+    log = TaskRunLog(task_name=task_name, started_at=started_at, status=TaskRunLog.STATUS_RUNNING)
+    log_id: int | None = None
     try:
         session.add(log)
         session.flush()
+        log_id = log.id
         processed = spec.fn(session)
         log.status = TaskRunLog.STATUS_SUCCESS
         log.finished_at = datetime.now()
@@ -384,14 +386,11 @@ def _run_task_locked(task_name: str, spec, *, manual: bool, admin) -> dict:
         session.rollback()
         logger.error("task %s failed: %s", task_name, exc, exc_info=True)
         try:
-            fail_log = TaskRunLog(
-                task_name=task_name,
-                started_at=datetime.now(),
-                finished_at=datetime.now(),
-                status=TaskRunLog.STATUS_FAILED,
-                error=str(exc)[:2000],
+            # R11-03：失败收口到**同一条**记录（任务体内层 commit 会把 RUNNING 行一起提交，
+            # rollback 撤不掉它；再插一条 failed 会让看板"连续失败"恒为 1）。
+            finalize_failed_run(
+                session, log_id, task_name=task_name, started_at=started_at, exc=exc
             )
-            session.add(fail_log)
             if manual and admin is not None:
                 _audit_manual_run(session, admin, spec, "failed", 0, error=str(exc)[:2000])
             session.commit()

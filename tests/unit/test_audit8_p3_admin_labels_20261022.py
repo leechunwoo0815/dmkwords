@@ -2,7 +2,7 @@
 """P3 管理端族两条「前端映射落后后端」的守护（第八轮审查 §3.3 管理端族）：
 
 - **审计动作/对象筛选**：`AuditLog.tsx` 原先只列 2 项（`login` / `config.update`），
-  而后端 `publish_audit(action="…")` 实际写入 **67 个 action**、21 个 `target_type` →
+  而后端 `publish_audit(action="…")` 实际写入 **69 个 action**、21 个 `target_type` →
   其余既**筛不出来**，场景列还显示**裸英文**（运营看不懂）。本批把两张表补齐到全量。
 - **收款方式枚举**：`PAY_METHOD_OPTIONS` 原先只 5 项、缺 `wechat`（线上支付回调落库即该值）
   → 管理端订单/退款列表显示裸英文 `wechat`。本批抽到 `constants/pay.ts` 并补齐。
@@ -11,12 +11,15 @@
 RED（还原修复）：删掉 `ACTION_LABEL` 里任意一个后端真实存在的 action（例如 `refund.execute`），
 或从 `PAY_METHOD_OPTIONS` 删掉 `wechat`，对应断言立即失败。
 
-**覆盖面诚实说明**：本用例只钉**字面量**形态（`action="x"` / `target_type="x"`）；
+**覆盖面诚实说明（R11-07，2026-10-26 订正）**：本用例钉两种**字面量**形态——
+`publish_audit(action="x")` 关键字 + `catalog/service.py::_audit(admin, "x")` 位置参数
+（该封装层的 action 不是 keyword-only，14 个 book/copy/quiz 动作曾因此全部逃逸）。
 若将来出现动态拼接的 action（f-string / 变量），本用例看不见——那类新增需靠 code review 兜。
 """
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -32,6 +35,30 @@ def _backend_literals(kwarg: str) -> set[str]:
     found: set[str] = set()
     for py in BACKEND.rglob("*.py"):
         found |= set(pat.findall(py.read_text(encoding="utf-8")))
+    return found
+
+
+def _backend_positional_audit_actions() -> set[str]:
+    """扫 `_audit(..., "action", ...)` 的位置参数形态（R11-07 根因）。
+
+    `publish_audit` 的 action 是 keyword-only；但 catalog 的封装层
+    `_audit(self, admin, action, target, detail, reason="")` 收的是第 2 个位置参数，
+    其调用点全是 `_audit(admin, "book.create", …)` ⇒ 只扫 `action="…"` 会整层漏掉。
+    """
+    found: set[str] = set()
+    for py in BACKEND.rglob("*.py"):
+        tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or len(node.args) < 2:
+                continue
+            func = node.func
+            name = getattr(func, "id", None) or getattr(func, "attr", None)
+            if name != "_audit":
+                continue
+            arg = node.args[1]
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                if re.fullmatch(r"[a-z][a-z0-9_.]*", arg.value):
+                    found.add(arg.value)
     return found
 
 
@@ -52,8 +79,8 @@ def _tsx_option_values(path: Path, const_name: str) -> set[str]:
 
 
 def test_audit_action_labels_cover_backend_actions():
-    """审计页动作标签必须覆盖后端**全部** action 字面量（原先只 2 项 → 64 个筛不出来）。"""
-    backend = _backend_literals("action")
+    """审计页动作标签必须覆盖后端**全部** action 字面量（含 `_audit` 位置形态）。"""
+    backend = _backend_literals("action") | _backend_positional_audit_actions()
     frontend = _tsx_map_keys(AUDIT_TSX, "ACTION_LABEL")
     missing = sorted(backend - frontend)
     assert not missing, (

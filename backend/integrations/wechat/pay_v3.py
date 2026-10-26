@@ -429,6 +429,22 @@ class WeChatPayV3(PaymentGateway):
             text = raw.decode("utf-8")
         return text
 
+    def _persist_platform_cert(self, cert_pem: bytes, new_cert: object) -> None:
+        """落盘新证书并让进程内网关单例立刻换用（R11-02，2026-10-26）。
+
+        回调验签走 `get_payment_gateway()` 的 lru_cache 单例，而轮换任务用的是临时实例——
+        只写文件不清缓存 ⇒ 进程不重启就继续用旧证书验签（换证后回调全部 401：钱收了、
+        单不认），任务却按新文件判到期报绿。
+        """
+        cert_path = Path(get_settings().WECHAT_PLATFORM_CERT_PATH)
+        if cert_path.parent.exists():
+            cert_path.write_bytes(cert_pem)
+        self.platform_cert = new_cert
+        # 局部导入：避免集成层与网关选择器在导入期形成环
+        from backend.integrations.payment import reset_payment_gateway_cache
+
+        reset_payment_gateway_cache()
+
     async def refresh_platform_cert(self) -> bool:
         """从微信 API 下载最新平台证书
 
@@ -476,10 +492,7 @@ class WeChatPayV3(PaymentGateway):
                 ):
                     continue
 
-                cert_path = Path(get_settings().WECHAT_PLATFORM_CERT_PATH)
-                if cert_path.parent.exists():
-                    cert_path.write_bytes(cert_pem)
-                self.platform_cert = new_cert
+                self._persist_platform_cert(cert_pem, new_cert)
                 logger.info(f"Platform cert refreshed, valid until: {new_cert.not_valid_after}")
                 return True
 
