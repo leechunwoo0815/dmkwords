@@ -157,14 +157,19 @@ def _day_words(db: Session, child_id: int, day: date) -> int:
     )
 
 
-def _best_day(db: Session, child_id: int) -> tuple[date, int] | None:
-    """历史最高单日词数 (day, words)；无账目返回 None（突破卡数据源）。"""
-    rows = (
-        db.query(func.date(WordsLedger.created_at), func.sum(WordsLedger.word_count))
-        .filter(WordsLedger.child_id == child_id, WordsLedger.is_deleted == 0)
-        .group_by(func.date(WordsLedger.created_at))
-        .all()
+def _best_day(
+    db: Session, child_id: int, *, exclude_day: date | None = None
+) -> tuple[date, int] | None:
+    """历史最高单日词数 (day, words)；无账目返回 None（突破卡数据源）。
+
+    `exclude_day`（R11-c2/B5）：排除指定日，用于判断"本日是否真的比过去更高"。
+    """
+    q = db.query(func.date(WordsLedger.created_at), func.sum(WordsLedger.word_count)).filter(
+        WordsLedger.child_id == child_id, WordsLedger.is_deleted == 0
     )
+    if exclude_day is not None:
+        q = q.filter(func.date(WordsLedger.created_at) != exclude_day)
+    rows = q.group_by(func.date(WordsLedger.created_at)).all()
     if not rows:
         return None
     day, words = max(rows, key=lambda r: r[1])
@@ -420,7 +425,12 @@ def assemble_card_data(db: Session, child: Child, card_type: str, ref_id: int) -
         day = _parse_yyyymmdd(ref_id)
         words = _day_words(db, child.id, day) if day else 0
         # 门槛化：太少则刷屏（配置 circle_breakthrough_min_words，默认 1000）
+        # R11-c2/B5：还必须**真的**高于此前任何一天——原实现只校验门槛，家长传任意达标日
+        # 都能拿到文案恒印"单日新高"的卡（同率/更低也算，属于虚假成就）。
+        prior_best = _best_day(db, child.id, exclude_day=day) if day else None
         if not day or words < _breakthrough_min_words(db):
+            _fail()
+        if prior_best and prior_best[1] >= words:
             _fail()
         return {
             **base,

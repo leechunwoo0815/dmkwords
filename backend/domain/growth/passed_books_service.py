@@ -51,15 +51,17 @@ class PassedBooksService:
                 )
                 .all()
             )
+            # R11-c2/G3：与书架角标/管理端同口径（按正确率取最佳，分子分母同源）
+            from backend.domain.growth.quiz_stats import best_attempt_stats
+
+            grouped: dict[int, list[tuple]] = {}
             for a in attempts:
-                cur = best.get(a.book_id)
-                if cur is None or a.score > cur.score:
-                    best[a.book_id] = a
+                grouped.setdefault(a.book_id, []).append((a.score, a.total_questions, a.id))
+            best = {bid: best_attempt_stats(lst) for bid, lst in grouped.items()}
         out: list[dict] = []
         for w, b in rows:
-            a = best.get(b.id)
-            total = int(a.total_questions) if a else 0
-            score = int(a.score) if a else 0
+            stats = best.get(b.id)
+            score, total = stats if stats else (0, 0)
             out.append(
                 {
                     "book_id": b.id,

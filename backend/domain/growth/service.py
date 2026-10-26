@@ -112,20 +112,24 @@ class GrowthService:
             return True
         return False
 
-    def _check_milestones(self, state: ChildGrowthState) -> list[int]:
-        """达成未发过的节点 → 补发勋章（永不回收）。返回本次新达成节点。"""
-        nodes = [
+    def _milestone_nodes(self) -> list[int]:
+        """配置的里程碑节点（升序）。"""
+        return sorted(
             int(n)
             for n in ConfigService(self.db).get_value("milestone_nodes").split(",")
             if n.strip()
-        ]
+        )
+
+    def _check_milestones(self, state: ChildGrowthState) -> list[int]:
+        """达成未发过的节点 → 补发勋章（永不回收）。返回本次新达成节点。"""
+        nodes = self._milestone_nodes()
         awarded = {
             r.node_words
             for r in self.db.query(MilestoneAward.node_words)
             .filter(MilestoneAward.child_id == state.child_id, MilestoneAward.is_deleted == 0)
             .all()
         }
-        new_nodes = [n for n in sorted(nodes) if n <= state.words_total and n not in awarded]
+        new_nodes = [n for n in nodes if n <= state.words_total and n not in awarded]
         for n in new_nodes:
             self.db.add(MilestoneAward(child_id=state.child_id, node_words=n))
         return new_nodes
@@ -326,19 +330,29 @@ class GrowthService:
             .order_by(QuizAttempt.id)  # 升序：同分时后面的覆盖前面的 = 取最近一次
             .all()
         )
+        # R11-c2/G3：最佳 = 正确率最高的一次（分子分母同源）；R11-c2/G4：书名只查用到的书
+        from backend.domain.growth.quiz_stats import best_attempt_stats
+
+        grouped: dict[int, list[tuple]] = {}
+        for book_id, score, total, attempt_id in rows:
+            grouped.setdefault(book_id, []).append((score, total, attempt_id))
         per_book: dict[int, dict] = {}
-        for book_id, score, total, _attempt_id in rows:
-            cur = per_book.get(book_id)
-            if cur is None:
-                per_book[book_id] = {"used": 1, "best": int(score or 0), "total": int(total or 0)}
-                continue
-            cur["used"] += 1
-            if int(score or 0) >= cur["best"]:
-                cur["best"] = int(score or 0)
-                cur["total"] = int(total or 0)
+        for book_id, lst in grouped.items():
+            best, total = best_attempt_stats(lst) or (0, 0)
+            per_book[book_id] = {"used": len(lst), "best": best, "total": total}
 
         max_attempts = int(ConfigService(self.db).get_value("quiz_max_attempts"))
-        books = {b.id: b for b in self.db.query(Book).filter(Book.is_deleted == 0).all()}
+        book_ids = list(per_book)
+        books = (
+            {
+                b.id: b
+                for b in self.db.query(Book)
+                .filter(Book.id.in_(book_ids), Book.is_deleted == 0)
+                .all()
+            }
+            if book_ids
+            else {}
+        )
         words_books = {
             w.book_id
             for w in self.db.query(WordsLedger.book_id)
@@ -408,10 +422,11 @@ class GrowthService:
             if target_idx > current_idx:
                 state.level = LEVEL_LETTERS[target_idx]
                 changed += 1
-        # 阈值调低后补发里程碑（按新口径）
-        milestone_new = 0
-        for state in states:
-            milestone_new += len(self._check_milestones(state))
+        # 阈值调低后补发里程碑（按新口径）。
+        # R11-c2/G4：抽到 `milestone_service`——一次取全量已授节点（原逐孩子查询 = N+1）。
+        from backend.domain.growth.milestone_service import award_pending_milestones
+
+        milestone_new = award_pending_milestones(self.db, states, self._milestone_nodes())
         publish_audit(
             self.db,
             admin=admin,

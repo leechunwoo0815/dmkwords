@@ -3,11 +3,10 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func
-
 from backend.common.config_service import ConfigService
 from backend.common.exceptions import ValidationError
 from backend.domain.growth.models import QuizAttempt, WordsLedger
+from backend.domain.growth.quiz_stats import best_attempt_stats
 
 
 def quiz_status_batch(db, child, book_ids: list[int]) -> list[dict]:
@@ -42,31 +41,30 @@ def quiz_status_batch(db, child, book_ids: list[int]) -> list[dict]:
         )
         .all()
     )
+    # R11-c2/G3：改成"逐次尝试"取最佳（分子分母必须来自同一次）。
+    # 行数上限 = 50 书 × 每书尝试数（受 quiz_max_attempts 约束），仍是一条 SQL。
     attempt_rows = (
         db.query(
             QuizAttempt.book_id,
-            func.count(QuizAttempt.id),
-            func.max(QuizAttempt.score),
-            # P3 性能族（2026-10-22 第一百一十五批）：`total_questions` 的 MAX **并进这条
-            # GROUP BY**——原先在下面用字典推导逐书再查一次（N = 有测验记录的书数，上限 50）
-            # → 书架页最坏多付 50 条 SQL。
-            func.max(QuizAttempt.total_questions),
+            QuizAttempt.score,
+            QuizAttempt.total_questions,
+            QuizAttempt.id,
         )
         .filter(
             QuizAttempt.child_id == child.id,
             QuizAttempt.book_id.in_(book_ids),
             QuizAttempt.is_deleted == 0,
         )
-        .group_by(QuizAttempt.book_id)
         .all()
     )
-    total_map = {r[0]: (r[3] or 0) for r in attempt_rows}
-    attempt_map = {r[0]: r for r in attempt_rows}
+    grouped: dict[int, list[tuple]] = {}
+    for book_id, score, total, attempt_id in attempt_rows:
+        grouped.setdefault(book_id, []).append((score, total, attempt_id))
+    stats = {bid: best_attempt_stats(rows) for bid, rows in grouped.items()}
     out = []
     for bid in book_ids:
-        used = attempt_map[bid][1] if bid in attempt_map else 0
-        best = attempt_map[bid][2] if bid in attempt_map else 0
-        total = total_map.get(bid, 0)
+        used = len(grouped.get(bid, []))
+        best, total = stats.get(bid) or (0, 0)
         # P2-15（2026-10-17 第六十九批·大审查）：解锁判据与 `get_quiz` 严格一致——
         # **有词账即已解锁**（通过测验的前提就是听完；词账/测验记录可能早于或独立于
         # ReadingProgress 存在，如榜单/里程碑造数只落词账）。此前先判 `finished` → 那类书
