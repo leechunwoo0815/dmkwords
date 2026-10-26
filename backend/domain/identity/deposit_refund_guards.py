@@ -58,7 +58,7 @@ def assert_deposit_refund_executable(db: Session, req) -> None:
         return
     if dep.available_amount < req.amount:
         raise ValidationError(
-            f"押金可用余额不足（可用 {dep.available_amount}，本次申请 {req.amount}）——"
+            f"押金可退金额不足（可退 {dep.available_amount}，本次申请 {req.amount}）——"
             "疑似重复退款单，请人工核对后再执行"
         )
     from sqlalchemy import func
@@ -144,5 +144,5 @@ def publish_deposit_overdraft(db: Session, *, admin, req, dep) -> None:
             "refund_amount": str(req.amount),
             "refund_request_id": req.id,
         },
-        reason="押金退款超额（可用余额不足仍执行）——疑似重复退款单，请人工核对",
+        reason="押金退款超额（可退金额不足仍执行）——疑似重复退款单，请人工核对",
     )

@@ -301,7 +301,7 @@ class PaymentService(PaymentNotifyMixin):
         )
         if child is not None and not child.can_transition(Child.MEMBER_OBSERVATION):
             raise ValidationError(
-                "孩子已是有效会员，无需再缴观察期费（如需续期请购买正式会员年费）"
+                "孩子已是有效会员，无需再缴观察期会员服务费（如需续期请购买年度会员服务）"
             )
 
     def _prepay_once(self, parent: Parent, order: Order) -> dict:

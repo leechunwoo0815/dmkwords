@@ -61,7 +61,7 @@ def price_member_order(db, parent: Parent, child: Child, order_type: str) -> Dec
         # 家长在购买页直接看到原因；发起支付前还有第二道复核（`_assert_observation_payable`）。
         if not child.can_transition(Child.MEMBER_OBSERVATION):
             raise ConflictError(
-                "孩子已是有效会员，如需续期请购买正式会员年费（观察期费仅未入会/已过期/已退会可购）"
+                "孩子已是有效会员，如需续期请购买年度会员服务（观察期会员服务仅未入会/已过期/已退会可购）"
             )
         return _config_decimal(db, "observation_fee")
     if order_type == Order.TYPE_FORMAL:

@@ -40,7 +40,7 @@ def test_unit_count_baseline_wired_into_gate():
     """S3：单测数量下限有独立基线文件，且 gate 真的比对（不是只跑覆盖率）。"""
     baseline = json.loads((ROOT / "scripts/gate_baseline.json").read_text(encoding="utf-8"))
     assert isinstance(baseline["min_passed"], int), "min_passed 必须是整数"
-    assert baseline["min_passed"] >= 1265, "基线只许升不许降（降基线和删测同义）"
+    assert baseline["min_passed"] >= 1266, "基线只许升不许降（降基线和删测同义）"
 
     gate = GATE.read_text(encoding="utf-8")
     assert "scripts/gate_baseline.json" in gate, "gate 未读取单测数量基线"

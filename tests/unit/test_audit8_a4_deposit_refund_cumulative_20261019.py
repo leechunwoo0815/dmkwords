@@ -110,4 +110,4 @@ def test_over_balance_still_blocked(client: TestClient):
 
     over = _add_refund(dep_id, c["id"], balance + Decimal("100.00"), RefundRequest.STATUS_PENDING)
     msg = _guard_raises(c["id"], over)
-    assert msg is not None and "押金可用余额不足" in msg
+    assert msg is not None and "押金可退金额不足" in msg

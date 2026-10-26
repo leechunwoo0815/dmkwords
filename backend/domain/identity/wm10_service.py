@@ -173,11 +173,11 @@ class RefundService:
                 .scalar()
             )
             if pending_withdrawal:
-                raise ConflictError("该孩子已有进行中的退会流程，会员费退款请走退会申请")
+                raise ConflictError("该孩子已有进行中的退会流程，会员服务费退款请走退会申请")
             withdrawal = WithdrawalRequest(
                 child_id=child.id,
                 source=WithdrawalRequest.SOURCE_REFUND,
-                reason=f"会员费退款联动退会：{reason.strip()}",
+                reason=f"会员服务费退款联动退会：{reason.strip()}",
             )
             self.db.add(withdrawal)
             self.db.flush()

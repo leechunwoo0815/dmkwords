@@ -108,9 +108,9 @@ def activity_refund_block(db: Session, order: Order) -> str | None:
 def rule_text(db: Session, order: Order) -> str:
     """给审核员看的规则说明（与实退算法同源，改配置后文字自动跟着变）。"""
     if order.order_type == Order.TYPE_OBSERVATION:
-        return f"观察期费按剩余天数比例退（{period_days(db, order.order_type)} 天期，无手续费）"
+        return f"观察期会员服务费按剩余天数比例退（{period_days(db, order.order_type)} 天期，无手续费）"
     if order.order_type == Order.TYPE_FORMAL:
-        return "年费按剩余天数比例退（按实付金额）"
+        return "年度会员服务费按剩余天数比例退（按实付金额）"
     if order.order_type == Order.TYPE_FIRST_ACTIVITY:
         return "未参加全额退（已参加过不退，审核时核对）"
     return "活动费：未签到且未开始全额退"

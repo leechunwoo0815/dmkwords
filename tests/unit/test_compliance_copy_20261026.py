@@ -49,6 +49,8 @@ FORBIDDEN = (
     "听书",
     "会员费",
     "年费",
+    "观察期费",
+    "可用余额",
     "线上开通",
     "立即开通",
 )
@@ -61,6 +63,28 @@ EXPECTED_TYPE_LABELS = {
     "TYPE_DEPOSIT": "图书借阅押金",
     "TYPE_DEPOSIT_SUPPLEMENT": "图书借阅押金补缴",
     "TYPE_ACTIVITY": "线下活动服务费",
+}
+
+#: **家长可见**的后端模块：这些模块的字符串会进入小程序页面/通知/支付描述。
+#: 2026-10-26 端上取证实锤：购买页的方案置灰原因来自 `order_pricing`，
+#: 只扫前端/`TYPE_LABELS` 抓不到「正式会员年费」这类残留——故补这条后端判据。
+PARENT_FACING_MODULES = (
+    "backend/domain/identity/payment_service.py",
+    "backend/domain/identity/order_pricing.py",
+    "backend/domain/identity/order_guards.py",
+    "backend/domain/identity/refund_rules.py",
+    "backend/domain/identity/wm10_service.py",
+    "backend/domain/identity/wm10_withdrawal_service.py",
+    "backend/domain/identity/deposit_refund_guards.py",
+    "backend/domain/identity/transfer_service.py",
+    "backend/tasks/notify_handlers.py",
+    "backend/domain/reading_circle/card_engine.py",
+    "backend/domain/growth/service.py",
+)
+
+#: 管理端专用字符串（不对家长展示）——必须逐条写明理由。
+ADMIN_ONLY_STRINGS = {
+    "重置测验次数必须填写原因": "超管重置测验次数（管理端 API），家长不可见",
 }
 
 
@@ -295,3 +319,43 @@ def test_offline_labels_reach_three_consumption_points(client, db, admin_headers
     assert [req.description for req in gateway.requests] == ["线下会员服务费（观察期）"], (
         f"微信支付描述未同步线下口径：{[req.description for req in gateway.requests]}"
     )
+
+
+def _string_constants(tree: ast.Module) -> list[str]:
+    """模块内字符串常量（跳过模块/类/函数的 docstring）。"""
+    docstrings: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            body = getattr(node, "body", [])
+            if (
+                body
+                and isinstance(body[0], ast.Expr)
+                and isinstance(body[0].value, ast.Constant)
+                and isinstance(body[0].value.value, str)
+            ):
+                docstrings.add(id(body[0].value))
+    return [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and id(node) not in docstrings
+    ]
+
+
+def test_backend_parent_facing_strings_have_no_forbidden_terms():
+    """判据 5：家长可见的后端字符串（页面原因/通知/支付）不得出现禁用词。
+
+    RED：把 `order_pricing` 的置灰原因改回「正式会员年费」→ 本条红
+    （2026-10-26 端上取证发现；前端静态扫描与 TYPE_LABELS 断言都覆盖不到）。
+    """
+    hits: list[str] = []
+    for rel in PARENT_FACING_MODULES:
+        tree = ast.parse((ROOT / rel).read_text(encoding="utf-8"))
+        for text in _string_constants(tree):
+            if text in ADMIN_ONLY_STRINGS:
+                continue
+            banned = [word for word in FORBIDDEN if word in text]
+            if banned:
+                hits.append(f"{rel}: {banned} —— {text[:80]}")
+    assert hits == [], "家长可见的后端字符串出现禁用词（docs/22 §二.4）：\n" + "\n".join(hits)

@@ -581,10 +581,10 @@ def step_settlement_math(context):
         formal_paid,
         formal_period,
     )
-    assert "年费按剩余天数比例" in by_type["formal_fee"]["rule"], by_type
+    assert "年度会员服务费按剩余天数比例" in by_type["formal_fee"]["rule"], by_type
     # 押金：退可用余额（已扣除部分不退）
     assert _amount(by_type["deposit"]["amount"]) == _amount(_deposit(context)["available_amount"])
-    assert by_type["deposit"]["rule"] == "押金退可用余额（已扣除部分不退）", by_type
+    assert by_type["deposit"]["rule"] == "押金退可退金额（已扣除部分不退）", by_type
     assert _amount(preview["total"]) == sum(_amount(i["amount"]) for i in items), preview
 
 

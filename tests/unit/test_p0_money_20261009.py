@@ -178,7 +178,7 @@ def test_deposit_refund_cannot_go_negative(client, db):
         headers=h,
     )
     assert blocked.status_code == 422, blocked.text
-    assert "余额不足" in blocked.json()["detail"]
+    assert "可退金额不足" in blocked.json()["detail"]
     db.refresh(dep)
     assert dep.available_amount == Decimal("0.00"), "终态永远不许为负"
     assert _refund_row(db, rr2).status == "approved", "校验不过不流转状态（人工处理后仍可执行）"

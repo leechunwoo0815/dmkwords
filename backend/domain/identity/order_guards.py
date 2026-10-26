@@ -110,7 +110,9 @@ class OrderGuardMixin:
             raise ValidationError("该订单已随权益转让处置，不再受理退款申请")
         child = self.db.query(Child).filter(Child.id == order.child_id).first()
         if child is not None and child.operation_locked:
-            raise ConflictError("孩子正在退会/转让审核流程中，会员费退款请走退会申请或等待审核完成")
+            raise ConflictError(
+                "孩子正在退会/转让审核流程中，会员服务费退款请走退会申请或等待审核完成"
+            )
         if order.order_type in (Order.TYPE_ACTIVITY, Order.TYPE_FIRST_ACTIVITY):
             block = refund_rules.activity_refund_block(self.db, order)
             if block:

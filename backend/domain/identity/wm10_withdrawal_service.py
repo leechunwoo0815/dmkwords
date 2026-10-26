@@ -138,7 +138,7 @@ class WithdrawalService:
             .scalar()
         )
         if pending_member_refund:
-            problems.append("有进行中的会员费退款申请")
+            problems.append("有进行中的会员服务费退款申请")
         return problems
 
     def apply(self, child: Child, reason: str) -> dict:
@@ -462,7 +462,7 @@ class WithdrawalService:
                     "kind": RefundRequest.KIND_DEPOSIT,
                     "deposit_id": dep.id,
                     "amount": dep.available_amount,
-                    "rule": "押金退可用余额（已扣除部分不退）",
+                    "rule": "押金退可退金额（已扣除部分不退）",
                 }
             )
         return items
@@ -642,7 +642,7 @@ def ensure_deposit_refund_on_withdrawal(db: Session, child: Child) -> None:
                 deposit_id=dep.id,
                 child_id=child.id,
                 amount=dep.available_amount,
-                reason="会员费退款成功，自动发起押金退款（R-310）",
+                reason="会员服务费退款成功，自动发起押金退款（R-310）",
             )
         )
         db.flush()
