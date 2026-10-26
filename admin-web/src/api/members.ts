@@ -24,6 +24,10 @@ export type OrderCounts = {
   paid: number; cancelled: number; refunded: number;
 };
 
+export function apiGetChild(childId: number): Promise<Child> {
+  return request(`/api/admin/members/children/${childId}`);
+}
+
 export function apiCreateParent(body: { name: string; phone: string; remark?: string }): Promise<Parent> {
   return request("/api/admin/members/parents", { method: "POST", body: JSON.stringify(body) });
 }

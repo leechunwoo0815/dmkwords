@@ -204,6 +204,11 @@ Page({
   async onReserve() {
     const { book, childId, reserving, borrowState } = this.data
     if (reserving || !childId) return
+    // R11-d/M1：状态查询失败（unknown）时不许预约——否则服务端会锁一册副本 72h，
+    // 而孩子可能已在借同一本书（到店核销才被顶回）。先让家长重试把状态问出来。
+    if (borrowState === 'unknown') {
+      wx.showToast({ title: '借阅状态未知，请先点重试加载', icon: 'none' }); return
+    }
     if (borrowState === 'borrowing') {
       wx.showToast({ title: '这本书已经在手上了哦', icon: 'none' }); return
     }

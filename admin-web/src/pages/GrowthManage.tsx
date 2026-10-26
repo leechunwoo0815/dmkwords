@@ -2,7 +2,7 @@ import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
 import PreviewImage from "../components/PreviewImage";
 // 成长与测验管理（WM7：词数流水/积分明细/测验重置/积分调整/等级重算）
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   App as AntdApp, Button, Descriptions, Drawer, Form, Input, InputNumber,
   Modal, Space, Table, Tabs, Tag, Typography,
@@ -13,7 +13,7 @@ import {
   apiRecalcLevels, apiResetQuizAttempts, type ChildGrowth, type ReportData,
 } from "../api/growth";
 import { getToken } from "../api/client";
-import { apiListChildren, type Child } from "../api/members";
+import { apiGetChild, apiListChildren, type Child } from "../api/members";
 import { useAuth } from "../auth";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { cfgNum, useConfigs } from "../hooks/useConfigs";
@@ -72,16 +72,25 @@ export default function GrowthManage() {
   useEffect(() => { load(page); }, [load, page]);
 
   // Q3 裁决：通知中心"查看关联(report)"跳转定位——?child_id= 打开对应孩子成长档案并高亮
+  // R11-d/A3：目标孩子不在当前页时按 id 取详情再打开（原实现静默无反应：无提示、无抽屉）。
+  const deepLinkTried = useRef(false);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const cid = Number(params.get("child_id"));
-    if (cid && children.length && !growChild) {
-      const found = children.find((c) => c.id === cid);
-      if (found) {
-        setHighlightId(cid);
-        openGrowth(found);
-      }
+    if (!cid || growChild || deepLinkTried.current) return;
+    deepLinkTried.current = true;
+    const found = children.find((c) => c.id === cid);
+    if (found) {
+      setHighlightId(cid);
+      openGrowth(found);
+      return;
     }
+    apiGetChild(cid)
+      .then((c) => {
+        setHighlightId(cid);
+        openGrowth(c);
+      })
+      .catch(() => message.warning("通知关联的孩子不存在或已被删除"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [children, growChild]);
 

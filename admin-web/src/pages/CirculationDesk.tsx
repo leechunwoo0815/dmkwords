@@ -216,7 +216,14 @@ export default function CirculationDesk() {
         message.success(`${label}：《${r.book_title ?? code}》`);
         (r.warnings ?? []).forEach((w) => message.warning(w, 4));
         pushRecent(code, `${label}《${r.book_title ?? ""}》`, true);
-        await refresh();
+        // R11-d/A2：扫描（借/还）已经成功——刷新失败只是**展示层**问题。
+        // 原先与 apiScan 同一个 try：刷新抛错 → 记成红"失败"→ 馆员重扫同一 ISBN，
+        // 服务端看到在借记录直接执行"还书"，当场把刚借出的书还掉。
+        try {
+          await refresh();
+        } catch {
+          message.warning("操作已成功，但卡片刷新失败——请手动刷新页面，不要重复扫码", 4);
+        }
         return true;
       } catch (e) {
         const errText = e instanceof Error ? e.message : "扫码失败";
@@ -268,9 +275,16 @@ export default function CirculationDesk() {
       okText: "正常归架",
       cancelText: "取消",
       onOk: async () => {
-        await apiReturnBook(record.copy_id, "normal");
-        message.success("归还成功");
-        await refresh();
+        // R11-d/A1：原实现无 try/catch —— 后端 404/网络失败时 AntD 只停 loading，
+        // 馆员看不到任何反馈（会反复点或直接放走家长）。失败时抛出让弹窗保持打开。
+        try {
+          await apiReturnBook(record.copy_id, "normal");
+          message.success("归还成功");
+          await refresh();
+        } catch (e) {
+          message.error(e instanceof Error ? e.message : "归还失败，请重试");
+          throw e;
+        }
       },
       footer: (_, { OkBtn, CancelBtn }) => (
         <Space>

@@ -327,10 +327,12 @@ Page({
     const position = Math.floor(audio.currentTime || 0)
     const sessionStart = this._sessionStart
     if (position <= sessionStart) return
-    // 上报后新会话段从当前位置继续累积
-    this._sessionStart = position
+    // R11-d/M2：会话起点只有**上报成功**后才推进（原先 await 前就推进——
+    // 网络失败/5xx 时这一段永久不计，离线收听整段作废）。失败时保留旧起点，
+    // 下一次心跳会把"失败区间 + 新播放区间"一起上报。
     this._lastBeatAt = Date.now()
     const done = (res) => {
+      this._sessionStart = position
       if (!res) return
       this.setData({
         coveragePercent: res.coverage_percent || 0,
