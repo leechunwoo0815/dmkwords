@@ -68,6 +68,7 @@ export default function CirculationDesk() {
   const { message, modal } = AntdApp.useApp();
   const [searchKeyword, setSearchKeyword] = useState("");
   const [searchResults, setSearchResults] = useState<{ id: number; name: string; parent_phone: string }[]>([]);
+  const [searchTotal, setSearchTotal] = useState(0);
   // W6-D15（第十轮 P2，2026-10-24）：手工搜索原先**无 try/catch**——失败时 0 条 toast、
   // 页面无任何错误词、结果区不渲染，只在控制台留 `unhandledrejection`。这是借阅台最核心的
   // 兜底动线（码扫不出时按姓名/手机号找孩子），馆员会理解成"查不到该孩子"→ 重复建档/放弃办理。
@@ -77,6 +78,7 @@ export default function CirculationDesk() {
   const [overdue, setOverdue] = useState<OverdueItem[]>([]);
   // P2-57：逾期名单取数失败标记（标题据此显示「取数失败」，不显示（0））
   const [overdueError, setOverdueError] = useState("");
+  const [overdueTruncated, setOverdueTruncated] = useState(false);
   const [recent, setRecent] = useState<RecentRow[]>([]);
   const [tab, setTab] = useState("desk");
   // G7（2026-10-13）：逾期书人工续借弹窗（原因必填 → 审计留痕）
@@ -107,7 +109,7 @@ export default function CirculationDesk() {
     // 标题改成"取数失败"并给重试入口（清空列表但如实说明，不假装没逾期）。
     setOverdueError("");
     apiOverdueList()
-      .then((rows) => { setOverdue(rows); })
+      .then((r) => { setOverdue(r.items); setOverdueTruncated(r.truncated); })
       .catch((e: Error) => { message.error(e.message); setOverdue([]); setOverdueError(e.message); });
   }, []);
   useEffect(loadOverdue, [loadOverdue]);
@@ -118,12 +120,14 @@ export default function CirculationDesk() {
     try {
       const r = await apiListChildren({ page: 1, page_size: 10, keyword: searchKeyword });
       setSearchResults((r.items ?? []).map((c) => ({ id: c.id, name: c.name, parent_phone: c.parent_phone })));
+      setSearchTotal(r.total ?? (r.items ?? []).length);
       setSearchError("");
     } catch (e) {
       // W6-D15：失败必须落到**可见**结果区（"搜索失败"≠"没有这个孩子"）
       const msg = e instanceof Error ? e.message : "搜索失败";
       message.error(msg);
       setSearchResults([]);
+      setSearchTotal(0);
       setSearchError(msg);
     } finally {
       setSearching(false);
@@ -440,6 +444,11 @@ export default function CirculationDesk() {
               {s.name}（{s.parent_phone}）
             </Button>
           ))}
+          {searchTotal > searchResults.length && (
+            <Typography.Text type="secondary" style={{ display: "block", marginTop: 4 }}>
+              共 {searchTotal} 个匹配，仅显示前 {searchResults.length} 个——请加姓名/手机号关键词
+            </Typography.Text>
+          )}
         </Card>
       )}
 
@@ -552,7 +561,8 @@ export default function CirculationDesk() {
 
       {/* 逾期名单 */}
       <Typography.Title level={5} style={{ fontFamily: "var(--font-display)", marginTop: 24 }}>
-        逾期名单（{overdueError ? "取数失败" : overdue.length}）
+        逾期名单（{overdueError ? "取数失败" : overdue.length}
+        {!overdueError && overdueTruncated ? "，已达上限，可能还有更多" : ""}）
       </Typography.Title>
       {overdueError && (
         <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>

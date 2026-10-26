@@ -784,20 +784,29 @@ export default function Notifications() {
             label: (
               <>
                 家长通知（未读{" "}
-                {(parentLoaded ? unreadCount : (todoCounts?.parent_unread ?? 0)) > 0 ? (
-                  <span
-                    style={{
-                      background: "#ff4d4f",
-                      color: "#fff",
-                      borderRadius: 10,
-                      padding: "0 6px",
-                    }}
-                  >
-                    {parentLoaded ? unreadCount : (todoCounts?.parent_unread ?? 0)}
-                  </span>
-                ) : (
-                  parentLoaded ? unreadCount : (todoCounts?.parent_unread ?? 0)
-                )}
+                {(() => {
+                  // R11-d2/A6：计数拉取失败时显示「—」，不退化 0（同页管理待办 tab 已如此）
+                  const n = parentLoaded
+                    ? unreadCount
+                    : todoFailed || !todoCounts
+                      ? null
+                      : todoCounts.parent_unread;
+                  if (n === null) return "—";
+                  return n > 0 ? (
+                    <span
+                      style={{
+                        background: "#ff4d4f",
+                        color: "#fff",
+                        borderRadius: 10,
+                        padding: "0 6px",
+                      }}
+                    >
+                      {n}
+                    </span>
+                  ) : (
+                    n
+                  );
+                })()}
                 ）
               </>
             ),

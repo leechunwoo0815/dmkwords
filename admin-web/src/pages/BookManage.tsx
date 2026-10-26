@@ -68,6 +68,8 @@ export default function BookManage() {
   const [batchErrors, setBatchErrors] = useState<string[] | null>(null);
   // C3：Tab 计数（与列表筛选同口径，后端 counts 返回）
   const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
+  // R11-d2/A5：计数取数失败不许显示 0（与会员管理「—（未取到）」同范式）
+  const [countsFailed, setCountsFailed] = useState(false);
   // P2-11（第九轮）：列表取数失败原因（空串=正常）。表格区如实提示 + 重试，不把失败画成空态
   const [listError, setListError] = useState("");
   const tableWrapRef = useRef<HTMLDivElement>(null);
@@ -110,11 +112,15 @@ export default function BookManage() {
           setBooks(result.items ?? []);
           setTotal(result.total);
           setTabCounts(result.counts ?? {});
+          setCountsFailed(false);
           setListError("");
         })
         // P2-11（第九轮审查）：**取数失败不许渲染成空表**——原先只弹一次 toast，表格区随即显示
         // "书架还空着呢"，运营会当成"库里真没这些书"（与 RefundCenter 的 listError 同范式）。
-        .catch((e: Error) => setListError(e.message || "列表加载失败"))
+        .catch((e: Error) => {
+          setCountsFailed(true);
+          setListError(e.message || "列表加载失败");
+        })
         .finally(() => setLoading(false));
     },
     [keyword, tab, pageSize, sortField, sortOrder, message]
@@ -256,13 +262,13 @@ export default function BookManage() {
           setPage(1);
         }}
         items={[
-          { key: "all", label: `全部（${tabCounts.all ?? 0}）` },
-          { key: "on", label: `上架中（${tabCounts.on ?? 0}）` },
-          { key: "off", label: `已下架（${tabCounts.off ?? 0}）` },
-          { key: "ar", label: `AR 待配置（${tabCounts.ar ?? 0}）` },
-          { key: "no_cover", label: `未传封面（${tabCounts.no_cover ?? 0}）` },
-          { key: "no_audio", label: `未传音频（${tabCounts.no_audio ?? 0}）` },
-          { key: "quiz_incomplete", label: `测验未满 ${cfgNum(configs, "quiz_questions_per_book", 5)} 道（${tabCounts.quiz_incomplete ?? 0}）` },
+          { key: "all", label: `全部（${countsFailed ? "—" : (tabCounts.all ?? 0)}）` },
+          { key: "on", label: `上架中（${countsFailed ? "—" : (tabCounts.on ?? 0)}）` },
+          { key: "off", label: `已下架（${countsFailed ? "—" : (tabCounts.off ?? 0)}）` },
+          { key: "ar", label: `AR 待配置（${countsFailed ? "—" : (tabCounts.ar ?? 0)}）` },
+          { key: "no_cover", label: `未传封面（${countsFailed ? "—" : (tabCounts.no_cover ?? 0)}）` },
+          { key: "no_audio", label: `未传音频（${countsFailed ? "—" : (tabCounts.no_audio ?? 0)}）` },
+          { key: "quiz_incomplete", label: `测验未满 ${cfgNum(configs, "quiz_questions_per_book", 5)} 道（${countsFailed ? "—" : (tabCounts.quiz_incomplete ?? 0)}）` },
         ]}
       />
       <div ref={tableWrapRef} style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>

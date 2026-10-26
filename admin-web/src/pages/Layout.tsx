@@ -117,8 +117,8 @@ export default function Layout() {
       icon: <TeamOutlined />,
       // T20e #3：会员管理侧边栏徽标（order_pending_manual，样式同通知中心 Badge）
       label:
-        memberBadge > 0 ? (
-          <Badge count={memberBadge} size="small" offset={[10, 0]}>
+        failed || memberBadge > 0 ? (
+          <Badge count={failed ? "?" : memberBadge} title={failed ? "待审核收款计数加载失败" : undefined} size="small" offset={[10, 0]}>
             会员管理
           </Badge>
         ) : (
@@ -136,8 +136,8 @@ export default function Layout() {
       perm: "member.manage",
       // T6：活动报名待确认徽标
       label:
-        activityBadge > 0 ? (
-          <Badge count={activityBadge} size="small" offset={[10, 0]}>
+        failed || activityBadge > 0 ? (
+          <Badge count={failed ? "?" : activityBadge} title={failed ? "活动报名待确认计数加载失败" : undefined} size="small" offset={[10, 0]}>
             线下活动
           </Badge>
         ) : (
@@ -149,8 +149,8 @@ export default function Layout() {
       icon: <SafetyCertificateOutlined />,
       // R6（#4）：退款中心侧边栏徽标（退款+转让待审之和）
       label:
-        refundCenterBadge > 0 ? (
-          <Badge count={refundCenterBadge} size="small" offset={[10, 0]}>
+        failed || refundCenterBadge > 0 ? (
+          <Badge count={failed ? "?" : refundCenterBadge} title={failed ? "退款/转让待审计数加载失败" : undefined} size="small" offset={[10, 0]}>
             退款中心
           </Badge>
         ) : (
@@ -164,8 +164,8 @@ export default function Layout() {
       perm: "member.manage",
       // WM14-A：阅读圈徽标（今日新帖未馆长赞——打开后台第一眼知道今天要赞什么）
       label:
-        circleBadge > 0 ? (
-          <Badge count={circleBadge} size="small" offset={[10, 0]}>
+        failed || circleBadge > 0 ? (
+          <Badge count={failed ? "?" : circleBadge} title={failed ? "阅读圈待赞计数加载失败" : undefined} size="small" offset={[10, 0]}>
             阅读圈
           </Badge>
         ) : (
@@ -176,8 +176,8 @@ export default function Layout() {
       key: "/notifications",
       icon: <NotificationOutlined />,
       label:
-        badgeCount > 0 ? (
-          <Badge count={badgeCount} size="small" offset={[10, 0]}>
+        failed || badgeCount > 0 ? (
+          <Badge count={failed ? "?" : badgeCount} title={failed ? "待办计数加载失败，点击通知中心重试" : undefined} size="small" offset={[10, 0]}>
             通知中心
           </Badge>
         ) : (

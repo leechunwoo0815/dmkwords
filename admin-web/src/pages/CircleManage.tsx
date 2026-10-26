@@ -276,7 +276,7 @@ export default function CircleManage() {
               {r.is_pinned ? "取消置顶" : "置顶"}
             </Button>
             {isSuperAdmin && (
-              <Button size="small" danger onClick={() => setDeleteTarget(r)}>
+              <Button size="small" danger onClick={() => { setDeleteReason(""); setDeleteTarget(r); }}>
                 删除
               </Button>
             )}

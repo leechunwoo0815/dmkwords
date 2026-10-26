@@ -1086,6 +1086,11 @@ export default function MemberManage() {
             // 于是英文名/年级/生日**永远清不掉**（表单里删掉、保存后原值还在）。
             // 口径：文本字段送**空串**（后端 `english_name or None` 落 NULL）；日期字段送 **null**
             // （后端按"显式传 null"清空，见 `update_profile(clear_birthday=...)`）。
+            // R11-d2/A10：AR 只升不降——清空不能被静默吞掉（`|| undefined` 丢键后仍提示"已保存"）
+            if (editChild.ar_level && !v.ar_level) {
+              message.warning("AR 值只升不降，不能清空；如需修正请联系技术");
+              return;
+            }
             await apiUpdateChild(editChild.id, {
               name: v.name || undefined,
               gender: v.gender ?? undefined,

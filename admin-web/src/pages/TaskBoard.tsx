@@ -225,7 +225,7 @@ export default function TaskBoard() {
          scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
       </Card>
-      <Card title="运行记录">
+      <Card title="运行记录（最近 20 条）">
         <Table<TaskRunItem>
           rowKey={(r) => `${r.task_name}-${r.started_at}`}
           size="small"

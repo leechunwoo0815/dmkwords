@@ -271,7 +271,9 @@ export default function GrowthManage() {
             <Tabs
               items={[
                 {
-                  key: "words", label: `词数流水（${growth.words_ledger.length}）`,
+                  key: "words",
+                  // R11-d2/A9：后端 limit=100 且无截断头——达到上限时如实显示 100+
+                  label: `词数流水（${growth.words_ledger.length >= 100 ? "100+" : growth.words_ledger.length}）`,
                   children: (
                     <>
                     <Table locale={{ emptyText: <PaintEmpty character="rabbit" /> }}
@@ -288,7 +290,8 @@ export default function GrowthManage() {
           ),
                 },
                 {
-                  key: "points", label: `积分明细（${growth.points_ledger.length}）`,
+                  key: "points",
+                  label: `积分明细（${growth.points_ledger.length >= 100 ? "100+" : growth.points_ledger.length}）`,
                   children: (
                     <>
                     <Table locale={{ emptyText: <PaintEmpty character="rabbit" /> }}
@@ -297,7 +300,11 @@ export default function GrowthManage() {
                       columns={[
                         { title: "类型", dataIndex: "reason_type", width: 110, render: (t) => REASON_LABEL[t] ?? t },
                         { title: "说明", dataIndex: "detail" },
-                        { title: "积分", dataIndex: "points", width: 80, render: (v) => <Typography.Text strong style={{ color: "var(--paint-secondary)" }}>+{v}</Typography.Text> },
+                        { title: "积分", dataIndex: "points", width: 80, render: (v) => (
+                          <Typography.Text strong style={{ color: "var(--paint-secondary)" }}>
+                            {v > 0 ? "+" : ""}{v}
+                          </Typography.Text>
+                        ) },
                         { title: "时间", dataIndex: "created_at", width: 170 },
                       ]}
                      scroll={{ x: "max-content" }}/>

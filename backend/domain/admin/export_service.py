@@ -27,6 +27,7 @@ class AuditExportService:
         from openpyxl import Workbook
         from openpyxl.styles import Font
 
+        from backend.domain.admin.audit_labels import AUDIT_ACTION_LABEL, AUDIT_TARGET_LABEL
         from backend.domain.admin.service import AUDIT_EXPORT_LIMIT
 
         q = self.db.query(AuditLog).filter(AuditLog.is_deleted == 0)
@@ -56,8 +57,8 @@ class AuditExportService:
                     [
                         r.id,
                         r.actor_name,
-                        r.action,
-                        r.target_type,
+                        AUDIT_ACTION_LABEL.get(r.action, r.action),
+                        AUDIT_TARGET_LABEL.get(r.target_type, r.target_type),
                         r.target_id,
                         r.detail or "",
                         r.reason,

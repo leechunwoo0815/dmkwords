@@ -1,6 +1,6 @@
 // circulation API
 import { downloadExcel } from "./admin";
-import { request } from "./client";
+import { request, requestList, type ListResult } from "./client";
 import type { components } from "./schema";
 
 export type ChildCard = components["schemas"]["ChildCardResponse"];
@@ -72,8 +72,10 @@ export function apiRenew(record_id: number, reason?: string): Promise<BorrowReco
   return request("/api/admin/circulation/renew", { method: "POST", body: JSON.stringify({ record_id, reason }) });
 }
 
-export function apiOverdueList(): Promise<OverdueItem[]> {
-  return request("/api/admin/circulation/overdue");
+// R11-d2/A4：逾期名单有 200 条硬上限——必须把 X-List-Truncated 带出来，
+// 否则管理端会把"200"当成总数（漏看第 201 条以后的逾期）。
+export function apiOverdueList(): Promise<ListResult<OverdueItem[]>> {
+  return requestList<OverdueItem[]>("/api/admin/circulation/overdue");
 }
 
 // 搜索孩子（复用 members API）

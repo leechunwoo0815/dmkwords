@@ -28,6 +28,14 @@ _STATUSES = (
     BorrowRecord.STATUS_LOST,
 )
 _UNRECORDED = "未记录"  # 历史行（加列前）确实没记操作人——如实展示，不编造
+#: R11-d2/A8：导出与界面同口径（原导出写英文枚举，运营看不懂）
+_STATUS_LABEL = {
+    BorrowRecord.STATUS_ACTIVE: "在借",
+    BorrowRecord.STATUS_OVERDUE: "逾期",
+    BorrowRecord.STATUS_RETURNED: "已归还",
+    BorrowRecord.STATUS_LOST: "遗失",
+}
+_CONDITION_LABEL = {"normal": "正常", "maintenance": "维护中", "lost": "遗失"}
 
 
 class BorrowRecordsService:
@@ -181,11 +189,13 @@ class BorrowRecordsService:
                         r["parent_phone"],
                         r["book_title"],
                         r["copy_code"],
-                        r["status"],
+                        _STATUS_LABEL.get(r["status"], r["status"]),
                         r["borrowed_at"].strftime("%Y-%m-%d %H:%M") if r["borrowed_at"] else "",
                         r["due_at"].strftime("%Y-%m-%d %H:%M") if r["due_at"] else "",
                         r["returned_at"].strftime("%Y-%m-%d %H:%M") if r["returned_at"] else "",
-                        r["returned_condition"] or "",
+                        _CONDITION_LABEL.get(
+                            r["returned_condition"] or "", r["returned_condition"] or ""
+                        ),
                         r["renew_used"],
                         r["days_overdue"],
                         r["borrowed_by_name"],
