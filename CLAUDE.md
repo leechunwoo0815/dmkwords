@@ -181,7 +181,7 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 | **D 级** | 仅文档/文字：`docs/**`、`*.md`、`error_list/**`、`外部专家意见/**`、代码注释文字 | **不跑门禁**（无代码语义变更） | ❌ **不单独推、不等 CI** | 攒批合并进下一次推送（红线 37）；判据：`git diff --name-only` 全落在上述路径 |
 
 > **2026-10-26 甲方指令（门禁频次放宽，立即生效）**：客户催进度，**全量门禁不再「每小轮一次」**——改为**批次簇**执行：
-> ① 每个小批次（含 C 级）只跑**定向判据**：新增/受影响域 `pytest` + `ruff check/format` + `python -m scripts.verify_architecture` + `python -m scripts.check_docs_code_alignment`（前端加 `tsc` / 小程序四检查器）；
+> ① 每个小批次（含 C 级）只跑**定向判据**：新增/受影响域 `pytest` + `ruff check/format` + `python -m scripts.verify_architecture` + `python -m scripts.check_docs_code_alignment`（**动到 Router/Schema/Query 参数时加 `python scripts/export_openapi.py --check`**——2026-10-26 实测：新增 `?fresh=1` 查询参数也会让快照不一致；前端加 `tsc` / 小程序四检查器）；
 > ② **每 2–3 个小批次、或推送/交付前**跑一次 `bash scripts/gate.sh full`（簇末）；簇内批次通过定向判据即可本地提交；
 > ③ **资金/状态机/公共层的改动仍必须有 RED 判据 + 变异**——不得以"门禁放宽"为由弱化断言或删测；
 > ④ 跑全量时既有纪律不变：一次只起一个、只认日志结论行、门禁后三核验、中途终止必须连带 `pkill -f "pytest tests/"`。
