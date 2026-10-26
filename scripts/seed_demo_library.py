@@ -425,24 +425,38 @@ def _draw_buddy(
         )
 
 
+def _load_font(path: str, size: int):
+    """加载字体；机器上没有该字体时退回 Pillow 内置字体。
+
+    R11-e（2026-10-26）：CI 在 Linux runner 上 `ImageFont.truetype(macOS 路径)` 抛
+    `OSError: cannot open resource`，`test_seed_demo_library_revives_soft_deleted_book` 因此红。
+    种子只要求"封面能画出来"，字形退化不影响数据断言。
+    """
+    from PIL import ImageFont
+
+    try:
+        return ImageFont.truetype(path, size)
+    except OSError:
+        return ImageFont.load_default()
+
+
 def _draw_title_plaque(d, title: str, topic: str, with_tag: bool) -> None:
     """书名贴纸：**只落在安全带内**，字号自适应，中文/英文各自换行。
 
     2026-09-15：首版 pad 30 / 不透明度 224 / 字号 52 → 白框大到把地平线整段糊住，
     像弹窗不像封面。收紧到 pad 20、半透明、字号降一档。
     """
-    from PIL import ImageFont
 
     font_path = _FONT_CJK if any(ord(c) > 127 for c in title) else _FONT_ROUND
     pad, max_w = 20, COVER_W - 2 * 84
     text_w = max_w - 2 * pad
     for size in (46, 41, 36, 31, 27):
-        f_title = ImageFont.truetype(font_path, size)
+        f_title = _load_font(font_path, size)
         lines = _wrap(d, title, f_title, text_w)
         if len(lines) <= 4 or size == 27:
             break
     lh = round(size * 1.22)
-    f_tag = ImageFont.truetype(_FONT_CJK, 24)
+    f_tag = _load_font(_FONT_CJK, 24)
     tag_h = 40 if with_tag else 0
     gap = 10 if with_tag else 0
     h = tag_h + gap + lh * len(lines) + 2 * pad
