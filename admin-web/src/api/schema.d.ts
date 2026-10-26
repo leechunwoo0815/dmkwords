@@ -8257,7 +8257,10 @@ export interface operations {
     };
     dashboard_overview_api_admin_dashboard_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description true=跳过 30s 缓存，强制重算 */
+                fresh?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8271,6 +8274,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardOverviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
