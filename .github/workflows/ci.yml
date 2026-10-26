@@ -6,12 +6,22 @@ on:
   pull_request:
     branches: [main]
 
-# DmkWords 门禁（D3 重写）：MySQL-only + uv + bash scripts/gate.sh（9 步；tsc=step 7 /
-# 契约快照+前端类型=step 8。2026-09-20 修正：旧注释写"含 tsc step 8"与 gate.sh 不符）
+# 最小权限（R11-e S6，2026-10-26）：CI 只读仓库，不写 issues/PR/包。
+permissions:
+  contents: read
+
+# DmkWords 门禁（D3 重写）：MySQL-only + uv + bash scripts/gate.sh（10 步；tsc=step 7 /
+# vite build=step 7b / 契约快照+前端类型=step 8。2026-09-20 修正：旧注释写"含 tsc step 8"与 gate.sh 不符）
 # 事实依据：项目为 pyproject.toml + uv（无 requirements.txt）；测试用 TRUNCATE/
 # MySQL 语义，sqlite 无法启动；旧 job（verify_api_contract/check_model_consistency/
 # verify_action_wiring/gen_config_doc.py）为 librio 遗留工具，仓库中不存在。
 # fix44 R2：CI 装了 admin-web 依赖 → gate[8] 的 `pnpm gen:api --check`（前端类型漂移）在 CI 同样生效。
+#
+# R11-e（2026-10-26）：
+#   S2 前端生产构建已进 gate step 7b（CI 调用同一个 gate.sh，一处收口两处生效）；
+#   S6 action 全部钉 commit SHA（原先浮动 major tag）+ 顶层 permissions + MySQL 固定到
+#   精确补丁版本 8.0.46（本地实测版本；digest 钉死需访问 Docker Hub registry，当前环境不可达，
+#   见 docs/项目交接 §六 挂账）+ 独立 image job（构建 + trivy 报告制扫描）。
 
 # P3 门禁族（2026-10-22 第一百一十四批）：原先**没有超时、没有并发取消、没有日志归档**——
 # ① 挂死的 job 会占满 runner（默认 6 小时）却不给出任何信号；
@@ -28,7 +38,9 @@ jobs:
     timeout-minutes: 60
     services:
       mysql:
-        image: mysql:8.0
+        # 精确补丁版本（R11-e S6）：原 `mysql:8.0` 会在 runner 缓存刷新时静默升级。
+        # digest 钉死待 registry 可达后补（本机 Docker Hub 出站超时，无法取得 multi-arch digest）。
+        image: mysql:8.0.46
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: dmkwords_ci
@@ -51,9 +63,9 @@ jobs:
       # 短信看 SMS_PROVIDER）——死键留着会让人误以为"CI 靠这两个开关走 mock"。
       # 现在 CI 与本地同款默认：PAYMENT_PROVIDER=mock、SMS_PROVIDER=mock。
     steps:
-      - uses: actions/checkout@v5
-
-      - uses: astral-sh/setup-uv@v6
+      # R11-e S6：action 一律钉 commit SHA（major tag 可被上游移动）。
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           python-version: "3.13"
           enable-cache: true
@@ -61,16 +73,16 @@ jobs:
       - name: Install dependencies (uv)
         run: uv sync --frozen
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: "11"
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "22"
           cache: "pnpm"
           cache-dependency-path: admin-web/pnpm-lock.yaml
 
-      - name: Install admin-web dependencies (tsc step 8)
+      - name: Install admin-web dependencies (tsc step 7 / build step 7b / contract step 8)
         run: pnpm --dir admin-web install --frozen-lockfile
 
       - name: Apply migrations (empty CI database)
@@ -81,9 +93,29 @@ jobs:
 
       - name: Upload gate logs (always)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: gate-logs-${{ github.run_id }}
           path: gate-runs/
           if-no-files-found: warn
           retention-days: 14
+
+  # R11-e S6：镜像构建 + 漏洞扫描（报告制）。
+  # 镜像当前定位为**非生产**（待甲方裁定，见 Dockerfile 头注释），因此本 job 失败不拦 CI；
+  # 它的价值是"源码/依赖漂移 + 高危 CVE"的持续信号，裁定接入生产后再收紧退出码。
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Build backend image
+        run: docker build --tag dmkwords:ci .
+      - name: Scan image (report-only)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: dmkwords:ci
+          format: table
+          exit-code: "0"
+          ignore-unfixed: true
+          severity: "HIGH,CRITICAL"

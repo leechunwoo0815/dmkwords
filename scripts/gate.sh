@@ -50,7 +50,27 @@ step 2 "单测 + 覆盖率（真实 MySQL 同构环境，单次跑全量）"
 # 占门禁总时长 96%（550s+712s）且双轮内存高峰——合并为单次（-42% 总时长）；
 # cov-fail-under 照常拦截；-x 快速失败语义随合并取消（门禁本就要看全貌）。
 # --durations=20：输出 top 慢测试清单（纯观测，为后续并行化铺路）
-run python -m pytest tests/ -q --tb=short --cov=backend --cov-fail-under=25 --cov-report=term-missing:skip-covered --durations=20
+# R11-e S3（2026-10-26）：单测数量基线守卫。原先只有 cov-fail-under=25（实测 91%），
+# 删掉一批测试也照样绿。现在解析本次 `passed` 数并与 scripts/gate_baseline.json 的下限比对：
+# 低于下限 = 测试被删/未被收集（如属预期删测，同步下调基线并在提交信息说明）。
+PYTEST_TMP=$(mktemp -t dmkwords-pytest-XXXXXX)
+if ! python -m pytest tests/ -q --tb=short --cov=backend --cov-fail-under=25 \
+  --cov-report=term-missing:skip-covered --durations=20 2>&1 | tee "$PYTEST_TMP"; then
+  echo "✗ 门禁失败: pytest tests/"
+  FAILED=1
+fi
+PASSED_COUNT=$(grep -oE '[0-9]+ passed' "$PYTEST_TMP" | tail -1 | grep -oE '[0-9]+' || true)
+MIN_PASSED=$(python -c "import json;print(json.load(open('scripts/gate_baseline.json'))['min_passed'])" 2>/dev/null || true)
+if [ -z "$MIN_PASSED" ]; then
+  fail "单测数量基线读取失败（scripts/gate_baseline.json 缺失或格式错）"
+elif [ -z "$PASSED_COUNT" ]; then
+  fail "pytest 输出没有 passed 计数——无法核对单测数量基线"
+elif [ "$PASSED_COUNT" -lt "$MIN_PASSED" ]; then
+  fail "单测数量 ${PASSED_COUNT} < 基线 ${MIN_PASSED}（测试被删/未被收集；确属预期删测时同步下调基线并写明理由）"
+else
+  echo "单测数量基线 OK：${PASSED_COUNT} >= ${MIN_PASSED}"
+fi
+rm -f "$PYTEST_TMP"
 
 step 3 "BDD (behave)"
 run python -m behave features/ --no-capture -q
@@ -148,6 +168,19 @@ else
   fi
 fi
 
+step 7b "前端生产构建（vite build；S2：产物与源码不许漂移）"
+# R11-e S2（2026-10-26）：门禁与 CI 原先都只跑 tsc、**不跑生产构建**——源码改了而 dist 未重建
+# 也能全绿（第十一轮实测 dist 落后 37 个源文件）。CI 走同一个 gate.sh，故此处一处收口两处生效。
+if [ -f "admin-web/node_modules/.bin/vite" ]; then
+  run bash -c "cd admin-web && pnpm build"
+elif [ -n "${CI:-}" ]; then
+  fail "CI 环境缺 admin-web 依赖（node_modules/.bin/vite 不存在）——pnpm install 后重跑"
+elif [ "${SKIP_FRONTEND_CHECKS:-0}" = "1" ]; then
+  skip "显式 SKIP_FRONTEND_CHECKS=1（本地临时跳过 vite build，不得用于交付）"
+else
+  fail "admin-web 未安装依赖（node_modules/.bin/vite 不存在）——请 pnpm install"
+fi
+
 step 8 "契约快照检查（T27：破坏性变更必须改代码+更新快照两步显形）"
 if [ -f "docs/api/openapi.json" ]; then
   run python scripts/export_openapi.py --check
@@ -200,40 +233,38 @@ else
   fi
 fi
 
-sleep 0.3  # E-20260901-04：等 tee 落盘再退出，防日志末行截断
+sleep 0.3  # E-20260901-04：等 tee 落盘再退出（防日志末行截断）
+echo ""
+# E-20260903-04 三犯史：①漏恢复 ②加提醒行 ③提醒行仍漏（2026-09-05）——
+# 证明"靠人记得"必败，裁量修正为全自动：检测到本地 dev 环境存活（8002 健康
+# 或 .dev-logs 存在）即自动 dev.sh restart（重启加载最新代码+双 seed 恢复）；
+# CI/无 dev 环境自动跳过，gate 纯验收语义保持。含后端改动批次由 restart 兜住
+# （E-20260905-01：start 幂等跳过=旧代码继续跑）
+#
+# R11-e S4（2026-10-26）：恢复后**必须跑 check_demo_baseline**。原先只看 restart 退出码，
+# 于是"现场已自动恢复 ✓"可能在库被清空/seed 未回填时照印（docs/19 记录过同族事故）。
+if curl -sf -m 2 http://localhost:8002/health > /dev/null 2>&1 || [ -d ".dev-logs" ]; then
+  echo "----- 检测到本地 dev 环境，自动恢复现场（dev.sh restart：重启后端+双 seed） -----"
+  if bash scripts/dev.sh restart >> "$GATE_LOG_FILE" 2>&1; then
+    if python scripts/check_demo_baseline.py >> "$GATE_LOG_FILE" 2>&1; then
+      echo "----- 现场已自动恢复 ✓（演示基线 PASS） -----"
+    else
+      echo "✗ 现场已恢复但演示基线 FAIL——见 $GATE_LOG_FILE 的 check_demo_baseline 段"
+      FAILED=1
+    fi
+  else
+    echo "⚠ 自动恢复失败——请手动执行: bash scripts/dev.sh restart"
+  fi
+else
+  echo "⚠ 业务表已被门禁清空——如需演示/目视请执行: bash scripts/dev.sh restart （重启加载最新代码+双 seed 恢复）"
+fi
+
+sleep 0.3
 echo ""
 if [ "$FAILED" -eq 0 ]; then
   echo "===== 全量门禁 PASS（退出码 0） ====="
-  # E-20260903-04 三犯史：①漏恢复 ②加提醒行 ③提醒行仍漏（2026-09-05）——
-  # 证明"靠人记得"必败，裁量修正为全自动：检测到本地 dev 环境存活（8002 健康
-  # 或 .dev-logs 存在）即自动 dev.sh restart（重启加载最新代码+双 seed 恢复）；
-  # CI/无 dev 环境自动跳过，gate 纯验收语义保持。含后端改动批次由 restart 兜住
-  # （E-20260905-01：start 幂等跳过=旧代码继续跑）
-  if curl -sf -m 2 http://localhost:8002/health > /dev/null 2>&1 || [ -d ".dev-logs" ]; then
-    echo "----- 检测到本地 dev 环境，自动恢复现场（dev.sh restart：重启后端+双 seed） -----"
-    if bash scripts/dev.sh restart >> "$GATE_LOG_FILE" 2>&1; then
-      echo "----- 现场已自动恢复 ✓ -----"
-    else
-      echo "⚠ 自动恢复失败——请手动执行: bash scripts/dev.sh restart"
-    fi
-  else
-    echo "⚠ 业务表已被门禁清空——如需演示/目视请执行: bash scripts/dev.sh restart （重启加载最新代码+双 seed 恢复）"
-  fi
   exit 0
 else
   echo "===== 全量门禁 FAIL ====="
-  # 2026-10-12 审查 P2：**失败分支同样恢复现场**。pytest 步骤已 TRUNCATE 全部业务表，
-  # 而"门禁红"恰是最容易忘记恢复的时刻（此前只有 PASS 分支自动 restart，
-  # docs/19 记录过三次"库里空了没人发现"的事故）。恢复失败不影响退出码语义。
-  if curl -sf -m 2 http://localhost:8002/health > /dev/null 2>&1 || [ -d ".dev-logs" ]; then
-    echo "----- 门禁失败但仍是本地 dev 环境：自动恢复现场（dev.sh restart） -----"
-    if bash scripts/dev.sh restart >> "$GATE_LOG_FILE" 2>&1; then
-      echo "----- 现场已自动恢复 ✓（业务表已回填演示数据） -----"
-    else
-      echo "⚠ 自动恢复失败——请手动执行: bash scripts/dev.sh restart"
-    fi
-  else
-    echo "⚠ 业务表已被门禁清空——如需演示/目视请执行: bash scripts/dev.sh restart"
-  fi
   exit 1
 fi

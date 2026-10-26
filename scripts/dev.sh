@@ -17,6 +17,17 @@ FRONTEND_URL="http://localhost:5173"
 
 is_running() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
 
+# R11-e S1（2026-10-26）：就绪探测统一带重试。原先后端/前端在"已在运行"分支只有**单次**
+# `curl -m 3`，进程刚起/刚重启时偶发超时 → 门禁收尾的"现场已自动恢复"误报失败。
+wait_http() {
+  local url="$1" tries="${2:-20}"
+  for _ in $(seq 1 "$tries"); do
+    curl -sf --noproxy '*' -m 3 "$url" > /dev/null && return 0
+    sleep 1
+  done
+  return 1
+}
+
 wait_mysql() {
   echo "等待 MySQL 健康..."
   for _ in $(seq 1 30); do
@@ -85,7 +96,7 @@ start() {
       fi
     fi
   fi
-  curl -sf --noproxy '*' -m 3 "$BACKEND_URL" > /dev/null && echo "后端 OK: $BACKEND_URL" || { echo "✗ 后端未就绪，查看 $LOG_DIR/backend.log"; exit 1; }
+  wait_http "$BACKEND_URL" 20 && echo "后端 OK: $BACKEND_URL" || { echo "✗ 后端未就绪，查看 $LOG_DIR/backend.log"; exit 1; }
 
   echo "===== [4/4] 管理端前端（:5173） ====="
   if is_running "$FRONTEND_PID_FILE"; then
@@ -99,7 +110,7 @@ start() {
       sleep 1
     done
   fi
-  curl -sf --noproxy '*' -m 3 "$FRONTEND_URL" > /dev/null && echo "前端 OK: $FRONTEND_URL" || { echo "✗ 前端未就绪，查看 $LOG_DIR/frontend.log"; exit 1; }
+  wait_http "$FRONTEND_URL" 30 && echo "前端 OK: $FRONTEND_URL" || { echo "✗ 前端未就绪，查看 $LOG_DIR/frontend.log"; exit 1; }
 
   echo ""
   echo "============================================"
