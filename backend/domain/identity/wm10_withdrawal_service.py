@@ -361,7 +361,7 @@ class WithdrawalService:
         2026-10-15（大审查 P1 #3）：活动类订单另过 `activity_refund_block`——"已签到/已开始/
         报名已取消或已退"一律不入清单（原先只管类型、不看参加状态，已签到也照退）。
         """
-        from backend.domain.billing.models import Deposit
+        from backend.domain.billing.models import Deposit, DepositLedger
 
         items: list[dict] = []
         # 已存在「在办或已退」退款单的订单/押金 → 退会结算不再重复计入
@@ -382,7 +382,33 @@ class WithdrawalService:
             .all()
         )
         settled_order_ids = {r.order_id for r in settled if r.order_id}
-        has_deposit_refund = any(r.kind == RefundRequest.KIND_DEPOSIT for r in settled)
+        dep = (
+            self.db.query(Deposit)
+            .filter(Deposit.child_id == child.id, Deposit.is_deleted == 0)
+            .first()
+        )
+        # R11-b/F1（2026-10-26）：押金退款单只认**本周期**——`reset_refunded_on_rejoin` 重新入会
+        # 会复位账户但保留历史流水；若把跨周期的历史 REFUNDED 单也算"已建单"，二次退会的押金项
+        # 会被永久屏蔽（钱静默滞留，而押金没有单独的退款入口）。
+        # 周期起点 = 最近一笔 `pay` 流水（重新缴纳时新落一条）。
+        cycle_start = (
+            self.db.query(func.max(DepositLedger.created_at))
+            .filter(
+                DepositLedger.deposit_id == dep.id,
+                DepositLedger.entry_type == DepositLedger.ENTRY_PAY,
+                DepositLedger.is_deleted == 0,
+            )
+            .scalar()
+            if dep
+            else None
+        )
+        has_deposit_refund = any(
+            r.kind == RefundRequest.KIND_DEPOSIT
+            and (
+                cycle_start is None or (r.create_time is not None and r.create_time >= cycle_start)
+            )
+            for r in settled
+        )
         # 1) 费用类已支付订单（会员费按剩余天数比例；活动费未签到未开始全额退）。
         #    ⚠️ 必须按类型白名单，不能 `Order.status == PAID` 一把扫：
         #    押金在系统里**同时**是一条 Order(type=deposit) 和一个 Deposit 实体，
@@ -430,11 +456,6 @@ class WithdrawalService:
                 }
             )
         # 2) 押金（可用余额；已扣除部分不退）
-        dep = (
-            self.db.query(Deposit)
-            .filter(Deposit.child_id == child.id, Deposit.is_deleted == 0)
-            .first()
-        )
         if dep and dep.available_amount > 0 and not has_deposit_refund:
             items.append(
                 {
@@ -586,3 +607,44 @@ class WithdrawalService:
 
 
 # 权益转让已拆至 transfer_service.py；保留 re-export 兼容既有 import
+
+
+def ensure_deposit_refund_on_withdrawal(db: Session, child: Child) -> None:
+    """会员费退款联动退会时自动发起押金退款（R-310）。
+
+    从 `wm10_service.RefundService._complete_refund_withdrawal` 抽出（R11-b，2026-10-26）：
+    ① 该文件已卡 800 行 god-file 红线；② 这是"退会联动押金"的退会域职责，放在退会服务里更内聚。
+    幂等：已有进行中（pending/approved/processing）押金退款单则不重复发起。
+    """
+    from backend.domain.billing.models import Deposit
+
+    existing = (
+        db.query(func.count(RefundRequest.id))
+        .filter(
+            RefundRequest.child_id == child.id,
+            RefundRequest.kind == RefundRequest.KIND_DEPOSIT,
+            RefundRequest.status.in_(
+                [
+                    RefundRequest.STATUS_PENDING,
+                    RefundRequest.STATUS_APPROVED,
+                    RefundRequest.STATUS_PROCESSING,
+                ]
+            ),
+            RefundRequest.is_deleted == 0,
+        )
+        .scalar()
+    )
+    dep = db.query(Deposit).filter(Deposit.child_id == child.id, Deposit.is_deleted == 0).first()
+    if dep and dep.available_amount > 0 and not existing:
+        db.add(
+            RefundRequest(
+                kind=RefundRequest.KIND_DEPOSIT,
+                deposit_id=dep.id,
+                child_id=child.id,
+                amount=dep.available_amount,
+                reason="会员费退款成功，自动发起押金退款（R-310）",
+            )
+        )
+        db.flush()
+        dep.assert_transition(Deposit.STATUS_REFUNDING)
+        dep.status = Deposit.STATUS_REFUNDING

@@ -238,7 +238,17 @@ def ensure_circle_thumbs(db: Session) -> dict:
             # 第十轮 W1-8（P3，2026-10-25）：守卫由**裸前缀**改 `is_within`（全仓最后一处收口）。
             # 裸 `startswith(circle_dir)` 会把兄弟目录也算进来——`uploads/circle-old/xxx.jpg`
             # 以 `…/uploads/circle` 开头 ⇒ 命中 ⇒ **删掉别的目录里的真实文件**（目录名共用前缀是常态）。
-            if is_within(circle_dir, old_full) and os.path.isfile(old_full):
+            # R11-b/B4（2026-10-26）：内容寻址同内容同名 ⇒ 删前查其它活跃帖是否仍引用该文件。
+            shared = (
+                db.query(CirclePost.id)
+                .filter(
+                    CirclePost.id != post.id,
+                    CirclePost.is_deleted == 0,
+                    CirclePost.thumb_path == old_rel,
+                )
+                .first()
+            )
+            if shared is None and is_within(circle_dir, old_full) and os.path.isfile(old_full):
                 try:
                     os.remove(old_full)
                 except OSError:

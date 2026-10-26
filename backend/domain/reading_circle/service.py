@@ -511,6 +511,16 @@ class CircleService:
         fresh = self.db.query(CirclePost.like_count).filter(CirclePost.id == post_id).scalar()
         return {"post_id": post_id, "like_count": fresh, "liked": True}
 
+    def _consume_like_row(self, like_id: int) -> bool:
+        """把点赞行 `is_deleted` 0→1 **原子消费**；只有真正消费到的请求返回 True（R11-b/B1）。"""
+        return bool(
+            self.db.execute(
+                update(CircleLike)
+                .where(CircleLike.id == like_id, CircleLike.is_deleted == 0)
+                .values(is_deleted=1)
+            ).rowcount
+        )
+
     def unlike(self, post_id: int, child: Child) -> dict:
         """取消点赞（按孩子主体定位行；未赞过则幂等返回）。"""
         post = (
@@ -531,13 +541,16 @@ class CircleService:
         )
         if not row:
             return {"post_id": post_id, "like_count": post.like_count, "liked": False}
-        row.is_deleted = 1
-        # 原子 UPDATE -1（0 下限防负数）
-        self.db.execute(
-            update(CirclePost)
-            .where(CirclePost.id == post_id, CirclePost.like_count > 0)
-            .values(like_count=CirclePost.like_count - 1)
-        )
+        # R11-b/B1（2026-10-26）：**条件 UPDATE 消费点赞行**——原先是"读到未删 → 置 1 → 无条件 -1"，
+        # 并发双击两个请求都读到旧行、各减 1（计数 -2 且永不自愈）。与 like/复活路径同款：
+        # 只有真正把 `is_deleted` 0→1 的那一个请求拿到 rowcount=1，才允许扣减。
+        if self._consume_like_row(row.id):
+            # 原子 UPDATE -1（0 下限防负数）
+            self.db.execute(
+                update(CirclePost)
+                .where(CirclePost.id == post_id, CirclePost.like_count > 0)
+                .values(like_count=CirclePost.like_count - 1)
+            )
         self.db.commit()
         fresh = self.db.query(CirclePost.like_count).filter(CirclePost.id == post_id).scalar()
         return {"post_id": post_id, "like_count": fresh, "liked": False}

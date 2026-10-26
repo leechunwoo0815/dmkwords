@@ -588,6 +588,11 @@ class RefundService:
         child = self.db.query(Child).filter(Child.id == req.child_id).first()
         if not child or child.member_status == Child.MEMBER_WITHDRAWN:
             return
+        if child.operation_locked and not req.withdrawal_id:
+            # R11-b/F2（2026-10-26）：审核流程中（冻结标志已提交）的**单笔**会员费退款不得把
+            # 孩子直接写成 withdrawn——审核结果未定，且解锁唯一出口是 `_advance_withdrawal`；
+            # 退款本身照常入账，退会状态交给退会结算/审核链收口（原退会单仍 applying）。
+            return
         reason_code = "user_refund"
         if req.withdrawal_id:
             w = (
@@ -606,41 +611,12 @@ class RefundService:
         # 解锁唯一出口 = _advance_withdrawal（全部退款单终态才 completed+解锁；
         # T5 后 reject/cancel 也有出口，语义闭环）。refund_linked 单申请路径行为不变。
         # 自动发起押金退款申请（可用余额；已有进行中押金单则不重复发起）
-        from backend.domain.billing.models import Deposit
+        # R11-b：块体抽到退会域（`ensure_deposit_refund_on_withdrawal`），本文件守住 800 行红线。
+        from backend.domain.identity.wm10_withdrawal_service import (
+            ensure_deposit_refund_on_withdrawal,
+        )
 
-        existing_dep_rr = (
-            self.db.query(func.count(RefundRequest.id))
-            .filter(
-                RefundRequest.child_id == child.id,
-                RefundRequest.kind == RefundRequest.KIND_DEPOSIT,
-                RefundRequest.status.in_(
-                    [
-                        RefundRequest.STATUS_PENDING,
-                        RefundRequest.STATUS_APPROVED,
-                        RefundRequest.STATUS_PROCESSING,
-                    ]
-                ),
-                RefundRequest.is_deleted == 0,
-            )
-            .scalar()
-        )
-        dep = (
-            self.db.query(Deposit)
-            .filter(Deposit.child_id == child.id, Deposit.is_deleted == 0)
-            .first()
-        )
-        if dep and dep.available_amount > 0 and not existing_dep_rr:
-            dep_rr = RefundRequest(
-                kind=RefundRequest.KIND_DEPOSIT,
-                deposit_id=dep.id,
-                child_id=child.id,
-                amount=dep.available_amount,
-                reason="会员费退款成功，自动发起押金退款（R-310）",
-            )
-            self.db.add(dep_rr)
-            self.db.flush()
-            dep.assert_transition(Deposit.STATUS_REFUNDING)
-            dep.status = Deposit.STATUS_REFUNDING
+        ensure_deposit_refund_on_withdrawal(self.db, child)
 
     def _advance_withdrawal(self, refund_request_id: int) -> None:
         """退款执行成功后聚合推进关联退会流程：

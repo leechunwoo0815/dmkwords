@@ -98,6 +98,22 @@ class ReservationService:
         # 2026-09-21 甲方口径：逾期不拦截（全端统一）——原先此处对"有逾期未还"硬拦
         # （raise "有逾期未还图书，请先归还"）已按裁定移除；逾期只占借阅额度里的一个名额
         # （见 PRD §5.4 现行口径与 CLAUDE.md §二 借阅并发红线）。
+        # R11-05（第十一轮，2026-10-26）：**同书在借即拒**——原先只查"同书进行中预约"，
+        # 家长可给一本手上还没还的书建预约；到店核销时 `borrow()` 以"该书尚未归还"顶回，
+        # 事务回滚而预约仍挂着：锁一册副本 72h + 占 1 格借阅额度 + 家长白跑一趟。
+        # 判据与 `CirculationService.borrow` 同源（ACTIVE/OVERDUE）。
+        borrowed = (
+            self.db.query(func.count(BorrowRecord.id))
+            .filter(
+                BorrowRecord.child_id == child.id,
+                BorrowRecord.book_id == book_id,
+                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
+                BorrowRecord.is_deleted == 0,
+            )
+            .scalar()
+        )
+        if borrowed:
+            raise ConflictError("该书尚未归还，不能重复借阅")
         # 同书进行中预约唯一
         dup = (
             self.db.query(func.count(Reservation.id))
@@ -487,6 +503,21 @@ class ReservationAdminService:
             raise ValidationError("预约不存在或状态不可核销")
         if res.expires_at < datetime.now():
             raise ValidationError("预约已超时，请先走逾期释放")
+        # R11-05 同源（2026-10-26）：核销前复查"该孩子是否已在借同一本书"。新建预约已在
+        # `create` 拦截；这里兜住历史预约与"预约后又在别处借到同书"的窗口——否则
+        # `borrow()` 会顶回并回滚，预约仍是 active（白占副本），馆员反复核销反复失败。
+        borrowed = (
+            self.db.query(func.count(BorrowRecord.id))
+            .filter(
+                BorrowRecord.child_id == res.child_id,
+                BorrowRecord.book_id == res.book_id,
+                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
+                BorrowRecord.is_deleted == 0,
+            )
+            .scalar()
+        )
+        if borrowed:
+            raise ConflictError("该书尚未归还，不能重复借阅（预约保持有效，请归还后再核销）")
         copy = (
             self.db.query(BookCopy)
             .filter(BookCopy.id == res.copy_id)

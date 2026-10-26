@@ -95,17 +95,22 @@ class OrderGuardMixin:
             )
 
     def assert_refund_allowed(self, order: Order) -> None:
-        """退款受理的两道判据（P1 #4，2026-10-15 大审查）——**与家长侧同源，超管不得绕过**：
+        """退款受理的判据（P1 #4，2026-10-15；R11-b 增冻结期闸）——**与家长侧同源，超管不得绕过**：
 
         ① `refund_status=transferred`（已随权益转让处置）：同一笔年费既转给受让方又退款 = 重复得利
            （家长侧判据在 `wm10_service.apply_refund`）；
         ② 活动退款矩阵：已签到 / 活动已开始 / 报名已取消或已退 → 不可退
-           （判据本体 `refund_rules.activity_refund_block`，三条链共用）。
+           （判据本体 `refund_rules.activity_refund_block`，三条链共用）；
+        ③ **冻结期闸（R-309，R11-b）**：`operation_locked`（退会/转让审核中）不得单笔退款——
+           退款执行会把孩子直接写成 withdrawn，而审核结果未定、解锁唯一出口是退会流程。
         """
         from backend.domain.identity import refund_rules
 
         if order.refund_status == Order.REFUND_STATUS_TRANSFERRED:
             raise ValidationError("该订单已随权益转让处置，不再受理退款申请")
+        child = self.db.query(Child).filter(Child.id == order.child_id).first()
+        if child is not None and child.operation_locked:
+            raise ConflictError("孩子正在退会/转让审核流程中，会员费退款请走退会申请或等待审核完成")
         if order.order_type in (Order.TYPE_ACTIVITY, Order.TYPE_FIRST_ACTIVITY):
             block = refund_rules.activity_refund_block(self.db, order)
             if block:

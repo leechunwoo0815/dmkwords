@@ -696,10 +696,10 @@ CROSS_DOMAIN_WRITE_WHITELIST: dict[tuple[str, str, str], str] = {
         "billing",
     ): "退款执行：押金 -> refunded + DepositLedger",
     (
-        "backend/domain/identity/wm10_service.py",
-        "_complete_refund_withdrawal",
+        "backend/domain/identity/wm10_withdrawal_service.py",
+        "ensure_deposit_refund_on_withdrawal",
         "billing",
-    ): "退会结算：押金 -> refunded",
+    ): "退会联动押金：Deposit -> REFUNDING + 建押金退款单（R11-b 从 _complete_refund_withdrawal 抽出）",
     (
         "backend/domain/identity/wm10_withdrawal_service.py",
         "review",

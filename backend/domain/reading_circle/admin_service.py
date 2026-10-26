@@ -102,6 +102,33 @@ class AdminCircleService(CircleService):
 
     # ---------- 馆长赞 ----------
 
+    def _set_admin_liked(self, post_id: int, *, liked: bool) -> bool:
+        """原子切换馆长赞（R11-b/B1，2026-10-26）。
+
+        liked=True：仅当 `admin_liked=0` 时置 1 并 +1；liked=False：仅当 `admin_liked=1` 时置 0 并 -1
+        （0 下限）。返回是否真的发生了切换——并发双击时后到者拿到 rowcount=0，不再重复加减。
+        """
+        if liked:
+            return bool(
+                self.db.execute(
+                    update(CirclePost)
+                    .where(CirclePost.id == post_id, CirclePost.admin_liked == 0)
+                    .values(admin_liked=1, like_count=CirclePost.like_count + 1)
+                ).rowcount
+            )
+        changed = self.db.execute(
+            update(CirclePost)
+            .where(CirclePost.id == post_id, CirclePost.admin_liked == 1)
+            .values(admin_liked=0)
+        ).rowcount
+        if changed:
+            self.db.execute(
+                update(CirclePost)
+                .where(CirclePost.id == post_id, CirclePost.like_count > 0)
+                .values(like_count=CirclePost.like_count - 1)
+            )
+        return bool(changed)
+
     def admin_like(self, admin, post_id: int) -> dict:
         """行内一键馆长赞：admin_liked=1 + like_count 原子 +1 + 特殊文案通知。"""
         post = (
@@ -111,23 +138,22 @@ class AdminCircleService(CircleService):
         )
         if not post:
             raise NotFoundError("帖子不存在")
-        if not post.admin_liked:
-            post.admin_liked = 1
-            self.db.execute(
-                update(CirclePost)
-                .where(CirclePost.id == post_id)
-                .values(like_count=CirclePost.like_count + 1)
-            )
+        # R11-b/B1：条件 UPDATE 原子切换——并发双击只有第一个请求 rowcount=1（旧的
+        # "读 admin_liked → 判 → 写"会让两个请求都 +1，计数永不自愈）。
+        if self._set_admin_liked(post_id, liked=True):
             self.db.flush()
             # 馆长赞特殊文案（同事务）
             self._notify_liked(post, liker_name="", dedup_key="admin", admin=True)
+            fresh_count = (
+                self.db.query(CirclePost.like_count).filter(CirclePost.id == post_id).scalar()
+            )
             publish_audit(
                 self.db,
                 admin=admin,
                 action="circle.admin_like",
                 target_type="circle_post",
                 target_id=str(post_id),
-                detail={"like_count": post.like_count + 1},
+                detail={"like_count": fresh_count},
                 reason="馆长赞",
             )
             self.db.commit()
@@ -143,13 +169,7 @@ class AdminCircleService(CircleService):
         )
         if not post:
             raise NotFoundError("帖子不存在")
-        if post.admin_liked:
-            post.admin_liked = 0
-            self.db.execute(
-                update(CirclePost)
-                .where(CirclePost.id == post_id, CirclePost.like_count > 0)
-                .values(like_count=CirclePost.like_count - 1)
-            )
+        if self._set_admin_liked(post_id, liked=False):
             publish_audit(
                 self.db,
                 admin=admin,
@@ -335,6 +355,22 @@ class CircleImageCleanupService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _referenced_elsewhere(self, rel: str) -> bool:
+        """该内容寻址文件是否仍被**其它活跃帖**引用（R11-b/B4，2026-10-26）。
+
+        生成图按内容指纹落盘（同内容同名，`file_storage.save_generated_media`）——两个帖子
+        可以共享同一路径。只按"本行软删"就删文件会把活跃帖的图打碎，故删前必须问一句。
+        """
+        return (
+            self.db.query(CirclePost.id)
+            .filter(
+                CirclePost.is_deleted == 0,
+                or_(CirclePost.image_path == rel, CirclePost.thumb_path == rel),
+            )
+            .first()
+            is not None
+        )
+
     def cleanup_orphan_images(self) -> int:
         import os
 
@@ -365,6 +401,10 @@ class CircleImageCleanupService:
                 if not rel:
                     continue
                 full = os.path.abspath(os.path.join(root, rel))
+                # R11-b/B4：有其它活跃帖引用同一文件时**只清本行指针，不删文件**。
+                if self._referenced_elsewhere(rel):
+                    setattr(row, attr, "")
+                    continue
                 if full.startswith(circle_dir) and os.path.isfile(full):
                     try:
                         os.remove(full)
