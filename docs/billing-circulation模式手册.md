@@ -48,8 +48,7 @@
 > | 订单 | `pending_payment / pending_manual_confirm / paid / cancelled / refunded`，**退款状态独立成列** `refund_status`（不再塞进订单状态机） | `backend/domain/identity/models.py` |
 > | 报名 | `pending_payment / enrolled / checked_in / refund_pending / refunded / cancelled` | `backend/domain/activity/models.py` |
 >
-> 已接入 `ALLOWED_TRANSITIONS` 转移矩阵的是 **5 张表**（Child / Order / RefundRequest / WithdrawalRequest / BookCopy）；
-> 押金、借阅、预约、测验、报名**尚未**接入矩阵——这是待迁项，别按"全部已接入"理解（见 `docs/02-架构蓝图.md`）。
+> 已接入 `ALLOWED_TRANSITIONS` 转移矩阵的是 **11 张表**（identity 的 Child/Order/RefundRequest/WithdrawalRequest/TransferRequest + Deposit/BorrowRecord/Reservation/Activity/ActivityEnrollment/BookCopy）；Quiz 是**派生值**、无矩阵。26 处写点接入与静态守卫见 `docs/09` 第一百一十五批。
 - 每次转移前：`with_for_update()` 重取记录 + `if record.status != 期望态: raise ConflictError`
 - **非法转移必须显式拒绝**（不是静默跳过），报错文案带当前状态
 - **双状态镜像**：DepositRecord.status 与 Child.deposit_status 同步更新（同一事务内），
@@ -167,6 +166,8 @@ if existing: raise ConflictError("已有待支付订单")
 1. 订单归属校验（user_id）+ 已支付状态
 2. `assert_no_pending_transfer`：权益转移中 → 拒绝（转移/退款/删除三方互斥）
 3. 未归还图书 > 0 → 拒绝（BorrowRecord BORROWING/OVERDUE 计数，**带行锁**）
+   ⚠️ **新项目现状（2026-10-26 核实）：这一闸在退款申请路径尚未实现**——`wm10_service.RefundService.apply`
+   只校验原因/归属/活动矩阵/0 元/重复，不查 BorrowRecord；退会前置条件里才有"无未还书"。别按已落地理解。
 4. 年度滥用拦截：365 天内同孩子已退过（APPROVED + COMPLETED 都算，F51/F25；
    用 `timedelta(days=365)` 不用 `replace(year-1)`——闰年 2/29 抛 ValueError）
    ⚠️ **新项目现状（2026-09-15 核实）：这一闸没有实现**——`wm10_service.py` 的

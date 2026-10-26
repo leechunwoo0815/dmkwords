@@ -84,7 +84,7 @@ Router 只照搬——**回调必须永远有明确应答**，抛异常等于让
 - 通道：`BusinessException(message, code, error_code=...)` → 响应多一个 `error_code` 字段，
   前端据此触发专用交互（区别于纯文案 toast）。
 - **现状实测（2026-10-24，第九轮 E 批订正）**：机制就绪，**已有生产方**——
-  `backend/domain/identity/guards.py::require_audio_access` 在 403 时抛
+  `backend/domain/identity/guards.py::check_audio`（经 `require_member_action` 调用；音频错误码在 `guards.py:167` 抛）在 403 时抛
   `error_code=f"audio.{reason}"`（`audio.off_shelf` 等），小程序在
   `miniapp/utils/request.js` 按 `error_code` 分流（带码的 403 交给调用方做 UX、不弹通用 toast）；
   第九轮 A 批的 `check_event_contract` 同族对账亦覆盖该面。
