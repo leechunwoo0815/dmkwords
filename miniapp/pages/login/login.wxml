@@ -2,7 +2,7 @@
   <view class="logo-area">
     <view class="logo-icon"><image class="logo-emoji" src="/icons/ui/book.png" mode="aspectFit" /></view>
     <view class="app-name">DmkWords</view>
-    <view class="app-slogan">分级阅读 · 听见成长</view>
+    <view class="app-slogan">亲子阅读 · 听见成长</view>
   </view>
 
   <view class="login-form">

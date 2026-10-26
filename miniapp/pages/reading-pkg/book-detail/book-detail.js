@@ -266,7 +266,7 @@ Page({
     }
     if (!progress || !progress.finished) {
       wx.showToast({
-        title: `需先听完音频（${this.data.cfg.audio_finish_threshold_percent}%）才解锁测验`,
+        title: `需先听完音频（${this.data.cfg.audio_finish_threshold_percent}%）才解锁小挑战`,
         icon: 'none',
       }); return
     }

@@ -32,6 +32,6 @@
   </view>
 
   <view class="x-43089c" wx:if="{{!noChild && !loadError}}">
-    {{childName}} · 当天首次完播自动打卡，重复听书不重复计
+    {{childName}} · 当天首次完播自动打卡，重复阅读不重复计
   </view>
 </view>

@@ -19,12 +19,12 @@ function memberStatusText(status) {
 // 订单类型中文。订单历史页与退款页各写了一份、且都漏了 custom（FEAT-080 自定义单）
 // ——家长会在退款页看到裸英文「custom」，故收编成唯一源。
 const ORDER_TYPE_TEXT = {
-  observation_fee: '观察期费',
-  formal_fee: '年费',
-  first_activity_fee: '首场活动',
-  activity_fee: '活动费',
-  deposit: '押金',
-  deposit_supplement: '押金补缴',
+  observation_fee: '观察期会员服务',
+  formal_fee: '年度会员服务',
+  first_activity_fee: '首场亲子活动',
+  activity_fee: '线下活动',
+  deposit: '图书借阅押金',
+  deposit_supplement: '借阅押金补缴',
   custom: '其他费用',
 }
 

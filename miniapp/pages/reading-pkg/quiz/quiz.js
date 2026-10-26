@@ -55,7 +55,7 @@ Page({
       // W7-04：失败必须落到 error-view（"测验加载失败" + 重试），
       // 并清空 status/questions —— 否则页面会渲染成"第 1 题"的假题面
       this.setData({
-        loadError: (e && e.message) || '测验加载失败',
+        loadError: (e && e.message) || '小挑战加载失败',
         status: '', questions: [], answers: [], current: 0, selected: null,
       })
     }

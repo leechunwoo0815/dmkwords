@@ -142,7 +142,7 @@
     <view class="section-title h-section">快捷入口</view>
     <view class="entry-grid">
       <view class="entry" bindtap="goMoreBooks">
-        <view class="entry-icon e-orange"><image class="entry-icon-img" src="/icons/ui/book.png" mode="aspectFit" /></view><text class="entry-name">图书馆</text>
+        <view class="entry-icon e-orange"><image class="entry-icon-img" src="/icons/ui/book.png" mode="aspectFit" /></view><text class="entry-name">阅读空间</text>
       </view>
       <view class="entry" bindtap="goCheckin">
         <view class="entry-icon e-green"><image class="entry-icon-img" src="/icons/ui/calendar.png" mode="aspectFit" /></view><text class="entry-name">打卡日历</text>

@@ -27,11 +27,11 @@
       </view>
       <view class="rp-stat">
         <text class="rp-num">{{report.quiz_count}}</text>
-        <text class="rp-label">测验(次)</text>
+        <text class="rp-label">小挑战(次)</text>
       </view>
       <view class="rp-stat">
         <text class="rp-num">{{report.quiz_avg_percent || '—'}}{{report.quiz_avg_percent ? '%' : ''}}</text>
-        <text class="rp-label">测验均分</text>
+        <text class="rp-label">小挑战均分</text>
       </view>
       <view class="rp-stat">
         <text class="rp-num">{{report.level || '—'}}</text>

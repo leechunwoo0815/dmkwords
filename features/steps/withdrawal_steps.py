@@ -475,7 +475,7 @@ def step_all_frozen(context):
         headers=context.mini,
     )
     assert quiz.status_code == 422, quiz.text
-    assert "新测验已冻结" in quiz.json()["detail"], quiz.text
+    assert "新小挑战已冻结" in quiz.json()["detail"], quiz.text
 
     sibling = context.client.post(
         f"/api/admin/members/parents/{context.parent['id']}/children",

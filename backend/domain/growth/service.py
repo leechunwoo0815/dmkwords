@@ -182,7 +182,7 @@ class GrowthService:
                     state,
                     full_bonus,
                     "quiz_full_marks",
-                    f"《{book.title}》测验满分",
+                    f"《{book.title}》小挑战满分",
                     related_id=book.id,
                 )
                 result["points_detail"].append({"type": "quiz_full_marks", "points": full_bonus})
@@ -191,7 +191,7 @@ class GrowthService:
                     state,
                     pass_bonus,
                     "quiz_first_pass",
-                    f"《{book.title}》测验首次通过",
+                    f"《{book.title}》小挑战首次通过",
                     related_id=book.id,
                 )
                 result["points_detail"].append({"type": "quiz_first_pass", "points": pass_bonus})
@@ -517,7 +517,7 @@ class QuizService:
         # 解封 catalog 场景时实测）。这里只拦**开始**：§4.4 原话约束的是"没开始的"——**已在做/已通过的
         # 不动**（已通过的词账与成绩由 `passed_before` / 词账读取链路原样保留，不回收）。
         if book.status != Book.STATUS_ON:
-            raise ValidationError(f"《{book.title}》已下架，不能开始测验")
+            raise ValidationError(f"《{book.title}》已下架，不能开始小挑战")
         from backend.domain.reading.models import ReadingProgress
 
         progress = (
@@ -634,7 +634,7 @@ class QuizService:
             .first()
         )
         if child.operation_locked:
-            raise ValidationError("孩子正在转让/退会审核流程中，新测验已冻结")
+            raise ValidationError("孩子正在转让/退会审核流程中，新小挑战已冻结")
         book = self.db.query(Book).filter(Book.id == book_id, Book.is_deleted == 0).first()
         if not book:
             raise NotFoundError("图书不存在")
@@ -652,7 +652,7 @@ class QuizService:
             .first()
         )
         if not progress or progress.finished != 1:
-            raise ValidationError("需先听完音频（95%）才能开始测验")
+            raise ValidationError("需先听完音频（95%）才能开始小挑战")
 
         questions = self._load_questions(book_id)
         if not questions:
@@ -663,7 +663,7 @@ class QuizService:
         max_attempts = int(ConfigService(self.db).get_value("quiz_max_attempts"))
         used = self._attempts_used(child.id, book_id)
         if used >= max_attempts:
-            raise ValidationError(f"测验机会已用完（{max_attempts} 次）")
+            raise ValidationError(f"小挑战机会已用完（{max_attempts} 次）")
 
         pass_percent = int(ConfigService(self.db).get_value("quiz_pass_percent"))
 

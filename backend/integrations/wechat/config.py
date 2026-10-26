@@ -18,14 +18,14 @@ class SubscribeTemplate:
     REFUND_RESULT = ""  # 退款审核结果通知
 
 
-# 支付描述模板
+# 支付描述模板（口径见 docs/22：线下服务费 + 图书借阅押金，禁用课程/报名类措辞）
 class PayDescription:
     ORDER_TEMPLATES = {
-        1: "DmkWords亲子课程",
-        2: "DmkWords观察期会员",
-        3: "DmkWords正式会员",
+        1: "DmkWords亲子阅读活动",
+        2: "DmkWords观察期会员服务",
+        3: "DmkWords年度会员服务",
     }
 
-    DEPOSIT = "DmkWords图书押金"
+    DEPOSIT = "DmkWords图书借阅押金"
 
-    ACTIVITY = "DmkWords活动报名"
+    ACTIVITY = "DmkWords线下活动"

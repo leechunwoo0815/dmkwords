@@ -73,7 +73,7 @@ CARD_TYPE_LABELS = {
     CirclePost.CARD_MILESTONE: "里程碑",
     CirclePost.CARD_BOOKS_COUNT: "读本数",
     CirclePost.CARD_LEVEL_UP: "等级晋级",
-    CirclePost.CARD_PERFECT_QUIZ: "测验满分",
+    CirclePost.CARD_PERFECT_QUIZ: "小挑战满分",
     CirclePost.CARD_STREAK: "连续打卡",
     CirclePost.CARD_FINISH_BOOK: "完读",
     CirclePost.CARD_RANK_TOP: "周榜上榜",
@@ -314,7 +314,7 @@ def assemble_card_data(db: Session, child: Child, card_type: str, ref_id: int) -
             _fail()
         return {
             **base,
-            "title": "测验满分！",
+            "title": "小挑战满分！",
             "value_text": f"{row[0].score}/{row[0].total_questions}",
             "value_label": f"《{row[1].title}》",
             "label": CARD_TYPE_LABELS[card_type],
@@ -548,7 +548,7 @@ def enumerate_cards(db: Session, child: Child) -> list[dict]:
                 # 前端在"成绩单页晒成就"时拿不到本次提交 id，只能按 ref_id 取最新一张
                 # → 会晒出**别的书**的满分卡。有了 book_id，前端才能按本书精确匹配。
                 "book_id": row.book_id,
-                "title": f"测验满分 · 《{_book_title(row.book_id)}》 {row.score}/{row.total_questions}",
+                "title": f"小挑战满分 · 《{_book_title(row.book_id)}》 {row.score}/{row.total_questions}",
             }
         )
 

@@ -15,23 +15,23 @@
   <!-- W7-04（第十轮 P2，2026-10-24）：取数失败必须有可见态。原先静默 catch → status 空、questions 空，
        落到下面的 wx:else 答题区：显示「第 1 题」+ 空题干 + 空选项 + 「下一题」（点了只提示"先选一个答案"）
        = 死界面。现在失败态优先于全部状态分支。 -->
-  <error-view wx:if="{{loadError}}" type="network" title="测验加载失败"
-    desc="{{loadError}}（不是「测验不可用」，请重试）" bind:onRetry="onRetryLoad" />
+  <error-view wx:if="{{loadError}}" type="network" title="小挑战加载失败"
+    desc="{{loadError}}（不是「小挑战不可用」，请重试）" bind:onRetry="onRetryLoad" />
 
   <view wx:elif="{{status === 'locked'}}" class="feedback">
     <image class="feedback-icon" src="/icons/ui/lock.png" mode="aspectFit" />
-    <text class="feedback-text">先去把这本书听完（{{cfg.audio_finish_threshold_percent}}%），测验就会解锁啦</text>
-    <view class="feedback-btn" bindtap="goBack">去听书</view>
+    <text class="feedback-text">先去把这本书听完（{{cfg.audio_finish_threshold_percent}}%），小挑战就会解锁啦</text>
+    <view class="feedback-btn" bindtap="goBack">去听音频</view>
   </view>
   <view wx:elif="{{status === 'passed'}}" class="feedback">
     <image class="feedback-icon" src="/icons/ui/party.png" mode="aspectFit" />
-    <text class="feedback-text">这本书你已经通过测验啦，词数已入账
+    <text class="feedback-text">这本书你已经通过小挑战啦，词数已入账
 去挑战下一本书吧！</text>
     <view class="feedback-btn" bindtap="goBack">选下一本</view>
   </view>
   <view wx:elif="{{status === 'failed'}}" class="feedback">
     <image class="feedback-icon" src="/icons/ui/warning.png" mode="aspectFit" />
-    <text class="feedback-text">这本书的测验机会已用完，可以请馆员帮忙重置</text>
+    <text class="feedback-text">这本书的小挑战机会已用完，可以请馆员帮忙重置</text>
   </view>
 
   <view wx:else class="question-area">
@@ -53,7 +53,7 @@
   <view class="quiz-footer" wx:if="{{!loadError && status !== 'locked' && status !== 'failed' && status !== 'passed'}}">
     <view wx:if="{{current > 0}}" class="next-btn x-dc4dd1" bindtap="onPrev">上一题</view>
     <view class="next-btn" bindtap="onNext">
-      {{current === questions.length - 1 ? '提交测验' : '下一题'}}
+      {{current === questions.length - 1 ? '提交挑战' : '下一题'}}
     </view>
   </view>
 

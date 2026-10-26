@@ -97,7 +97,7 @@
       },
       {
         "pagePath": "pages/books/books",
-        "text": "图书馆",
+        "text": "阅读空间",
         "iconPath": "icons/book.png",
         "selectedIconPath": "icons/book-active.png"
       },

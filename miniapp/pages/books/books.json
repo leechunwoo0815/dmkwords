@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "图书馆",
+  "navigationBarTitleText": "阅读空间",
   "usingComponents": {
     "error-view": "/components/error-view/error-view"
   }

@@ -8,16 +8,17 @@
 //    只给"请用微信一键登录"的引导（点了必 422，入口就不该存在）。
 const api = require('../../../utils/api')
 const { isIOS } = require('../../../utils/platform')
+const session = require('../../../utils/session')
 
-const HINT_ONLINE = '线上支付即时开通会员；价格以本页展示为准（下单时服务端复核）。'
-const HINT_LOGIN = '线上开通仅支持微信一键登录的家长；当前登录方式不支持，可重新用微信一键登录或到店办理。'
-const HINT_STORE = '会员方案与价格以到店公示为准；iOS 端不提供在线开通。'
+const HINT_ONLINE = '线上支付仅为到店会员服务的付款方式；会员权益以到店核验为准（下单时服务端复核价格）。'
+const HINT_LOGIN = '线上支付仅支持微信一键登录的家长；当前登录方式不支持，可重新用微信一键登录或到店办理。'
+const HINT_STORE = '会员方案与价格以到店公示为准；iOS 端不提供在线支付。'
 
 // 方案卖点（文案固定，价格与可用性都来自服务端）
 const PLAN_FEATURES = {
   observation_fee: [
     '面向新入会孩子的适应期方案',
-    '到店借阅 + 线上听读测验全功能',
+    '到店借阅 + 随书配套音频与阅读小挑战',
     '到期后可转正式会员（馆方核定）',
   ],
   formal_fee: [
@@ -25,7 +26,7 @@ const PLAN_FEATURES = {
     '等级/积分/榜单/护照完整成长体系',
     '馆内活动优先报名',
   ],
-  first_activity_fee: ['每个账号限购一次', '线上支付后即完成首场活动报名'],
+  first_activity_fee: ['每个账号限购一次', '线上支付仅为付款方式，活动在馆内线下举行'],
   deposit: ['借阅前需缴纳，退会时按规则退还', '押金扣减明细可在押金页查看'],
 }
 
@@ -200,7 +201,6 @@ Page({
     if (paid) {
       wx.showToast({ title: '支付成功', icon: 'success' })
       // 刷会员态（会员到期日/状态变了）+ 方案列表（已购方案应由服务端判为不可再买）
-      const session = require('../../../utils/session')
       await session.refreshChildren(true)
       this.loadPlans()
       return

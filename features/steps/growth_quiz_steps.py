@@ -8,7 +8,7 @@
 
 **判据必须与实现同源（红线 108）——动手前逐条亲验**：
 - 解锁口径：`ReadingProgress.finished == 1` **或**已有词账（`get_quiz` 的 `passed_before`：做过榜/里程碑造数的书也算解锁）。
-- 提交前提：先完播（`需先听完音频（95%）才能开始测验`）、题目数匹配、`quiz_max_attempts`（默认 3）内。
+- 提交前提：先完播（`需先听完音频（95%）才能开始小挑战`）、题目数匹配、`quiz_max_attempts`（默认 3）内。
 - 分数是**答对题数**口径（`score/total`），通过阈值走 `quiz_pass_percent`（默认 60）；另有 `best_percent` 百分制。
 - 完播上报有**心跳防刷**（Δ 上限 2.0×墙钟 + 60s 宽限），测试靠 `_backdate` 把 `last_report_at` 拨回模拟时间流逝
   （与 `tests/unit/test_wm6_reading.py` 同款手法）。
@@ -557,7 +557,7 @@ def step_quiz_status(context, status, left):
 def step_attempts_exhausted(context):
     again = _submit(context, context.book, correct=5)
     assert again.status_code == 422, again.text
-    assert "测验机会已用完" in again.json()["detail"], again.text
+    assert "小挑战机会已用完" in again.json()["detail"], again.text
 
 
 @given("小明第一次 {first:d} 分 第二次 {second:d} 分")

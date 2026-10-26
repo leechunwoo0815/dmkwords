@@ -51,7 +51,7 @@
 
     <block wx:if="{{!loading && tab === 'shared'}}">
       <empty-state wx:if="{{!shared.length}}"
-        icon-name="sparkle" title="还没有晒过的成就" desc="在阅读护照或测验结果页选一张卡片晒出来" />
+        icon-name="sparkle" title="还没有晒过的成就" desc="在阅读护照或挑战结果页选一张卡片晒出来" />
       <view class="card-list">
         <view wx:for="{{shared}}" wx:key="index" class="ach-card shared">
           <text class="ach-label">{{item.label}}</text>

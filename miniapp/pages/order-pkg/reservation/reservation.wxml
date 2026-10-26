@@ -10,7 +10,7 @@
   <view wx:if="{{loading && !noChild && !loadError}}" class="loading-state">加载中…</view>
 
   <empty-state wx:if="{{!loading && !noChild && !loadError && !items.length}}" icon-name="bookmark" title="还没有预约"
-    desc="在图书馆里选一本书，点「预约此书」，副本会为你保留 {{cfg.reservation_hours}} 小时" />
+    desc="在阅读空间里选一本书，点「预约此书」，副本会为你保留 {{cfg.reservation_hours}} 小时" />
 
   <view class="reservation-list">
     <view wx:for="{{items}}" wx:key="id" class="reservation-card">

@@ -13,7 +13,7 @@
     <view class="dp-amounts">
       <view class="dp-amt">
         <text class="dp-num">￥{{dep.available_amount}}</text>
-        <text class="dp-label">可用余额</text>
+        <text class="dp-label">可退押金</text>
       </view>
       <view class="dp-amt">
         <text class="dp-num x-0c118e">￥{{dep.deducted_amount}}</text>

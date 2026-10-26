@@ -450,7 +450,7 @@ class ChildService:
             target_type="child",
             target_id=str(child.id),
             detail={"fields": changed, "ar_level": child.ar_level, "grade": child.grade},
-            reason="维护孩子资料（老师评估）",
+            reason="维护孩子资料（馆员评估）",
         )
         self.db.commit()
         return child

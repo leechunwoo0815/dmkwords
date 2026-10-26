@@ -1,7 +1,7 @@
 <view class="page x-faa900">
   <view class="tip-card">
     <image class="tip-icon" src="/icons/ui/tip.png" mode="aspectFit" />
-    <text class="tip-text">把大孩的会员剩余时间转给二孩：年费不退、到期日直接继承；词数/等级/积分/打卡各是各的（排行榜不失真）。押金不转，各缴各的。</text>
+    <text class="tip-text">把大孩的会员剩余时间转给二孩：年度会员服务费不退、到期日直接继承；词数/等级/积分/打卡各是各的（排行榜不失真）。押金不转，各缴各的。</text>
   </view>
 
   <view class="transfer-card">

@@ -196,8 +196,8 @@ Page({
               // 按钮 + 阅读护照「我的成就」+ 阅读圈页顶
               wx.showModal({
                 title: '已读完！',
-                content: `太棒了，读完啦！要不要挑战一下测验？还剩 ${q.attempts_left} 次机会`,
-                confirmText: '去测验',
+                content: `太棒了，读完啦！要不要挑战一下阅读小挑战？还剩 ${q.attempts_left} 次机会`,
+                confirmText: '去挑战',
                 cancelText: '先不',
                 success: (r) => {
                   if (r.confirm) {

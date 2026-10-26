@@ -52,35 +52,35 @@
 
   <!-- 阅读进度 -->
   <view wx:if="{{childName}}" class="section-card">
-    <view class="section-card-title">{{childName}} 的听读进度</view>
+    <view class="section-card-title">{{childName}} 的阅读进度</view>
     <!-- 2026-09-15：已通过测验的书若没有本地进度记录（词账可由榜单/里程碑造数产生），
          不能说「还没开始听 / 已听 0%」——它明明已经测过关了，前后自相矛盾。 -->
     <view wx:if="{{progress && progress.coverage_seconds > 0}}" class="progress-section">
       <view class="reading-progress">
         <view class="rp-bar"><view class="rp-fill" style="width: {{progress.displayPercent}}%"></view></view>
         <text wx:if="{{progress.finished}}">已读完 100%</text>
-        <text wx:else>已听 {{progress.displayPercent}}%</text>
+        <text wx:else>已读 {{progress.displayPercent}}%</text>
       </view>
     </view>
-    <view wx:elif="{{quizStatus === 'passed'}}" class="muted-line">本书已通过测验 ✓</view>
-    <view wx:else class="muted-line">还没开始听，从第一秒开始吧</view>
+    <view wx:elif="{{quizStatus === 'passed'}}" class="muted-line">本书已通过小挑战 ✓</view>
+    <view wx:else class="muted-line">还没开始读，从第一秒开始吧</view>
   </view>
 
   <!-- 插修9/R8：徽章区外提独立于进度卡——首进即显示（passed 不再依赖 progress 存在） -->
   <block wx:if="{{quizStatus}}">
     <view wx:if="{{quizStatus === 'passed'}}" class="quiz-hero-card" bindtap="onQuizCard">
       <view class="qhc-stamp">PASSED</view>
-      <view class="qhc-title">测验通过！</view>
+      <view class="qhc-title">挑战成功！</view>
       <view class="qhc-stars">
         <image wx:for="{{[1, 2, 3, 4, 5]}}" wx:key="*this" class="qhc-star"
           src="/icons/ui/{{item <= quizStars ? 'star' : 'star-off'}}.png" mode="aspectFit" />
         <!-- 2026-09-15：词账已入账但测验记录缺失时，曾渲染成「PASSED + 最佳成绩 0 分 + 1 星」
              自相矛盾（用户实测）。无成绩就不编数字，直说待同步。 -->
-        <text class="qhc-best" wx:if="{{quizHasScore}}">最佳成绩 {{quizBest}} 分</text>
-        <text class="qhc-best" wx:else>成绩待同步</text>
+        <text class="qhc-best" wx:if="{{quizHasScore}}">最佳表现 {{quizBest}} 分</text>
+        <text class="qhc-best" wx:else>结果待同步</text>
       </view>
       <view class="qhc-cheer">{{cheerText}}</view>
-      <view class="qhc-tip">点卡片看成绩单 ›</view>
+      <view class="qhc-tip">点卡片看挑战结果 ›</view>
     </view>
     <view wx:elif="{{quizStatus === 'available'}}" class="quiz-challenge-card">
       <view class="qcc-title">{{quizAttemptsUsed > 0 ? '差一点点就过啦！' : '轮到你挑战啦！'}}</view>
@@ -88,7 +88,7 @@
       <button class="qcc-btn pulse-anim" bindtap="onQuiz">{{quizAttemptsUsed > 0 ? '再挑战一次！' : '开始挑战！'}}</button>
     </view>
     <view wx:elif="{{quizStatus === 'locked' || quizStatus === 'failed'}}" class="quiz-locked-hint">
-      {{quizStatus === 'failed' ? '挑战机会用完了，请老师帮忙重置后再来吧' : (progress ? '听完音频就能解锁挑战哦～（已听 ' + progress.displayPercent + '%）' : '听完音频就能解锁挑战哦～')}}
+      {{quizStatus === 'failed' ? '挑战机会用完了，请馆员帮忙重置后再来吧' : (progress ? '听完音频就能解锁挑战哦～（已听 ' + progress.displayPercent + '%）' : '听完音频就能解锁挑战哦～')}}
     </view>
   </block>
 
@@ -119,7 +119,7 @@
       <button class="action-icon" bindtap="onQuiz">
         <image class="action-icon-emoji" src="/icons/ui/clipboard.png" mode="aspectFit" />
         <!-- 2026-09-15：已通过的书即便没有本地进度记录也已解锁，不能显示「测验未解锁」 -->
-        <text class="action-icon-label">{{quizStatus === 'passed' ? '看成绩单' : (quizUnlocked ? '去测验' : '测验未解锁')}}</text>
+        <text class="action-icon-label">{{quizStatus === 'passed' ? '看挑战结果' : (quizUnlocked ? '去挑战' : '挑战未解锁')}}</text>
       </button>
     </view>
   </view>

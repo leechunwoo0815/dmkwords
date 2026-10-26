@@ -95,14 +95,14 @@ ONLINE_ORDER_TYPES = (
     Order.TYPE_DEPOSIT,
 )
 
-#: 微信支付商品描述（≤127 字）
+#: 订单类型中文名（≤127 字）——**三处同源**：购买页方案名 / 订单备注 / 微信支付描述；口径见 docs/22 §二。
 TYPE_LABELS = {
-    Order.TYPE_FIRST_ACTIVITY: "首场亲子活动费",
-    Order.TYPE_OBSERVATION: "观察期会员费",
-    Order.TYPE_FORMAL: "正式会员年费",
-    Order.TYPE_DEPOSIT: "借阅押金",
-    Order.TYPE_DEPOSIT_SUPPLEMENT: "押金补缴",
-    Order.TYPE_ACTIVITY: "活动报名费",
+    Order.TYPE_FIRST_ACTIVITY: "线下亲子活动服务费（首场）",
+    Order.TYPE_OBSERVATION: "线下会员服务费（观察期）",
+    Order.TYPE_FORMAL: "线下会员服务费（年度）",
+    Order.TYPE_DEPOSIT: "图书借阅押金",
+    Order.TYPE_DEPOSIT_SUPPLEMENT: "图书借阅押金补缴",
+    Order.TYPE_ACTIVITY: "线下活动服务费",
 }
 
 SYSTEM_ACTOR_NAME = "微信支付回调"
@@ -208,7 +208,7 @@ class PaymentService(PaymentNotifyMixin):
             child_id=child.id,
             amount=amount,
             status=Order.STATUS_PENDING_PAYMENT,
-            remark=f"小程序在线下单（{TYPE_LABELS.get(order_type, order_type)}）",
+            remark=f"小程序在线下单 · {TYPE_LABELS.get(order_type, order_type)}",
         )
         self.db.add(order)
         self.db.flush()
@@ -363,7 +363,7 @@ class PaymentService(PaymentNotifyMixin):
                     PaymentOrderRequest(
                         out_trade_no=order.order_no,
                         amount=Decimal(yuan_to_cents(order.amount)),
-                        description=TYPE_LABELS.get(order.order_type, "会员费用"),
+                        description=TYPE_LABELS.get(order.order_type, "会员服务费"),
                         openid=openid,
                     )
                 )

@@ -40,6 +40,6 @@
 
   <view class="x-2a2b2d" wx:if="{{board && !board.entries.length && !loading}}">
     本期还没有孩子上榜
-继续听书测验，第一名就是你！
+继续阅读小挑战，第一名就是你！
   </view>
 </view>

@@ -7,7 +7,7 @@
   </block>
   <block wx:else>
     <view class="pay-ios-tip" bindtap="onTap">
-      <text>当前暂不支持 iOS 端在线开通，点击查看门店/客服联系方式</text>
+      <text>当前暂不支持 iOS 端在线支付，点击查看门店/客服联系方式</text>
     </view>
   </block>
 </view>

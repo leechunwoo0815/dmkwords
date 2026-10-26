@@ -61,7 +61,7 @@ Page({
         const trulyMissing = code === 404 || (code === 422 && /没有|暂无|未.*记录/.test(msg))
         if (!trulyMissing) {
           this.setData({
-            loadError: (e && e.message) || '成绩单加载失败',
+            loadError: (e && e.message) || '挑战结果加载失败',
             childId,
             childName: decodeURIComponent(options.child_name || ''),
           })
@@ -70,7 +70,7 @@ Page({
       }
     }
     if (!result) {
-      wx.showToast({ title: noRecordMsg || '没有测验记录', icon: 'none' })
+      wx.showToast({ title: noRecordMsg || '没有挑战记录', icon: 'none' })
       setTimeout(() => wx.navigateBack(), 800)
       return
     }

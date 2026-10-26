@@ -2,7 +2,7 @@
   <!-- P2-15（第九轮审查）：失败态显式呈现——原先失败时这行会留首屏默认文案
        （"iOS 端不提供在线开通"），把网络故障讲成平台政策 -->
   <error-view wx:if="{{loadError}}" type="network" title="会员方案加载失败"
-    desc="{{loadError}}（方案未加载，不代表线上开通已关闭）" bind:onRetry="onRetryLoad" />
+    desc="{{loadError}}（方案未加载，不代表线上支付已关闭）" bind:onRetry="onRetryLoad" />
   <view class="head-hint" wx:else>{{headHint}}</view>
 
   <view class="plan-card" wx:for="{{plans}}" wx:key="order_type">
@@ -15,7 +15,7 @@
     <view wx:if="{{showPay}}"
       class="plan-cta {{item.available ? '' : 'plan-cta-off'}} {{paying ? 'plan-cta-busy' : ''}}"
       data-type="{{item.order_type}}"
-      bindtap="onBuy">{{item.available ? '立即开通' : '不可购买'}}</view>
+      bindtap="onBuy">{{item.available ? '在线支付' : '不可购买'}}</view>
   </view>
 
   <view class="store-card">
@@ -23,13 +23,13 @@
     <view class="store-line">① 携孩子到店，由馆员核定方案与价格</view>
     <view class="store-line">② 到店支付或按馆方指引完成缴费</view>
     <view class="store-line">③ 馆员确认收款后，会员状态在小程序内生效</view>
-    <view class="store-line store-soft">会员资格以到店核验为准；线上开通以支付结果为准。</view>
+    <view class="store-line store-soft">会员服务以到店核验为准；线上支付仅为付款方式，支付结果以订单状态为准。</view>
   </view>
 
   <view class="orders-entry" bindtap="goOrders">查看我的订单 ›</view>
 
   <view class="pay-wrap" wx:if="{{!showPay}}">
-    <view wx:if="{{payBlocked === 'login'}}" class="login-hint">线上开通需微信一键登录：请退出后在登录页选择「微信一键登录」；也可到店办理。</view>
+    <view wx:if="{{payBlocked === 'login'}}" class="login-hint">线上支付需微信一键登录：请退出后在登录页选择「微信一键登录」；也可到店办理。</view>
     <pay-button wx:else amount="{{0}}" buttonText="到店办理会员" bind:pay="onStoreGuide" />
   </view>
 </view>

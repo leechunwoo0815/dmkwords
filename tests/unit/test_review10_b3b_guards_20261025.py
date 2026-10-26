@@ -283,8 +283,8 @@ def test_w1_5_quiz_attempts_message_uses_config():
     """
     src = (ROOT / "backend/domain/growth/service.py").read_text(encoding="utf-8")
     code = "\n".join(ln for ln in src.split("\n") if not ln.lstrip().startswith("#"))
-    assert "测验机会已用完（3 次）" not in code, "文案不许写死 3"
-    assert 'f"测验机会已用完（{max_attempts} 次）"' in code, "文案必须引用 max_attempts"
+    assert "小挑战机会已用完（3 次）" not in code, "文案不许写死 3"
+    assert 'f"小挑战机会已用完（{max_attempts} 次）"' in code, "文案必须引用 max_attempts"
 
 
 # ---------------------------------------------------------------- W1-6 装饰器

@@ -1,7 +1,7 @@
 <!-- W7-05（第十轮 P2，2026-10-24）：取不到成绩单（网络/5xx）必须说"加载失败 + 重试"，
      不许说成「没有测验记录」并自动返回上一页（账上其实有成绩） -->
-<error-view wx:if="{{loadError}}" type="network" title="成绩单加载失败"
-  desc="{{loadError}}（不是「没有测验记录」，请重试）" bind:onRetry="onRetryLoad" />
+<error-view wx:if="{{loadError}}" type="network" title="挑战结果加载失败"
+  desc="{{loadError}}（不是「没有挑战记录」，请重试）" bind:onRetry="onRetryLoad" />
 
 <view class="result-page" wx:if="{{result}}">
   <view class="level-up-banner" wx:if="{{result.level_up}}">
@@ -13,9 +13,9 @@
   <view class="result-card">
     <view class="result-icon {{result.passed ? 'result-icon-pass' : 'result-icon-fail'}}">{{result.passed ? '✓' : '!'}}</view>
     <view class="result-title {{result.passed ? 'title-pass' : 'title-fail'}}">
-      {{result.passed ? '测验通过' : '再试一次'}}
+      {{result.passed ? '挑战成功' : '再试一次'}}
     </view>
-    <view class="result-sub" wx:if="{{result.from_server}}">本机无本次作答记录，显示服务端历史成绩</view>
+    <view class="result-sub" wx:if="{{result.from_server}}">本机无本次作答记录，显示服务端历史挑战结果</view>
     <view class="result-sub">{{result.book_title}} · 答对 {{result.score}} / {{result.total}} 题</view>
 
     <!-- 2026-09-16 接线修复：WXSS 早就写好三层环形（ring 渐变 + inner 挖洞 + 数值），

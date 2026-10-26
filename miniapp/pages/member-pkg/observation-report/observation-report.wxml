@@ -4,7 +4,7 @@
     <image class="obs-hero-icon" src="/icons/ui/clipboard.png" mode="aspectFit" />
     <view class="obs-hero-main">
       <view class="obs-hero-title">{{childName}} 的评估报告</view>
-      <view class="obs-hero-sub">由馆内老师评估上传 · 每一阶段的成长记录</view>
+      <view class="obs-hero-sub">由馆内馆员评估上传 · 每一阶段的成长记录</view>
     </view>
     <view class="obs-hero-count" wx:if="{{reports.length}}">
       <text class="obs-hero-count-num">{{reports.length}}</text>
@@ -19,7 +19,7 @@
     desc="{{loadError}}（报告未加载，不代表没有报告）" bind:onRetry="onRetryLoad" />
 
   <empty-state wx:if="{{!loading && !loadError && !reports.length}}"
-    icon-name="clipboard" title="还没有评估报告" desc="老师上传后这里会展示" />
+    icon-name="clipboard" title="还没有评估报告" desc="馆员上传后这里会展示" />
 
   <!-- 最新一期：整页展开（家长第一眼要看清的就是它） -->
   <view class="obs-paper" wx:if="{{latest}}">
@@ -32,7 +32,7 @@
     <view class="obs-comment" wx:if="{{latest.remark}}">
       <image class="obs-comment-icon" src="/icons/ui/tip.png" mode="aspectFit" />
       <view class="obs-comment-body">
-        <view class="obs-comment-label">老师评语</view>
+        <view class="obs-comment-label">馆员评语</view>
         <view class="obs-comment-text">{{latest.remark}}</view>
       </view>
     </view>
