@@ -3944,6 +3944,8 @@ export interface components {
             activity_type: string;
             /** Description */
             description?: string | null;
+            /** End At */
+            end_at?: string | null;
             /** Enroll Deadline */
             enroll_deadline?: string | null;
             /**
@@ -3960,7 +3962,7 @@ export interface components {
             max_quota: number;
             /**
              * Member Only
-             * @default false
+             * @default true
              */
             member_only: boolean;
             /**
@@ -3987,6 +3989,8 @@ export interface components {
         ActivityUpdateRequest: {
             /** Description */
             description?: string | null;
+            /** End At */
+            end_at?: string | null;
             /** Enroll Deadline */
             enroll_deadline?: string | null;
             /** Fee */
@@ -5224,6 +5228,16 @@ export interface components {
              * Format: date-time
              */
             create_time: string;
+            /**
+             * Deposit Refunded Amount
+             * @default 0.00
+             */
+            deposit_refunded_amount: string;
+            /**
+             * Deposit Status
+             * @default
+             */
+            deposit_status: string;
             /** Enrollment Id */
             enrollment_id?: number | null;
             /** Id */
