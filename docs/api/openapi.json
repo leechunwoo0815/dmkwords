@@ -21,6 +21,18 @@
             ],
             "title": "Description"
           },
+          "end_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
           "enroll_deadline": {
             "anyOf": [
               {
@@ -60,7 +72,7 @@
             "type": "integer"
           },
           "member_only": {
-            "default": false,
+            "default": true,
             "title": "Member Only",
             "type": "boolean"
           },
@@ -115,6 +127,18 @@
               }
             ],
             "title": "Description"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
           },
           "enroll_deadline": {
             "anyOf": [
@@ -3008,6 +3032,16 @@
           "create_time": {
             "format": "date-time",
             "title": "Create Time",
+            "type": "string"
+          },
+          "deposit_refunded_amount": {
+            "default": "0.00",
+            "title": "Deposit Refunded Amount",
+            "type": "string"
+          },
+          "deposit_status": {
+            "default": "",
+            "title": "Deposit Status",
             "type": "string"
           },
           "enrollment_id": {
