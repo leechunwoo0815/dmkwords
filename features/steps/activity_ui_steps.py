@@ -14,7 +14,13 @@ from pathlib import Path
 
 from behave import given, then, when
 
-from features.steps.activity_steps import _enroll, _family, _mk_activity, _signin
+from features.steps.activity_steps import (
+    _enroll,
+    _family,
+    _mk_activity,
+    _shift_activity_to_now,
+    _signin,
+)
 
 REPO = Path(__file__).resolve().parents[2]
 MINI = REPO / "miniapp" / "pages" / "activity-pkg"
@@ -51,6 +57,7 @@ def step_scan_one_ok_one_fail(ctx):
 
     _confirm(ctx, r.json()["order_id"])
     ctx.ticket = r.json()["enrollment"]["ticket_code"]
+    _shift_activity_to_now(ctx, ctx.activity["id"])
     assert _signin(ctx, ctx.ticket).status_code == 200  # 成功那一张
     ctx.fail_resp = _signin(ctx, ctx.ticket)  # 失败那一张（同一张券 → 已签到）
 
@@ -204,6 +211,7 @@ def step_checked_in_state(ctx):
     from features.steps.activity_steps import _enrolled_paid
 
     ctx.paid = _enrolled_paid(ctx, ctx.activity["id"], ctx.fam)
+    _shift_activity_to_now(ctx, ctx.activity["id"])
     assert _signin(ctx, ctx.paid["ticket_code"]).status_code == 200
     ctx.list_js = _mini("activity-list/activity-list.js")
 
@@ -229,6 +237,7 @@ def step_stop_at_ticket_page(ctx):
 
 @when("馆员扫码签到成功")
 def step_admin_signin_ok(ctx):
+    _shift_activity_to_now(ctx, ctx.activity["id"])
     ctx.signin_resp = _signin(ctx, ctx.paid["ticket_code"])
     assert ctx.signin_resp.status_code == 200, ctx.signin_resp.text
 

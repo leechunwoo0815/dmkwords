@@ -203,7 +203,9 @@ class BookService:
         if ar_min is not None:
             q = q.filter(ar_expr >= ar_min)
         if ar_max is not None:
-            q = q.filter(ar_expr <= ar_max)
+            # 产品口径（docs/23 §三，2026-10-27）：左闭右开 [lo, hi)——AR 2.0/3.0/4.0
+            # 只落唯一一档（原 `<=` 双闭会让边界书同时出现在相邻两档）。
+            q = q.filter(ar_expr < ar_max)
         if has_audio:
             q = q.filter(Book.audio_path.isnot(None))
         order = {

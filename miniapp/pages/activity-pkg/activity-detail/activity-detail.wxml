@@ -12,7 +12,7 @@
       <view class="hero-title">
         <text wx:if="{{activity.is_past}}" class="hero-past">往期活动</text>{{activity.title}}
       </view>
-      <view class="hero-sub">{{activity.start_at}} · {{activity.location}}</view>
+      <view class="hero-sub">{{activity.start_at}}{{activity.end_at ? ' ~ ' + activity.end_at : ''}} · {{activity.location}}</view>
     </view>
   </view>
 

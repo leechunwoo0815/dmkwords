@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import func
 
@@ -20,7 +20,7 @@ from backend.domain.activity.schemas import (
     DETAIL_IMAGE_DIR,
     MAX_IMAGES,
 )
-from backend.domain.activity.service import ActivityService
+from backend.domain.activity.service import DEFAULT_ACTIVITY_HOURS, ActivityService
 from backend.domain.catalog.audit_events import publish_audit
 
 
@@ -103,6 +103,14 @@ class AdminActivityService(ActivityService):
         new_deadline = data["enroll_deadline"] if "enroll_deadline" in data else a.enroll_deadline
         if new_deadline is not None and new_deadline > new_start:
             raise ValidationError("报名截止时间不能晚于活动开始时间")
+        # 产品口径（docs/23 §二）：结束时间必须晚于开始；未传且历史为空时按 start+3h 兜底。
+        new_end = data["end_at"] if "end_at" in data else a.end_at
+        if new_end is None:
+            new_end = new_start + timedelta(hours=DEFAULT_ACTIVITY_HOURS)
+            if "end_at" in data:
+                data["end_at"] = new_end
+        if new_end <= new_start:
+            raise ValidationError("结束时间必须晚于开始时间")
         if "max_quota" in data and data["max_quota"] is not None:
             used = self._quota_used(a.id)
             if data["max_quota"] < used:

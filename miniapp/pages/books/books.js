@@ -14,7 +14,7 @@ const TOPIC_OPTIONS = [
   '全部主题', '韵文启蒙', '自然认知', '想象力', '幽默桥梁书',
   '奇幻章节书', '科普百科', '成长故事', '侦探冒险',
 ]
-const AR_OPTIONS = ['全部 AR', 'AR 0-2', 'AR 2-3', 'AR 3-4', 'AR 4 以上']
+const AR_OPTIONS = ['全部 AR', 'AR 0-1.9', 'AR 2-2.9', 'AR 3-3.9', 'AR 4 以上']
 const AR_RANGES = [[null, null], [0, 2], [2, 3], [3, 4], [4, null]]
 const SORT_OPTIONS = ['最新上架', 'AR 低→高', 'AR 高→低', '词数少→多', '词数多→少']
 const SORT_KEYS = ['newest', 'ar_asc', 'ar_desc', 'words_asc', 'words_desc']

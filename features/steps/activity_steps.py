@@ -39,10 +39,12 @@ def _mk_activity(
     ctx, *, title="读书会", quota=20, fee=50, hours=72, member_only=False, start_at=None
 ) -> dict:
     _admin(ctx)
+    start = start_at or (datetime.now() + timedelta(hours=hours))
     payload = {
         "title": title,
         "activity_type": "book_club",
-        "start_at": (start_at or (datetime.now() + timedelta(hours=hours))).isoformat(),
+        "start_at": start.isoformat(),
+        "end_at": (start + timedelta(hours=2)).isoformat(),
         "location": "馆内一层",
         "max_quota": quota,
         "fee": fee,
@@ -52,6 +54,24 @@ def _mk_activity(
     r = ctx.client.post("/api/admin/activities", json=payload, headers=ctx.h)
     assert r.status_code == 200, f"建活动失败：{r.status_code} {r.text}"
     return r.json()
+
+
+def _shift_activity_to_now(
+    ctx, activity_id: int, *, start_minutes: int = -10, duration_minutes: int = 120
+) -> None:
+    """把活动挪进签到窗（docs/23 §二：开始前 60 分钟 ~ 结束后 30 分钟）。
+
+    造数纪律允许直接改时间（与"时间已过/已签到"同类）；报名/收款等业务动作仍走真实 API。
+    """
+    from backend.database import get_session
+    from backend.domain.activity.models import Activity
+
+    now = datetime.now()
+    with get_session() as db:
+        a = db.query(Activity).filter(Activity.id == activity_id).first()
+        a.start_at = now + timedelta(minutes=start_minutes)
+        a.end_at = now + timedelta(minutes=duration_minutes)
+        db.commit()
 
 
 def _family(ctx, parent_name="张女士", kids=("小明",), *, member=False, login=True) -> dict:
@@ -334,6 +354,7 @@ def step_scan_ticket(ctx):
     ctx.fam = _family(ctx, "签到家长", ("签到孩",))
     ctx.mini = ctx.fam["mini"]
     ctx.paid = _enrolled_paid(ctx, ctx.activity["id"], ctx.fam)
+    _shift_activity_to_now(ctx, ctx.activity["id"])
     ctx.signin_resp = _signin(ctx, ctx.paid["ticket_code"])
 
 
@@ -380,6 +401,7 @@ def step_n_children_enrolled(ctx, count):
 @when("馆员用扫码枪连续扫描 {count:d} 张券（每张回车即提交）")
 def step_scan_burst(ctx, count):
     """连扫 = 依次提交（每条一次请求，与扫码枪回车等价）；回执线索逐一收集。"""
+    _shift_activity_to_now(ctx, ctx.activity["id"])
     ctx.signin_results = [_signin(ctx, p["ticket_code"]) for p in ctx.paid_list]
 
 
@@ -415,6 +437,7 @@ def step_one_checked_in(ctx):
     ctx.fam = _family(ctx, "重扫家长", ("重扫孩",))
     ctx.mini = ctx.fam["mini"]
     ctx.paid = _enrolled_paid(ctx, ctx.activity["id"], ctx.fam)
+    _shift_activity_to_now(ctx, ctx.activity["id"])
     first = _signin(ctx, ctx.paid["ticket_code"])
     assert first.status_code == 200, first.text
     ctx.first_checked_in_at = first.json()["checked_in_at"]
@@ -472,12 +495,14 @@ def step_four_invalid_tickets(ctx):
     ctx.fam = _family(ctx, "四类家长", ("四类孩甲", "四类孩乙"))
     ctx.mini = ctx.fam["mini"]
     paid_a = _enrolled_paid(ctx, ctx.activity["id"], ctx.fam)
-    assert _signin(ctx, paid_a["ticket_code"]).status_code == 200
     ctx.invalid_cases.append(("已签到", paid_a["ticket_code"]))
     # ③ 未完成收款（待收款报名，券码已存在但不可签到）
     r = _enroll(ctx, ctx.fam["children"][1]["id"], ctx.activity["id"])
     assert r.status_code == 200, r.text
     ctx.invalid_cases.append(("未收款", r.json()["enrollment"]["ticket_code"]))
+    # 报名动作完成后才把活动挪进签到窗（否则"已开始"会挡住第 ③ 步报名）
+    _shift_activity_to_now(ctx, ctx.activity["id"])
+    assert _signin(ctx, paid_a["ticket_code"]).status_code == 200
     # ④ 活动已取消/结束的券：**走 DB 直改**构造——正常取消流程会把已付费报名一并翻成
     # refund_pending（先撞"报名状态不可签到"分支），自动结束任务又要求"无进行中报名"，
     # 所以"活动终态 + 报名仍 ENROLLED"这个组合在产品路径上不可达（本步骤专测签到侧的
@@ -536,6 +561,7 @@ def step_xiaoming_checked_in(ctx):
     ctx.fam = _family(ctx, "已签家长", ("小明",))
     ctx.mini = ctx.fam["mini"]
     ctx.paid = _enrolled_paid(ctx, ctx.activity["id"], ctx.fam)
+    _shift_activity_to_now(ctx, ctx.activity["id"])
     assert _signin(ctx, ctx.paid["ticket_code"]).status_code == 200
 
 

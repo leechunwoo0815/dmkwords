@@ -20,7 +20,7 @@ def _future_iso(*, days: int = 0, minutes: int = 0, zulu: bool = False) -> str:
     return t.strftime("%Y-%m-%dT%H:%M:%S.000Z" if zulu else "%Y-%m-%dT%H:%M:%S")
 
 
-def test_staff_activity_signin_regression_lock(client: TestClient):
+def test_staff_activity_signin_regression_lock(client: TestClient, db):
     """staff01：列活动 200 / 创建 200 / 签到 200（既有行为锁定，防未来误收）。"""
     h = _h(client)
     hs = _h(client, "staff01")
@@ -31,8 +31,11 @@ def test_staff_activity_signin_regression_lock(client: TestClient):
             "title": "staff发布活动",
             "activity_type": "book_club",
             "start_at": _future_iso(days=7),
+            "end_at": _future_iso(days=7, minutes=120),
             "max_quota": 2,
             "fee": "50",
+            # 本用例验 staff 签到权限，不验会员门槛（docs/23 §一 默认仅会员）
+            "member_only": False,
         },
         headers=hs,
     )
@@ -56,6 +59,16 @@ def test_staff_activity_signin_regression_lock(client: TestClient):
         f"/api/admin/orders/{e['order_id']}/confirm-payment", json={"pay_method": "scan"}, headers=h
     )
     ticket = e["enrollment"]["ticket_code"]
+    # 签到窗（docs/23 §二）：把活动挪到当前窗口内再签
+    from datetime import datetime, timedelta
+
+    from backend.domain.activity.models import Activity
+
+    a = db.query(Activity).filter(Activity.id == act["id"]).first()
+    now = datetime.now()
+    a.start_at = now - timedelta(minutes=10)
+    a.end_at = now + timedelta(hours=2)
+    db.commit()
     s = client.post("/api/admin/activity-signin", json={"ticket_code": ticket}, headers=hs)
     assert s.status_code == 200, (
         f"staff 签到应 200（语义对齐 borrow.operate 后保持），实 {s.status_code} {s.text[:100]}"

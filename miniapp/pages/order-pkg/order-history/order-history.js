@@ -23,6 +23,15 @@ const REFUND_STATUS_TEXT = {
   transferred: '已随权益转让处置',
 }
 
+// 押金退款展示（docs/23 §四，2026-10-27）：订单状态保持「已支付」，
+// 退款事实按押金台账的累计退款额展示（全额/部分退款都如实）。
+function depositRefundText(o) {
+  if (o.order_type !== 'deposit' && o.order_type !== 'deposit_supplement') return ''
+  const amount = Number(o.deposit_refunded_amount || 0)
+  if (!(amount > 0)) return ''
+  return `${o.deposit_status === 'refunded' ? '押金已退' : '押金部分退'} ￥${amount.toFixed(2)}`
+}
+
 const TABS = [
   { key: 'all', label: '全部' },
   { key: 'unpaid', label: '待支付' },
@@ -113,6 +122,7 @@ Page({
         iconCls: (TYPE_STYLE[o.order_type] || DEFAULT_TYPE_STYLE).cls,
         iconUrl: (TYPE_STYLE[o.order_type] || DEFAULT_TYPE_STYLE).icon,
         refundText: o.refund_status ? (REFUND_STATUS_TEXT[o.refund_status] || o.refund_status) : '',
+        depositText: depositRefundText(o),
         timeText: (o.paid_at || o.created_at || '').replace('T', ' ').slice(0, 16),
         // WM12-A：待支付（线上/待人工确认）都可继续发起线上支付
         payable: o.status === 'pending_payment' || o.status === 'pending_manual_confirm',

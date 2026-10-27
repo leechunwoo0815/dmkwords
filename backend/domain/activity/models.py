@@ -59,12 +59,22 @@ class Activity(BaseModel):
     title = Column(String(120), nullable=False, comment="活动名称")
     activity_type = Column(String(30), nullable=False, default="book_club", comment="类型")
     start_at = Column(DateTime, nullable=False, comment="开始时间")
+    end_at = Column(
+        DateTime,
+        nullable=True,
+        comment="结束时间（签到窗=开始前60分钟~结束后30分钟；历史行为空时按开始+3h）",
+    )
     location = Column(String(200), nullable=False, default="", comment="地点")
     max_quota = Column(Integer, nullable=False, default=0, comment="最大报名人数")
     fee = Column(Numeric(10, 2), nullable=False, default=0, comment="报名费用（0=免费）")
     description = Column(Text, nullable=True, comment="活动介绍")
     cover_path = Column(String(255), nullable=True, comment="封面图")
-    member_only = Column(SmallInteger, nullable=False, default=0, comment="1=仅会员")
+    member_only = Column(
+        SmallInteger,
+        nullable=False,
+        default=1,
+        comment="1=仅会员（默认开启；首场/开放日显式关）",
+    )
     enroll_deadline = Column(DateTime, nullable=True, comment="报名截止")
     status = Column(String(20), nullable=False, default=STATUS_PUBLISHED, index=True)
     # 图文详情块（2026-09-20 客户需求「像公众号一样」）：JSON 数组，块类型仅 paragraph / image。

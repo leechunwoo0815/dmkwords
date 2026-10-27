@@ -34,12 +34,14 @@ def _mk_child(client, h, phone, name, member=True):
 
 
 def _mk_activity(client, h, quota=2, fee=50, hours_later=72, member_only=False, title="读书会"):
+    start = datetime.now() + timedelta(hours=hours_later)
     r = client.post(
         "/api/admin/activities",
         json={
             "title": title,
             "activity_type": "book_club",
-            "start_at": (datetime.now() + timedelta(hours=hours_later)).isoformat(),
+            "start_at": start.isoformat(),
+            "end_at": (start + timedelta(hours=2)).isoformat(),
             "location": "馆内一层",
             "max_quota": quota,
             "fee": fee,
@@ -116,7 +118,18 @@ def test_free_activity_cancel_and_reenroll(client: TestClient):
     assert e2.status_code == 200
 
 
-def test_signin_and_refund_matrix(client: TestClient):
+def _shift_activity(db, activity_id, *, start_delta_minutes, duration_minutes=120):
+    """直接改活动时间（签到窗判据需要"现在就在活动窗口内"）。"""
+    from backend.domain.activity.models import Activity
+
+    a = db.query(Activity).filter(Activity.id == activity_id).first()
+    now = datetime.now()
+    a.start_at = now + timedelta(minutes=start_delta_minutes)
+    a.end_at = a.start_at + timedelta(minutes=duration_minutes)
+    db.commit()
+
+
+def test_signin_and_refund_matrix(client: TestClient, db):
     h = _h(client)
     act = _mk_activity(client, h, quota=3, fee=50, hours_later=48)
     c1, m1 = _mk_child(client, h, "13800000906", "签到孩")
@@ -128,7 +141,8 @@ def test_signin_and_refund_matrix(client: TestClient):
     )
     eid = e["enrollment"]["id"]
     ticket = e["enrollment"]["ticket_code"]
-    # 签到
+    # 签到窗（docs/23 §二）：先把活动挪到"现在"（开始前 10 分钟），签完再挪回未来
+    _shift_activity(db, act["id"], start_delta_minutes=-10)
     s = client.post("/api/admin/activity-signin", json={"ticket_code": ticket}, headers=h)
     assert s.status_code == 200
     body = s.json()
@@ -146,6 +160,9 @@ def test_signin_and_refund_matrix(client: TestClient):
     )
     assert r.status_code == 422
     assert "签到" in r.json()["detail"]
+
+    # 挪回未来：下面的退款矩阵要验"未开始 + >2h"
+    _shift_activity(db, act["id"], start_delta_minutes=48 * 60)
 
     # 未签到 + 未开始 + >2h → 全额退款待审核
     c2, m2 = _mk_child(client, h, "13800000907", "退款孩")

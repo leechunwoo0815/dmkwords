@@ -72,6 +72,7 @@ Page({
       a.cover_url = a.cover_url ? media.fullUrl(a.cover_url, true) : ''
       // 时间去掉秒级精度（2026-09-16 01:38:32 → 2026-09-16 01:38）
       if (a.start_at) a.start_at = String(a.start_at).replace('T', ' ').slice(0, 16)
+      if (a.end_at) a.end_at = String(a.end_at).replace('T', ' ').slice(0, 16)
       this.setData({
         activity: a,
         ...this._stripOf(a.my_enrollment, a.is_past),

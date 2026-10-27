@@ -7,6 +7,7 @@ export interface ActivityItem {
   title: string;
   activity_type: string;
   start_at: string;
+  end_at: string | null;
   location: string;
   fee: string;
   fee_display: string;
@@ -39,6 +40,7 @@ export interface CreateActivityBody {
   title: string;
   activity_type: string;
   start_at: string;
+  end_at?: string | null;
   location: string;
   max_quota: number;
   fee: number;
@@ -122,7 +124,7 @@ export function apiGetActivityDetail(id: number): Promise<ActivityDetail> {
 export function apiUpdateActivity(
   id: number,
   body: Partial<{
-    title: string; start_at: string; location: string; max_quota: number;
+    title: string; start_at: string; end_at?: string | null; location: string; max_quota: number;
     fee: number; description: string; member_only: boolean;
     // W6-D5（第十轮 P2）：必须允许 `null`——清空「报名截止」要送**显式 null**
     // （后端 `model_dump(exclude_unset=True)` 只对"出现在 payload 里的键"赋值）；

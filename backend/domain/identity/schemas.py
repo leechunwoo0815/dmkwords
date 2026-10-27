@@ -129,6 +129,10 @@ class OrderResponse(BaseSchema):
     # R10b（插修 14 目视补刀）：活动报名高亮锚点——订单行带关联报名 id，
     # 通知"去处理"跳订单 tab 后按此匹配高亮行（非活动单 None）
     enrollment_id: int | None = None
+    # 产品口径（docs/23 §四，2026-10-27）：押金退款不改订单状态；列表按押金台账展示
+    # 累计退款额与押金状态（仅押金/押金补缴单有值，其余为 0.00/空）。
+    deposit_refunded_amount: str = "0.00"
+    deposit_status: str = ""
 
     @field_validator("amount", mode="before")
     @classmethod

@@ -35,6 +35,8 @@ def _mk_act(client, h, title="活动单确认测试"):
             "start_at": _future_iso(days=7),
             "max_quota": 5,
             "fee": "50",
+            # 报名链回归用例用非会员孩子，显式放开会员门槛（docs/23 §一 默认仅会员）
+            "member_only": False,
         },
         headers=h,
     )

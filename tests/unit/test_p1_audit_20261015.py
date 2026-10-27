@@ -85,6 +85,9 @@ def _signin(client, h, enrollment_id: int) -> None:
             .filter(ActivityEnrollment.id == enrollment_id)
             .scalar()
         )
+    from tests.unit.activity_time import shift_enrollment_activity_to_now
+
+    shift_enrollment_activity_to_now(enrollment_id)
     r = client.post("/api/admin/activity-signin", json={"ticket_code": ticket}, headers=h)
     assert r.status_code == 200, r.text
 

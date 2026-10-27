@@ -88,9 +88,9 @@ export default function ActivityManage() {
     try {
       await apiCreateActivity({
         title: v.title, activity_type: v.activity_type,
-        start_at: v.start_at.toISOString(), location: v.location,
+        start_at: v.start_at.toISOString(), end_at: v.end_at.toISOString(), location: v.location,
         max_quota: v.max_quota, fee: v.fee ?? 0,
-        description: v.description, member_only: v.member_only ?? false,
+        description: v.description, member_only: v.member_only ?? true,
         // P2-60：清空报名截止要送**显式 null**（后端 `model_dump(exclude_unset=True)` 会把
         // 出现在 payload 里的 null 应用到字段上）；送 `undefined` 会被当成"不改"，永远清不掉。
         enroll_deadline: v.enroll_deadline ? v.enroll_deadline.toISOString() : null,
@@ -118,6 +118,7 @@ export default function ActivityManage() {
       setEditCover(d.cover_url ? activityCoverUrl(a.id) : null);
       form.setFieldsValue({
         title: d.title, start_at: d.start_at ? dayjs(d.start_at) : undefined,
+        end_at: d.end_at ? dayjs(d.end_at) : undefined,
         location: d.location, max_quota: d.max_quota, fee: Number(d.fee),
         description: d.description, member_only: d.member_only,
         enroll_deadline: d.enroll_deadline ? dayjs(d.enroll_deadline) : undefined,
@@ -189,9 +190,10 @@ export default function ActivityManage() {
     const v = await form.validateFields();
     try {
       await apiUpdateActivity(editTarget.id, {
-        title: v.title, start_at: v.start_at.toISOString(), location: v.location,
+        title: v.title, start_at: v.start_at.toISOString(), end_at: v.end_at.toISOString(),
+        location: v.location,
         max_quota: v.max_quota, fee: v.fee ?? 0, description: v.description,
-        member_only: v.member_only ?? false,
+        member_only: v.member_only ?? true,
         // W6-D5（第十轮 P2，2026-10-24）：与创建路径（`:96`，P2-60 口径）**完全一致**送显式 null。
         // 原先送 `undefined` → `JSON.stringify` 丢键 → 后端 `model_dump(exclude_unset=True)`
         // 视为"不改" → 旧报名截止继续生效（运营以为已取消，家长端仍在旧时间点关闭报名）。
@@ -298,6 +300,7 @@ export default function ActivityManage() {
                     },
                     { title: "类型", dataIndex: "activity_type", width: 110, render: (t) => TYPE_OPTIONS.find((o) => o.value === t)?.label ?? t },
                     { title: "开始时间", dataIndex: "start_at", width: 170, render: (v) => v.replace("T", " ").slice(0, 16) },
+                    { title: "结束时间", dataIndex: "end_at", width: 170, render: (v) => (v ? v.replace("T", " ").slice(0, 16) : "—") },
                     { title: "地点", dataIndex: "location", width: 130 },
                     { title: "费用", dataIndex: "fee_display", width: 90 },
                     {
@@ -411,6 +414,9 @@ export default function ActivityManage() {
 
             <Descriptions column={2} size="small" bordered style={{ marginBottom: 16 }}>
               <Descriptions.Item label="开始时间">{detailView.start_at.replace("T", " ").slice(0, 16)}</Descriptions.Item>
+              <Descriptions.Item label="结束时间">
+                {detailView.end_at ? detailView.end_at.replace("T", " ").slice(0, 16) : "未设置"}
+              </Descriptions.Item>
               <Descriptions.Item label="报名截止">
                 {detailView.enroll_deadline ? detailView.enroll_deadline.replace("T", " ").slice(0, 16) : "未设置"}
               </Descriptions.Item>
@@ -462,7 +468,7 @@ export default function ActivityManage() {
             </Upload>
           </div>
         )}
-        <Form form={form} layout="vertical" initialValues={{ activity_type: "book_club", fee: 0, member_only: false }}>
+        <Form form={form} layout="vertical" initialValues={{ activity_type: "book_club", fee: 0, member_only: true }}>
           <Form.Item name="title" label="活动名称" rules={[{ required: true }]}>
             <Input placeholder="如：周六英文绘本读书会" />
           </Form.Item>
@@ -472,6 +478,13 @@ export default function ActivityManage() {
               <Select options={TYPE_OPTIONS} style={{ width: 150 }} disabled={!!editTarget} />
             </Form.Item>
             <Form.Item name="start_at" label="开始时间" rules={[{ required: true }]}>
+              <DatePicker showTime style={{ width: 200 }} />
+            </Form.Item>
+            <Form.Item
+              name="end_at"
+              label="结束时间"
+              rules={[{ required: true, message: "结束时间必填（签到窗=开始前60分钟~结束后30分钟）" }]}
+            >
               <DatePicker showTime style={{ width: 200 }} />
             </Form.Item>
           </Space>
@@ -485,7 +498,7 @@ export default function ActivityManage() {
             <Form.Item name="fee" label="费用（0=免费）">
               <InputNumber min={0} style={{ width: 130 }} />
             </Form.Item>
-            <Form.Item name="member_only" label="仅限会员" valuePropName="checked">
+            <Form.Item name="member_only" label="仅限会员（默认开启）" valuePropName="checked">
               <Switch />
             </Form.Item>
           </Space>

@@ -60,9 +60,15 @@ def _put_blocks(ctx, activity_id: int, blocks: list[dict]):
 
 def _set_activity(ctx, activity_id: int, **fields):
     """直接改活动的**时间/状态**（正常流程要等真实流逝或跑任务；造态理由就地写明）。"""
+    from datetime import timedelta
+
     from backend.database import get_session
     from backend.domain.activity.models import Activity
 
+    if "start_at" in fields and "end_at" not in fields:
+        # 产品口径（docs/23 §二）：开始时间变了，结束时间跟着走（默认时长 2h），
+        # 否则"改成过去"的活动会留下一个未来的 end_at。
+        fields["end_at"] = fields["start_at"] + timedelta(hours=2)
     with get_session() as db:
         db.query(Activity).filter(Activity.id == activity_id).update(fields)
         db.commit()
@@ -522,7 +528,10 @@ def _make_past(ctx, *, title: str, hours_ago: int, checkin: bool, cancel: bool =
     a = _mk_activity(ctx, title=title, quota=20, fee=50 if checkin else 0)
     fam = _family(ctx, f"{title}家长", (f"{title}孩",))
     if checkin:
+        from features.steps.activity_steps import _shift_activity_to_now
+
         paid = _enrolled_paid(ctx, a["id"], fam)
+        _shift_activity_to_now(ctx, a["id"])
         assert _signin(ctx, paid["ticket_code"]).status_code == 200
     else:
         r = ctx.client.post(
@@ -663,12 +672,16 @@ def step_past_no_child_info(ctx):
 
 @given("某往期活动有 {n:d} 个已签到报名")
 def step_past_with_n_checkins(ctx, n):
+    from features.steps.activity_steps import _enrolled_via_admin, _shift_activity_to_now
+
     ctx.activity = _mk_activity(ctx, title="签到口径会", quota=n + 5, fee=50)
+    paids = []
     for i in range(n):
         fam = _family(ctx, f"签到口径家长{i}", (f"签到口径孩{i}",), login=False)
-        from features.steps.activity_steps import _enrolled_via_admin
-
-        paid = _enrolled_via_admin(ctx, ctx.activity["id"], fam)
+        paids.append(_enrolled_via_admin(ctx, ctx.activity["id"], fam))
+    # 报名全部完成后再挪进签到窗（活动开始后管理端建单会被拒）
+    _shift_activity_to_now(ctx, ctx.activity["id"])
+    for paid in paids:
         assert _signin(ctx, paid["ticket_code"]).status_code == 200
     _set_activity(ctx, ctx.activity["id"], start_at=datetime.now() - timedelta(hours=30))
     ctx.fam = _family(ctx, "口径观察家长", ("口径观察孩",))

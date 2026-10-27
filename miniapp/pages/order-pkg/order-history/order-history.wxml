@@ -41,6 +41,7 @@
           <view class="order-type">{{item.typeText}}</view>
           <view class="order-time">{{item.timeText}}</view>
           <view wx:if="{{item.refundText}}" class="order-amount-refund">{{item.refundText}}</view>
+          <view wx:if="{{item.depositText}}" class="order-amount-refund">{{item.depositText}}</view>
         </view>
         <view class="order-amount">￥{{item.amount}}</view>
       </view>

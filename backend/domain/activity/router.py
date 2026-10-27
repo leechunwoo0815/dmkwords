@@ -29,6 +29,7 @@ class ActivityUpdateRequest(BaseSchema):
 
     title: str | None = Field(None, min_length=1, max_length=120)
     start_at: datetime | None = None
+    end_at: datetime | None = None
     location: str | None = Field(None, max_length=200)
     max_quota: int | None = Field(None, gt=0, le=1000)
     # 第十一轮 R11-08：列是 Numeric(10,2)，编辑入参原先只有 ge=0 → 越界 500 / 静默截断。
@@ -38,7 +39,7 @@ class ActivityUpdateRequest(BaseSchema):
     member_only: bool | None = None
     enroll_deadline: datetime | None = None
 
-    @field_validator("start_at", "enroll_deadline", mode="after")
+    @field_validator("start_at", "end_at", "enroll_deadline", mode="after")
     @classmethod
     def _strip_tz(cls, v: datetime | None) -> datetime | None:
         if v is not None and v.tzinfo is not None:
@@ -50,16 +51,19 @@ class ActivityCreateRequest(BaseSchema):
     title: str = Field(..., min_length=1, max_length=120)
     activity_type: str = Field("book_club")
     start_at: datetime
+    # 产品口径（docs/23 §二）：结束时间必填由管理端表单保证；API 未传时服务端按 start+3h
+    # 兜底（历史调用方/脚本兼容），签到窗仍按 end_at 计算。
+    end_at: datetime | None = None
     location: str = Field("", max_length=200)
     max_quota: int = Field(..., gt=0, le=1000)
     # B-8/T15：金额严禁 float（宪法红线），Decimal 落 Numeric(10,2)
     # 2026-10-12 审查 P2（T11）：列是 Numeric(10,2)，入参原先无上界 → 溢出 500（应为 422）
     fee: Decimal = Field(Decimal("0"), ge=0, max_digits=10, decimal_places=2)
     description: str | None = Field(None, max_length=2000)
-    member_only: bool = False
+    member_only: bool = True
     enroll_deadline: datetime | None = None
 
-    @field_validator("start_at", "enroll_deadline", mode="after")
+    @field_validator("start_at", "end_at", "enroll_deadline", mode="after")
     @classmethod
     def _strip_tz(cls, v: datetime | None) -> datetime | None:
         """T20a：前端 toISOString 发 aware 时间，服务端全 naive——统一剥时区

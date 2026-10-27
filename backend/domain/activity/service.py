@@ -39,6 +39,17 @@ def _ticket_code(activity_id: int, child_id: int) -> str:
 #: 与 `activity_auto_finish` 的 cutoff **同源**——两处各写一份，迟早出现"状态说结束了、往期列表说没有"。
 PAST_AFTER_HOURS = 24
 
+#: 产品口径（docs/23 §二，2026-10-27 拍板）：签到窗 = 开始前 60 分钟 ~ 结束后 30 分钟。
+#: 历史活动 `end_at` 为空时按"开始 + 3 小时"兜底（与创建接口未传 end_at 的默认同源）。
+CHECKIN_OPEN_BEFORE = timedelta(minutes=60)
+CHECKIN_CLOSE_AFTER = timedelta(minutes=30)
+DEFAULT_ACTIVITY_HOURS = 3
+
+
+def activity_end_at(a: Activity) -> datetime:
+    """活动结束时间（历史行兜底 start+3h；签到窗与展示同源）。"""
+    return a.end_at or (a.start_at + timedelta(hours=DEFAULT_ACTIVITY_HOURS))
+
 
 class ActivityService(ActivityCancelMixin):
     #: 管理端活动列表硬上限（P2-44：上限与"是否已达上限"经响应头如实告知，见 `common/list_meta.py`）
@@ -170,6 +181,7 @@ class ActivityService(ActivityCancelMixin):
             "title": a.title,
             "activity_type": a.activity_type,
             "start_at": str(a.start_at),
+            "end_at": str(a.end_at) if a.end_at else None,
             "location": a.location,
             "fee": str(a.fee),
             "fee_display": "免费" if not a.fee else f"{a.fee} 元",
@@ -216,10 +228,14 @@ class ActivityService(ActivityCancelMixin):
             raise ValidationError("费用不能为负（免费填 0）")
         if req.enroll_deadline and req.enroll_deadline > req.start_at:
             raise ValidationError("报名截止不能晚于活动开始")
+        end_at = req.end_at or (req.start_at + timedelta(hours=DEFAULT_ACTIVITY_HOURS))
+        if end_at <= req.start_at:
+            raise ValidationError("结束时间必须晚于开始时间")
         a = Activity(
             title=req.title.strip(),
             activity_type=req.activity_type,
             start_at=req.start_at,
+            end_at=end_at,
             location=(req.location or "").strip(),
             max_quota=req.max_quota,
             fee=req.fee,
@@ -279,10 +295,19 @@ class ActivityService(ActivityCancelMixin):
         a = self._get(e.activity_id)
         if a.status != Activity.STATUS_PUBLISHED:
             raise ValidationError("活动已取消或结束")
+        # 产品口径（docs/23 §二）：签到窗 = 开始前 60 分钟 ~ 结束后 30 分钟。
+        # 放在报名状态/活动状态检查之后——已签到/未收款/已取消仍先报各自原因。
+        now = datetime.now()
+        window_start = a.start_at - CHECKIN_OPEN_BEFORE
+        window_end = activity_end_at(a) + CHECKIN_CLOSE_AFTER
+        if now < window_start:
+            raise ValidationError("签到通道未开启（活动开始前 60 分钟开放）")
+        if now > window_end:
+            raise ValidationError("签到通道已关闭（活动结束后 30 分钟关闭）")
         child = self.db.query(Child).filter(Child.id == e.child_id).first()
         e.assert_transition(ActivityEnrollment.STATUS_CHECKED_IN)
         e.status = ActivityEnrollment.STATUS_CHECKED_IN
-        e.checked_in_at = datetime.now()
+        e.checked_in_at = now
         e.checked_in_by = admin.id
         publish_audit(
             self.db,

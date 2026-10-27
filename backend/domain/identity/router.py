@@ -235,7 +235,7 @@ def list_orders(
     admin: Any = Depends(require_perm("member.manage")),
     db: Session = Depends(get_db),
 ):
-    rows, total, enrollment_map = OrderService(db).list_orders(
+    rows, total, enrollment_map, deposit_map = OrderService(db).list_orders(
         page, page_size, status, keyword, order_by
     )
     items = []
@@ -245,6 +245,10 @@ def list_orders(
         item.child_name = child_name
         item.parent_name = parent_name
         item.enrollment_id = enrollment_map.get(order.id)
+        if order.order_type in ("deposit", "deposit_supplement"):
+            info = deposit_map.get(order.child_id) or {}
+            item.deposit_refunded_amount = info.get("deposit_refunded_amount", "0.00")
+            item.deposit_status = info.get("deposit_status", "")
         items.append(item)
     return PaginatedResponse[OrderResponse].create(
         items=items, total=total, page=page, page_size=page_size

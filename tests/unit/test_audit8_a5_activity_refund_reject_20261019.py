@@ -72,6 +72,9 @@ def test_reject_restores_enrollment_and_signin_works(client: TestClient):
 
     # 用户可见后果：入场券可签到（refund_pending 会被 422 拦下）
     ticket = e["enrollment"]["ticket_code"]
+    from tests.unit.activity_time import shift_activity_to_now
+
+    shift_activity_to_now(act["id"])
     si = client.post("/api/admin/activity-signin", json={"ticket_code": ticket}, headers=h)
     assert si.status_code == 200, si.text
     with get_session() as db:

@@ -1294,6 +1294,7 @@ def _ensure_demo_activity(db: Session) -> None:
                 title="周末英文绘本读书会（演示）",
                 activity_type="book_club",
                 start_at=start,
+                end_at=start + timedelta(hours=2),
                 location="馆内一层阅读区",
                 max_quota=20,
                 fee=Decimal("50"),
@@ -1313,6 +1314,7 @@ def _ensure_demo_activity(db: Session) -> None:
                 title="亲子共读体验课（演示）",
                 activity_type="parent_child",
                 start_at=start + timedelta(days=1),
+                end_at=start + timedelta(days=1, hours=2),
                 location="馆内二层活动室",
                 max_quota=15,
                 fee=Decimal("0"),
@@ -1559,6 +1561,7 @@ def _ensure_past_activities(db: Session) -> None:
                 title=title,
                 activity_type=atype,
                 start_at=now - timedelta(days=days_ago),
+                end_at=now - timedelta(days=days_ago) + timedelta(hours=2),
                 location=location,
                 max_quota=20,
                 fee=Decimal("0"),
@@ -1994,7 +1997,18 @@ def _ensure_wm4_10_acceptance_data(db: Session) -> None:
                 .first()
             )
             if checked_in and e:
-                ActivityService(db).signin(admin, e.ticket_code)
+                # 签到窗（docs/23 §二）：演示活动建在未来 3 天，直接签到会被
+                # 「通道未开启」拒绝。临时把活动挪进窗口，签完恢复原时间（演示动线不变）。
+                orig_start, orig_end = act.start_at, act.end_at
+                now = datetime.now()
+                act.start_at = now - timedelta(minutes=10)
+                act.end_at = now + timedelta(hours=2)
+                db.commit()
+                try:
+                    ActivityService(db).signin(admin, e.ticket_code)
+                finally:
+                    act.start_at, act.end_at = orig_start, orig_end
+                    db.commit()
             if e:
                 tickets[kid.name] = e.ticket_code
 

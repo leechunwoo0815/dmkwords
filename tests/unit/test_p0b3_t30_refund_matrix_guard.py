@@ -43,6 +43,9 @@ def _signin(client, h, eid):
     with _db() as db:
         e = db.query(ActivityEnrollment).filter(ActivityEnrollment.id == eid).first()
         ticket = e.ticket_code
+    from tests.unit.activity_time import shift_enrollment_activity_to_now
+
+    shift_enrollment_activity_to_now(eid)
     r = client.post("/api/admin/activity-signin", json={"ticket_code": ticket}, headers=h)
     assert r.status_code == 200, r.text
 

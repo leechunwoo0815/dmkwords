@@ -651,7 +651,19 @@ export default function MemberManage() {
             }}
             columns={[
               { title: "订单号", dataIndex: "order_no", width: 200, render: (v) => <Typography.Text code style={{ fontSize: 12 }}>{v}</Typography.Text> },
-              { title: "类型", dataIndex: "order_type", width: 120, render: (t: string) => ORDER_TYPE_LABEL[t] ?? t },
+              { title: "类型", dataIndex: "order_type", width: 200, render: (t: string, r: Order) => (
+                <>
+                  {ORDER_TYPE_LABEL[t] ?? t}
+                  {t === "deposit" || t === "deposit_supplement" ? (
+                    Number(r.deposit_refunded_amount || 0) > 0 ? (
+                      <Tag color="volcano" style={{ marginLeft: 4 }}>
+                        {r.deposit_status === "refunded" ? "押金已退" : "押金部分退"} ￥
+                        {Number(r.deposit_refunded_amount).toFixed(2)}
+                      </Tag>
+                    ) : null
+                  ) : null}
+                </>
+              ) },
               { title: "孩子", dataIndex: "child_name", width: 90, render: (v) => v ?? "—" },
               { title: "家长", dataIndex: "parent_name", width: 90 },
               { title: "金额", dataIndex: "amount", key: "amount", width: 100, sorter: true, render: (v: string) => <Typography.Text strong>￥{Number(v).toLocaleString()}</Typography.Text> },

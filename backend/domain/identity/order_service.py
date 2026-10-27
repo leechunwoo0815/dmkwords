@@ -23,6 +23,7 @@ from backend.domain.identity.order_guards import (
     OrderGuardMixin,
     assert_no_inflight_deposit_order,
 )
+from backend.domain.identity.order_views import deposit_refund_map, name_maps
 from backend.domain.identity.wm_notify import parent_openid
 
 
@@ -54,19 +55,29 @@ class OrderService(OrderGuardMixin):
             .limit(self.MY_ORDERS_LIMIT)
             .all()
         )
-        return [
-            {
-                "id": r.id,
-                "order_no": r.order_no,
-                "order_type": r.order_type,
-                "amount": str(r.amount),
-                "status": r.status,
-                "refund_status": r.refund_status or "",
-                "created_at": str(r.create_time),
-                "paid_at": str(r.paid_at) if r.paid_at else None,
-            }
-            for r in rows
-        ]
+        dep_map = deposit_refund_map(self.db, [r.child_id for r in rows])
+        out = []
+        for r in rows:
+            info = (
+                dep_map.get(r.child_id, {})
+                if r.order_type in (Order.TYPE_DEPOSIT, Order.TYPE_DEPOSIT_SUPPLEMENT)
+                else {}
+            )
+            out.append(
+                {
+                    "id": r.id,
+                    "order_no": r.order_no,
+                    "order_type": r.order_type,
+                    "amount": str(r.amount),
+                    "status": r.status,
+                    "refund_status": r.refund_status or "",
+                    "created_at": str(r.create_time),
+                    "paid_at": str(r.paid_at) if r.paid_at else None,
+                    "deposit_refunded_amount": info.get("deposit_refunded_amount", "0.00"),
+                    "deposit_status": info.get("deposit_status", ""),
+                }
+            )
+        return out
 
     def create(self, admin, req) -> Order:
         child = self.db.query(Child).filter(Child.id == req.child_id, Child.is_deleted == 0).first()
@@ -610,7 +621,7 @@ class OrderService(OrderGuardMixin):
         q = q.order_by(order_clause if order_clause is not None else Order.id.desc())
         orders = q.offset((page - 1) * page_size).limit(page_size).all()
         # 关联孩子/家长名（P2-4，2026-10-11：**批查**——原先每行 2 条 SELECT，20 行 40 条）
-        cmap, pmap = _name_maps(self.db, orders)
+        cmap, pmap = name_maps(self.db, orders)
         out = [(o, cmap.get(o.child_id), pmap.get(o.parent_id)) for o in orders]
         # R10b：活动报名高亮锚点（批量一次查映射，零 N+1）
         order_ids = [o.id for o in orders]
@@ -627,7 +638,8 @@ class OrderService(OrderGuardMixin):
                 .all()
             )
             enrollment_map = {oid: eid for oid, eid in erows}
-        return out, total, enrollment_map
+        deposit_map = deposit_refund_map(self.db, list({o.child_id for o, _, _ in out}))
+        return out, total, enrollment_map, deposit_map
 
     def counts(self) -> dict:
         """订单各状态计数（W3/UI 待确认待办；WM13 待办聚合复用，键名语义化不可改）。"""
@@ -785,15 +797,3 @@ class OrderService(OrderGuardMixin):
         if sent:
             self.db.commit()
         return sent
-
-
-def _name_maps(db: Session, orders: list[Order]) -> tuple[dict[int, str], dict[int, str]]:
-    """订单行的孩子/家长名**批查**（P2-4，2026-10-11）——每行 2 条 SELECT → 总计 2 条。
-
-    放模块级而非方法内：`order_service.py` 触顶 800 行 god-file 关（同批实测 807 行）。
-    """
-    cids = {o.child_id for o in orders if o.child_id}
-    pids = {o.parent_id for o in orders if o.parent_id}
-    cmap = dict(db.query(Child.id, Child.name).filter(Child.id.in_(cids)).all()) if cids else {}
-    pmap = dict(db.query(Parent.id, Parent.name).filter(Parent.id.in_(pids)).all()) if pids else {}
-    return cmap, pmap
