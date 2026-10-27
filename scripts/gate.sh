@@ -51,8 +51,11 @@ step 2 "单测 + 覆盖率（真实 MySQL 同构环境，单次跑全量）"
 # cov-fail-under 照常拦截；-x 快速失败语义随合并取消（门禁本就要看全貌）。
 # --durations=20：输出 top 慢测试清单（纯观测，为后续并行化铺路）
 # R11-e S3（2026-10-26）：单测数量基线守卫。原先只有 cov-fail-under=25（实测 91%），
-# 删掉一批测试也照样绿。现在解析本次 `passed` 数并与 scripts/gate_baseline.json 的下限比对：
-# 低于下限 = 测试被删/未被收集（如属预期删测，同步下调基线并在提交信息说明）。
+# 删掉一批测试也照样绿。现在解析本次**收集数**（passed + skipped）并与
+# scripts/gate_baseline.json 的下限比对：低于下限 = 测试被删/未被收集
+# （如属预期删测，同步下调基线并在提交信息说明）。
+# 2026-10-27 CI 实证：`test_media_health` 按运行机本地时钟在 UTC 凌晨走 skip 分支，
+# 只数 `passed` 会让同一份代码在 CI 比本地少 1 → 必须用收集数（skip 也是被收集的）。
 PYTEST_TMP=$(mktemp -t dmkwords-pytest-XXXXXX)
 if ! python -m pytest tests/ -q --tb=short --cov=backend --cov-fail-under=25 \
   --cov-report=term-missing:skip-covered --durations=20 2>&1 | tee "$PYTEST_TMP"; then
@@ -60,15 +63,20 @@ if ! python -m pytest tests/ -q --tb=short --cov=backend --cov-fail-under=25 \
   FAILED=1
 fi
 PASSED_COUNT=$(grep -oE '[0-9]+ passed' "$PYTEST_TMP" | tail -1 | grep -oE '[0-9]+' || true)
+SKIPPED_COUNT=$(grep -oE '[0-9]+ skipped' "$PYTEST_TMP" | tail -1 | grep -oE '[0-9]+' || true)
+SKIPPED_COUNT=${SKIPPED_COUNT:-0}
 MIN_PASSED=$(python -c "import json;print(json.load(open('scripts/gate_baseline.json'))['min_passed'])" 2>/dev/null || true)
 if [ -z "$MIN_PASSED" ]; then
   fail "单测数量基线读取失败（scripts/gate_baseline.json 缺失或格式错）"
 elif [ -z "$PASSED_COUNT" ]; then
   fail "pytest 输出没有 passed 计数——无法核对单测数量基线"
-elif [ "$PASSED_COUNT" -lt "$MIN_PASSED" ]; then
-  fail "单测数量 ${PASSED_COUNT} < 基线 ${MIN_PASSED}（测试被删/未被收集；确属预期删测时同步下调基线并写明理由）"
 else
-  echo "单测数量基线 OK：${PASSED_COUNT} >= ${MIN_PASSED}"
+  COLLECTED_COUNT=$((PASSED_COUNT + SKIPPED_COUNT))
+  if [ "$COLLECTED_COUNT" -lt "$MIN_PASSED" ]; then
+    fail "单测数量 ${COLLECTED_COUNT}（passed ${PASSED_COUNT} + skipped ${SKIPPED_COUNT}）< 基线 ${MIN_PASSED}（测试被删/未被收集；确属预期删测时同步下调基线并写明理由）"
+  else
+    echo "单测数量基线 OK：${COLLECTED_COUNT}（passed ${PASSED_COUNT} + skipped ${SKIPPED_COUNT}）>= ${MIN_PASSED}"
+  fi
 fi
 rm -f "$PYTEST_TMP"
 

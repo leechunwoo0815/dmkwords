@@ -37,16 +37,27 @@ def test_dev_sh_retries_health_checks():
 
 
 def test_unit_count_baseline_wired_into_gate():
-    """S3：单测数量下限有独立基线文件，且 gate 真的比对（不是只跑覆盖率）。"""
+    """S3：单测数量下限有独立基线文件，且 gate 按**收集数**比对（skip 也计入）。"""
     baseline = json.loads((ROOT / "scripts/gate_baseline.json").read_text(encoding="utf-8"))
     assert isinstance(baseline["min_passed"], int), "min_passed 必须是整数"
-    assert baseline["min_passed"] >= 1266, "基线只许升不许降（降基线和删测同义）"
+    assert baseline["min_passed"] >= 1267, "基线只许升不许降（降基线和删测同义）"
 
     gate = GATE.read_text(encoding="utf-8")
     assert "scripts/gate_baseline.json" in gate, "gate 未读取单测数量基线"
-    assert "PASSED_COUNT" in gate and "MIN_PASSED" in gate
-    assert 'if [ "$PASSED_COUNT" -lt "$MIN_PASSED" ]' in gate, "gate 未执行数量比对"
+    assert "PASSED_COUNT" in gate and "SKIPPED_COUNT" in gate and "COLLECTED_COUNT" in gate
+    assert 'if [ "$COLLECTED_COUNT" -lt "$MIN_PASSED" ]' in gate, (
+        "gate 未按收集数比对（只数 passed 会在 CI 的时钟分支 skip 时误红）"
+    )
     assert "单测数量基线 OK" in gate, "gate 未输出基线核对结果"
+
+
+def test_dockerfile_pins_debian_release_for_apt_names():
+    """S6 补充：基础镜像必须钉 Debian 版本（trixie 改名 libgdk-pixbuf 包，CI 已实证）。"""
+    src = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    froms = [line.strip() for line in src.splitlines() if line.strip().startswith("FROM ")]
+    assert "FROM python:3.13-slim-bookworm" in froms, (
+        f"基础镜像未钉 bookworm（slim 会随 Debian 滚动换包名）：{froms}"
+    )
 
 
 def test_gate_builds_frontend_and_checks_baseline_after_restore():

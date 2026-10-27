@@ -18,7 +18,10 @@
 #      `not is_production_env(APP_ENV) and DEBUG` —— 打开它会跳过全部生产红线
 #      （固定验证码 1234 + mock 支付可结单），镜像因此在生产上必须保持 `DEBUG=false`。
 
-FROM python:3.13-slim
+# 2026-10-27 CI 实证：`python:3.13-slim` 已切到 Debian trixie，`libgdk-pixbuf2.0-0`
+# 更名为 `libgdk-pixbuf-2.0-0` → apt 安装直接失败（新增的 image job 首跑红）。
+# 钉 bookworm 保证包名与构建结果可复现；将来升 trixie 时同步改下面的包名。
+FROM python:3.13-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
