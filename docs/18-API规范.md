@@ -22,7 +22,7 @@
 
 **强制链路**（物理强制，不靠自觉）：
 - Service 层只抛 `BusinessException` 体系异常，自带状态码语义；
-- 全局处理器 `business_exception_handler` 于 `backend/main.py:108` 注册〔**2026-10-22 订正**：原写 `:42`——该行现为日志脱敏 filter；异常处理器注册行随 B 批中间件改造下移〕
+- 全局处理器 `business_exception_handler` 于 `backend/main.py:114` 注册〔**2026-10-27 订正**：原写 `:42`（2026-10-22 改 `:108`）——该行随批次继续下移，引用时以 `grep -n business_exception_handler backend/main.py` 为准〕
   （`app.add_exception_handler(BusinessException, ...)`），统一转换 JSON 响应；
 - **Router 层禁 try/except、禁 raise HTTPException、禁直接操作 ORM**
   ——`scripts/verify_architecture.py` 机械执法（T6 后含 miniapp_router）。
@@ -105,11 +105,12 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
 响应：PaginatedResponse{items, total, page, page_size}
 ```
 
-  ⚠️ miniapp 侧**部分清偿，仅剩 reading 一处**：`identity/miniapp_router.py:182`（2026-10-22 订正，原写 :91）、
-  `reading_circle/miniapp_router.py:44` 均已改 `Query(ge=1)`；`reading/miniapp_router.py:58`
-  仍为裸默认值（`page: int = 1`，无 Query 约束）——归 T29 sweep 处置。
-  **另注（2026-09-20）**：`GET /activities/past` 用的是 `limit: int = 30, offset: int = 0`
-  裸默认（`activity/miniapp_router.py:34-35`，2026-10-22 订正原写 :27-28），既不是 `page/page_size` 也无 `Query` 约束——
+  ✅ **miniapp 侧已全部清偿（2026-10-27 复核）**：`identity/miniapp_router.py:182`、
+  `reading_circle/miniapp_router.py:46`、`reading/miniapp_router.py:63`（原写 :58，T29 sweep 已改）
+  均为 `Query(1, ge=1)`，无裸默认值残留。
+  **另注（2026-09-20，2026-10-27 订正行号）**：`GET /activities/past` 用的是
+  `limit/offset` 轻分页（`activity/miniapp_router.py:38-39`，已钉 `Query(30, ge=1, le=100)` /
+  `Query(0, ge=0, le=10000)`，2026-10-22 原写 :34-35、原写 :27-28），既不是 `page/page_size` 也无裸默认——
   它刻意沿用"列表取一段"的轻分页（往期回顾只需前 30 条），**不是笔误**；要统一口径时一并改它。
 - 媒体流（音频/封面/报告图）：query token 传鉴权（`?token=`），组件无法带
   Authorization 头的历史约束；归属校验见 P0-F1/T25。
@@ -209,5 +210,5 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
 
 ---
 
-*源实测文件：backend/common/exceptions.py、backend/main.py:108（2026-10-22 订正，原写 :42）、backend/domain/{billing,admin,catalog}/router.py、
-backend/domain/reading/miniapp_router.py；实测日期 2026-09-03。*
+*源实测文件：backend/common/exceptions.py、backend/main.py:114（2026-10-27 订正；原写 :42 / :108）、backend/domain/{billing,admin,catalog}/router.py、
+backend/domain/reading/miniapp_router.py；实测日期 2026-09-03（行号 2026-10-27 复核）。*

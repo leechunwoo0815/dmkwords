@@ -16,6 +16,15 @@
 | `ACCEPTED` | 用户已明确点头（批次级验收见 `docs/01` 批次表与 `docs/LEDGER`） |
 | `REGISTERED` | 已登记但按设计本期不做（如依赖未交付的 WM12 在线支付、用户裁定不做的逾期费） |
 
+**交付强度披露（W10-D10，2026-10-27 复核）**：以下 **16 行**的 Gherkin 全部处于挂起态（**0 个活跃可执行场景**，对应 11 个文件级 `@draft` 的 `.feature`），其验收强度 = **仅手动验收**（`docs/04`），无 BDD 兜底：
+
+- `MANUAL_TEST`（14）：FEAT-015/016/017/018/047/048/052/053/062/066/067/068/069/070
+- `ACCEPTED`（1）：FEAT-084（阅读圈，文件级 `@draft`，但已由用户验收）
+- `IMPLEMENTED`（1）：FEAT-019
+
+对应文件：`order/payment/level/passport/report/notification/observation_report/scheduler/dashboard/permission_matrix/reading_circle.feature`。
+挂起总数与活跃场景数由 `check_bdd_baseline`（门禁第 [3] 步）与 `features/bdd_baseline.json` 守门；本披露不改变任何行的状态语义。
+
 ## 总览
 
 - **16 个 Feature 包（F0-F15）× 90 项 Feature**（FEAT-001 ~ FEAT-085 + 补登 FEAT-086/087 + **FEAT-088 往期活动回顾** + **FEAT-089 借还记录查询与导出** + **FEAT-090 媒体体检**；另 FEAT-074 有一行变更记录）。
