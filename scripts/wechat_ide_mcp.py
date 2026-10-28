@@ -12,6 +12,10 @@ CLI（v0.3.11）已不再提供该子命令——直连报 `BrokenPipeError`（�
 
 参数约定：JSON 键 snake_case / camelCase 一律转 `--kebab-case`；布尔 true 作开关
 （`--optimize`），false 省略；`project` 缺省为本仓 miniapp 目录。
+
+**路径可移植（W3-10，2026-10-27）**：CLI 与项目目录不再写死本机绝对路径——
+`WECHATIDE_BIN` / `WECHATIDE_PROJECT` 环境变量优先，其次 `PATH` 查找 `wechatide`，
+最后回落本机默认值；项目目录默认由本文件位置推导（`<repo>/miniapp`）。
 授权：首次连接 IDE 弹「MCP 客户端授权」——**必须用户点「允许」**（模型点不了，
 实测 osascript 被系统拒绝辅助访问 -25211）。自查流程见 docs/15 §二十。
 """
@@ -19,13 +23,18 @@ CLI（v0.3.11）已不再提供该子命令——直连报 `BrokenPipeError`（�
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
+from pathlib import Path
 
-CLI = "/usr/local/bin/wechatide"
-CLIENT = "zcode"
-DEFAULT_PROJECT = "/Users/litianyu/cc-projects/dmkwords/miniapp"
+CLI = os.environ.get("WECHATIDE_BIN") or shutil.which("wechatide") or "/usr/local/bin/wechatide"
+CLIENT = os.environ.get("WECHATIDE_CLIENT", "zcode")
+DEFAULT_PROJECT = os.environ.get(
+    "WECHATIDE_PROJECT", str(Path(__file__).resolve().parent.parent / "miniapp")
+)
 
 
 def to_flag(key: str) -> str:

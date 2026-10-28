@@ -17,6 +17,7 @@ from sqlalchemy import (
     BigInteger,
     Column,
     DateTime,
+    Index,
     Integer,
     String,
     Text,
@@ -42,6 +43,19 @@ class Notification(BaseModel):
             "dedup_key",
             "is_deleted",
             name="uq_notif_dedup",
+        ),
+        # W3-08（第十轮审查，2026-10-27）：去重预取查 `scene=? AND ref_type=? AND
+        # ref_id IN (...) AND is_deleted=0`，原先只能命中 ix_notifications_scene(scene)
+        # ——60k 造量实测取回 18516 行再逐行过滤；本索引把三级过滤下推到索引，实测
+        # range 125 行且覆盖查询列（Using index，无需回表）。
+        Index(
+            "ix_notifications_scene_ref",
+            "scene",
+            "ref_type",
+            "ref_id",
+            "is_deleted",
+            "parent_id",
+            "dedup_key",
         ),
     )
 

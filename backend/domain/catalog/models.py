@@ -20,6 +20,14 @@ class Book(BaseModel):
     # 原先只有 PRIMARY/internal_code/isbn 三个索引 → 3 万级书目下退化为"扫全表+过滤"（造量实测见
     # tests/unit/test_audit7_p2_indexes_20261018.py）。索引列尾用 **id**（真实排序键）而不是报告建议的
     # create_time——默认排序是 `id DESC`（= 入库先后），用 create_time 收尾仍会 filesort。
+    #
+    # W3-06（第十轮审查，2026-10-27，B5 批复核结论：**不加索引**）：
+    # 「全部」页（无 status 筛选）确实会走 (is_deleted, status, id) + filesort，
+    # 但那是**统计信息陈旧**时的计划——60k 造量实测：插入后未 ANALYZE =
+    # ref 30000 行 + filesort；`ANALYZE TABLE books` 后 = PRIMARY 逆序扫描 40 行、
+    # 零 filesort（有无 (is_deleted,id) 都一样，该索引从没被优化器选中）。
+    # 故正确处置是**批量导入后刷新统计**（InnoDB 自动采样之外的手工兜底），
+    # 加索引既无收益又添写入成本。别再加 (is_deleted, id)。
     __table_args__ = (Index("ix_books_deleted_status_id", "is_deleted", "status", "id"),)
 
     STATUS_ON = 1  # 上架

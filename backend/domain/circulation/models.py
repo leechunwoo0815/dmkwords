@@ -14,6 +14,12 @@ class BorrowRecord(BaseModel):
     __table_args__ = (
         # 逾期扫描（overdue_mark / overdue_list）：WHERE status=? AND due_at < NOW()
         # （上线前审查 P1-6：原先只有 status 单列索引 → 取回全部在借行再过滤 + filesort）
+        # W3-07（第十轮审查，2026-10-27）：实际业务查询是
+        # `status IN ('active','overdue') AND due_at < NOW() ORDER BY due_at`——
+        # IN 跨两段后索引序不再等于 due_at 全局序，**仍会 filesort**（演示库 EXPLAIN
+        # 实证 `Using where; Using filesort`）。本索引只保证"status 等值 + due_at 范围"
+        # 的取数效率；要消掉 filesort 得改成两条等值查询 UNION ALL 或加覆盖索引，
+        # 属另行优化，不在 B5 批内动语义。
         Index("ix_borrow_records_status_due_at", "status", "due_at"),
         # P2-36（第八轮审查，2026-10-20）：借出/归还**日期**筛选原先无索引——
         # 仪表盘趋势 `WHERE is_deleted=0 AND borrowed_at >= ?` GROUP BY DATE 实测 `type=ALL`

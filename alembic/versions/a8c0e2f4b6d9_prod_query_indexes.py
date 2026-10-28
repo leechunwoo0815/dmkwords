@@ -13,7 +13,13 @@ Create Date: 2026-10-08 23:30:00.000000
 | circle_posts | `(is_deleted, created_at)` | 信息流 `WHERE is_deleted=0 ORDER BY created_at DESC, id DESC LIMIT 20` | type=ALL+filesort 15.7ms → ref 逆序索引扫描 0.4ms |
 | words_ledgers | `(created_at)` | 周期榜/周报 `WHERE created_at >= ? AND < ? GROUP BY child_id` | 全索引扫描 119802 行 52.2ms → range 2100 行 1.6ms |
 | orders | `(create_time)` | 管理端列表 `WHERE is_deleted=0 ORDER BY create_time DESC LIMIT 20` | type=ALL+filesort 57643 行 15.0ms → 逆序索引扫描 20 行 0.3ms |
-| borrow_records | `(status, due_at)` | 逾期扫描 `WHERE status=? AND due_at < NOW()` | status 单列取回 29973 行 + filesort 52.0ms → range 19356 行 40.5ms（不再排序） |
+| borrow_records | `(status, due_at)` | 逾期扫描 `WHERE status=? AND due_at < NOW()` | status 单列取回 29973 行 + filesort 52.0ms → range 19356 行 40.5ms（**仅 status 等值时不排序**） |
+
+> **W3-07 订正（第十轮审查，2026-10-27）**：上表 borrow_records 的「不再排序」只对
+> `status=?` 等值成立。**实际业务查询**是 `status IN ('active','overdue') AND due_at < NOW()
+> ORDER BY due_at`——IN 跨两段后索引序不等于 due_at 全局序，EXPLAIN 实测仍为
+> `Using where; Using filesort`。索引仍值得保留（把取数从全表缩到 range），但别据此
+> 认为逾期扫描已无排序；要消除 filesort 需改查询形状（两条等值 UNION ALL）或另建索引。
 
 两个**实测否掉**的候选（避免后人"顺手优化"回头改）：
   · `orders(is_deleted, create_time)`：估算行数 29880 vs 单列 20，更差——LIMIT 下逆序索引扫描直接停；

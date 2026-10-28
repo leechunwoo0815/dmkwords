@@ -19,6 +19,14 @@ MySQL 没有部分索引（`WHERE` 条件唯一），故用**生成列 + 唯一�
 
 downgrade 只回滚 schema（旧非唯一索引还原）；**去重不回滚**（被取消的历史重复报名不复活）。
 
+**锁表窗口（W3-12，2026-10-27 补记）**：第 3 步用 `op.add_column(Computed(..., persisted=True))`
+给既有表加 **STORED 生成列**——MySQL 必须重建表（`ALGORITHM=COPY` 或 `INPLACE + rebuild`），
+期间持有元数据锁并阻塞写入；随后建唯一索引又是一次 ONLINE DDL。**执行口径**：
+① 线上低峰执行，先 `SHOW PROCESSLIST` 确认无长事务；② `activity_enrollments` 量级小
+（单馆活动报名，万级以内），实测重建为秒级；③ 若需零停写，可先用 `pt-online-schema-change`
+/ `gh-ost` 做影子表方案，但本仓单机部署未引入该工具链；④ 失败不会留下半截版本号
+（alembic 版本表在事务提交后才写），重跑前先确认列/索引是否已存在。
+
 Revision ID: a1b8c4d9e2f3
 Revises: 0f345c121f66
 """
