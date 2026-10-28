@@ -349,7 +349,7 @@ export default function RefundCenter() {
                   <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
                 </Typography.Text>
               )}
-              <Table<RefundRequestItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
+              <Table<RefundRequestItem> locale={{ emptyText: listErrors.refund ? null : <PaintEmpty character="cat" /> }}
                 rowKey="id"
                 rowClassName={(r) => (r.id === highlightId ? "wm13-highlight-row" : "")}
                 dataSource={refunds} size="middle"
@@ -440,7 +440,7 @@ export default function RefundCenter() {
                   <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
                 </Typography.Text>
               )}
-              <Table<WithdrawalItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
+              <Table<WithdrawalItem> locale={{ emptyText: listErrors.withdrawal ? null : <PaintEmpty character="cat" /> }}
                 rowKey="id"
                 rowClassName={(r) => (r.id === highlightId ? "wm13-highlight-row" : "")}
                 dataSource={withdrawals} size="middle"
@@ -519,7 +519,7 @@ export default function RefundCenter() {
                   <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
                 </Typography.Text>
               )}
-              <Table<TransferItem> locale={{ emptyText: <PaintEmpty character="cat" /> }}
+              <Table<TransferItem> locale={{ emptyText: listErrors.transfer ? null : <PaintEmpty character="cat" /> }}
                 rowKey="id"
                 rowClassName={(r) => (r.id === highlightId ? "wm13-highlight-row" : "")}
                 dataSource={transfers} size="middle"

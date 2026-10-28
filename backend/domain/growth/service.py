@@ -24,6 +24,7 @@ from backend.common.events import (
 from backend.common.exceptions import NotFoundError, ValidationError
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.catalog.models import Book, QuizQuestion
+from backend.domain.growth import quiz_queries
 from backend.domain.growth.models import (
     ChildGrowthState,
     MilestoneAward,
@@ -482,18 +483,6 @@ class QuizService:
             .scalar()
         )
 
-    def _best_score(self, child_id: int, book_id: int) -> int:
-        best = (
-            self.db.query(func.max(QuizAttempt.score))
-            .filter(
-                QuizAttempt.child_id == child_id,
-                QuizAttempt.book_id == book_id,
-                QuizAttempt.is_deleted == 0,
-            )
-            .scalar()
-        )
-        return int(best or 0)
-
     def _load_questions(self, book_id: int) -> list[QuizQuestion]:
         limit = int(ConfigService(self.db).get_value("quiz_questions_per_book"))
         return (
@@ -549,16 +538,7 @@ class QuizService:
         # 插修10：best_score 是答对题数口径（前端金卡曾显示"最佳成绩 5 分"+一星），
         # 补 best_percent 百分制口径；words_added/points_added 供 quiz-result 兜底
         # 显示真实到账（原硬编码 0 与护照片矛盾）
-        best_attempt = (
-            self.db.query(QuizAttempt)
-            .filter(
-                QuizAttempt.child_id == child.id,
-                QuizAttempt.book_id == book_id,
-                QuizAttempt.is_deleted == 0,
-            )
-            .order_by(QuizAttempt.score.desc(), QuizAttempt.total_questions.asc())
-            .first()
-        )
+        best_attempt = quiz_queries.best_attempt(self.db, child.id, book_id)
         best = int(best_attempt.score) if best_attempt else 0
         best_percent = (
             round(best * 100 / best_attempt.total_questions)
@@ -575,19 +555,7 @@ class QuizService:
             .scalar()
             or 0
         )
-        points_added = (
-            self.db.query(func.sum(PointLedger.points))
-            .filter(
-                PointLedger.child_id == child.id,
-                PointLedger.related_id == book_id,
-                PointLedger.reason_type.in_(
-                    ["words_convert", "quiz_first_pass", "quiz_full_marks"]
-                ),
-                PointLedger.is_deleted == 0,
-            )
-            .scalar()
-            or 0
-        )
+        points_added = quiz_queries.points_added_for_book(self.db, child.id, book_id)
         if not unlocked:
             status = "locked"
         elif passed_before:
@@ -703,7 +671,7 @@ class QuizService:
             "score": score,
             "total": total_q,
             "passed": bool(passed),
-            "best_score": max(score, self._best_score(child.id, book_id)),
+            "best_score": max(score, quiz_queries.best_score(self.db, child.id, book_id)),
             "attempts_left": max_attempts - used - 1,
             "wrong": [s for s in snapshot if not s["correct"]],
             "just_passed": False,
@@ -755,6 +723,17 @@ class QuizService:
                 ),
                 db=self.db,
             )
+        # FE-2（2026-10-28）：提交响应补齐成绩单字段——小程序把本次响应直接缓存给结果页，
+        # 缺 best_percent/points_added 会让金卡正确率与积分明细要么空白、要么走另一条
+        # 服务端兜底路径（两条路径口径不一致）。复用状态页同一查询（不新增来源）。
+        best_attempt = quiz_queries.best_attempt(self.db, child.id, book_id)
+        result["best_percent"] = (
+            round(best_attempt.score * 100 / best_attempt.total_questions)
+            if best_attempt and best_attempt.total_questions
+            else 0
+        )
+        result["attempts_used"] = used + 1
+        result["points_added"] = quiz_queries.points_added_for_book(self.db, child.id, book_id)
         self.db.commit()
         return result
 

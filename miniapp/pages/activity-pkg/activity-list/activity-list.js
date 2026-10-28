@@ -22,6 +22,8 @@ Page({
     pastActivities: [],
     loading: true,
     loadError: false,
+    // W7-10（2026-10-28）：无孩子档案时的可见态（原先骨架永久转）
+    noChild: false,
     // P3（第一百一十六批）：近期活动有 50 条硬上限（`ActivityService.UPCOMING_LIMIT`），
     // 截断信号在后端响应头里；原先被前端丢掉 → 家长看到 50 场以为"就这些活动"
     truncated: false,
@@ -32,8 +34,9 @@ Page({
     if (!session.ensureLogin()) return
     const child = session.getCurrentChild()
     this._childId = child ? child.id : null
-    this.setData({ childName: child ? child.name : '' })
+    this.setData({ childName: child ? child.name : '', noChild: !this._childId })
     if (this._childId) this.load({ silent: true })
+    else this.setData({ loading: false })
   },
 
   onTab(e) { this.setData({ tab: e.currentTarget.dataset.tab }) },

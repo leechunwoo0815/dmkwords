@@ -1,4 +1,7 @@
 <view class="page-bg" wx:if="{{book}}">
+  <!-- W7-15（2026-10-28）：详情补数失败必须有可见态（原先静默保留半空数据） -->
+  <error-view wx:if="{{detailError}}" type="network" title="详情加载失败"
+    desc="{{detailError}}（书名/词数可能不完整）" bind:onRetry="loadDetail" />
   <!-- 头部：封面 + 信息 -->
   <view class="book-hero">
     <image wx:if="{{book.cover_url}}" class="hero-cover" src="{{book.cover_url}}" mode="aspectFill"

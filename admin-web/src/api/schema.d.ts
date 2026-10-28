@@ -5781,6 +5781,46 @@ export interface components {
             /** Child Id */
             child_id: number;
         };
+        /**
+         * QuizSubmitResponse
+         * @description 小挑战提交响应。
+         *
+         *     `extra="allow"`：通过/升级/里程碑等分支会给 dict 追加成长字段（`from_level`/`new_level`
+         *     等），逐字段穷举会把它们过滤掉——声明已知字段 + 放行扩展，既让 OpenAPI 有真实形状，
+         *     又不改变运行时载荷。
+         */
+        QuizSubmitResponse: {
+            /** Attempts Left */
+            attempts_left: number;
+            /** Attempts Used */
+            attempts_used: number;
+            /** Best Percent */
+            best_percent: number;
+            /** Best Score */
+            best_score: number;
+            /** Just Passed */
+            just_passed: boolean;
+            /** Level Up */
+            level_up: boolean;
+            /** New Milestones */
+            new_milestones: unknown[];
+            /** Passed */
+            passed: boolean;
+            /** Points Added */
+            points_added: number;
+            /** Points Detail */
+            points_detail: unknown[];
+            /** Score */
+            score: number;
+            /** Total */
+            total: number;
+            /** Words Added */
+            words_added: number;
+            /** Wrong */
+            wrong: unknown[];
+        } & {
+            [key: string]: unknown;
+        };
         /** ReadNotificationsRequest */
         ReadNotificationsRequest: {
             /**
@@ -12527,7 +12567,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["QuizSubmitResponse"];
                 };
             };
             /** @description Validation Error */

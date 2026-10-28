@@ -1,5 +1,5 @@
 // catalog 域 API（类型由 openapi-typescript 生成）
-import { request } from "./client";
+import { handleAuthStatus, request } from "./client";
 import type { components } from "./schema";
 
 export type Book = components["schemas"]["BookResponse"];
@@ -121,6 +121,7 @@ function uploadWithProgress(
           resolve(xhr.responseText);
         }
       } else {
+        try { handleAuthStatus(xhr.status); } catch (e) { reject(e); return; }
         let detail = "上传失败";
         try {
           detail = JSON.parse(xhr.responseText).detail || detail;
@@ -168,6 +169,7 @@ export async function apiImportBooks(file: File): Promise<{
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: form,
   });
+  handleAuthStatus(res.status);
   if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { detail?: string }).detail ?? "导入失败");
   return res.json();
 }
@@ -177,6 +179,7 @@ export async function apiDownloadImportTemplate(): Promise<void> {
   const res = await fetch("/api/admin/books/import-template", {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
+  handleAuthStatus(res.status);
   if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { detail?: string }).detail ?? "模板下载失败");
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);

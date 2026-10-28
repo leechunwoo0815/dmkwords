@@ -97,8 +97,12 @@ export default function BorrowRecordPanel({ active = true }: { active?: boolean 
 
   // 切到本 tab 时重新拉一次（2026-09-21 用户反馈"直接点借还记录要刷新页面才显示新数据"：
   // Tabs 会把 pane 留在 DOM 里，挂载时那一次 useEffect 不会因为切回来再跑）
+  // W6-D8（2026-10-28）：原来只 `load(1)` 不改页码 → 数据回到第 1 页、分页高亮仍停原页。
+  // page≠1 时交给 [load,page] effect 拉取（避免 setPage+load 双请求）；page 已是 1 才直接刷新。
   useEffect(() => {
-    if (active) load(1);
+    if (!active) return;
+    if (page !== 1) setPage(1);
+    else load(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 

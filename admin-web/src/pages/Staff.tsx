@@ -33,11 +33,14 @@ export default function Staff() {
   // P2-11（第九轮审查）：取数失败不许渲染成空表（员工页空表 = "还没建过账号"的语义结论，
   // 而真相是"可能一个员工都进不去后台"）
   const [listError, setListError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const load = useCallback(() => {
+    setLoading(true);
     apiListStaff()
       .then((r) => { setRows(r); setListError(""); })
-      .catch((e: Error) => setListError(e.message || "员工列表加载失败"));
+      .catch((e: Error) => setListError(e.message || "员工列表加载失败"))
+      .finally(() => setLoading(false));
   }, [message]);
 
   useEffect(() => { load(); }, [load]);
@@ -101,7 +104,7 @@ export default function Staff() {
           <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
         </Typography.Text>
       )}
-      <Table<AdminUser> locale={{ emptyText: listError ? null : <PaintEmpty character="default" /> }}
+      <Table<AdminUser> loading={loading} locale={{ emptyText: listError ? null : <PaintEmpty character="default" /> }}
         rowKey="id" dataSource={rows} size="middle" pagination={false}
         columns={[
           { title: "登录名", dataIndex: "username", width: 160, render: (v) => <Typography.Text code>{v}</Typography.Text> },

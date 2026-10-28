@@ -17,7 +17,9 @@ Page({
     countdown: 0,
     // 2026-10-12 拍板（P1）：短信通道开关由服务端下发——关闭时**隐藏手机号入口**
     // （不允许出现"页面能点、验证码永远收不到"的假入口）
-    smsEnabled: true,
+    // W7-16（2026-10-28）：默认改为 **false**（fail-closed）——原先初值 true 且请求失败空转，
+    // 服务端关闭短信时若取数失败会露出假入口。微信主通道不受影响。
+    smsEnabled: false,
     loginError: '',  // P2-52：登录失败在页面内也留痕（toast 会消失，家长回来能看到原因）
     cfg: getConfigs(),  // 业务口径（后端下发；倒计时秒数 P2-73）
   },
@@ -30,7 +32,10 @@ Page({
       if (res && typeof res.sms_enabled === 'boolean') {
         this.setData({ smsEnabled: res.sms_enabled })
       }
-    }).catch(() => {})
+    }).catch(() => {
+      // W7-16：取不到开关就保持隐藏（宁可少一个入口，也不给假入口）
+      this.setData({ smsEnabled: false })
+    })
   },
 
   onPhoneInput(e) { this.setData({ phone: e.detail.value }) },

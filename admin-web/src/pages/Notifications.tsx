@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Card,
@@ -175,6 +175,9 @@ export default function Notifications() {
     initialTab === "done" ? "done" : initialTab === "milestone" ? "milestone" : "todo"
   );
   const [keyword, setKeyword] = useState<string>(searchParams.get("keyword") ?? "");
+  // W6-D9（2026-10-28）：输入框与生效关键词分离 + 300ms 防抖（两个搜索框共用）
+  const kwDebounceReady = useRef(false);
+  const [kwInput, setKwInput] = useState<string>(searchParams.get("keyword") ?? "");
   const [scene, setScene] = useState<string | undefined>(searchParams.get("scene") ?? undefined);
   // 家长通知（现状平移）
   const [items, setItems] = useState<AdminNotification[]>([]);
@@ -206,6 +209,17 @@ export default function Notifications() {
   const [handleTarget, setHandleTarget] = useState<AdminInboxItem | null>(null);
   const [handleReason, setHandleReason] = useState("");
   const [handleSaving, setHandleSaving] = useState(false);
+
+  useEffect(() => {
+    if (!kwDebounceReady.current) { kwDebounceReady.current = true; return; }
+    const timer = window.setTimeout(() => {
+      setKeyword(kwInput);
+      setPage(1);
+      mirrorUrl({ box, tab: box === "admin" ? adminTab : parentTab, page: 1, keyword: kwInput, scene });
+    }, 300);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kwInput]);
 
   const mirrorUrl = useCallback(
     (next: { box: string; tab: string; page: number; keyword: string; scene?: string }) => {
@@ -585,9 +599,10 @@ export default function Notifications() {
           allowClear
           placeholder="按家长姓名搜索"
           style={{ width: 220 }}
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
+          value={kwInput}
+          onChange={(e) => setKwInput(e.target.value)}
           onSearch={(v) => {
+            setKwInput(v); setKeyword(v);
             setPage(1);
             mirrorUrl({ box, tab: parentTab, page: 1, keyword: v, scene });
           }}
@@ -674,9 +689,10 @@ export default function Notifications() {
           allowClear
           placeholder="按申请人搜索"
           style={{ width: 220 }}
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
+          value={kwInput}
+          onChange={(e) => setKwInput(e.target.value)}
           onSearch={(v) => {
+            setKwInput(v); setKeyword(v);
             setPage(1);
             mirrorUrl({ box, tab: adminTab, page: 1, keyword: v, scene });
           }}

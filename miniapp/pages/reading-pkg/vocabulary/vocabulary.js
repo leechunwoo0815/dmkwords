@@ -7,6 +7,7 @@
 // 并把「本周新增/查过多次」也下沉服务端——分页后前端滤波只剩当前页结果，口径必漂移。
 // 口径：docs/15 §二十一 成就类页面呈现规范。
 const api = require('../../../utils/api')
+const session = require('../../../utils/session')
 
 /** 后端给 `str(datetime)`，列表只显示到日（成就页看"攒了多久"，不看时分秒）。 */
 function fmtDate(s) {
@@ -20,6 +21,8 @@ Page({
     words: [],
     loading: true,
     loadError: false,
+    // W7-11（2026-10-28）：无 child_id 时必须落到可见态（原先早退在 loading 之前 → 永久"加载中"）
+    noChild: false,
     // 统计五口径（收录词数 / 累计查词 / 来源书目 / 本周新增 / 查过多次）**全部服务端聚合**
     // （PRD §8.1.1 实现说明）：列表分页后，前端 reduce 出来的数只剩当前页结果，
     // 与真实口径漂移（P3 第一百一十六批把「本周新增/查过多次」也下沉）。
@@ -44,11 +47,18 @@ Page({
   },
 
   onLoad(options) {
-    this.setData({ childName: decodeURIComponent(options.child_name || '') })
-    this._childId = Number(options.child_id)
+    // W7-11：统一走 session 解析（缺参/非法值回落当前孩子），再决定是否进入加载
+    const me = session.getCurrentChild ? session.getCurrentChild() : null
+    const fromUrl = Number(options.child_id)
+    this._childId = fromUrl || (me && me.id ? me.id : 0) || null
+    this.setData({
+      childName: decodeURIComponent(options.child_name || '') || (me ? me.name : ''),
+      noChild: !this._childId,
+      loading: !!this._childId,
+    })
   },
 
-  onShow() { this.load() },
+  onShow() { if (this._childId) this.load(); else this.setData({ loading: false, noChild: true }) },
 
   // 触底加载下一页（页数由 `wordCount` 服务端口径判定到底，不猜）
   onReachBottom() { this.loadMore() },
@@ -75,7 +85,10 @@ Page({
   },
 
   async load() {
-    if (!this._childId) return
+    if (!this._childId) {
+      this.setData({ loading: false, noChild: true })
+      return
+    }
     this.setData({ loading: true, loadError: false })
     try {
       // 五口径走服务端聚合（两次请求并发，少一个 RTT）

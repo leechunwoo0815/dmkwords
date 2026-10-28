@@ -24,6 +24,7 @@
 
 对应文件：`order/payment/level/passport/report/notification/observation_report/scheduler/dashboard/permission_matrix/reading_circle.feature`。
 挂起总数与活跃场景数由 `check_bdd_baseline`（门禁第 [3] 步）与 `features/bdd_baseline.json` 守门；本披露不改变任何行的状态语义。
+**全量口径（D-A12-1）**：BDD 全量 **345** 个展开场景 = 活动面 **249**（进 gate）+ 挂起 **96**（11 个文件级 @draft + 4 个场景级标签，展开后）。
 
 ## 总览
 

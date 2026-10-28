@@ -108,13 +108,16 @@ export default function MemberManage() {
     window.history.replaceState(null, "", url.toString());
   }, []);
   const urlInitialPage = Number(readUrl().get("page")) || 1;
+  // W6-D10（2026-10-28）：三个 tab 各自分页键——原先共用一个 `page`，刷新后串页
+  const urlOrderPage = Number(readUrl().get("opage")) || urlInitialPage;
+  const urlParentPage = Number(readUrl().get("ppage")) || 1;
   const [tab, setTab] = useState<string>(() => {
     const t0 = readUrl().get("tab");
     return t0 === "orders" || t0 === "parents" ? t0 : "children";
   });
   const changeTab = useCallback((t: string) => {
     setTab(t);
-    updateUrl({ tab: t, page: undefined });
+    updateUrl({ tab: t, page: undefined, opage: undefined, ppage: undefined });
   }, [updateUrl]);
   // 孩子列表
   const [children, setChildren] = useState<Child[]>([]);
@@ -170,7 +173,8 @@ export default function MemberManage() {
   const [voucherFile, setVoucherFile] = useState<UploadFile[]>([]);
   const viewer = useImageViewer();
   const childPg = usePaintPagination(undefined, urlInitialPage);
-  const orderPg = usePaintPagination(undefined, urlInitialPage);
+  const orderPg = usePaintPagination(undefined, urlOrderPage);
+  const parentPg = usePaintPagination(undefined, urlParentPage);
   // 弹窗
   const [parentOpen, setParentOpen] = useState(false);
   const [childOpen, setChildOpen] = useState(false);
@@ -369,8 +373,9 @@ export default function MemberManage() {
         try {
           const order = await apiEvaluateApprove(c.id, reason.trim() || "评估通过，转正式会员");
           message.success(`已创建年费订单 ￥${Number(order.amount).toLocaleString()}，请到「订单」页确认收款`);
-          setTab("orders");
-          loadOrders(1);
+          changeTab("orders");
+          if (orderPg.page !== 1) orderPg.setPage(1);
+          else loadOrders(1);
         } catch (e) {
           message.error((e as Error).message);
           return Promise.reject(e);
@@ -401,16 +406,16 @@ export default function MemberManage() {
   const loadParents = useCallback(
     (page: number) => {
       setParentLoading(true);
-      apiListParentsPage({ page, page_size: childPg.pageSize })
+      apiListParentsPage({ page, page_size: parentPg.pageSize })
         .then((r) => { setParents(r.items ?? []); setParentTotal(r.total); setParentListError(""); })
         .catch((e: Error) => setParentListError(e.message || "列表加载失败"))
         .finally(() => setParentLoading(false));
     },
-    [childPg.pageSize, message]
+    [parentPg.pageSize, message]
   );
   // F1（同族第三次，E-03 反模式 1）：家长 tab 标题计数唯一数据源=loadParents 的
   // total——守卫导致默认 tab 下「家长（0）」。挂载即拉（与 A1 对称，模式已验证无害）
-  useEffect(() => { loadParents(childPg.page); }, [loadParents, childPg.page, tab]);
+  useEffect(() => { loadParents(parentPg.page); }, [loadParents, parentPg.page, tab]);
 
   // W3 订单 Tab 待确认计数（轻量单请求）；WM3-A1：页面挂载即拉，不设 tab 守卫
   // B4（插修5）计数不刷新同族第四案（A1→F4→W3→B4）：状态变更点显式刷计数，
@@ -714,7 +719,7 @@ export default function MemberManage() {
            scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
           <PaintPagination current={orderPg.page} pageSize={orderPg.pageSize} total={orderTotal}
-            onChange={(p, s) => { orderPg.onChange(p, s); updateUrl({ page: String(p) }); }} />
+            onChange={(p, s) => { orderPg.onChange(p, s); updateUrl({ opage: String(p) }); }} />
         </>
       )}
 
@@ -723,7 +728,7 @@ export default function MemberManage() {
           {parentListError && (
             <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
               {parentListError} · 本次刷新失败：列表可能不是最新的（不代表没有家长账号）——请重试
-              <Typography.Link onClick={() => loadParents(childPg.page)} style={{ marginLeft: 8 }}>重试</Typography.Link>
+              <Typography.Link onClick={() => loadParents(parentPg.page)} style={{ marginLeft: 8 }}>重试</Typography.Link>
             </Typography.Text>
           )}
           <Table<ParentRow> locale={{ emptyText: parentListError ? null : <PaintEmpty character="star" /> }}
@@ -753,7 +758,7 @@ export default function MemberManage() {
                         try {
                           await apiDeleteParent(r.id);
                           message.success("家长已删除（软删，订单历史保留）");
-                          loadParents(childPg.page);
+                          loadParents(parentPg.page);
                         } catch (e) {
                           message.error((e as Error).message);
                         }
@@ -769,8 +774,8 @@ export default function MemberManage() {
             ]}
            scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
-          <PaintPagination current={childPg.page} pageSize={childPg.pageSize} total={parentTotal}
-            onChange={(p, s) => { childPg.onChange(p, s); updateUrl({ page: String(p) }); }} />
+          <PaintPagination current={parentPg.page} pageSize={parentPg.pageSize} total={parentTotal}
+            onChange={(p, s) => { parentPg.onChange(p, s); updateUrl({ ppage: String(p) }); }} />
         </>
       )}
 
@@ -868,8 +873,9 @@ export default function MemberManage() {
             });
             message.success(`订单已创建（金额 ￥${Number(order.amount).toLocaleString()}），请到「订单」页确认收款`);
             setOrderOpen(false);
-            setTab("orders");
-            loadOrders(1);
+            changeTab("orders");
+            if (orderPg.page !== 1) orderPg.setPage(1);
+            else loadOrders(1);
           } catch (e) {
             message.error(e instanceof Error ? e.message : "创建失败");
           }
@@ -1179,7 +1185,7 @@ export default function MemberManage() {
             });
             message.success(v.phone && v.phone !== editParent.phone ? "已保存（手机号即登录账号，家长需用新号登录）" : "已保存");
             setEditParent(null);
-            loadParents(childPg.page);
+            loadParents(parentPg.page);
           } catch (e) {
             if ((e as Error).message) message.error((e as Error).message);
           }

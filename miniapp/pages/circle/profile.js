@@ -23,15 +23,21 @@ Page({
     posts: [],
     loading: true,
     loadError: false,
+    // W7-09（2026-10-28）：无 child_id 时必须有可见态（原先骨架永久转）
+    noChild: false,
     posterUrl: '',
   },
 
   onLoad(options) {
-    this.setData({ childId: Number(options.child_id) || null })
+    // W7-09：缺参时回落到当前孩子；仍没有 → 可见"请先选择孩子"，不再永久骨架
+    const me = session.getCurrentChild ? session.getCurrentChild() : null
+    const id = Number(options.child_id) || (me && me.id ? me.id : 0) || null
+    this.setData({ childId: id, noChild: !id, loading: !!id })
   },
 
   onShow() {
     if (this.data.childId) this.load()
+    else this.setData({ loading: false, noChild: true })
   },
 
   async load() {

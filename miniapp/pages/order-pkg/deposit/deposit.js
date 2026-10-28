@@ -66,6 +66,8 @@ Page({
       this.setData({
         dep: null,
         ledger: [],
+        // W7-13（2026-10-28）：失败时清掉陈旧状态标签——否则标题旁还挂着上次的「已结清」
+        statusText: '',
         loadError: (e && e.message) || '押金信息加载失败',
       })
     }

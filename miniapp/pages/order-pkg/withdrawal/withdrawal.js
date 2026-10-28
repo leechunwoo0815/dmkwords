@@ -18,7 +18,8 @@ Page({
   },
 
   onLoad(options) {
-    this.setData({ childName: decodeURIComponent(options.child_name || '') })
+    // W7-12：缺参回落到当前孩子
+    this.setData({ childName: decodeURIComponent(options.child_name || '') || ((session.getCurrentChild() || {}).name || '') })
     this._childId = session.resolveChildId(options)
   },
 

@@ -570,7 +570,7 @@ export default function CirculationDesk() {
           <Typography.Link onClick={loadOverdue} style={{ marginLeft: 8 }}>重试</Typography.Link>
         </Typography.Text>
       )}
-      <Table<OverdueItem> locale={{ emptyText: <PaintEmpty character="bear" /> }}
+      <Table<OverdueItem> locale={{ emptyText: overdueError ? null : <PaintEmpty character="bear" /> }}
         rowKey="record_id" size="small" pagination={false} dataSource={overdue}
         columns={[
           { title: "孩子", dataIndex: "child_name", width: 100 },

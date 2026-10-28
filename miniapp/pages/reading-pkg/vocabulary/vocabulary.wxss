@@ -239,6 +239,9 @@
   right: 16rpx;
   width: 56rpx;
   height: 56rpx;
+  /* W7-08：命中区 ≥88rpx */
+  min-width: 88rpx;
+  min-height: 88rpx;
   border-radius: 50%;
   background: var(--bg);
   border: 2rpx solid var(--border);

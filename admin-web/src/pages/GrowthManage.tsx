@@ -58,13 +58,15 @@ export default function GrowthManage() {
 
   const load = useCallback(
     (targetPage: number) => {
+      setLoading(true);
       apiListChildren({ page: targetPage, page_size: pageSize, keyword: keyword || undefined })
         .then((r) => {
           setChildren(r.items ?? []);
           setChildrenTotal(r.total);
           setListError("");
         })
-        .catch((e: Error) => setListError(e.message || "孩子列表加载失败"));
+        .catch((e: Error) => setListError(e.message || "孩子列表加载失败"))
+        .finally(() => setLoading(false));
     },
     [keyword, pageSize, message]
   );
@@ -208,7 +210,7 @@ export default function GrowthManage() {
           <Typography.Link onClick={() => load(page)} style={{ marginLeft: 8 }}>重试</Typography.Link>
         </Typography.Text>
       )}
-      <Table<Child> locale={{ emptyText: listError ? null : <PaintEmpty character="rabbit" /> }}
+      <Table<Child> loading={loading} locale={{ emptyText: listError ? null : <PaintEmpty character="rabbit" /> }}
         rowKey="id" dataSource={children} size="middle"
         pagination={false}
         onRow={(r) => ({ style: r.id === highlightId ? { background: "#fff7e6" } : {} })}

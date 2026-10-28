@@ -1,7 +1,8 @@
 <view class="page-bg x-cb307e">
   <view class="dp-head">
     <text class="dp-title">{{childName}} · 押金</text>
-    <text class="dp-status">{{statusText}}</text>
+    <!-- W7-13：失败态下不显示（可能是上次的陈旧状态） -->
+    <text class="dp-status" wx:if="{{!loadError}}">{{statusText}}</text>
   </view>
 
   <!-- 第一百三十四批：失败态显式呈现（原先仅靠 request.js 的瞬时 toast → toast 一过

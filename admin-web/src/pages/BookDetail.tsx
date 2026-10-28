@@ -224,10 +224,8 @@ export default function BookDetail() {
           message.warning("所有选项都需要填写");
           return;
         }
-        if (trimmed.length < 2) {
-          message.warning("单选题至少 2 个选项");
-          return;
-        }
+        // W6-D13（2026-10-28）：原「至少 2 个选项」分支不可达——删除按钮在 2 项时禁用、
+        // 新建固定 4 项、编辑器至少补到 4 项；后端仍有同样的选项校验兜底，故删掉死分支。
         const body = {
           question_type: String(values.question_type),
           question_text: String(values.question_text),

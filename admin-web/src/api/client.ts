@@ -13,6 +13,19 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+/**
+ * W6-D14（2026-10-28）：401 的统一处理（清 token + 回登录页）。
+ * 直接 fetch / XHR 的下载、导出、上传通道原先各自只抛文案——token 过期后留在原页
+ * 反复点、反复 401。所有绕过 request() 的通道都必须调本函数。
+ */
+export function handleAuthStatus(status: number): void {
+  if (status === 401) {
+    clearToken();
+    window.location.href = "/login";
+    throw new ApiError(401, "登录已过期，请重新登录");
+  }
+}
+
 export class ApiError extends Error {
   status: number;
 
@@ -37,11 +50,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
     },
   });
 
-  if (res.status === 401) {
-    clearToken();
-    window.location.href = "/login";
-    throw new ApiError(401, "登录已过期，请重新登录");
-  }
+  handleAuthStatus(res.status);
 
   if (!res.ok) {
     // F6：FastAPI 422 的 detail 是数组 [{loc,msg,type}]——提取 msg 拼接，
@@ -88,11 +97,7 @@ export async function requestList<T>(
     },
   });
 
-  if (res.status === 401) {
-    clearToken();
-    window.location.href = "/login";
-    throw new ApiError(401, "登录已过期，请重新登录");
-  }
+  handleAuthStatus(res.status);
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { detail?: unknown };
     const msg = Array.isArray(body.detail)

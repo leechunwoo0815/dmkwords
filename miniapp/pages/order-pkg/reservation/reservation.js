@@ -24,7 +24,8 @@ Page({
   },
 
   onLoad(options) {
-    this.setData({ childName: options.child_name ? decodeURIComponent(options.child_name) : '' })
+    // W7-12（2026-10-28）：缺参回落到当前孩子（各页统一口径）
+    this.setData({ childName: options.child_name ? decodeURIComponent(options.child_name) : ((session.getCurrentChild() || {}).name || '') })
     // P3（第一百一十三批）：走统一解析（URL 参数合法才用，否则回落当前孩子）
     // **必须在 await 之前赋值**：onShow 紧随 onLoad 触发并调用 load()，冷启动时
     // loadConfigs() 是真请求（首个页面未缓存）→ 若等它回来再设 `_childId`，load()

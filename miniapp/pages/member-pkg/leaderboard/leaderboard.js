@@ -20,7 +20,8 @@ Page({
   },
 
   onLoad(options) {
-    this.setData({ childName: decodeURIComponent(options.child_name || '') })
+    // W7-12：缺参回落到当前孩子
+    this.setData({ childName: decodeURIComponent(options.child_name || '') || ((session.getCurrentChild() || {}).name || '') })
     // P3（第一百一十三批）：统一解析 + 无孩子进可见态（原先永久空白：board 为 null 时
     // 三个 wx:if 全不成立，页面只剩背景色）
     this._childId = session.resolveChildId(options)

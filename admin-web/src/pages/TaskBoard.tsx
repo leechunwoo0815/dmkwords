@@ -162,7 +162,7 @@ export default function TaskBoard() {
           size="small"
           loading={loading}
           dataSource={specs}
-          locale={{ emptyText: <PaintEmpty message="暂无任务" /> }}
+          locale={{ emptyText: listError ? null : <PaintEmpty message="暂无任务" /> }}
           pagination={false}
           columns={[
             { title: "任务", dataIndex: "display_name", width: 160 },
@@ -229,7 +229,9 @@ export default function TaskBoard() {
         <Table<TaskRunItem>
           rowKey={(r) => `${r.task_name}-${r.started_at}`}
           size="small"
+          loading={loading}
           dataSource={runs}
+          locale={{ emptyText: listError ? null : <PaintEmpty message="暂无运行记录" /> }}
           pagination={false}
           expandable={{
             expandedRowRender: (r) =>

@@ -55,7 +55,12 @@ function loadPage(rel, opts) {
   let captured = null;
   const sandboxRequire = (spec) => {
     if (spec.endsWith('utils/api')) return opts.api || stubApi();
-    if (spec.endsWith('utils/session')) return { resolveChildId: (o) => Number((o && o.child_id) || 1) };
+    if (spec.endsWith('utils/session')) return {
+      resolveChildId: (o) => Number((o && o.child_id) || 1),
+      // W7-12（B7，2026-10-28）：多页统一回落当前孩子——桩必须镜像真实 session 的这两个方法
+      getCurrentChild: () => ({ id: 1, name: '演示孩' }),
+      ensureLogin: () => true,
+    };
     if (spec.endsWith('utils/configs')) {
       return { loadConfigs: async () => ({ configs: { quiz_questions_per_book: 5 } }),
                getConfigs: () => ({ quiz_questions_per_book: 5 }) };

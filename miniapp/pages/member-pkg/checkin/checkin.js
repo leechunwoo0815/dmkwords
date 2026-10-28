@@ -20,7 +20,8 @@ Page({
   },
 
   onLoad(options) {
-    this.setData({ childName: options.child_name ? decodeURIComponent(options.child_name) : '' })
+    // W7-12：缺参回落到当前孩子
+    this.setData({ childName: options.child_name ? decodeURIComponent(options.child_name) : ((session.getCurrentChild() || {}).name || '') })
     // 同族补齐（第一百一十六批）：统一解析（URL 合法才用，否则回落当前孩子）——
     // 原写法拿不到 child_id 就静默早退，日历照渲一屏"本月没打卡、连续 0 天"（禁假 0 同族）
     this._childId = session.resolveChildId(options)

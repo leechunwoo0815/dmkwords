@@ -108,7 +108,7 @@ export default function SystemConfigPage() {
           <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
         </Typography.Text>
       )}
-      <Table<SystemConfig> locale={{ emptyText: <PaintEmpty character="default" /> }}
+      <Table<SystemConfig> locale={{ emptyText: listError ? null : <PaintEmpty character="default" /> }}
         rowKey="config_key"
         loading={loading}
         dataSource={filtered.slice((page - 1) * pageSize, page * pageSize)}

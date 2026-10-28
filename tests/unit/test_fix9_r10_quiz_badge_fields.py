@@ -68,3 +68,28 @@ def test_get_quiz_best_percent_partial_fail_no_words(client: TestClient):
     assert q["best_percent"] == 60, q
     assert q["words_added"] == 0, q
     assert q["points_added"] == 0, q
+
+
+def test_submit_response_carries_result_page_fields(client: TestClient):
+    """FE-2（第十轮 B7，2026-10-28）：提交响应必须自带成绩单三字段。
+
+    quiz.js 把**本次提交响应**直接缓存给结果页；原先响应缺 `best_percent` /
+    `points_added` / `attempts_used`，结果页只能走另一条服务端兜底路径，两条路径口径不一致。
+    同时断言 `extra="allow"` 没有把成长/升级/里程碑等扩展字段过滤掉。
+    """
+    h = _h(client)
+    c, book, mini = _setup_finished_book(client, h, "13800000712", "9787100000012")
+    r = client.post(
+        f"/api/miniapp/quiz/{book['id']}/submit",
+        json={"child_id": c["id"], "answers": ALL_RIGHT},
+        headers=mini,
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    for key in ("best_percent", "attempts_used", "points_added", "best_score", "attempts_left"):
+        assert key in body, f"提交响应缺 {key}：{sorted(body)}"
+    assert body["best_percent"] == 100
+    assert body["attempts_used"] == 1
+    # 扩展字段不被 response_model 过滤
+    assert body["just_passed"] is True
+    assert "level_up" in body and "new_milestones" in body

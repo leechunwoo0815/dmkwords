@@ -5,7 +5,10 @@
     <view class="tab {{tab === 'past' ? 'active' : ''}}" data-tab="past" bindtap="onTab">往期回顾</view>
   </view>
 
-  <loading-skeleton wx:if="{{loading && !loadError}}" type="rows" rows="{{3}}" />
+  <error-view wx:if="{{noChild}}" type="empty" title="还没有选择孩子"
+    desc="请先在「我的」里添加或选择孩子，报名按孩子生成" showRetry="{{false}}" />
+
+  <loading-skeleton wx:if="{{loading && !noChild && !loadError}}" type="rows" rows="{{3}}" />
 
   <error-view wx:if="{{loadError}}" type="network" title="加载失败"
     desc="活动列表加载失败，请重试" bind:onRetry="onRetryLoad" />

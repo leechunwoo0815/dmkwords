@@ -106,8 +106,11 @@
 }
 
 .cal-nav-btn {
+  /* W7-08（2026-10-28）：触控区 ≥88rpx（原先 56rpx，低于 44px 可点性下限） */
   width: 56rpx;
   height: 56rpx;
+  min-width: 88rpx;
+  min-height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: center;

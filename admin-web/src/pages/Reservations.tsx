@@ -1,5 +1,5 @@
 // 预约管理（WM6：列表 / 状态筛选 / 核销转借阅）
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { App as AntdApp, Button, Input, Select, Space, Table, Tag, Typography } from "antd";
 import PaintEmpty from "../components/PaintEmpty";
@@ -34,6 +34,9 @@ export default function Reservations() {
   // URLSearchParams 已经解码过一次，再解一次遇 `%` 关键词（如「50%」）抛 URIError，
   // 且发生在 useState 初始化器里 → **整页崩**（当前无带参跳转，属潜伏）。
   const [keyword, setKeyword] = useState(searchParams.get("keyword") ?? "");
+  // W6-D9（2026-10-28）：输入框与生效关键词分离 + 300ms 防抖（原先逐键发请求）
+  const kwDebounceReady = useRef(false);
+  const [kwInput, setKwInput] = useState(keyword);
   const [loading, setLoading] = useState(true);
   const { page, pageSize, setPage, onChange: onPageChange } = usePaintPagination();
   // P2-44：后端硬上限（200）——已达上限时提示"可能还有更多未显示"
@@ -50,6 +53,16 @@ export default function Reservations() {
   }, [status, keyword, message]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!kwDebounceReady.current) { kwDebounceReady.current = true; return; }
+    const timer = window.setTimeout(() => {
+      setKeyword(kwInput);
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kwInput]);
 
   const onCheckout = (r: ReservationItem) => {
     modal.confirm({
@@ -74,9 +87,9 @@ export default function Reservations() {
       <Space style={{ marginBottom: 12 }}>
         <Input.Search
           placeholder="搜孩子名 / 家长名 / 手机号" allowClear style={{ width: 240 }}
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          value={kwInput}
+          onChange={(e) => setKwInput(e.target.value)}
+          onSearch={(v) => { setKwInput(v); setKeyword(v); setPage(1); }}
         />
         <Select
           placeholder="预约状态" style={{ width: 140 }} value={status}

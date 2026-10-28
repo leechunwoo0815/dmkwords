@@ -42,6 +42,7 @@ Page({
     quizHasScore: false,
     quizUnlocked: false,
     cheerText: '',
+    detailError: '',
     cfg: getConfigs(),  // 业务口径（后端下发；预约保留时长/完播阈值）
   },
 
@@ -91,11 +92,16 @@ Page({
   },
 
   async loadDetail() {
+    this.setData({ detailError: '' })
     try {
       const fresh = await api.getBookDetail(this.data.book.id)
       const merged = media.formatBook({ ...this.data.book, ...fresh })
       this.setData({ book: merged, durationText: durText(merged.audio_duration) })
-    } catch (e) { /* 保留传入数据兜底 */ }
+    } catch (e) {
+      // W7-15（2026-10-28）：原先静默兜底——只传 book_id 进入时书名/词数全空，看起来像"书坏了"。
+      // 保留已传入的数据，但给出可见失败态 + 重试。
+      this.setData({ detailError: (e && e.message) || '书籍详情加载失败' })
+    }
   },
 
   async loadProgress() {

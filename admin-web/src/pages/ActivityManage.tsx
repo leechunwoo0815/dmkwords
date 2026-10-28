@@ -67,6 +67,8 @@ export default function ActivityManage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [enrollActivity, setEnrollActivity] = useState<ActivityItem | null>(null);
   const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
+  // W6-D11（2026-10-28）：报名抽屉失败态（原先只有 toast，表格落成"无人报名"）
+  const [enrollError, setEnrollError] = useState("");
   const [form] = Form.useForm();
 
   const load = useCallback(() => {
@@ -115,6 +117,10 @@ export default function ActivityManage() {
     try {
       const d = await apiGetActivityDetail(a.id);
       setEditTarget(d);
+      // W6-D6（2026-10-28）：图文详情与主表单**同一次**详情请求返回——原先这里清空后又发
+      // 第二次 GET，失败只弹 warning，编辑器留空而「保存图文详情」仍可点 → 一次点击用空数组
+      // 覆盖掉后端已有图文。现在详情取不到就不开弹窗（天然禁止保存），成功则直接填编辑器。
+      setDetailBlocks(d.detail_blocks || []);
       setEditCover(d.cover_url ? activityCoverUrl(a.id) : null);
       form.setFieldsValue({
         title: d.title, start_at: d.start_at ? dayjs(d.start_at) : undefined,
@@ -127,11 +133,6 @@ export default function ActivityManage() {
     } catch (e) {
       message.error((e as Error).message);
     }
-    // 图文详情：与表单同源拉一次详情（编辑器要的是**原始路径**，不是 URL）
-    setDetailBlocks([]);
-    apiGetActivityDetail(a.id)
-      .then((d) => setDetailBlocks(d.detail_blocks || []))
-      .catch((e: Error) => message.warning(`图文详情加载失败：${e.message}`));
   };
 
   const onCoverUpload = async (file: File) => {
@@ -229,9 +230,13 @@ export default function ActivityManage() {
   const openEnrollments = (a: ActivityItem) => {
     setEnrollActivity(a);
     setEnrollments([]);
+    setEnrollError("");
     apiListEnrollments(a.id)
       .then(setEnrollments)
-      .catch((e: Error) => message.error(e.message));
+      .catch((e: Error) => {
+        // W6-D11（2026-10-28）：失败不许渲染成"无人报名"——抽屉里给可见失败态
+        setEnrollError(e.message || "报名名单加载失败");
+      });
   };
 
   // 只读活动详情（2026-09-15 用户需求）：点活动名称看封面/内容/报名与签到人数。
@@ -287,7 +292,7 @@ export default function ActivityManage() {
           <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
         </Typography.Text>
       )}
-                <Table<ActivityItem> locale={{ emptyText: <PaintEmpty character="star" /> }}
+                <Table<ActivityItem> locale={{ emptyText: listError ? null : <PaintEmpty character="star" /> }}
                   rowKey="id" loading={loading} dataSource={activities.slice((activityPg.page - 1) * activityPg.pageSize, activityPg.page * activityPg.pageSize)} size="middle"
                   pagination={false}
                   columns={[
@@ -352,7 +357,14 @@ export default function ActivityManage() {
           activityTitle={enrollActivity?.title}
           onSignedIn={() => { if (enrollActivity) openEnrollments(enrollActivity); }}
         />
-        <Table<EnrollmentItem> locale={{ emptyText: <PaintEmpty character="star" /> }}
+        {enrollError && (
+          <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+            {enrollError} · 名单未加载，不代表无人报名
+            <Typography.Link onClick={() => { if (enrollActivity) openEnrollments(enrollActivity); }}
+              style={{ marginLeft: 8 }}>重试</Typography.Link>
+          </Typography.Text>
+        )}
+        <Table<EnrollmentItem> locale={{ emptyText: enrollError ? null : <PaintEmpty character="star" /> }}
           rowKey="id" dataSource={enrollments} size="small" pagination={false}
           columns={[
             { title: "孩子", dataIndex: "child_name", width: 90 },

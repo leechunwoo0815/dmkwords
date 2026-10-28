@@ -1,5 +1,5 @@
 // 管理端 API（类型由 openapi-typescript 从后端 OpenAPI 生成，禁止手写 — 宪法五-3）
-import { ApiError, getToken, request } from "./client";
+import { ApiError, getToken, handleAuthStatus, request } from "./client";
 import type { components } from "./schema";
 
 export type AdminUser = components["schemas"]["AdminUserResponse"];
@@ -349,6 +349,7 @@ export function apiDashboardCharts(days = 14, top = 5): Promise<DashboardCharts>
 export async function downloadExcel(path: string, filename: string): Promise<void> {
   const token = getToken();
   const res = await fetch(path, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  handleAuthStatus(res.status);
   if (!res.ok) throw new ApiError(res.status, ((await res.json().catch(() => ({}))) as { detail?: string }).detail ?? "导出失败");
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);

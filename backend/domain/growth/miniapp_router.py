@@ -15,6 +15,7 @@ from backend.database import get_db
 from backend.domain.growth.board_service import LeaderboardService, PassportService
 from backend.domain.growth.passed_books_service import PassedBooksService
 from backend.domain.growth.report_service import ReportService
+from backend.domain.growth.schemas import QuizSubmitResponse
 from backend.domain.growth.service import GrowthService, QuizService
 from backend.domain.identity import guards
 from backend.domain.identity.auth import _parent_from_token, child_of_parent, get_current_parent
@@ -50,7 +51,7 @@ def get_quiz(book_id: int, child_id: int, auth: Any = Depends(get_current_parent
     return QuizService(db).get_quiz(child, book_id)
 
 
-@router.post("/quiz/{book_id}/submit")
+@router.post("/quiz/{book_id}/submit", response_model=QuizSubmitResponse)
 def submit_quiz(book_id: int, body: QuizSubmitRequest, auth: Any = Depends(get_current_parent)):
     parent, db = auth
     child = child_of_parent(db, parent.id, body.child_id)

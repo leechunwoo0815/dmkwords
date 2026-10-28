@@ -515,43 +515,9 @@ h1, h2, h3, h4, h5, h6,
   box-shadow: var(--paint-card-shadow);
 }
 
-.paint-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 18px;
-  border: 2.5px solid var(--paint-ink);
-  border-radius: 999px;
-  font-weight: 700;
-  box-shadow: var(--paint-shadow);
-  transition: all 0.15s ease;
-  cursor: pointer;
-}
-
-.paint-button:active {
-  box-shadow: 1px 1px 0 var(--paint-ink);
-}
-
-.paint-button--primary {
-  background: var(--paint-primary);
-  color: #fff;
-}
-
-.paint-button--secondary {
-  background: var(--paint-paper);
-  color: var(--paint-ink);
-}
-
-.paint-button--success {
-  background: var(--paint-secondary);
-  color: #fff;
-}
-
-.paint-button--danger {
-  background: var(--paint-danger);
-  color: #fff;
-}
+/* W6-D12（2026-10-28）：原 `.paint-button*` 五条规则**零 tsx 引用**——主按钮已由
+   App.tsx 的 ConfigProvider token（colorPrimary/controlHeight/borderRadius）统一接管，
+   这里保留说明避免后人重新造一套并行实现。需要新样式请扩展 token，不要再加 paint-button。 */
 
 .paint-tag {
   display: inline-flex;
@@ -873,6 +839,15 @@ h1, h2, h3, h4, h5, h6,
   padding: 28px 0;
 }
 /* 趋势折线 */
+.chart-trend {
+  width: 100%;
+}
+/* W6-D12（2026-10-28）：tsx 里用到的图例文字类，原先没有定义（视觉意图未生效） */
+.chart-legend-label {
+  font-size: 12px;
+  color: var(--paint-ink-light);
+  margin-left: 4px;
+}
 .chart-trend-axis {
   display: flex;
   justify-content: space-between;

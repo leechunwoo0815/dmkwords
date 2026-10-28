@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Card,
@@ -82,6 +82,9 @@ export default function CircleManage() {
   const [cardTypeOptions, setCardTypeOptions] = useState(FALLBACK_CARD_TYPE_OPTIONS);
   const [range, setRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
   const [keyword, setKeyword] = useState("");
+  // W6-D9（2026-10-28）：输入框与生效关键词分离 + 300ms 防抖
+  const kwDebounceReady = useRef(false);
+  const [kwInput, setKwInput] = useState("");
   useEffect(() => {
     let alive = true;
     apiCircleCardTypes()
@@ -134,6 +137,13 @@ export default function CircleManage() {
       setLoading(false);
     }
   }, [page, pageSize, cardType, range, keyword, message]);
+
+  useEffect(() => {
+    if (!kwDebounceReady.current) { kwDebounceReady.current = true; return; }
+    const timer = window.setTimeout(() => { setKeyword(kwInput); setPage(1); }, 300);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kwInput]);
 
   const loadOverview = useCallback(async () => {
     try {
@@ -335,9 +345,9 @@ export default function CircleManage() {
           allowClear
           placeholder="按家长/孩子姓名搜索"
           style={{ width: 220 }}
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-          onSearch={() => setPage(1)}
+          value={kwInput}
+          onChange={(e) => setKwInput(e.target.value)}
+          onSearch={() => { setKeyword(kwInput); setPage(1); }}
         />
       </div>
       {listError && (

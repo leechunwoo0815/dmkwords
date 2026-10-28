@@ -4028,6 +4028,89 @@
         "title": "QuizSubmitRequest",
         "type": "object"
       },
+      "QuizSubmitResponse": {
+        "additionalProperties": true,
+        "description": "小挑战提交响应。\n\n`extra=\"allow\"`：通过/升级/里程碑等分支会给 dict 追加成长字段（`from_level`/`new_level`\n等），逐字段穷举会把它们过滤掉——声明已知字段 + 放行扩展，既让 OpenAPI 有真实形状，\n又不改变运行时载荷。",
+        "properties": {
+          "attempts_left": {
+            "title": "Attempts Left",
+            "type": "integer"
+          },
+          "attempts_used": {
+            "title": "Attempts Used",
+            "type": "integer"
+          },
+          "best_percent": {
+            "title": "Best Percent",
+            "type": "integer"
+          },
+          "best_score": {
+            "title": "Best Score",
+            "type": "integer"
+          },
+          "just_passed": {
+            "title": "Just Passed",
+            "type": "boolean"
+          },
+          "level_up": {
+            "title": "Level Up",
+            "type": "boolean"
+          },
+          "new_milestones": {
+            "items": {},
+            "title": "New Milestones",
+            "type": "array"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "points_added": {
+            "title": "Points Added",
+            "type": "integer"
+          },
+          "points_detail": {
+            "items": {},
+            "title": "Points Detail",
+            "type": "array"
+          },
+          "score": {
+            "title": "Score",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "words_added": {
+            "title": "Words Added",
+            "type": "integer"
+          },
+          "wrong": {
+            "items": {},
+            "title": "Wrong",
+            "type": "array"
+          }
+        },
+        "required": [
+          "score",
+          "total",
+          "passed",
+          "best_score",
+          "best_percent",
+          "attempts_left",
+          "attempts_used",
+          "points_added",
+          "words_added",
+          "wrong",
+          "points_detail",
+          "just_passed",
+          "level_up",
+          "new_milestones"
+        ],
+        "title": "QuizSubmitResponse",
+        "type": "object"
+      },
       "ReadNotificationsRequest": {
         "additionalProperties": false,
         "properties": {
@@ -15723,7 +15806,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/QuizSubmitResponse"
+                }
               }
             },
             "description": "Successful Response"

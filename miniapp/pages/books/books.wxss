@@ -24,8 +24,11 @@
 .search-icon { font-size: 30rpx; }
 .search-input { flex: 1; font-size: 28rpx; color: var(--fg); }
 .search-clear {
+  /* W7-08：命中区 ≥88rpx */
   width: 64rpx;
   height: 64rpx;
+  min-width: 88rpx;
+  min-height: 88rpx;
   border-radius: 50%;
   background: var(--bg);
   border: 2rpx solid var(--border);

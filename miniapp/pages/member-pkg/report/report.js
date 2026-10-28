@@ -17,7 +17,8 @@ Page({
   },
 
   onLoad(options) {
-    this.setData({ childName: decodeURIComponent(options.child_name || '') })
+    // W7-12：缺参回落到当前孩子
+    this.setData({ childName: decodeURIComponent(options.child_name || '') || ((session.getCurrentChild() || {}).name || '') })
     // P3（第一百一十三批）：统一解析（原 `Number(undefined)` → NaN → 早退 → 永久「生成中」）
     this._childId = session.resolveChildId(options)
   },

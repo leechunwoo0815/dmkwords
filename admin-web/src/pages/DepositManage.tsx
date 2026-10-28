@@ -124,7 +124,7 @@ export default function DepositManage() {
           <Typography.Link onClick={() => load(page)} style={{ marginLeft: 8 }}>重试</Typography.Link>
         </Typography.Text>
       )}
-      <Table<Deposit> locale={{ emptyText: <PaintEmpty character="cat" /> }}
+      <Table<Deposit> locale={{ emptyText: listError ? null : <PaintEmpty character="cat" /> }}
         rowKey="id" loading={loading} dataSource={deposits} size="middle"
         pagination={false}
         columns={[

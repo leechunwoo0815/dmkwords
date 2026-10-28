@@ -171,6 +171,10 @@
   flex-direction: column;
   align-items: center;
   gap: 2rpx;
+  /* W7-08：命中区 ≥88rpx（视觉尺寸不变，用最小盒撑开） */
+  min-width: 88rpx;
+  min-height: 88rpx;
+  justify-content: center;
   padding: 12rpx 20rpx;
   border-radius: var(--radius-sm);
   transition: background 0.12s;
@@ -208,6 +212,12 @@
   margin-bottom: 40rpx;
 }
 .speed-chip {
+  /* W7-08：命中区 ≥88rpx */
+  min-width: 88rpx;
+  min-height: 88rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 10rpx 28rpx;
   border-radius: 999rpx;
   font-size: 24rpx;

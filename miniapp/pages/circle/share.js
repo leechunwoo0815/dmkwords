@@ -30,7 +30,8 @@ Page({
     this.setData({
       // W7-06：无参不再落 NaN（那会让页面永久停在骨架屏）——统一解析 + 走可见态
       childId: session.resolveChildId(options),
-      childName: decodeURIComponent(options.child_name || ''),
+      // W7-12：缺参回落到当前孩子
+      childName: decodeURIComponent(options.child_name || '') || ((session.getCurrentChild() || {}).name || ''),
       // Q5：事件触发点带卡定位（quiz-result「晒成就」→ 该卡置顶便于直接晒）
       focusType: options.focus_type || '',
       focusRef: options.focus_ref ? Number(options.focus_ref) : null,

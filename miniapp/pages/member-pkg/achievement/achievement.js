@@ -28,7 +28,8 @@ Page({
   },
 
   onLoad(options) {
-    this.setData({ childName: decodeURIComponent(options.child_name || '') })
+    // W7-12：缺参回落到当前孩子
+    this.setData({ childName: decodeURIComponent(options.child_name || '') || ((session.getCurrentChild() || {}).name || '') })
     // W7-03：与 checkin / leaderboard / report / profile-card 对齐，走统一解析
     // （原先裸 `Number(options.child_id)`：无参时 NaN → load() 直接 return = 永久空页）
     this._childId = session.resolveChildId(options)

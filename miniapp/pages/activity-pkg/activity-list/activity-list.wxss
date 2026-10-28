@@ -164,6 +164,8 @@
   margin: 0;
   padding: 0 20rpx;
   height: 68rpx;
+  /* W7-08：命中小按钮的高度下限 */
+  min-height: 88rpx;
   line-height: 68rpx;
   font-size: 26rpx;
   font-weight: 700;

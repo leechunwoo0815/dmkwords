@@ -27,6 +27,7 @@ Scenario Outline 按 Examples 行展开、背景步按场景重复计入——�
 
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
 import re
@@ -40,14 +41,21 @@ DRAFT_TAGS = ("draft", "wip", "future")
 BEHAVE_INI = "behave.ini"
 
 
-def _parse_features(features_dir: pathlib.Path) -> tuple[dict, dict, list[dict]]:
-    """解析全部 `.feature` → (活动计数, 文件级挂起, 场景级挂起)。"""
+def _steps_hash(scenario) -> str:
+    """活动场景的步骤文本指纹（W8/D-A12-2：改弱断言而步数不变也要显形）。"""
+    text = "\n".join(f"{s.keyword.strip()}|{s.name.strip()}" for s in scenario.steps)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def _parse_features(features_dir: pathlib.Path) -> tuple[dict, dict, list[dict], dict]:
+    """解析全部 `.feature` → (活动计数, 文件级挂起, 场景级挂起, 活动场景步骤指纹)。"""
     from behave.model import ScenarioOutline
     from behave.parser import parse_file
 
     counts = {"features": 0, "scenarios": 0, "steps": 0}
     draft_files: dict[str, dict] = {}
     draft_scenarios: list[dict] = []
+    active_steps: dict[str, str] = {}
     for path in sorted(features_dir.rglob("*.feature")):
         rel = path.relative_to(features_dir.parent).as_posix()
         feature = parse_file(str(path))
@@ -73,11 +81,12 @@ def _parse_features(features_dir: pathlib.Path) -> tuple[dict, dict, list[dict]]
             counts["scenarios"] += n_scenarios
             counts["steps"] += n_steps
             active_here += n_scenarios
+            active_steps[f"{rel}::{scenario.name}"] = _steps_hash(scenario)
         if file_tags:
             draft_files[rel] = {"tags": file_tags, "reason": ""}
         elif active_here:
             counts["features"] += 1
-    return counts, draft_files, draft_scenarios
+    return counts, draft_files, draft_scenarios, active_steps
 
 
 def _behave_ini_problems(root: pathlib.Path) -> list[str]:
@@ -102,7 +111,7 @@ def find_problems(root: pathlib.Path, baseline: dict) -> list[str]:
     features_dir = root / FEATURES
     if not features_dir.is_dir():
         return problems + [f"{FEATURES}/ 目录不存在——BDD 基线守卫无对象"]
-    counts, draft_files, draft_scenarios = _parse_features(features_dir)
+    counts, draft_files, draft_scenarios, active_steps = _parse_features(features_dir)
     if counts["scenarios"] == 0 and not draft_files and not draft_scenarios:
         return problems + [f"{FEATURES}/ 下解析到 0 个场景——扫描面塌缩（路径/解析器失效）"]
 
@@ -166,6 +175,29 @@ def find_problems(root: pathlib.Path, baseline: dict) -> list[str]:
         reason = (base_scn.get(key, {}) or {}).get("reason", "")
         if not reason.strip():
             problems.append(f"{key[0]} 场景「{key[1]}」的挂起**没有理由**——基线里补 `reason`")
+
+    # 守卫 ⑤（D-A12-2，2026-10-28）：活动场景的**步骤文本**按指纹比对——把断言改弱
+    # （例如 `那么 返回 200` → `那么 有响应`）但场景/步数不变时，旧判据全绿。
+    base_steps = baseline.get("active_steps", {})
+    if not base_steps:
+        problems.append(
+            "基线缺 `active_steps`（活动场景步骤指纹）——跑 `--update` 生成；"
+            "本守卫防的是「改弱断言但步数不变」"
+        )
+    else:
+        for key in sorted(set(base_steps) - set(active_steps)):
+            problems.append(f"{key} 已不在活动集（基线仍记着它的步骤指纹）——`--update` 刷新")
+        for key in sorted(set(active_steps) - set(base_steps)):
+            problems.append(
+                f"{key} **新增活动场景**（基线没有指纹）——新增/解封一律 `--update` 并在 LEDGER 留痕"
+            )
+        for key in sorted(set(base_steps) & set(active_steps)):
+            if base_steps[key] != active_steps[key]:
+                problems.append(
+                    f"{key} 的**步骤文本变了**（指纹 {base_steps[key]} → {active_steps[key]}）——"
+                    "如果是有意改断言，跑 `--update` 并在 LEDGER 写明改了什么；"
+                    "如果是把断言改弱，请恢复"
+                )
     return problems
 
 
@@ -179,7 +211,7 @@ def load_baseline(root: pathlib.Path) -> dict:
 def write_baseline(root: pathlib.Path, baseline: dict | None = None) -> pathlib.Path:
     """刷新基线：**保留已有 reason**（避免刷新一次把理由全抹掉）。"""
     old = baseline if baseline is not None else load_baseline(root)
-    counts, draft_files, draft_scenarios = _parse_features(root / FEATURES)
+    counts, draft_files, draft_scenarios, active_steps = _parse_features(root / FEATURES)
     old_files = old.get("draft_files", {})
     old_scn = {(e["file"], e["name"]): e for e in old.get("draft_scenarios", [])}
     data = {
@@ -189,6 +221,7 @@ def write_baseline(root: pathlib.Path, baseline: dict | None = None) -> pathlib.
             "本文件是「哪些场景没进门禁」的唯一事实源。"
         ),
         "active": counts,
+        "active_steps": dict(sorted(active_steps.items())),
         "draft_files": {
             rel: {
                 "tags": entry["tags"],
@@ -288,6 +321,16 @@ def self_test() -> int:
             print(f"✗ S1 「活动面下降」未命中：{got}")
             bad += 1
 
+        # ⑤ 改弱断言但步数不变（D-A12-2，2026-10-28）：步骤文本指纹必须显形
+        good.write_text(
+            "# language: zh-CN\n功能: 正常集\n  场景: 会跑的场景\n    假如 另一步\n",
+            encoding="utf-8",
+        )
+        got = find_problems(root, load_baseline(root))
+        if not any("步骤文本变了" in p for p in got):
+            print(f"✗ S1 「步骤文本变化」未命中：{got}")
+            bad += 1
+
         # ④ behave.ini 不再排除 @draft（盲区形状）
         (root / BEHAVE_INI).write_text("[behave]\ntags = ~@wip\n    ~@future\n", encoding="utf-8")
         got = find_problems(root, load_baseline(root))
@@ -308,7 +351,9 @@ def self_test() -> int:
     if bad:
         print(f"✗ S1 注入自检失败 {bad} 项")
         return 1
-    print("✓ S1 注入自检通过（静默挂起/无理由/活动面下降/排除行被删 四类全命中 + 合规零误报）")
+    print(
+        "✓ S1 注入自检通过（静默挂起/无理由/活动面下降/步骤文本变化/排除行被删 五类全命中 + 合规零误报）"
+    )
     return 0
 
 
