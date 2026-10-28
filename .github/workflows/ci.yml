@@ -44,8 +44,10 @@ jobs:
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: dmkwords_ci
-          # B8（2026-10-28）：与 docker-compose 同构——原 CI 缺 TZ/字符集/时区，
-          # 「同构」名不副实（DATETIME 比较与排序在不同时区下可能表现不同）。
+          # B8（2026-10-28）：容器 TZ 与本地一致（Python datetime.now() 与 MySQL NOW() 同为 +08:00）。
+          # 注：MySQL **服务端参数不能**写进 services.options（那是 docker create 参数，
+          # 写进去会让容器创建直接失败 exit 125，2026-10-28 实测）；MySQL 8 默认已是
+          # utf8mb4，故字符集/时区只靠 TZ 环境变量即可。
           TZ: Asia/Shanghai
         ports:
           - 3306:3306
@@ -54,9 +56,6 @@ jobs:
           --health-interval=5s
           --health-timeout=3s
           --health-retries=20
-          --character-set-server=utf8mb4
-          --collation-server=utf8mb4_unicode_ci
-          --default-time-zone=+08:00
     env:
       # B8：runner 与 MySQL 同时区（应用侧 datetime.now() 与 DB 默认时区一致）
       TZ: Asia/Shanghai

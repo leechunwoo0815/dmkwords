@@ -54,8 +54,10 @@ def test_ci_mysql_matches_local_timezone_and_charset():
     root = pathlib.Path(__file__).resolve().parents[2]
     ci = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     assert "TZ: Asia/Shanghai" in ci
-    assert "--default-time-zone=+08:00" in ci
-    assert "--character-set-server=utf8mb4" in ci
+    # services.options 只能放 docker create 参数：MySQL 服务端参数写进去会让容器起不来
+    # （2026-10-28 CI run 40667250153 实测 exit 125）。字符集靠 MySQL 8 默认 utf8mb4。
+    assert "--character-set-server" not in ci
+    assert "--default-time-zone" not in ci
 
 
 def test_dockerfile_installs_project_after_copy():
