@@ -169,7 +169,7 @@ class MilestoneAchievedEvent(DomainEvent):
     发布者：`growth/service.py`（里程碑判定）
     订阅者：
       - `tasks/notify_handlers.py::_on_milestone_achieved`
-    W2-D2（第十轮 P3，2026-10-25）核实：原文的订阅者清单与实现不符，现按真实订阅者订正（同批核对：事件面 16 类 / 发布 12 / 订阅 12）。
+    W2-D2（第十轮 P3，2026-10-25）核实：原文的订阅者清单与实现不符，现按真实订阅者订正（同批核对：事件面 12 类 / 发布 12 / 订阅 12）。
     """
 
     event_type: str = "milestone.achieved"
@@ -184,7 +184,7 @@ class OrderPaidEvent(DomainEvent):
     发布者：`OrderService`（人工确认收款 / 线上回调结算）
     订阅者：
       - `tasks/notify_handlers.py::_on_order_paid`
-    W2-D2（第十轮 P3，2026-10-25）核实：原文的订阅者清单与实现不符，现按真实订阅者订正（同批核对：事件面 16 类 / 发布 12 / 订阅 12）。
+    W2-D2（第十轮 P3，2026-10-25）核实：原文的订阅者清单与实现不符，现按真实订阅者订正（同批核对：事件面 12 类 / 发布 12 / 订阅 12）。
     """
 
     event_type: str = "order.paid"
@@ -220,7 +220,7 @@ class DepositPaidEvent(DomainEvent):
     发布者：`billing/service.py`（押金收款确认）
     订阅者：
       - `tasks/notify_handlers.py::_on_deposit_paid`
-    W2-D2（第十轮 P3，2026-10-25）核实：原文的订阅者清单与实现不符，现按真实订阅者订正（同批核对：事件面 16 类 / 发布 12 / 订阅 12）。
+    W2-D2（第十轮 P3，2026-10-25）核实：原文的订阅者清单与实现不符，现按真实订阅者订正（同批核对：事件面 12 类 / 发布 12 / 订阅 12）。
     """
 
     event_type: str = "deposit.paid"
@@ -240,46 +240,10 @@ class ReservationCreatedEvent(DomainEvent):
     发布者：`reading/reservation_service.py::ReservationService.create`
     订阅者：
       - `tasks/notify_handlers.py::_on_reservation_created`
-    W2-D2（第十轮 P3，2026-10-25）核实：原文的订阅者清单与实现不符，现按真实订阅者订正（同批核对：事件面 16 类 / 发布 12 / 订阅 12）。
+    W2-D2（第十轮 P3，2026-10-25）核实：原文的订阅者清单与实现不符，现按真实订阅者订正（同批核对：事件面 12 类 / 发布 12 / 订阅 12）。
     """
 
     event_type: str = "reservation.created"
-    child_id: int = 0
-    book_id: int = 0
-    reservation_id: int = 0
-
-
-@dataclass
-class ReservationFulfilledEvent(DomainEvent):
-    """预约取书事件
-
-    发布者：无（当前无发布点）
-    订阅者：无
-    W2-D2（第十轮 P3，2026-10-25）核实：**本事件当前既无发布者也无订阅者**（未接线事件，清单见 `docs/09` 挂账「N-8 四个死事件类」）。
-    保留类定义是为了不阻断「先定契约后接线」的写法；接线或删除由甲方裁定。
-
-    """
-
-    event_type: str = "reservation.fulfilled"
-    child_id: int = 0
-    book_id: int = 0
-    reservation_id: int = 0
-    borrow_record_id: int | None = None
-    book_copy_id: int | None = None  # B1a：扫码取书时定位到具体副本
-
-
-@dataclass
-class ReservationCancelledEvent(DomainEvent):
-    """预约取消事件
-
-    发布者：无（当前无发布点；取消路径**同事务**直接释放副本，不走事件）
-    订阅者：无
-    W2-D2（第十轮 P3，2026-10-25）核实：**本事件当前既无发布者也无订阅者**（未接线事件，清单见 `docs/09` 挂账「N-8 四个死事件类」）。
-    保留类定义是为了不阻断「先定契约后接线」的写法；接线或删除由甲方裁定。
-
-    """
-
-    event_type: str = "reservation.cancelled"
     child_id: int = 0
     book_id: int = 0
     reservation_id: int = 0
@@ -292,46 +256,13 @@ class ReservationExpiredEvent(DomainEvent):
     发布者：`reading/reservation_service.py::ReservationService.expire_due`
     订阅者：
       - `tasks/notify_handlers.py::_on_reservation_released`
-    W2-D2（第十轮 P3，2026-10-25）核实：原文的订阅者清单与实现不符，现按真实订阅者订正（同批核对：事件面 16 类 / 发布 12 / 订阅 12）。
+    W2-D2（第十轮 P3，2026-10-25）核实：原文的订阅者清单与实现不符，现按真实订阅者订正（同批核对：事件面 12 类 / 发布 12 / 订阅 12）。
     """
 
     event_type: str = "reservation.expired"
     child_id: int = 0
     book_id: int = 0
     reservation_id: int = 0
-
-
-@dataclass
-class ReadingBookFinishedEvent(DomainEvent):
-    """阅读完成一本书事件
-
-    发布者：无（当前无发布点）
-    订阅者：无
-    W2-D2（第十轮 P3，2026-10-25）核实：**本事件当前既无发布者也无订阅者**（未接线事件，清单见 `docs/09` 挂账「N-8 四个死事件类」）。
-    保留类定义是为了不阻断「先定契约后接线」的写法；接线或删除由甲方裁定。
-
-    """
-
-    event_type: str = "reading.book_finished"
-    child_id: int = 0
-    book_id: int = 0
-    word_count: int = 0
-
-
-@dataclass
-class ReadingSessionCompletedEvent(DomainEvent):
-    """阅读会话结束事件
-
-    发布者：无（当前无发布点）
-    订阅者：无
-    W2-D2（第十轮 P3，2026-10-25）核实：**本事件当前既无发布者也无订阅者**（未接线事件，清单见 `docs/09` 挂账「N-8 四个死事件类」）。
-    保留类定义是为了不阻断「先定契约后接线」的写法；接线或删除由甲方裁定。
-
-    """
-
-    event_type: str = "reading.session_completed"
-    child_id: int = 0
-    duration_minutes: int = 0
 
 
 # ============================================================

@@ -368,8 +368,9 @@ WIRED_SUBSCRIBERS = {
     "MilestoneAchievedEvent": "_on_milestone_achieved",
 }
 
-#: 四个未接线事件（N-8 挂账；接线或删除由甲方裁定）——docstring 必须**如实**写"无"
-DEAD_EVENTS = (
+#: N-8（2026-10-28 甲方裁定）：四个未接线事件类已删除。留名册用于**防回归**——
+#: 谁把类加回来（无论有没有接线）立刻判红；重新接线属新功能，须同步补发布/订阅并审视白名单。
+REMOVED_DEAD_EVENTS = (
     "ReservationFulfilledEvent",
     "ReservationCancelledEvent",
     "ReadingBookFinishedEvent",
@@ -406,13 +407,7 @@ def test_w2_d2_event_docstrings_match_reality():
         names = [getattr(h, "__name__", "") for h in event_bus._handlers.get(event_type, [])]
         assert handler in names, f"{cls}（{event_type}）的真实订阅者是 {names}，不是 {handler}"
 
-    # ② 四个未接线事件：docstring 必须写"无订阅者"（不许继续宣称有）
-    for cls in DEAD_EVENTS:
-        node = next(
-            n for n in ast.walk(ast.parse(src)) if isinstance(n, ast.ClassDef) and n.name == cls
-        )
-        doc = ast.get_docstring(node) or ""
-        assert "订阅者：无" in doc, f"{cls} 当前无订阅者，docstring 必须如实写"
+    # ② 四个未接线事件类已按 N-8 裁定删除——防回归守卫见下方独立用例
 
     # ③ **声明行**（发布者 / `- 订阅者` 行）不得引用不存在的 `X.y` 符号。
     #    只看声明行、不看说明文字：订正注释里会**引用**旧错误写法（"原文写的 X 全仓不存在"），
@@ -435,6 +430,24 @@ def test_w2_d2_event_docstrings_match_reality():
                     f"{node.name} 的声明行仍引用不存在的符号 {token}"
                 )
     assert ev_mod.__name__ == "backend.common.events"  # 模块可加载（事件面契约不被改坏）
+
+
+def test_n8_dead_events_removed_and_whitelist_empty():
+    """N-8（2026-10-28 甲方裁定）：四个零发布零订阅的事件类已删除，白名单清零。
+
+    RED：删类不删白名单 → `verify_architecture` 判「白名单条目已不再命中任何问题」；
+    把任一死类加回来（仍不接线）→ 本用例直接红，防止「先定契约后接线」的空壳回潮。
+    """
+    from backend.common import events as ev_mod
+    from scripts.verify_architecture import EVENT_CONTRACT_WHITELIST
+
+    for cls in REMOVED_DEAD_EVENTS:
+        assert not hasattr(ev_mod, cls), (
+            f"{cls} 已按 N-8 裁定删除，不得重新引入（重新接线须同步补发布/订阅）"
+        )
+    assert EVENT_CONTRACT_WHITELIST == {}, (
+        "死事件类已删除，事件契约白名单必须为空（过期条目会被门禁判红）"
+    )
 
 
 # ---------------------------------------------------------------- W2-D3 对账幂等

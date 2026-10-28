@@ -359,12 +359,9 @@ def check_like_escape(errors: list[str]) -> None:
 #: 事件契约白名单：`event_type` → **不修的理由**（空理由不放行；条目过期会被判红）。
 #: 依据：`CLAUDE.md` 第三节「跨域副作用走事件…**事件发布/订阅双向对账入门禁**」——
 #: 第九轮 P1-8 实证这条承诺从未落地，而 P1-1（预约成功通知链断链）正是靠这个空档长期存活。
-EVENT_CONTRACT_WHITELIST: dict[str, str] = {
-    "reservation.cancelled": "N-8 死事件类：零发布零订阅——补接「家长取消预约」通知还是删类，待甲方裁定（整改任务书 §八-1）",
-    "reservation.fulfilled": "N-8 死事件类：零发布零订阅——核销转借阅是否需要独立通知，待甲方裁定（同上）",
-    "reading.book_finished": "N-8 死事件类：零发布零订阅——待甲方裁定（同上）",
-    "reading.session_completed": "N-8 死事件类：零发布零订阅——待甲方裁定（同上）",
-}
+#: 2026-10-28 甲方裁定：N-8 四个死事件类（预约取书/预约取消/阅读完成/会话结束）已删除，
+#: 白名单清零。此表只接受「确属设计选择且本轮不修」的条目，且必须写清理由。
+EVENT_CONTRACT_WHITELIST: dict[str, str] = {}
 
 
 def _scan_event_contract(backend: Path):
