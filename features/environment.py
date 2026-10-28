@@ -9,8 +9,9 @@ from tests.unit.conftest import ADMIN_TABLES
 
 # G-13/T34（域G）：清理清单对齐 conftest 单一事实源（原 13 表清单缺 refund/
 # withdrawal/transfer/activities/notifications 等 23 表——横切批解封资金类
-# feature 时会踩跨场景残留；改清单须改 conftest 一处）
-BDD_TABLES = [t for t in ADMIN_TABLES if t not in ("audit_logs", "system_configs", "admin_users")]
+# feature 时会踩跨场景残留；改清单须改 conftest 一处）。
+# W8-D9（2026-10-28）：原 `ADMIN_TABLES + BDD_TABLES` 每场景重复 37 条 TRUNCATE
+# （BDD_TABLES 是 ADMIN_TABLES 去掉三张种子表的子集——少清那三张会破坏种子，故必须清全量）。
 
 
 def before_scenario(context, scenario):
@@ -23,7 +24,9 @@ def before_scenario(context, scenario):
 
     _rate_limiter._requests.clear()
     with engine.begin() as conn:
-        for table in ADMIN_TABLES + BDD_TABLES:
+        # W8-D9（2026-10-28）：BDD_TABLES 是 ADMIN_TABLES 的子集（37 ⊂ 40），
+        # 原先 `ADMIN_TABLES + BDD_TABLES` 每场景多跑 37 条重复 TRUNCATE。
+        for table in ADMIN_TABLES:
             conn.execute(text(f"TRUNCATE TABLE {table}"))
     from backend.seeds.seed_admin import seed as seed_admin
     from backend.seeds.seed_configs import seed as seed_configs

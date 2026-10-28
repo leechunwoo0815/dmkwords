@@ -72,11 +72,15 @@ IMPORT_RE = re.compile(r"@import\s+\"([^\"]+)\";")
 #: W3：reader 入口传整对象（`?book={...}`）——`/borrows` 等接口不下发 audio_url，必哑火
 READER_OBJ_PARAM_RE = re.compile("reader/reader\\?[^\"'`\n]*\\bbook=")
 #: W4：把"请求失败"吞成空数据（`[]` / `null`）——失败会被渲染成"没有数据/0"
-#: 覆盖两种写法：`() => []` / `() => null` / `function () { return [] }`。
+#: 覆盖写法：`() => []` / `(e) => []` / `() => null` / `function (e) { return [] }` /
+#: 跨行 `.catch(() =>\n [])`（W8-D4，2026-10-28：原正则只认无参单行）。
 #: 注意**不要**在 `[]` 后面加 `\b`——`]` 是非单词字符，`\b` 会永远匹配不上（自检当场抓到）。
 SILENT_EMPTY_CATCH_RE = re.compile(
-    r"\.catch\(\s*(?:\(\s*\)|function\s*\(\s*\))\s*=>\s*(?:\{\s*return\s+)?(?:\[\s*\]|null)"
-    r"|\.catch\(\s*function\s*\(\s*\)\s*\{\s*return\s+(?:\[\s*\]|null)\s*;?\s*\}\s*\)"
+    r"\.catch\(\s*(?:"
+    r"(?:\(\s*[^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*(?:\{\s*return\s+)?(?:\[\s*\]|null|undefined)"
+    r"|function\s*\(\s*[^)]*\)\s*\{\s*return\s+(?:\[\s*\]|null|undefined)\s*;?\s*\}"
+    r")\s*\}?\s*\)",
+    re.S,
 )
 
 #: W4 **第二形态**（2026-10-22 第一百一十三批）：`try { … } catch (e) { this.setData({ rows: [] }) }`
@@ -913,6 +917,16 @@ def selftest() -> list[str]:
         w4_hits = scan_silent_empty_catch([bad_catch])
         if not any(p.startswith("W4") for p in w4_hits):
             fails.append("S1: W4 未命中注入样本")
+        # W8-D4（2026-10-28）：带参 / 跨行两种原先漏掉的写法
+        for text, label in (
+            ("api.list().catch((e) => [])\n", "带参 `.catch((e) => [])`"),
+            ("api.list().catch(() =>\n  null)\n", "跨行 `.catch(() =>\\n null)`"),
+            ("api.list().catch(function (e) { return [] })\n", "function 形态"),
+        ):
+            probe = base / f"bad_catch_{abs(hash(label))}.js"
+            probe.write_text(text, encoding="utf-8")
+            if not any(p.startswith("W4") for p in scan_silent_empty_catch([probe])):
+                fails.append(f"S1: W4 未命中注入样本（{label}）")
         good_catch = base / "ok_catch.js"
         good_catch.write_text(
             "api.list().then((r) => this.setData({ rows: r })).catch((e) => {\n"
@@ -1143,6 +1157,14 @@ def main() -> int:
     self_fails = selftest()
     if self_fails:
         print("FAIL(S1): " + "；".join(self_fails))
+        return 1
+    # W8-D4（2026-10-28）：W4c 清单存在性守卫——路径改名/移动会让 W4c 静默漏检
+    missing_pages = sorted(p for p in FAILURE_STATE_PAGES if not (ROOT / p).is_file())
+    if missing_pages:
+        print(
+            f"FAIL(S2): FAILURE_STATE_PAGES 有 {len(missing_pages)} 个路径不存在"
+            f"（改名/移动会让 W4c 静默漏检）：{missing_pages}"
+        )
         return 1
     problems = (
         scan(wxml_files)

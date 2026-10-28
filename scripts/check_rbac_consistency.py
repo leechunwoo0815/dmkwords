@@ -35,9 +35,25 @@ UNWIRED_ALLOWLIST: dict[str, str] = {
     "activity.manage": "F-L9 裁定保留（staff 目录断言依赖）；端点实挂 member.manage，接线评估挂后续批",
 }
 
+# 前端零拦截但**当前无风险**的码（W8-D16，2026-10-28）：两个内置角色目录都持有这些码
+# （staff 显式列出、superadmin 为 *），管理端按角色渲染页面，不会出现"看得到入口但必然 403"。
+# 新增自定义角色 / 从 staff 目录移除某码之前，必须先补前端拦截或从本表删除——否则门禁判红。
+FRONTEND_ALLOWLIST: dict[str, str] = {
+    "activity.manage": "staff 目录持有（活动管理页按角色渲染）；端点实挂 member.manage",
+    "audio.manage": "staff 目录持有（音频管理在图书详情内，按角色渲染）",
+    "quiz.manage": "staff 目录持有（题目管理在图书详情内，按角色渲染）",
+}
+
 
 def _read(p: pathlib.Path) -> str:
     return p.read_text(encoding="utf-8", errors="replace")
+
+
+def classify(declared: set[str], be: set[str], fe: set[str]) -> tuple[list[str], list[str]]:
+    """W8-D16：返回 (死权限, 前端零拦截且未登记)——两者都判红，登记过的除外。"""
+    dead = sorted(declared - set(be) - set(UNWIRED_ALLOWLIST))
+    ungated = sorted((declared - set(fe)) - set(FRONTEND_ALLOWLIST))
+    return dead, ungated
 
 
 def backend_used(root: pathlib.Path | None = None) -> dict[str, set[str]]:
@@ -112,6 +128,19 @@ def self_test() -> int:
         if backend_used(root):
             print("✗ S2 空扫描自检失败（清空样本后仍抽出引用）")
             bad += 1
+    # W8-D16：死权限 / 前端零拦截必须能判出来（登记过的除外）
+    dead, ungated = classify({"a.manage", "b.view"}, {"a.manage"}, {"a.manage"})
+    if dead != ["b.view"] or ungated != ["b.view"]:
+        print(f"✗ S1 死权限/前端零拦截判定失败：dead={dead}, ungated={ungated}")
+        bad += 1
+    dead, ungated = classify(set(UNWIRED_ALLOWLIST), set(), set())
+    if dead or ungated:
+        print(f"✗ S1 UNWIRED 已登记项被误判：dead={dead}, ungated={ungated}")
+        bad += 1
+    dead, ungated = classify(set(FRONTEND_ALLOWLIST), set(FRONTEND_ALLOWLIST), set())
+    if dead or ungated:
+        print(f"✗ S1 FRONTEND 已登记项被误判：dead={dead}, ungated={ungated}")
+        bad += 1
     if bad:
         print(f"✗ S1 注入自检失败 {bad} 项")
         return 1
@@ -148,16 +177,27 @@ def main() -> int:
         for c, fs in sorted(undeclared_fe.items()):
             print(f"   {c} ← {', '.join(sorted(fs))}")
 
-    dead = sorted(declared - set(be) - set(UNWIRED_ALLOWLIST))
+    dead, ungated_unregistered = classify(declared, set(be), set(fe))
     if dead:
-        print(f"⚠ 已声明但后端从未引用（死权限）{len(dead)}：{dead}")
+        # W8-D16（2026-10-28）：死权限从 WARN 升为硬失败——声明了却没人用，等于给角色
+        # 发了一张永远打不开的门禁卡；确属未接线请登记 UNWIRED_ALLOWLIST（含理由）。
+        failed = 1
+        print(f"✗ 已声明但后端从未引用（死权限）{len(dead)}：{dead}")
     for code, why in sorted(UNWIRED_ALLOWLIST.items()):
         mark = "已声明未接线（已登记）" if code in declared else "登记了但不在目录里"
         print(f"⚠ {code}：{mark} —— {why}")
 
     ungated = sorted(declared - set(fe))
-    if ungated:
-        print(f"⚠ 前端零拦截的码（缺该码的角色会看到必然 403 的入口）{len(ungated)}：{ungated}")
+    if ungated_unregistered:
+        # W8-D16：前端零拦截的码从 WARN 升为硬失败——新增码必须同时接 UI 或登记理由。
+        failed = 1
+        print(
+            f"✗ 前端零拦截且未登记的码（缺该码的角色会看到必然 403 的入口）"
+            f"{len(ungated_unregistered)}：{ungated_unregistered}"
+        )
+    for code in ungated:
+        if code in FRONTEND_ALLOWLIST:
+            print(f"⚠ {code}：前端零拦截（已登记）—— {FRONTEND_ALLOWLIST[code]}")
 
     if failed:
         print("[rbac] ✗ 对账失败（修目录/引用，或把「暂未接线」写进 UNWIRED_ALLOWLIST 并注明理由）")

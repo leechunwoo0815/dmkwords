@@ -71,16 +71,20 @@ def test_gate_builds_frontend_and_checks_baseline_after_restore():
 
 
 def test_gate_selftest_counts_only_real_checkers():
-    """S5：待启用的旧工具不算 gate 覆盖；真实检查器必须计入。"""
+    """S5：gate 覆盖只数真实在岗的检查器（W8-D10：旧工具死分支已删除）。"""
     from scripts import check_gate_selftest as cg
 
     names = cg.gate_checker_names(GATE)
     assert "verify_architecture" in names
     assert "check_demo_baseline" in names
-    assert "verify_api_contract" not in names, "-f 守卫的旧工具不是真实覆盖"
-    assert "check_model_consistency" not in names, "-f 守卫的旧工具不是真实覆盖"
-    assert cg.PENDING_TOOLS, "待启用工具必须显式登记（禁止静默）"
-    assert all(reason.strip() for reason in cg.PENDING_TOOLS.values()), "待启用工具必须写理由"
+    assert "verify_api_contract" not in names, "盘上不存在的旧工具不是真实覆盖"
+    assert "check_model_consistency" not in names, "盘上不存在的旧工具不是真实覆盖"
+    # W8-D10（2026-10-28）：两个旧工具的 `if [ -f ... ] else skip` 死分支已从 gate 删除，
+    # 能力由 [6] alembic check（模型一致性）+ [8] 契约快照两检（API 契约）覆盖。
+    assert not cg.PENDING_TOOLS, "PENDING_TOOLS 应为空——死分支已删；再出现说明又加了不落地的工具"
+    # 只看**代码行**：删除说明里会保留旧工具名（注释不是调用）
+    gate_code = cg._code_lines(GATE.read_text(encoding="utf-8"))
+    assert "verify_api_contract" not in gate_code and "check_model_consistency" not in gate_code
 
 
 def test_ci_pins_actions_and_declares_permissions():

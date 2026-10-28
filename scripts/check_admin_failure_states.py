@@ -42,9 +42,29 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "admin-web" / "src"
 
-#: A1：catch 直接把失败变成空值（连提示都不给）
-THROWAWAY_CATCH_RE = re.compile(
-    r"\.catch\(\s*(?:\(\s*\)|\w+)\s*=>\s*(\[\]|null|undefined|\{\s*\}|set\w+\(\[\]\))\s*\)"
+#: A1：catch 直接把失败变成空值（连提示都不给）。
+#: 2026-10-28（B4/W8-D2）：原正则只看**单行**、只认无参 `()`，四种写法全漏：
+#: `.catch((e) => [])`、块体 `.catch(() => { setX([]); })`、
+#: 对象字面量 `.catch(() => ({ ... }))`、跨行 `.catch(() =>\n [])`。
+#: 现改为「去注释后全文扫 + 花括号配平块体」，四种形态同一判据。
+CATCH_HEAD_RE = re.compile(
+    r"\.catch\(\s*(?:\(\s*[^)]*\)|[A-Za-z_$][\w$]*)\s*=>|\.catch\(\s*function\s*\([^)]*\)"
+)
+#: 空值形态（表达式体）：[] / null / undefined / {} / ({})
+EMPTY_VALUE_RE = re.compile(r"^(?:\[\s*\]|null|undefined|\{\s*\})$")
+#: 表达式体里直接 `setX([])`（等价于块体里的赋值）
+SINGLE_EMPTY_ASSIGN_RE = re.compile(
+    r"^set[A-Za-z0-9_$]+\(\s*(?:\[\s*\]|null|undefined|\{\s*\})\s*\)$"
+)
+#: 块体里的吞空赋值 / 返回
+EMPTY_ASSIGN_RE = re.compile(
+    r"\bset[A-Za-z0-9_$]+\(\s*(?:\[\s*\]|null|undefined|\{\s*\})\s*\)"
+    r"|\breturn\s+(?:\[\s*\]|null|undefined|\{\s*\})\s*;?"
+)
+#: 块体/对象里的失败提示（任一出现即不算静默吞错）
+FAILURE_MARK_RE = re.compile(
+    r"message\.|notification\.|console\.(?:error|warn)|toast|alert\("
+    r"|set[A-Za-z0-9_$]*(?:Error|Failed)|(?:error|message|failed)\s*:"
 )
 #: A1 登记逃生口（同行或上一行）
 A1_OK_RE = re.compile(r"//\s*A1-ok\s*[:：]\s*\S+")
@@ -58,22 +78,137 @@ TABLE_RE = re.compile(r"<Table\b")
 API_CALL_RE = re.compile(r"\bapi[A-Z]\w+\(")
 
 
+def _mask_comments(text: str) -> str:
+    """注释字符替换为空格（保留换行与长度），避免注释里的反例被当成代码。"""
+    out = list(text)
+    i, n = 0, len(text)
+    quote = ""
+    while i < n:
+        ch = text[i]
+        if quote:
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == quote:
+                quote = ""
+            i += 1
+            continue
+        if ch in "'\"`":
+            quote = ch
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n:
+            nxt = text[i + 1]
+            if nxt == "/":
+                while i < n and text[i] != "\n":
+                    out[i] = " "
+                    i += 1
+                continue
+            if nxt == "*":
+                out[i] = out[i + 1] = " "
+                i += 2
+                while i < n and not (text[i] == "*" and i + 1 < n and text[i + 1] == "/"):
+                    if text[i] != "\n":
+                        out[i] = " "
+                    i += 1
+                if i < n:
+                    out[i] = " "
+                    if i + 1 < n:
+                        out[i + 1] = " "
+                    i += 2
+                continue
+        i += 1
+    return "".join(out)
+
+
+def _brace_body(text: str, open_index: int) -> str:
+    """从 `open_index` 的 `{` 起配平取块体（跳过引号内的括号）。"""
+    depth = 0
+    i = open_index
+    quote = ""
+    while i < len(text):
+        ch = text[i]
+        if quote:
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == quote:
+                quote = ""
+        elif ch in "'\"`":
+            quote = ch
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[open_index : i + 1]
+        i += 1
+    return text[open_index:]
+
+
+def _catch_line_problems(text: str) -> list[tuple[int, str]]:
+    """A1 全文扫描：返回 `(行号, 形态)`。"""
+    masked = _mask_comments(text)
+    hits: list[tuple[int, str]] = []
+    for m in CATCH_HEAD_RE.finditer(masked):
+        i = m.end()
+        while i < len(masked) and masked[i].isspace():
+            i += 1
+        if i < len(masked) and masked[i] == "{":
+            body = _brace_body(masked, i)
+            if EMPTY_ASSIGN_RE.search(body) and not FAILURE_MARK_RE.search(body):
+                hits.append((masked[: m.start()].count("\n") + 1, "块体"))
+            continue
+        # 表达式体：取到分号/换行（上限 240 字符，防跨函数误伤）
+        j, quote, depth = i, "", 0
+        while j < len(masked) and j - i < 240:
+            ch = masked[j]
+            if quote:
+                if ch == "\\":
+                    j += 2
+                    continue
+                if ch == quote:
+                    quote = ""
+            elif ch in "'\"`":
+                quote = ch
+            elif ch in "([{":
+                depth += 1
+            elif ch in ")]}":
+                if depth == 0:
+                    break
+                depth -= 1
+            elif ch == ";" and depth == 0:
+                break
+            elif ch == "\n" and depth == 0:
+                break
+            j += 1
+        expr = masked[i:j].strip()
+        simple = expr.strip("()").strip()
+        if (
+            EMPTY_VALUE_RE.match(simple)
+            or SINGLE_EMPTY_ASSIGN_RE.match(expr)
+            or SINGLE_EMPTY_ASSIGN_RE.match(simple)
+        ):
+            hits.append((masked[: m.start()].count("\n") + 1, "表达式"))
+            continue
+        # 对象字面量：({ ... }) / { ... }——没有 error/message/failed 键 = 默认值兜底
+        if simple.startswith("{") and simple.endswith("}"):
+            inner = simple[1:-1]
+            if "{" not in inner and not FAILURE_MARK_RE.search(inner):
+                hits.append((masked[: m.start()].count("\n") + 1, "对象字面量"))
+    return hits
+
+
 def scan_file(text: str) -> list[str]:
     """单个 tsx/ts 文件的两条规则（自证与主流程共用同一实现）。"""
     problems: list[str] = []
     lines = text.splitlines()
-    for i, line in enumerate(lines, 1):
-        stripped = line.strip()
-        # 跳过纯注释行（文档里写反例是正常的：本仓 DashboardCharts 的注释就在讲旧 `.catch(() => {})`）
-        if stripped.startswith(("//", "*", "/*")):
-            continue
-        m = THROWAWAY_CATCH_RE.search(line)
-        if not m:
-            continue
-        prev = lines[i - 2] if i >= 2 else ""
+    for lineno, form in _catch_line_problems(text):
+        line = lines[lineno - 1] if 0 < lineno <= len(lines) else ""
+        prev = lines[lineno - 2] if lineno >= 2 else ""
         if A1_OK_RE.search(line) or A1_OK_RE.search(prev):
             continue
-        problems.append(f"A1 失败吞成空：{stripped[:100]}")
+        problems.append(f"A1 失败吞成空（{form}）：{line.strip()[:100]}")
     if (
         TABLE_RE.search(text)
         and API_CALL_RE.search(text)
@@ -109,6 +244,24 @@ def self_test() -> int:
     if not scan_file("apiX().catch(() => setRows([]));\n"):
         print("✗ A1 未命中：`.catch(() => setRows([]))`")
         bad += 1
+    # W8-D2（2026-10-28）：四种原先漏掉的写法，现在都必须命中
+    for sample_text, label in (
+        ("apiX().catch((e) => []);\n", "`.catch((e) => [])`"),
+        ("apiX().catch(() => { setRows([]); });\n", "块体 `.catch(() => { setRows([]); })`"),
+        ("apiX().catch(() => ({ rows: [] }));\n", "对象字面量 `.catch(() => ({ rows: [] }))`"),
+        ("apiX().catch(() =>\n  []);\n", "跨行 `.catch(() =>\\n [])`"),
+    ):
+        if not scan_file(sample_text):
+            print(f"✗ A1 未命中：{label}")
+            bad += 1
+    for sample_text in (
+        "apiX().catch(() => { setRows([]); message.error('加载失败'); });\n",
+        "apiX().catch(() => ({ rows: [], error: '加载失败' }));\n",
+        "apiX().catch((e) => { console.error(e); setRows([]); });\n",
+    ):
+        if scan_file(sample_text):
+            print(f"✗ A1 误报：有失败提示的兜底被拦：{sample_text.strip()}")
+            bad += 1
     if scan_file("apiX().catch(() => []); // A1-ok: 下拉兜底\n"):
         print("✗ A1 误报：已登记 A1-ok 的行被拦")
         bad += 1
@@ -148,7 +301,8 @@ def self_test() -> int:
         print(f"✗ S1 注入自检失败 {bad} 项")
         return 1
     print(
-        "✓ S1 注入自检通过（A1 两种吞法命中 + A1-ok/注释/正常失败态零误报 + A2 命中与两条正例零误报）"
+        "✓ S1 注入自检通过（A1 五种吞法命中（含参数/块体/对象/跨行） + A1-ok/注释/正常失败态零误报"
+        " + A2 命中与两条正例零误报）"
     )
     return 0
 

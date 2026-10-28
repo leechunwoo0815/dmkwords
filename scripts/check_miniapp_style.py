@@ -1011,7 +1011,10 @@ RE_ICON_SLOT_EMOJI = re.compile(
 # 排版字形白名单：✓ ✕ ★ ☆ ▶ 等在 2600~27BF 区间，但属**设计系统文字符号**
 # （`已打卡 ✓`、环形勾叉、星级），不是平台 emoji——不能一并禁掉（R13a 误报源，已实证）。
 TYPO_GLYPHS = "\u2713\u2714\u2715\u2716\u2717\u2718\u2605\u2606\u25b6\u25c0\u25b2\u25bc\u25cf\u25cb\u25a0\u25a1\u25c6\u25c7\u203b"
-RE_EMOJI = re.compile("[\U0001f300-\U0001faff\u2600-\u27bf\u2b00-\u2bff]")
+RE_EMOJI = re.compile(
+    "[\U0001f000-\U0001faff\u2600-\u27bf\u2b00-\u2bff"
+    "\u203c\u2049\u00a9\u00ae\u2122\u2139\u3030\u303d\u3297\u3299]"
+)
 
 
 def scan_icon_emoji(base: Path = MINIAPP):

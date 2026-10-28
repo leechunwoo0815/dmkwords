@@ -1,5 +1,13 @@
 {
-  "min_passed": 1273,
-  "updated_at": "2026-10-27",
-  "note": "单测数量下限（R11-e S3，防测试被删/未被收集）。新增测试时只升不降；如确需删测，同步下调本值并在提交信息写明理由。判据：tests/unit/test_gate_selftest_20261026.py。"
+  "min_passed": 1280,
+  "updated_at": "2026-10-28",
+  "note": "单测数量下限（R11-e S3，防测试被删/未被收集）。新增测试时只升不降；如确需删测，同步下调本值并在提交信息写明理由。判据：tests/unit/test_gate_selftest_20261026.py。",
+  "allowed_skips": {
+    "tests/unit/test_media_health.py": "按本地时钟：未过 08:00 走 skip（判定逻辑另有用固定时刻的用例覆盖）",
+    "tests/unit/test_a1_closure_20261009.py": "本机装了阿里云 SDK 时跳过（dev/CI 不装）",
+    "tests/unit/test_audit4_fix2_20261017.py": "无 node 时跳过",
+    "tests/unit/test_audit8_p3_miniapp_20261022.py": "无 node 时跳过",
+    "tests/unit/test_review10_b2_miniapp_failure_states_20261024.py": "无 node 时跳过",
+    "tests/unit/test_miniapp_platform_isios.py": "无 node 时跳过"
+  }
 }

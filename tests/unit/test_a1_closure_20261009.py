@@ -343,8 +343,13 @@ def test_wiring_checker_passes_and_is_registered():
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "PASS" in proc.stdout
-    gate = (ROOT / "scripts/gate.sh").read_text(encoding="utf-8")
-    assert "check_miniapp_wiring.py" in gate, "检查器必须进门禁"
+    # W8-D14（2026-10-28）：原先是 `"check_miniapp_wiring.py" in gate 文本`（换行/
+    # 注释里出现即满足）；改为解析 gate 的真调用集合（与 check_gate_selftest 同一实现）。
+    from scripts import check_gate_selftest as cg
+
+    assert "check_miniapp_wiring" in cg.gate_checker_names(ROOT / "scripts/gate.sh"), (
+        "检查器必须进门禁（按 gate 真调用解析，不是全文子串）"
+    )
 
 
 def test_refund_notify_amount_mismatch_still_rejected(client, db, monkeypatch):

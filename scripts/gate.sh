@@ -43,6 +43,9 @@ fail() {
 
 step 1 "lint (ruff)"
 run ruff check backend/ tests/ features/ scripts/
+# W8-D15（2026-10-28 B4）：alembic/versions 是历史文件（147 条风格问题），全量 lint 不现实，
+# 但**语法/未定义名/失效断言**这类"导入即炸"的错误必须拦——本批实测 0 条，可持续守住。
+run ruff check alembic/versions/ --select E9,F63,F7,F82
 run ruff format --check .
 
 step 2 "单测 + 覆盖率（真实 MySQL 同构环境，单次跑全量）"
@@ -50,14 +53,14 @@ step 2 "单测 + 覆盖率（真实 MySQL 同构环境，单次跑全量）"
 # 占门禁总时长 96%（550s+712s）且双轮内存高峰——合并为单次（-42% 总时长）；
 # cov-fail-under 照常拦截；-x 快速失败语义随合并取消（门禁本就要看全貌）。
 # --durations=20：输出 top 慢测试清单（纯观测，为后续并行化铺路）
-# R11-e S3（2026-10-26）：单测数量基线守卫。原先只有 cov-fail-under=25（实测 91%），
+# R11-e S3（2026-10-26）：单测数量基线守卫。原先只有 cov-fail-under（实测 91%），
 # 删掉一批测试也照样绿。现在解析本次**收集数**（passed + skipped）并与
 # scripts/gate_baseline.json 的下限比对：低于下限 = 测试被删/未被收集
 # （如属预期删测，同步下调基线并在提交信息说明）。
 # 2026-10-27 CI 实证：`test_media_health` 按运行机本地时钟在 UTC 凌晨走 skip 分支，
 # 只数 `passed` 会让同一份代码在 CI 比本地少 1 → 必须用收集数（skip 也是被收集的）。
 PYTEST_TMP=$(mktemp -t dmkwords-pytest-XXXXXX)
-if ! python -m pytest tests/ -q --tb=short --cov=backend --cov-fail-under=25 \
+if ! python -m pytest tests/ -q --tb=short -rs --cov=backend --cov-fail-under=85 \
   --cov-report=term-missing:skip-covered --durations=20 2>&1 | tee "$PYTEST_TMP"; then
   echo "✗ 门禁失败: pytest tests/"
   FAILED=1
@@ -78,6 +81,9 @@ else
     echo "单测数量基线 OK：${COLLECTED_COUNT}（passed ${PASSED_COUNT} + skipped ${SKIPPED_COUNT}）>= ${MIN_PASSED}"
   fi
 fi
+# W8-D11（2026-10-28 B4）：skip 本身也要受约束——收集数不变时把用例改成 skip 不会红。
+# 每个被跳过的文件必须在 gate_baseline.json 的 allowed_skips 登记理由。
+run python scripts/gate_skip_audit.py "$PYTEST_TMP"
 rm -f "$PYTEST_TMP"
 
 step 3 "BDD (behave)"
@@ -90,17 +96,10 @@ run python -m scripts.verify_architecture --self-test
 run python -m scripts.verify_architecture
 
 step 5 "契约与反假绿（**含检查器自证**）"
-# verify_api_contract / check_model_consistency 为旧项目工具，F0 按新代码结构重写后启用
-if [ -f "scripts/verify_api_contract.py" ] && grep -q "dmkwords" scripts/verify_api_contract.py 2>/dev/null; then
-  run python -m scripts.verify_api_contract
-else
-  skip "verify_api_contract 旧结构工具待 F0 重写"
-fi
-if [ -f "scripts/check_model_consistency.py" ] && grep -q "dmkwords" scripts/check_model_consistency.py 2>/dev/null; then
-  run python -m scripts.check_model_consistency
-else
-  skip "check_model_consistency 旧结构工具待 F0 重写"
-fi
+# W8-D10（2026-10-28 B4）：原有两个 `if [ -f scripts/verify_api_contract.py ]` /
+# `check_model_consistency.py` 死分支——两个文件都不存在，每次门禁只打印 skip，
+# 步骤名却宣称"契约"。能力已由 [6] `alembic check`（模型↔迁移一致）与 [8] 契约快照两检
+# （OpenAPI + schema.d.ts）覆盖，故删除死分支，不在门禁里保留"永不启用"的名字。
 # ---------------------------------------------------------------------------
 # 检查器清单（**唯一来源**）：每个检查器都先跑 `--self-test` 再跑主流程。
 # 第八轮审查 P1-10：原先只跑主流程，注释里写着"含 S1 注入自检"而**实际没传 --self-test**——
@@ -232,12 +231,26 @@ else
     GIT_STATUS_OUT=""
   }
   UNTRACKED_OTHERS=$(printf '%s\n' "$GIT_STATUS_OUT" | grep '^??' | grep -vE '^\?\? \.zcodeignore$' || true)
+  # W8-D17（2026-10-28 B4）：`git status --porcelain` 看不见被 .gitignore 命中的文件——
+  # E-20260903-03 的变体（把"运行时必需的文件"写进 ignore，clone 后跑不起来但门禁照绿）。
+  # 判据：源码目录内**被忽略**的文件必须为空；工具产物与微信开发者工具的本机私有配置除外。
+  IGNORED_SRC=$(git -c core.quotepath=false status --porcelain --ignored 2>/dev/null \
+    | grep '^!!' | sed 's/^!! //' \
+    | grep -E '^(backend|miniapp|admin-web/src|scripts|alembic|features|tests)/' \
+    | grep -vE '(__pycache__|\.pytest_cache|\.DS_Store|\.pyc$|node_modules|/dist/|/uploads/|\.dev-logs|project\.private\.config\.json)' \
+    || true)
+  if [ -n "$IGNORED_SRC" ]; then
+    echo "✗ 源码目录内有被 .gitignore 命中的文件（clone 后缺失 → 门禁/运行会坏）："
+    echo "$IGNORED_SRC"
+    echo "  确属工具产物请加进本步白名单并说明理由；源码/种子依赖必须入库"
+    FAILED=1
+  fi
   if [ -n "$UNTRACKED_OTHERS" ]; then
     echo "✗ 工作区存在未入库文件（先 git add 或显式忽略；seed 依赖/文档引用的文件尤其不能留）："
     echo "$UNTRACKED_OTHERS"
     FAILED=1
   elif [ "$FAILED" -eq 0 ]; then
-    echo "交付完整性 PASS：工作区零 untracked（白名单 .zcodeignore）✓"
+    echo "交付完整性 PASS：工作区零 untracked（白名单 .zcodeignore）+ 源码目录零 ignored ✓"
   fi
 fi
 

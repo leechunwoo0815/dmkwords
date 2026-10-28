@@ -174,7 +174,11 @@ export default function RefundCenter() {
     // P1-7：徽标计数来自后端（分页后本页行数算不出"待审 N"，那会变成"假 0"）
     apiRefundCenterCounts()
       .then(setCounts)
-      .catch(() => setCounts(null));
+      // counts=null = 未知（界面显示「—」），不是假 0；失败留一条 warn 便于排查
+      .catch((e) => {
+        console.warn("退款中心计数加载失败", e);
+        setCounts(null);
+      });
   }, [message, refundPg.page, refundPg.pageSize, withdrawalPg.page, withdrawalPg.pageSize, transferPg.page, transferPg.pageSize]);
 
   useEffect(() => {

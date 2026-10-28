@@ -27,10 +27,14 @@ from __future__ import annotations
 
 import pathlib
 import re
+import subprocess
 import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+#: 单个检查器 --self-test 的墙钟上限（秒）。W8-D7：真跑自证，防止死循环拖死门禁。
+CHECKER_SELFTEST_TIMEOUT = 180
 
 #: gate.sh 里"检查器调用"的形状：`python -m scripts.<name>` 或 `python scripts/<name>.py`
 INVOKE_RE = re.compile(r"python(?:3)?\s+(?:-m\s+scripts\.(\w+)|scripts/(\w+)\.py)")
@@ -50,12 +54,11 @@ RUNTIME_CHECKERS: dict[str, str] = {
     "check_demo_baseline": "起停 dev + 查真实库的现场基线核验；无纯函数自证面（门禁价值=真实计数）",
 }
 
-#: **gate 文本里出现、但当前不执行**的旧结构工具（`if [ -f ... ]` 守卫，F0 重写后启用）。
+#: **gate 文本里出现、但当前不执行**的旧结构工具。
 #: R11-e S5（2026-10-26）：原先把这两个名字算进"gate 调用 16 个"，制造了不存在的覆盖面。
-PENDING_TOOLS: dict[str, str] = {
-    "verify_api_contract": "旧结构工具，gate 用 `-f` 守卫；F0 重写后启用",
-    "check_model_consistency": "旧结构工具，gate 用 `-f` 守卫；F0 重写后启用",
-}
+#: W8-D10（2026-10-28 B4）：两个 `-f` 死分支已从 gate 删除——能力由 [6] `alembic check`
+#: （模型一致性）与 [8] 契约快照两检（API 契约）覆盖。清单保持为空，防止再挂"永不启用"的工具。
+PENDING_TOOLS: dict[str, str] = {}
 
 
 def _code_lines(text: str) -> str:
@@ -94,10 +97,12 @@ def find_problems(root: pathlib.Path) -> list[str]:
     invoked = gate_invocations(gate)
     active = invoked - set(PENDING_TOOLS)
     gate_text = gate.read_text(encoding="utf-8")
+    gate_code = _code_lines(gate_text)
 
     # ① gate 真的传了 --self-test（注释写自证、代码不传 = P1-10 的原形状）
-    if "--self-test" not in gate_text:
-        problems.append("gate.sh 全文没有 `--self-test`——检查器自证没有接入门禁（P1-10 原形状）")
+    #    W8-D7（2026-10-28）：只看**代码行**——把字符串留在注释里不能算数。
+    if "--self-test" not in gate_code:
+        problems.append("gate.sh 代码里没有 `--self-test`（注释提及不算）——检查器自证没接入门禁")
 
     # ② 实际调用必须有实体文件（R11-e S5：原先把 `-f` 守卫的旧工具/注释里的名字也算进覆盖数）
     for name in sorted(active):
@@ -109,15 +114,30 @@ def find_problems(root: pathlib.Path) -> list[str]:
 
     # ③ gate 里跑的每个**检查器**都必须支持 --self-test（非检查器脚本不在本检查范围；
     #    运行期检查器见 RUNTIME_CHECKERS——它们操作真实环境，没有可注入的纯函数自证面）
+    #    W8-D7（2026-10-28）：从"文件里出现过字符串"改为**真子进程跑一遍**——
+    #    删掉 `if "--self-test"` 分支、只在 docstring 里留字符串的假自证现在会被抓。
     for name in sorted(active):
         if not (name.startswith("check_") or name.startswith("verify_")):
             continue  # 契约导出/迁移等非检查器脚本
         if name in RUNTIME_CHECKERS:
             continue
         f = root / "scripts" / f"{name}.py"
-        if f.is_file() and "--self-test" not in f.read_text(encoding="utf-8"):
+        if not f.is_file():
+            continue  # ② 已单独报"脚本不存在"
+        proc = subprocess.run(
+            [sys.executable, str(f), "--self-test"],
+            capture_output=True,
+            text=True,
+            cwd=root,
+            timeout=CHECKER_SELFTEST_TIMEOUT,
+        )
+        out = (proc.stdout or "") + (proc.stderr or "")
+        if proc.returncode != 0 or not any(
+            marker in out for marker in ("S1", "S2", "自检", "self-test", "✓", "PASS", "OK")
+        ):
             problems.append(
-                f"scripts/{name}.py 被 gate 调用但**不支持 `--self-test`**——"
+                f"scripts/{name}.py 的 `--self-test` 不能真正跑通"
+                f"（exit={proc.returncode}，输出首行={out.strip().splitlines()[:1]}）——"
                 "它改坏了没人知道（补自证，或把它从 gate 移除并写进 NOT_IN_GATE）"
             )
 
@@ -146,11 +166,21 @@ def self_test() -> int:
             tail = (
                 'if __name__ == "__main__":\n'
                 '    if "--self-test" in sys.argv:\n'
+                '        print("✓ S1 self-test")\n'
                 "        raise SystemExit(0)\n"
                 if selftest
                 else 'if __name__ == "__main__":\n    raise SystemExit(0)\n'
             )
             (root / "scripts" / f"{name}.py").write_text("import sys\n" + tail, encoding="utf-8")
+
+        def write_fake_selftest_checker(name: str) -> None:
+            """W8-D7 的原形状：`--self-test` 只出现在注释里，代码忽略参数直接退出 0。"""
+            (root / "scripts" / f"{name}.py").write_text(
+                "import sys\n"
+                "# 本检查器支持 --self-test（注释里写着，但代码没实现）\n"
+                'if __name__ == "__main__":\n    raise SystemExit(0)\n',
+                encoding="utf-8",
+            )
 
         # ① 合规样本：唯一检查器接进 gate 且支持自证 → 零问题
         write_gate(
@@ -195,10 +225,24 @@ def self_test() -> int:
         if not any("check_ghost" in p and "不存在" in p for p in got):
             print(f"✗ S1 「调用不存在的检查器」未命中: {got}")
             bad += 1
+
+        # ⑥ 违例（W8-D7）：字符串只在注释里、代码忽略 --self-test → 必须判红
+        write_gate(
+            "run python -m scripts.check_alpha --self-test\n"
+            "run python -m scripts.check_gamma --self-test\n"
+        )
+        write_fake_selftest_checker("check_gamma")
+        got = find_problems(root)
+        if not any("check_gamma" in p and "不能真正跑通" in p for p in got):
+            print(f"✗ S1 「注释冒充自证」未命中: {got}")
+            bad += 1
     if bad:
         print(f"✗ S1 注入自检失败 {bad} 项")
         return 1
-    print("✓ S1 注入自检通过（无自证/假自证/未接入/调用不存在四类违例全命中 + 合规样本零误报）")
+    print(
+        "✓ S1 注入自检通过（无自证/假自证/注释冒充/未接入/调用不存在五类违例全命中"
+        " + 合规样本零误报）"
+    )
     return 0
 
 

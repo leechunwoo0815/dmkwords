@@ -433,17 +433,26 @@ def test_import_row_cap_reports_honestly(client: TestClient, admin_headers: dict
 # ------------------------------------------------------------------ P2-21 验证码 CSPRNG
 
 
-def test_sms_code_uses_csprng():
+def test_sms_code_uses_csprng(monkeypatch):
     """验证码生成必须走 `secrets`，且**全项目不再有第二份弱随机实现**。
 
     RED（还原修复前）：四个生成点都是 `random.randint` → 断言失败。
+    W8-D14（2026-10-28）：原先用 `inspect.getsource` 找 `"secrets.randbelow"` 字符串，
+    换等价实现（如 `secrets.choice`）就假红——现改为**行为断言**：桩掉
+    `secrets.randbelow`，断言验证码真的从它取数。
     """
     import inspect
 
     from backend.common import security
 
+    calls: list[int] = []
+    # 用 context 收窄桩的寿命：后面的用例还会生成多枚码并断言**互不相同**，
+    # 桩常驻会让全部输出恒为 "0000"（首版就这么自伤过一次）。
+    with monkeypatch.context() as m:
+        m.setattr(security.secrets, "randbelow", lambda n: calls.append(n) or 0)
+        assert security.random_digit_code(4) == "0000"
+    assert calls == [10000], "random_digit_code 必须从 secrets.randbelow(10**digits) 取数"
     src = inspect.getsource(security.random_digit_code)
-    assert "secrets.randbelow" in src, "唯一生成口径必须用 secrets"
     # 判"代码里"有没有 random：docstring 里在**解释**为什么不能用它，不能算违规
     # （首版直接 substring 判定 → 把说明文字判成违例，自检当场抓到）
     body = ast.parse(textwrap.dedent(src)).body[0].body

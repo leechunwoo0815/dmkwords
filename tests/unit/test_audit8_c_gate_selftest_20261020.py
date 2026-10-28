@@ -24,23 +24,6 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "scripts"
 
-#: gate.sh 第 [5] 步清单里**跑自证**的检查器（与 `CHECKER_CMDS` 同口径；
-#: 清单一致性由 `check_gate_selftest` 机械校验，这里只跑"自证真的过"）
-SELF_TESTED = [
-    "check_fake_assertions",
-    "check_bdd_baseline",  # 第八轮 P2-69（2026-10-21 补）：BDD 挂起基线守卫
-    "check_miniapp_bindings",
-    "check_miniapp_wiring",
-    "check_docs_code_alignment",
-    "check_rbac_consistency",
-    "check_admin_todo_rows",
-    "check_miniapp_style",
-    "check_media_discipline",
-    "check_copy_emoji",
-    "check_gate_selftest",
-    "verify_architecture",
-]
-
 
 def _load(name: str):
     """按文件路径加载 scripts/<name>.py（它们不是包，import 名不可用）。"""
@@ -48,6 +31,26 @@ def _load(name: str):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+def _gate_self_test_targets() -> list[str]:
+    """W8-D8：清单**从 gate 现场推导**，不再手抄。
+
+    原先手抄 12 项漏了 `check_admin_failure_states`（2026-10-24 新增），且没有机制
+    校验这份清单与 `CHECKER_CMDS` 同口径。现在直接问 `check_gate_selftest`：
+    gate 实际调用、非运行期、非待启用的检查器 —— 新增检查器自动纳入本用例。
+    """
+    mod = _load("check_gate_selftest")
+    names = sorted(
+        mod.gate_checker_names(SCRIPTS / "gate.sh")
+        - set(mod.RUNTIME_CHECKERS)
+        - set(mod.PENDING_TOOLS)
+    )
+    assert names, "gate 现场没有可自证的检查器——清单推导失败"
+    return names
+
+
+SELF_TESTED = _gate_self_test_targets()
 
 
 def _run_selftest(name: str) -> subprocess.CompletedProcess:

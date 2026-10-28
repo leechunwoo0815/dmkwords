@@ -47,6 +47,8 @@ import tempfile
 SCAN_DIRS = ("features/steps", "tests")
 
 #: 规则 B：键名 + 字符串字面量形式的时间（如 `"start_at": "2026-09-20T15:00:00"`）
+#: 2026-10-28（B4/W8-D5）：补 `due_at/expires_at/checkin_at` 三个同族键；日期分隔符
+#: 允许 `T` 或**空格**（原先只认 ISO `T` 形式，`"2026-09-20 15:00:00"` 整类漏检）。
 TIME_BOMB_KEYS = (
     "start_at",
     "end_at",
@@ -54,10 +56,14 @@ TIME_BOMB_KEYS = (
     "publish_at",
     "deadline",
     "expire_at",
+    "expires_at",
+    "due_at",
+    "checkin_at",
+    "checked_in_at",
 )
 _KEYS_ALT = "|".join(TIME_BOMB_KEYS)
 TIME_BOMB_RE = re.compile(
-    rf"""["'](?P<key>{_KEYS_ALT})["']\s*[:=]\s*["'](?P<date>(\d{{4}})-\d{{2}}-\d{{2}}T)"""
+    rf"""["'](?P<key>{_KEYS_ALT})["']\s*[:=]\s*["'](?P<date>(\d{{4}})-\d{{2}}-\d{{2}}[T ])"""
 )
 #: B3：`.feature` 场景表格/步骤文本里的"键名 + 绝对日期"。
 #: 分隔符只许**标点与空白**（`|`/`:`/`=`/引号/逗号/空格）——中文注释里
@@ -204,15 +210,20 @@ def _loop_literals(tree: ast.AST) -> dict[str, str]:
 
 
 def _path_consts(tree: ast.AST) -> dict[str, str]:
-    """模块级/函数内**路径常量**：`PAGE_JS = ROOT / "miniapp/pages/x.js"` → {PAGE_JS: "miniapp/..."}。"""
+    """模块级/函数内**路径常量**：`PAGE_JS = ROOT / "miniapp/pages/x.js"` → {PAGE_JS: "miniapp/..."}。
+
+    W8-D5：`AnnAssign`（`PAGE_JS: Path = ROOT / "x"`）原先不认，补上。
+    """
     out: dict[str, str] = {}
+    pairs: list[tuple[ast.expr, ast.expr]] = []
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
-            continue
-        t = node.targets[0]
+        if isinstance(node, ast.Assign) and len(node.targets) == 1:
+            pairs.append((node.targets[0], node.value))
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            pairs.append((node.target, node.value))
+    for t, v in pairs:
         if not isinstance(t, ast.Name):
             continue
-        v = node.value
         if isinstance(v, ast.Call):
             fname = v.func.attr if isinstance(v.func, ast.Attribute) else getattr(v.func, "id", "")
             if fname in SOURCE_READ_FUNCS or fname == "open":
@@ -245,6 +256,15 @@ def _open_bound_names(tree: ast.AST) -> set[str]:
                 for t in node.targets:
                     if isinstance(t, ast.Name):
                         names.add(t.id)
+        if (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and isinstance(node.value, ast.Call)
+        ):
+            fn = node.value.func
+            fname = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+            if fname == "open":
+                names.add(node.target.id)
     return names
 
 
@@ -260,10 +280,18 @@ def _collect_source_vars(tree: ast.AST) -> dict[str, str]:
     consts = _path_consts(tree)
     file_objs = _open_bound_names(tree)
     out: dict[str, str] = {}
+    pairs: list[tuple[ast.expr, ast.Call]] = []
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Call):
-            continue
-        call = node.value
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+            pairs.extend((t, node.value) for t in node.targets)
+        # W8-D5：`src: str = path.read_text()`（AnnAssign）原先整类不认
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and isinstance(node.value, ast.Call)
+        ):
+            pairs.append((node.target, node.value))
+    for target_node, call in pairs:
         func = call.func
         fname = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
         if fname not in SOURCE_READ_FUNCS:
@@ -277,11 +305,10 @@ def _collect_source_vars(tree: ast.AST) -> dict[str, str]:
             target = _source_read_target(call)
             if not target and isinstance(receiver, ast.Name):
                 target = loops.get(receiver.id) or consts.get(receiver.id, "")
-        for t in node.targets:
-            if isinstance(t, ast.Name):
-                if out.get(t.id) and not target:
-                    continue  # 已有可解析目标，别被后面的空解析覆盖
-                out.setdefault(t.id, target)
+        if isinstance(target_node, ast.Name):
+            if out.get(target_node.id) and not target:
+                continue  # 已有可解析目标，别被后面的空解析覆盖
+            out.setdefault(target_node.id, target)
     return out
 
 
@@ -296,14 +323,60 @@ def _is_pure(node: ast.AST) -> bool:
     return False
 
 
+def _has_real_comment(line: str) -> bool:
+    """行内是否有**真注释**（`#` 在字符串外）。
+
+    W8-D5：原先 `"#" not in after` 把消息串里的 `#` 也当注释——`assert True, "#假绿"`
+    因此被放行。这里按引号状态判断。
+    """
+    quote = ""
+    i = 0
+    while i < len(line):
+        ch = line[i]
+        if quote:
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == quote:
+                quote = ""
+        elif ch in "'\"":
+            quote = ch
+        elif ch == "#":
+            return True
+        i += 1
+    return False
+
+
+def _tautology(node: ast.AST) -> str | None:
+    """常量断言 / 恒真恒假表达式的统一判定（W8-D5 补 BoolOp 与 not）。"""
+    if isinstance(node, ast.Constant) and node.value in (True, False):
+        return f"常量断言 `assert {node.value}`"
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+        inner = node.operand
+        if isinstance(inner, ast.Constant) and inner.value in (True, False):
+            return f"not 常量 `assert not {inner.value}`（恒真/恒假）"
+    if isinstance(node, ast.BoolOp):
+        consts = [
+            e.value
+            for e in node.values
+            if isinstance(e, ast.Constant) and isinstance(e.value, bool)
+        ]
+        if isinstance(node.op, ast.Or) and True in consts:
+            return f"or True 恒真：{ast.unparse(node)[:80]}"
+        if isinstance(node.op, ast.And) and False in consts:
+            return f"and False 恒假：{ast.unparse(node)[:80]}"
+    return None
+
+
 def _assert_problem(node: ast.Assert, lines: list[str]) -> str | None:
     """规则 A 判定（**只在这一处**，自证与主流程共用）。"""
     test = node.test
-    if isinstance(test, ast.Constant) and test.value in (True, False):
-        line = lines[node.lineno - 1] if node.lineno <= len(lines) else ""
+    line = lines[node.lineno - 1] if node.lineno <= len(lines) else ""
+    taut = _tautology(test)
+    if taut:
         after = line[line.find("assert") :] if "assert" in line else ""
-        if "#" not in after:
-            return f"常量断言 `assert {test.value}`（无同行注释说明原因）"
+        if not _has_real_comment(after):
+            return f"{taut}（无同行注释说明原因）"
         return None
     if isinstance(test, ast.Compare) and len(test.ops) == 1 and len(test.comparators) == 1:
         left, right = test.left, test.comparators[0]
@@ -473,9 +546,10 @@ def self_test() -> int:
     """
     bad = 0
     expect_violations = (
-        8  # A1 裸 ×2 + A1 带消息 ×1 + A2 同形 ×1 + A2 双常量 ×2 + steps ×1 + 规则 C 未登记 ×1
+        13  # A1 裸×2 + 带消息×1 + #假绿×1 + or True×2 + not False×1
+        # + A2 同形×1 + 双常量×2 + steps×1 + 规则 C 未登记×2（Assign + AnnAssign）
     )
-    expect_bombs = 3  # B1 字符串 ×1 + B2 构造式 ×1 + B3 .feature ×1
+    expect_bombs = 4  # B1 字符串×2（T/空格） + B2 构造式×1 + B3 .feature×1
     with tempfile.TemporaryDirectory(prefix="fake-assert-selftest-") as d:
         root = pathlib.Path(d)
         (root / "tests").mkdir(parents=True)
@@ -485,22 +559,31 @@ def self_test() -> int:
             "assert True\n"  # A1：裸 assert True
             "assert False\n"  # A1：裸 assert False
             'assert True, "看起来在断言"\n'  # A1：带消息也拦（消息不是"说明原因"）
+            'assert True, "#假绿"\n'  # W8-D5：消息串里的 # 不是注释
+            "assert True or x\n"  # W8-D5：or True 恒真
+            "assert x == 1 or True\n"  # W8-D5：比较 + or True
+            "assert not False\n"  # W8-D5：not 常量
             "assert x == x\n"  # A2：两侧同一表达式
             "assert 1 == 1\n"  # A2：双常量
             'assert "a" == "a"\n'  # A2：双常量（字符串）
             # ---- 规则 A 合法 ----
             "assert x == 1, '业务说明'\n"  # 正常断言
             "assert True  # 前端交互步骤无服务端断言\n"  # 逃生口：同行注释
+            "assert not x\n"  # not 变量不是恒真
+            "assert x and True\n"  # 等价于 x，不是恒真断言
             "assert r.status_code == 404\n"  # 正常断言（非双常量）
             "assert f() == f()\n"  # 有副作用 → 不算恒真
             # ---- 规则 C（源码文本断言登记制）----
             "src = (ROOT / 'backend/domain/admin/service.py').read_text(encoding='utf-8')\n"
             "assert 'SUPERADMIN_ONLY_TASK_GROUPS = ' in src\n"  # C 违例：后端实现文本未登记
+            "src2: str = (ROOT / 'backend/domain/admin/service.py').read_text(encoding='utf-8')\n"
+            "assert 'SUPERADMIN_ONLY_TASK_GROUPS = ' in src2\n"  # W8-D5：AnnAssign 同样要拦
             "page = (ROOT / 'admin-web/src/pages/X.tsx').read_text(encoding='utf-8')\n"
             "assert 'listError' in page\n"  # C 合法：前端产物已登记前缀
             "assert x == 1\n"  # C 邻居：不涉及源码读取变量 → 不归规则 C 管
             # ---- 规则 B 违例 ----
             '{"start_at": "2026-11-01T10:00:00"}\n'  # B1：键位 + 近期未来字符串
+            '{"due_at": "2026-11-01 10:00:00"}\n'  # W8-D5：空格分隔 + 补登键位
             '{"start_at": datetime(2026, 12, 1, 10, 0)}\n'  # B2：键位 + 构造式近期未来
             # ---- 规则 B 合法 ----
             '{"start_at": "2099-01-01T10:00:00"}\n'  # 远期哨兵
@@ -579,6 +662,14 @@ def self_test() -> int:
     if bad:
         print(f"✗ S1 注入自检失败 {bad} 项")
         return 1
+    # S2（W8-D6）：空目录必须被扫描面守卫判死
+    with tempfile.TemporaryDirectory(prefix="fake-assert-surface-") as d:
+        if not _surface_problem(pathlib.Path(d)):
+            print("✗ S2 扫描面塌缩未判红（空目录应触发守卫）")
+            bad += 1
+    if bad:
+        print(f"✗ S1/S2 注入自检失败 {bad} 项")
+        return 1
     print(
         f"✓ S1 注入自检通过（假绿断言 {expect_violations} 类全命中 / 时间炸弹 {expect_bombs} 类全命中"
         " / 合法写法零误报）"
@@ -586,8 +677,27 @@ def self_test() -> int:
     return 0
 
 
+def _surface_problem(root: pathlib.Path) -> str | None:
+    """S2：真仓扫描面塌缩守卫（W8-D6）。
+
+    从非仓库根运行、或 `tests/`/`features/steps` 改名/移动时，`scan()` 会返回
+    `([], [])` → 打印 "OK … 0 处"、exit 0。与 check_admin_failure_states 的 S2 同口径。
+    """
+    surface = sum(1 for d in SCAN_DIRS for _ in (root / d).rglob("*.py"))
+    if surface < 30:
+        return (
+            f"扫描面塌缩：只找到 {surface} 个 .py（期望 ≥30）——"
+            "当前目录不是仓库根，或 tests/features/steps 被改名/移动"
+        )
+    return None
+
+
 def main() -> int:
     root = pathlib.Path.cwd()
+    surface = _surface_problem(root)
+    if surface:
+        print(f"FAIL(S2): {surface}")
+        return 1
     violations, bombs = scan(root)
     zombie = _zombie_entries(_hit_source_prefixes(root))
     if zombie:

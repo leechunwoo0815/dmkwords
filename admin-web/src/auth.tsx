@@ -29,7 +29,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(me.user);
         setPermissions(me.permissions);
       })
-      .catch(() => {
+      .catch((e) => {
+        // 启动恢复登录态失败 = 按未登录处理（登录页会引导重新登录）；
+        // 留一条 warn，避免"网络故障"被完全静默成"登出"
+        console.warn("恢复登录态失败", e);
         clearToken();
         setUser(null);
       })

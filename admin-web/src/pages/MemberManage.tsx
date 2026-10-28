@@ -195,6 +195,7 @@ export default function MemberManage() {
       setParentSearching(true);
       apiSearchParents(kw.trim())
         .then(setParentOptions)
+        // A1-ok: 建档搜索下拉兜底，非列表结论（重输关键词即重试；与空关键字分支同口径）
         .catch(() => { setParentOptions([]); })
         .finally(() => setParentSearching(false));
     }, 300);

@@ -32,7 +32,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 #: 平台 emoji 判定（与 check_miniapp_style.RE_EMOJI 同区间）
-RE_EMOJI = re.compile("[\U0001f300-\U0001faff\u2600-\u27bf\u2b00-\u2bff\ufe0f]")
+#: W8-D12（2026-10-28）：原区间窄于自述「emoji 必须为 0」——补
+#: U+1F000–1F2FF（麻将/扑克/字母方块）、U+203C/2049/00A9/00AE/2122/2139/3030/303D/3297/3299
+#: （带 emoji 呈现的符号）。**不加 U+2190–21FF**：箭头在本仓是排版用法（代码注释 700+ 处，
+#: 部分是可见文案），且默认文本呈现不是彩色 emoji——一并禁掉只会制造噪音。
+RE_EMOJI = re.compile(
+    "[\U0001f000-\U0001faff\u2600-\u27bf\u2b00-\u2bff"
+    "\u203c\u2049\u00a9\u00ae\u2122\u2139\u3030\u303d\u3297\u3299\ufe0f]"
+)
 
 #: 排版字形白名单（设计系统文字符号，不是平台 emoji）——与 R13c 的 TYPO_GLYPHS 同源
 TYPO_GLYPHS = (
@@ -124,6 +131,10 @@ def _whitelisted(rows: list[tuple[str, int, str]]) -> list[tuple[str, int, str]]
 def self_test() -> list[str]:
     """S1 注入自检：违例必命中 / 合规不误报。"""
     failures: list[str] = []
+    # W8-D12：放宽后的区间必须真的覆盖这些码位（原先 6 个码位全部漏检）
+    for ch in ("\U0001f004", "\U0001f0cf", "\u00a9", "\u00ae", "\u2122", "\u203c", "\u2049"):
+        if not RE_EMOJI.search(ch):
+            failures.append(f"S1 emoji 区间漏检：U+{ord(ch):04X}")
     tmp = Path(tempfile.mkdtemp(prefix="copy-emoji-selftest-"))
     try:
         (tmp / "admin-web" / "src").mkdir(parents=True)
