@@ -26,6 +26,8 @@ Page({
     supplementDisabled: false,
     supplementHint: '',
     loading: false,
+    // B8（2026-10-28）：无孩子时不能渲染成"暂无流水"（未选孩子 ≠ 没有押金记录）
+    noChild: false,
   },
 
   onLoad(options) {
@@ -33,6 +35,7 @@ Page({
     this.setData({ childName: decodeURIComponent(options.child_name || '') || child.name || '' })
     // P3 统一解析（第一百三十四批补齐）：原先 `Number(options.child_id)` 缺参即 NaN → 整页空白
     this._childId = session.resolveChildId(options)
+    if (!this._childId) this.setData({ noChild: true, loading: false })
     // R-313：退会/未入会置灰（后端守卫为准，前端镜像提示）
     const status = options.member_status || ''
     if (status === 'withdrawn' || status === 'none') {
@@ -48,7 +51,10 @@ Page({
   onRetryLoad() { this.load() },
 
   async load() {
-    if (!this._childId) return
+    if (!this._childId) {
+      this.setData({ loading: false, noChild: true })
+      return
+    }
     this.setData({ loading: true, loadError: '' })
     try {
       const d = await api.myDeposit(this._childId)

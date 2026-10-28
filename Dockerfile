@@ -43,9 +43,12 @@ RUN pip install --no-cache-dir uv
 WORKDIR /app
 # 先只拷依赖清单 → 业务代码改动不会让依赖层失效
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+# B8（2026-10-28）：依赖层先装**依赖**不装本包（--no-install-project）——此时 backend/
+# 还没拷进来，装本包会得到空映射；COPY 之后再 sync 一次把本包装进 venv。
+RUN uv sync --frozen --no-dev --no-install-project
 
 COPY . .
+RUN uv sync --frozen --no-dev
 RUN useradd --create-home --uid 10001 app \
     && chown -R app:app /app
 USER app

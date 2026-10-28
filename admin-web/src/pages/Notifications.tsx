@@ -28,6 +28,7 @@ import {
   apiToggleNotificationRead,
   AdminInboxItem,
 } from "../api/admin";
+import { fmtDateTime } from "../utils/datetime";
 
 const SCENE_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "全部场景" },
@@ -625,7 +626,7 @@ export default function Notifications() {
           expandedRowRender: expandContent,
         }}
         columns={[
-          { title: "时间", dataIndex: "created_at", width: 140 },
+          { title: "时间", dataIndex: "created_at", width: 140, render: fmtDateTime },
           { title: "家长", dataIndex: "parent_name", width: 110 },
           { title: "分类", dataIndex: "category", width: 80 },
           { title: "标题", dataIndex: "title", width: 150 },

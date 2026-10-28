@@ -49,6 +49,12 @@ Page({
     if (!this.data.agreed) {
       wx.showToast({ title: '请先同意隐私政策', icon: 'none' }); return
     }
+    // B8：登录勾选同样是"同意"的一个入口——本地留痕（版本/时间），只在首次记录
+    if (!wx.getStorageSync('privacy_agreed')) {
+      wx.setStorageSync('privacy_agreed', true)
+      wx.setStorageSync('privacy_agreed_version', 'v1')
+      wx.setStorageSync('privacy_agreed_at', Date.now())
+    }
     this.setData({ submitting: true })
     try {
       const wxCode = await this._wxLoginCode()

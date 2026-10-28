@@ -47,7 +47,9 @@
         <view class="btn-mini btn-main" data-book="{{item}}" catchtap="goListen">▶ 续听</view>
         <!-- 自助续借（PRD §5.1，2026-10-13 G6）：can_renew 由服务端给（未逾期 + 次数未用尽） -->
         <view wx:if="{{item.canRenew}}" class="btn-mini" data-item="{{item}}" catchtap="onRenew">续借</view>
-        <view wx:elif="{{!item.overdue}}" class="asset-meta">已续借</view>
+        <!-- B8（2026-10-28）：只有真用过续借次数才显示"已续借"——renew_limit=0 时
+             canRenew=false 且未逾期，原先会误显"已续借" -->
+        <view wx:elif="{{!item.overdue && item.renewUsed > 0}}" class="asset-meta">已续借</view>
         <view class="btn-mini" data-book="{{item}}" catchtap="goDetail">详情</view>
       </view>
     </view>

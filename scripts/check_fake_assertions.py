@@ -96,6 +96,9 @@ SOURCE_ASSERT_ALLOWLIST: dict[str, str] = {
     "docker-compose": "生产编排模板无运行时：只能读文本核对部署纪律（端口只绑回环/binlog/卷名）",
     ".dockerignore": "构建上下文白名单无运行时（不实跑 docker build：拉基础镜像与 apt 包的网络/时间"
     "不可控）：只能读文本核对密钥面（.env/certs/backups/uploads）是否真被排除（第十轮 W3-02）",
+    "Dockerfile": "镜像构建不在门禁内实跑（网络/时间不可控）：依赖层顺序只能读文本核对（B8）",
+    ".github/workflows/ci.yml": "CI 配置无本地运行时（不在本机跑 GitHub Actions）：时区/字符集"
+    "与本地同构只能读文本核对（B8）",
     #: `inspect.getsource(...)` 没有磁盘路径：验的是"实现形状"（如必须用 inserted_primary_key）。
     #: 这类只能是弱证据，登记时必须写明"为什么构造不出可区分的运行时场景"。
     "<getsource>": "断言实现形状（无路径可登记）：须在用例注释写清为什么造不出可区分的运行时场景",

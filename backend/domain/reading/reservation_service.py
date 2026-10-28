@@ -94,7 +94,9 @@ class ReservationService:
         # 故在计数与锁副本之前就地释放到期单：与调度器**同一个函数**（单一来源），重复调用幂等。
         # ⚠️ 必须 `commit=False`：本行处在 Child 行锁**之内**，让 expire_due 自己 commit 会把锁提前放掉
         # （第十一轮复核抓到的回归——锁一放，下面的 dup/额度判据就退化成无锁读，双击可落两条预约）。
-        self.expire_due(commit=False)
+        # B8（2026-10-28）：只过期**本孩子**的到期单——原先是全表扫（调度停摆积压时
+        # 单个建单请求会在 Child 行锁内扫全表）。调度器路径仍走全表。
+        self.expire_due(commit=False, child_id=child.id)
         # 2026-09-21 甲方口径：逾期不拦截（全端统一）——原先此处对"有逾期未还"硬拦
         # （raise "有逾期未还图书，请先归还"）已按裁定移除；逾期只占借阅额度里的一个名额
         # （见 PRD §5.4 现行口径与 CLAUDE.md §二 借阅并发红线）。
@@ -219,7 +221,7 @@ class ReservationService:
         self.db.commit()
         return res
 
-    def expire_due(self, *, commit: bool = True) -> int:
+    def expire_due(self, *, commit: bool = True, child_id: int | None = None) -> int:
         """预约超时释放（FEAT-019/PRD §4）：expired + 副本回 available + 通知家长。幂等。
 
         `commit=False`（第十一轮复核发现，2026-10-25）：**把提交权交回调用方**。
@@ -231,15 +233,14 @@ class ReservationService:
         from backend.common.events import ReservationExpiredEvent, event_bus
 
         now = datetime.now()
-        due = (
-            self.db.query(Reservation)
-            .filter(
-                Reservation.is_deleted == 0,
-                Reservation.status == Reservation.STATUS_ACTIVE,
-                Reservation.expires_at < now,
-            )
-            .all()
+        q = self.db.query(Reservation).filter(
+            Reservation.is_deleted == 0,
+            Reservation.status == Reservation.STATUS_ACTIVE,
+            Reservation.expires_at < now,
         )
+        if child_id is not None:
+            q = q.filter(Reservation.child_id == child_id)
+        due = q.all()
         expired = 0
         for item in due:
             # P1-F4：逐条锁定读（锁序 Reservation → copy，与核销/取消一致）+

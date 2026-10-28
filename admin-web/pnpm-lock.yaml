@@ -11,6 +11,12 @@ importers:
       '@ant-design/icons':
         specifier: ^5.5.1
         version: 5.5.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@fontsource/nunito':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/zcool-kuaile':
+        specifier: 5.3.0
+        version: 5.3.0
       antd:
         specifier: ^5.22.2
         version: 5.29.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -326,6 +332,12 @@ packages:
     engines: {node: '>=12'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource/nunito@5.3.0':
+    resolution: {integrity: sha512-vw9TaTQJ/zpEpKrsODuPmOvaVjXgdda6B+xXA4YqjrdeJ62MLgVoDerdRXFQHyBnSCt2yQ2nHKCHPP/Pv7Xq4Q==}
+
+  '@fontsource/zcool-kuaile@5.3.0':
+    resolution: {integrity: sha512-jn4vpQ6QSVEckUn7uk5a9XcZMxEksTRqljmeE1VKRGMjGd6VoXdMyLGSdnTXSVwZLCCEHaIcm/2cdQuwvasJ9w==}
 
   '@jridgewell/gen-mapping@0.3.12':
     resolution: {integrity: sha512-OuLGC46TjB5BbN1dH8JULVVZY4WTdkF7tV9Ys6wLL1rubZnCMstOhNHueU5bLCrnRuDhKPDM4g6sw4Bel5Gzqg==}
@@ -1416,6 +1428,10 @@ snapshots:
 
   '@esbuild/win32-x64@0.21.3':
     optional: true
+
+  '@fontsource/nunito@5.3.0': {}
+
+  '@fontsource/zcool-kuaile@5.3.0': {}
 
   '@jridgewell/gen-mapping@0.3.12':
     dependencies:

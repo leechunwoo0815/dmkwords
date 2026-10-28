@@ -469,7 +469,8 @@ export default function MemberManage() {
           // WM3-D1：待确认数 M>0 时红底白字胶囊（M=0 保持原样避免满屏红）
           label: (
             <>
-              订单（{orderCounts.total ?? (orderTotal || "—")} · 待确认{" "}
+              {/* B8：筛选态显示筛选后的总数（并标注），未筛选才显示全局计数——两套口径不再混用 */}
+              订单（{orderKeyword || orderStatus ? `${orderTotal}（筛选）` : (orderCounts.total ?? (orderTotal || "—"))} · 待确认{" "}
               {orderCounts.pending_manual_confirm === null ? (
                 // W6-D4：未取到 = 未知，显式写「—」（不许 0 —— 那是"确认队列空"的错误结论）
                 <Typography.Text type="warning">—（未取到）</Typography.Text>
@@ -626,7 +627,7 @@ export default function MemberManage() {
             {/* WM3-A5：订单号 / 备注关键字搜索（后端 service.py list_orders keyword 已就绪） */}
             <Input.Search
               placeholder="订单号 / 备注" allowClear style={{ width: 240 }} defaultValue={orderKeyword}
-              onSearch={(v) => { setOrderKeyword(v); orderPg.setPage(1); updateUrl({ okeyword: v || undefined, page: undefined }); }}
+              onSearch={(v) => { setOrderKeyword(v); orderPg.setPage(1); updateUrl({ okeyword: v || undefined, opage: undefined }); }}
             />
             <Select
               placeholder="订单状态" allowClear style={{ width: 140 }} value={orderStatus}
@@ -1199,7 +1200,7 @@ export default function MemberManage() {
           <Form.Item
             name="phone"
             label="手机号（登录标识）"
-            rules={[{ pattern: /^\d{11}$/, message: "请输入 11 位手机号" }]}
+            rules={[{ required: true, message: "手机号必填（登录账号）" }, { pattern: /^\d{11}$/, message: "请输入 11 位手机号" }]}
             extra="手机号即小程序登录账号，修改后家长需用新号登录"
           >
             <Input maxLength={11} />

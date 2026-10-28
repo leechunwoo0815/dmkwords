@@ -111,7 +111,11 @@ App({
             cancelText: '拒绝',
             success: (res) => {
               if (res.confirm) {
+                // B8（2026-10-28）：本地同意留痕补**版本 + 时间戳**（后端 consent 表属 FEAT-006，
+                // 尚未实现）；至少让"同意的是哪一版、什么时候同意的"可追溯。
                 wx.setStorageSync('privacy_agreed', true)
+                wx.setStorageSync('privacy_agreed_version', 'v1')
+                wx.setStorageSync('privacy_agreed_at', Date.now())
                 resolve({ event: 'agree' })
               } else {
                 resolve({ event: 'disagree' })

@@ -13,6 +13,7 @@ import {
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { cfgNum, useConfigs } from "../hooks/useConfigs";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
+import { fmtDateTime } from "../utils/datetime";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "锁定中", expired: "已超时", cancelled: "已取消",
@@ -130,8 +131,8 @@ export default function Reservations() {
               </Tag>
             ),
           },
-          { title: "预约时间", dataIndex: "created_at", width: 170 },
-          { title: "锁定截止", dataIndex: "expires_at", width: 170 },
+          { title: "预约时间", dataIndex: "created_at", width: 170, render: fmtDateTime },
+          { title: "锁定截止", dataIndex: "expires_at", width: 170, render: fmtDateTime },
           {
             title: "操作", key: "op", width: 120, render: (_, r) => (
               r.status === "active" && !r.expired ? (

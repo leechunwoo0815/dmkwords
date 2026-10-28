@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 from dataclasses import dataclass, field
@@ -46,6 +47,8 @@ from backend.domain.admin.media_models import MediaCensus, MediaTrashEntry
 from backend.domain.catalog.models import Book
 from backend.domain.identity.models import ObservationReport, Order
 from backend.domain.reading_circle.models import CirclePost
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -547,9 +550,22 @@ class MediaHealthService:
             src = os.path.join(self.trash_root(), entry.batch, entry.rel_path)
             if entry.rel_path in referenced:
                 dst = os.path.join(root, entry.rel_path)
+                # B8（2026-10-28）：只有**真的移动成功**才标 restored。原先 dst 已存在
+                # （例如同路径又上传了一份）时也标 restored → src 永远留在 .trash 成孤儿，
+                # 而台账写着"已还原"。冲突条目保持 trashed，等人工处置。
+                moved = False
                 if os.path.isfile(src) and not os.path.exists(dst):
                     os.makedirs(os.path.dirname(dst), exist_ok=True)
                     shutil.move(src, dst)
+                    moved = True
+                if not moved:
+                    logger.warning(
+                        "回收站还原冲突，保持 trashed：rel_path=%s（src=%s, dst_exists=%s）",
+                        entry.rel_path,
+                        os.path.isfile(src),
+                        os.path.exists(dst),
+                    )
+                    continue
                 entry.state = MediaTrashEntry.STATE_RESTORED
                 entry.restored_at = now
                 restored += 1

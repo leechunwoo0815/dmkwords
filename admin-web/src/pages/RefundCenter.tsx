@@ -96,6 +96,9 @@ export default function RefundCenter() {
   const [listErrors, setListErrors] = useState<{ refund: string; withdrawal: string; transfer: string }>(
     { refund: "", withdrawal: "", transfer: "" },
   );
+  // B8（2026-10-28）：三张资金台账补 loading——原先加载中会先闪一帧"空表"，
+  // 与"确实没有待审"混淆（emptyText 失败态已修，但加载态仍缺）。
+  const [loading, setLoading] = useState(false);
   // R5（#3）时序加固：3 秒清除窗口从列表数据到达起算——原实现挂载即起算，
   // 接口返回前窗口已烧掉，行渲染时 highlightId 已被清（高亮不出现真凶嫌疑）
   const [hlArmed, setHlArmed] = useState(false);
@@ -140,7 +143,8 @@ export default function RefundCenter() {
   const load = useCallback(() => {
     // P1-7：三个台账都走**服务端分页**（页码/页大小来自各自的 PaintPagination 状态），
     // 总数取响应头 X-Total-Count；P2-44 的上限元信息（X-List-Limit）一并存下来给提示条。
-    apiListRefunds(undefined, refundPg.page, refundPg.pageSize)
+    setLoading(true);
+    const p1 = apiListRefunds(undefined, refundPg.page, refundPg.pageSize)
       .then((r) => {
         setRefunds(r.items); setRefundLimit(r.limit); setRefundTotal(r.total);
         setListErrors((s) => ({ ...s, refund: "" }));
@@ -151,7 +155,7 @@ export default function RefundCenter() {
         setListErrors((s) => ({ ...s, refund: e.message }));
       });
     // F-H4/T26：资金域列表 fetch 失败必须报错——静默置空=管理员误判无待审（最高危）
-    apiListWithdrawals(undefined, withdrawalPg.page, withdrawalPg.pageSize)
+    const p2 = apiListWithdrawals(undefined, withdrawalPg.page, withdrawalPg.pageSize)
       .then((r) => {
         setWithdrawals(r.items); setWithdrawalLimit(r.limit); setWithdrawalTotal(r.total);
         setListErrors((s) => ({ ...s, withdrawal: "" }));
@@ -161,7 +165,7 @@ export default function RefundCenter() {
         setWithdrawals([]);
         setListErrors((s) => ({ ...s, withdrawal: e.message }));
       });
-    apiListTransfers(undefined, transferPg.page, transferPg.pageSize)
+    const p3 = apiListTransfers(undefined, transferPg.page, transferPg.pageSize)
       .then((r) => {
         setTransfers(r.items); setTransferLimit(r.limit); setTransferTotal(r.total);
         setListErrors((s) => ({ ...s, transfer: "" }));
@@ -171,6 +175,7 @@ export default function RefundCenter() {
         setTransfers([]);
         setListErrors((s) => ({ ...s, transfer: e.message }));
       });
+    Promise.allSettled([p1, p2, p3]).finally(() => setLoading(false));
     // P1-7：徽标计数来自后端（分页后本页行数算不出"待审 N"，那会变成"假 0"）
     apiRefundCenterCounts()
       .then(setCounts)
@@ -349,7 +354,7 @@ export default function RefundCenter() {
                   <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
                 </Typography.Text>
               )}
-              <Table<RefundRequestItem> locale={{ emptyText: listErrors.refund ? null : <PaintEmpty character="cat" /> }}
+              <Table<RefundRequestItem> loading={loading} locale={{ emptyText: listErrors.refund ? null : <PaintEmpty character="cat" /> }}
                 rowKey="id"
                 rowClassName={(r) => (r.id === highlightId ? "wm13-highlight-row" : "")}
                 dataSource={refunds} size="middle"
@@ -440,7 +445,7 @@ export default function RefundCenter() {
                   <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
                 </Typography.Text>
               )}
-              <Table<WithdrawalItem> locale={{ emptyText: listErrors.withdrawal ? null : <PaintEmpty character="cat" /> }}
+              <Table<WithdrawalItem> loading={loading} locale={{ emptyText: listErrors.withdrawal ? null : <PaintEmpty character="cat" /> }}
                 rowKey="id"
                 rowClassName={(r) => (r.id === highlightId ? "wm13-highlight-row" : "")}
                 dataSource={withdrawals} size="middle"
@@ -519,7 +524,7 @@ export default function RefundCenter() {
                   <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
                 </Typography.Text>
               )}
-              <Table<TransferItem> locale={{ emptyText: listErrors.transfer ? null : <PaintEmpty character="cat" /> }}
+              <Table<TransferItem> loading={loading} locale={{ emptyText: listErrors.transfer ? null : <PaintEmpty character="cat" /> }}
                 rowKey="id"
                 rowClassName={(r) => (r.id === highlightId ? "wm13-highlight-row" : "")}
                 dataSource={transfers} size="middle"

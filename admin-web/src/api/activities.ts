@@ -104,10 +104,6 @@ export function apiSignin(ticketCode: string): Promise<SigninResult> {
   });
 }
 
-export function apiListActivityRefunds(): Promise<EnrollmentItem[]> {
-  return request("/api/admin/activity-refunds");
-}
-
 export function apiReviewActivityRefund(
   enrollmentId: number, approve: boolean, remark: string,
 ): Promise<{ enrollment_id: number; status: string }> {

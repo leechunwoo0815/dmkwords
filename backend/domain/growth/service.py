@@ -75,9 +75,18 @@ class GrowthService:
             .first()
         )
         if not state:
-            state = ChildGrowthState(child_id=child_id)
-            self.db.add(state)
-            self.db.flush()
+            # B8（2026-10-28）：并发首访会同时通过"先查" → 后到者撞 uq_growth_child 整单 500。
+            # 用 SAVEPOINT 兜底（冲突只回滚保存点），失败后重查拿对方插入的行。
+            from backend.common.sql_utils import add_with_unique_fallback
+
+            candidate = ChildGrowthState(child_id=child_id)
+            if not add_with_unique_fallback(self.db, candidate):
+                self.db.expunge(candidate)
+            state = (
+                self.db.query(ChildGrowthState)
+                .filter(ChildGrowthState.child_id == child_id, ChildGrowthState.is_deleted == 0)
+                .first()
+            )
         return state
 
     def _add_points(
@@ -131,9 +140,17 @@ class GrowthService:
             .all()
         }
         new_nodes = [n for n in nodes if n <= state.words_total and n not in awarded]
+        from backend.common.sql_utils import add_with_unique_fallback
+
+        granted: list[int] = []
         for n in new_nodes:
-            self.db.add(MilestoneAward(child_id=state.child_id, node_words=n))
-        return new_nodes
+            # B8：并发测验/补发会同时通过上面的 awarded 预取 → 撞 uq_milestone_child_node。
+            # SAVEPOINT 兜底，冲突即跳过（勋章不重复发，也不整单 500）。
+            if add_with_unique_fallback(
+                self.db, MilestoneAward(child_id=state.child_id, node_words=n)
+            ):
+                granted.append(n)
+        return granted
 
     def on_quiz_passed(self, child: Child, book: Book, score: int, total_q: int) -> dict:
         """测验通过后的入账链（同事务）：词数→积分折算（零头池）→首过/满分奖→等级→里程碑。"""

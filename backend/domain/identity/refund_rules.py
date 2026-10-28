@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy.orm import Session
 
@@ -44,7 +44,12 @@ def refundable_amount(db: Session, order: Order) -> Decimal:
     if order.order_type in (Order.TYPE_OBSERVATION, Order.TYPE_FORMAL):
         period = period_days(db, order.order_type)
         remaining = max(0, period - days_used(order))
-        return (order.amount * Decimal(remaining) / Decimal(period)).quantize(Decimal("0.01"))
+        # B8（2026-10-28）：金额舍入统一 **ROUND_HALF_UP**（四舍五入）——原默认
+        # ROUND_HALF_EVEN（银行家舍入）会与支付网关的分换算口径不一致（网关已用 HALF_UP），
+        # 0.005 的边界上退款额可能差 0.01。
+        return (order.amount * Decimal(remaining) / Decimal(period)).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
     # 首场活动费 / 活动费：未签到未开始全额（是否可退由审核判断）
     return order.amount
 

@@ -7,6 +7,10 @@
 
   <!-- 第一百三十四批：失败态显式呈现（原先仅靠 request.js 的瞬时 toast → toast 一过
        页面就显示「暂无流水记录」，把故障读成"没有押金流水"） -->
+  <!-- B8：未选择孩子 ≠ 没有押金记录 -->
+  <error-view wx:if="{{noChild}}" type="empty" title="还没有选择孩子"
+    desc="请先在「我的」里添加或选择孩子" showRetry="{{false}}" />
+
   <error-view wx:if="{{loadError}}" type="network" title="押金信息加载失败"
     desc="{{loadError}}（押金未加载，不代表没有缴纳记录）" bind:onRetry="onRetryLoad" />
 

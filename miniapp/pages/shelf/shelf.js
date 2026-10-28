@@ -44,7 +44,7 @@ Page({
     if (!session.ensureLogin()) return
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 2 })
-      this.getTabBar().refreshBadge && this.getTabBar().refreshBadge() // fix34b：每个 tab 页各自刷新（红点只活在首页实例上=原 bug）
+      // B8（2026-10-28）：刷新交给组件 pageLifetimes.show（此处再调会与它重复请求）
     }
     const child = session.getCurrentChild()
     const childId = child ? child.id : null

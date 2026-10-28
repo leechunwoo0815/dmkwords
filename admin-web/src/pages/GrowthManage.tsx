@@ -18,6 +18,7 @@ import { useAuth } from "../auth";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { cfgNum, useConfigs } from "../hooks/useConfigs";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
+import { fmtDateTime } from "../utils/datetime";
 
 const REASON_LABEL: Record<string, string> = {
   words_convert: "词数折算", quiz_first_pass: "测验首过",
@@ -284,7 +285,7 @@ export default function GrowthManage() {
                       columns={[
                         { title: "书名", dataIndex: "title" },
                         { title: "词数", dataIndex: "word_count", width: 100, render: (v) => <Typography.Text strong>+{v.toLocaleString()}</Typography.Text> },
-                        { title: "入账时间", dataIndex: "created_at", width: 170 },
+                        { title: "入账时间", dataIndex: "created_at", width: 170, render: fmtDateTime },
                       ]}
                      scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
@@ -307,7 +308,7 @@ export default function GrowthManage() {
                             {v > 0 ? "+" : ""}{v}
                           </Typography.Text>
                         ) },
-                        { title: "时间", dataIndex: "created_at", width: 170 },
+                        { title: "时间", dataIndex: "created_at", width: 170, render: fmtDateTime },
                       ]}
                      scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />

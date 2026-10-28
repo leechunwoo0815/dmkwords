@@ -55,6 +55,8 @@ export default function DepositManage() {
   const [loading, setLoading] = useState(true);
   // P2-62：列表取数失败标记（空表会骗人——运营以为"没有押金记录"）
   const [listError, setListError] = useState("");
+  // B8（2026-10-28）：建单请求在途时禁用按钮——双击会各发一次（服务端在途闸会拦，但界面出错误 toast）
+  const [creatingId, setCreatingId] = useState<number | null>(null);
   const [ledgerChild, setLedgerChild] = useState<Deposit | null>(null);
   const [ledgers, setLedgers] = useState<DepositLedger[]>([]);
   // P1-7（第九轮审查）：流水取数失败标记——原先失败时抽屉里留着**上一个孩子**的流水
@@ -143,23 +145,31 @@ export default function DepositManage() {
             render: (_, r) => (
               <Space>
                 {r.status === "unpaid" && (
-                  <Button type="link" size="small" onClick={async () => {
+                  <Button type="link" size="small" loading={creatingId === r.child_id}
+                    disabled={creatingId !== null} onClick={async () => {
                     // P1-7：原先无 catch——接口挂掉时 promise 静默 reject，运营看到的是"点了没反应"
+                    setCreatingId(r.child_id);
                     try {
                       const order = await apiCreateDepositOrder(r.child_id);
                       message.success(`押金订单已创建（￥${Number(order.amount).toLocaleString()}），请到「会员管理 → 订单」确认收款`);
                     } catch (e) {
                       message.error(e instanceof Error ? e.message : "创建押金订单失败");
+                    } finally {
+                      setCreatingId(null);
                     }
                   }}>缴押金</Button>
                 )}
                 {(r.status === "partially_deducted" || r.status === "fully_deducted") && (
-                  <Button type="link" size="small" onClick={async () => {
+                  <Button type="link" size="small" loading={creatingId === r.child_id}
+                    disabled={creatingId !== null} onClick={async () => {
+                    setCreatingId(r.child_id);
                     try {
                       const order = await apiCreateSupplementOrder(r.child_id);
                       message.success(`补缴订单已创建（￥${Number(order.amount).toLocaleString()}），确认收款后恢复全额`);
                     } catch (e) {
                       message.error(e instanceof Error ? e.message : "创建补缴订单失败");
+                    } finally {
+                      setCreatingId(null);
                     }
                   }}>补缴</Button>
                 )}

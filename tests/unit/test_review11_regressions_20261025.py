@@ -76,9 +76,10 @@ def test_create_defers_expire_due_commit(db, monkeypatch):
     calls: list[bool] = []
     orig = ReservationService.expire_due
 
-    def spy(self, *, commit: bool = True):
+    def spy(self, *, commit: bool = True, child_id: int | None = None):
+        # B8（2026-10-28）：create 路径改成只过期本孩子（child_id 透传）——spy 跟着放行
         calls.append(commit)
-        return orig(self, commit=commit)
+        return orig(self, commit=commit, child_id=child_id)
 
     monkeypatch.setattr(ReservationService, "expire_due", spy)
 

@@ -8,6 +8,7 @@ import PaintPagination from "../components/PaintPagination";
 import { apiListAuditLogs, type AuditLog } from "../api/admin";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
+import { fmtDateTime } from "../utils/datetime";
 
 // P3 管理端族（2026-10-22 第一百一十二批）：原先只列 2 项（login / config.update），
 // 后端实际写入 **67 个 action**（`publish_audit(action="…")` 字面量实测去重）→ 其余既**筛不出来**、
@@ -249,7 +250,7 @@ export default function AuditLogPage() {
         size="middle"
         pagination={false}
         columns={[
-          { title: "时间", dataIndex: "created_at", width: 170 },
+          { title: "时间", dataIndex: "created_at", width: 170, render: fmtDateTime },
           { title: "操作人", dataIndex: "actor_name", width: 110 },
           {
             title: "动作",

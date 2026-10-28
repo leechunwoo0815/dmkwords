@@ -491,8 +491,11 @@ class RefundService:
                         self._complete_refund_withdrawal(admin, req, order)
             elif req.kind == RefundRequest.KIND_DEPOSIT and req.deposit_id:
                 from backend.domain.billing.models import Deposit
+                from backend.domain.identity.deposit_refund_guards import lock_deposit
 
-                dep = self.db.query(Deposit).filter(Deposit.id == req.deposit_id).first()
+                # B8（2026-10-28）：押金分支原先普通读 → 两笔 PROCESSING 退款回调可各自
+                # 读到同一余额（lost update）。与复核侧同用一把行锁（锁定读 + populate_existing）。
+                dep = lock_deposit(self.db, req.deposit_id)
                 if dep:
                     if dep.available_amount < req.amount:
                         # P0-D 纵深：不掩盖——台账照实记负 + 异常审计（细则见 deposit_refund_guards）

@@ -653,7 +653,12 @@ export default function BookDetail() {
                             onChange={(e) => setQOptions((old) => old.map((o, j) => (j === i ? e.target.value : o)))}
                           />
                           <Button size="small" type="text" danger disabled={qOptions.length <= 2}
-                            onClick={() => setQOptions((old) => old.filter((_, j) => j !== i))}>
+                            onClick={() => {
+                              // B8（2026-10-28）：删选项必须同步调整正确答案下标——原先删选中项
+                              // 或它前面的项后，qAnswerIdx 仍指旧位置，答案静默漂移到别的选项。
+                              setQOptions((old) => old.filter((_, j) => j !== i));
+                              setQAnswerIdx((cur) => (cur === i ? 0 : cur > i ? cur - 1 : cur));
+                            }}>
                             删除
                           </Button>
                         </Space>

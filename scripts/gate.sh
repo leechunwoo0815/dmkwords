@@ -274,7 +274,9 @@ if curl -sf -m 2 http://localhost:8002/health > /dev/null 2>&1 || [ -d ".dev-log
       FAILED=1
     fi
   else
-    echo "⚠ 自动恢复失败——请手动执行: bash scripts/dev.sh restart"
+    # B8（2026-10-28）：恢复失败必须判红——原先只 warning，门禁可在"现场没恢复"时照印 PASS。
+    echo "✗ 自动恢复失败（dev.sh restart 退出非 0）——请手动执行: bash scripts/dev.sh restart"
+    FAILED=1
   fi
 else
   echo "⚠ 业务表已被门禁清空——如需演示/目视请执行: bash scripts/dev.sh restart （重启加载最新代码+双 seed 恢复）"

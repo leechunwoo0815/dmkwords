@@ -33,6 +33,7 @@ import {
   apiListCirclePosts,
   circlePostImageUrl,
 } from "../api/circle";
+import { fmtDateTime } from "../utils/datetime";
 
 // 类型选项**由后端下发**（P3 管理端族，2026-10-22 第一百一十二批）：
 // 原先是硬编码 6 种 + 全部，而后端 `CARD_TYPES` 有 **10 种**（另有 rank_top / rank_up /
@@ -263,7 +264,7 @@ export default function CircleManage() {
         render: (v: boolean) =>
           v ? <Tag color="red">置顶</Tag> : <span style={{ color: "rgba(0,0,0,0.4)" }}>—</span>,
       },
-      { title: "发布时间", dataIndex: "created_at", width: 150 },
+      { title: "发布时间", dataIndex: "created_at", width: 150, render: fmtDateTime },
       {
         title: "操作",
         key: "action",

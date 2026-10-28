@@ -86,12 +86,18 @@ Component({
     // 红点刷新：口径同消息中心未读（后端 unread_by_scene.circle_liked）——禁自建第二套计数
     async refreshBadge() {
       if (!wx.getStorageSync('token')) return
+      // B8（2026-10-28）：in-flight 去重——页面的 onShow 与组件 pageLifetimes.show
+      // 会各触发一次（同一红点发两次相同请求）。在途时直接复用本次结果。
+      if (this._refreshing) return
+      this._refreshing = true
       try {
         const r = await api.notifications(1, 1)
         this.setData({ circleDot: this._dotFrom(r) })
       } catch (e) {
         // fix34 R0：失败**保留旧值**（原先静默且不清值，导致"到底拉没拉到"无法判断）
         console.warn('[tabbar] 红点刷新失败', e)
+      } finally {
+        this._refreshing = false
       }
     },
 
