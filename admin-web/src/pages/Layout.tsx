@@ -277,6 +277,9 @@ export default function Layout() {
           </Dropdown>
         </Header>
         <Content style={{ padding: 24, minWidth: 0, flex: "1 1 auto", overflow: "auto" }}>
+          {/* B8（2026-10-28）：无障碍——每页一个语义化 h1（视觉隐藏，不改变布局）。
+              此前全仓管理端页面无 h1–h6，读屏软件无法定位页面主题。 */}
+          <h1 className="sr-only">{PAGE_TITLES[location.pathname] ?? "DmkWords 管理后台"}</h1>
           <Outlet />
         </Content>
       </AntLayout>

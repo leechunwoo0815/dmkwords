@@ -109,9 +109,12 @@ def test_todo_counts_sql_does_not_grow_with_rows(client, db):
         for i in range(6):
             s.execute(
                 text(
+                    # B9（W3-09）：三列已 NOT NULL——裸 INSERT 必须自带时间戳（漏列会响亮报错）
                     "INSERT INTO admin_notifications (scene, title, content, ref_type, ref_id, "
-                    "applicant_name, amount, dedup_key, is_deleted, created_at) VALUES "
-                    "('refund_request', :t, :c, 'refund_request', :r, 'A3 家长', 100.00, :d, 0, NOW())"
+                    "applicant_name, amount, dedup_key, is_deleted, created_at, create_time, "
+                    "update_time) VALUES "
+                    "('refund_request', :t, :c, 'refund_request', :r, 'A3 家长', 100.00, :d, 0, "
+                    "NOW(), NOW(), NOW())"
                 ),
                 {"t": f"A3 待办#{i}", "c": f"内容{i}", "r": str(i), "d": f"a3-{i}"},
             )

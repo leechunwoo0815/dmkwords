@@ -17,7 +17,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Column, DateTime, SmallInteger
+from sqlalchemy import BigInteger, Column, DateTime, SmallInteger, text
 
 from backend.database import Base as SQLAlchemyBase
 
@@ -38,9 +38,21 @@ class TimestampMixin:
     不用 func.now()（统一应用侧时间，避免 DB 时区歧义）。
     """
 
-    create_time = Column(DateTime, default=datetime.now, comment="创建时间")
-    update_time = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
-    is_deleted = Column(SmallInteger, default=0, comment="软删除标记: 0=正常 1=已删除")
+    # W3-09（2026-10-28 B9）：三列在 DB 层改为 NOT NULL——
+    #   · is_deleted：DEFAULT 0（绕过 ORM 的裸 INSERT 也不会写出对全站不可见的 NULL 行）；
+    #   · create_time/update_time：NOT NULL 但**不设 DB 默认**（保持应用侧 datetime.now()
+    #     的统一时钟口径；裸 INSERT 漏列直接报错 = 响亮失败，而不是静默写 NULL）。
+    create_time = Column(DateTime, nullable=False, default=datetime.now, comment="创建时间")
+    update_time = Column(
+        DateTime, nullable=False, default=datetime.now, onupdate=datetime.now, comment="更新时间"
+    )
+    is_deleted = Column(
+        SmallInteger,
+        nullable=False,
+        default=0,
+        server_default=text("0"),
+        comment="软删除标记: 0=正常 1=已删除",
+    )
 
 
 class BaseModel(SQLAlchemyBase, TimestampMixin):

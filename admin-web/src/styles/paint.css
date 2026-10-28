@@ -1,3 +1,16 @@
+/* B8：视觉隐藏但对读屏可见（页面 h1 用） */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* DmkWords 绘本风全局样式覆盖 — paint.css */
 /* 原则：只改形态/颜色/动效，不改布局尺寸与业务逻辑 */
 
