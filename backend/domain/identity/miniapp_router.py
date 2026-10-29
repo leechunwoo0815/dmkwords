@@ -343,6 +343,11 @@ class WeChatBindRequest(BaseSchema):
     code: str = ""
 
 
+class WeChatPhoneBindRequest(BaseSchema):
+    bind_ticket: str = ""
+    phone_code: str = ""  # <button open-type="getPhoneNumber"> 回调里的 e.detail.code
+
+
 class SmsSendRequest(BaseSchema):
     phone: str = ""
     purpose: str = "login"  # login=登录兜底 / bind=微信首次绑手机号
@@ -353,16 +358,29 @@ def login_wechat(body: WeChatLoginRequest, db: Session = Depends(get_db)):
     """微信一键登录（**主通道**）。
 
     openid 已绑家长 → 直接发登录态；未绑 → `{need_bind: true, bind_ticket}`，
-    小程序接着走「手机号 + 短信码」的绑定（`/login/bind`）。家长档案仍由馆员到店建档创建。
+    小程序接着走「微信手机号快速验证」（`/login/wechat/phone`，2026-10-29 起为主通道）；
+    短信绑定（`/login/bind`）仅在 `SMS_ENABLED=true` 时作为兼容通道。
+    家长档案仍由馆员到店建档创建。
     """
     from backend.domain.identity.auth import login_by_wechat
 
     return login_by_wechat(db, body.code)
 
 
+@router.post("/login/wechat/phone", dependencies=[Depends(rate_limit(10, 60))])
+def login_wechat_phone(body: WeChatPhoneBindRequest, db: Session = Depends(get_db)):
+    """微信手机号快速验证绑定：绑定凭证 + 微信临时 code → 落 openid 并发登录态。
+
+    2026-10-29 甲方裁定「短信退役」后的首次登录主通道；手机号仍必须已在馆建档。
+    """
+    from backend.domain.identity.auth import bind_wechat_by_phone_code
+
+    return bind_wechat_by_phone_code(db, body.bind_ticket, body.phone_code)
+
+
 @router.post("/login/bind", dependencies=[Depends(rate_limit(5, 60))])
 def login_bind(body: WeChatBindRequest, db: Session = Depends(get_db)):
-    """微信首次绑定手机号：绑定凭证 + 短信验证码 → 落 openid 并发登录态。"""
+    """微信首次绑定手机号（短信兼容通道）：绑定凭证 + 短信验证码 → 落 openid 并发登录态。"""
     from backend.domain.identity.auth import bind_wechat
 
     return bind_wechat(db, body.bind_ticket, body.phone, body.code)

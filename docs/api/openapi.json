@@ -4996,6 +4996,23 @@
         "title": "WeChatLoginRequest",
         "type": "object"
       },
+      "WeChatPhoneBindRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "bind_ticket": {
+            "default": "",
+            "title": "Bind Ticket",
+            "type": "string"
+          },
+          "phone_code": {
+            "default": "",
+            "title": "Phone Code",
+            "type": "string"
+          }
+        },
+        "title": "WeChatPhoneBindRequest",
+        "type": "object"
+      },
       "WithdrawalApplyRequest": {
         "additionalProperties": false,
         "properties": {
@@ -14902,7 +14919,7 @@
     },
     "/api/miniapp/login/bind": {
       "post": {
-        "description": "微信首次绑定手机号：绑定凭证 + 短信验证码 → 落 openid 并发登录态。",
+        "description": "微信首次绑定手机号（短信兼容通道）：绑定凭证 + 短信验证码 → 落 openid 并发登录态。",
         "operationId": "login_bind_api_miniapp_login_bind_post",
         "requestBody": {
           "content": {
@@ -14962,7 +14979,7 @@
     },
     "/api/miniapp/login/wechat": {
       "post": {
-        "description": "微信一键登录（**主通道**）。\n\nopenid 已绑家长 → 直接发登录态；未绑 → `{need_bind: true, bind_ticket}`，\n小程序接着走「手机号 + 短信码」的绑定（`/login/bind`）。家长档案仍由馆员到店建档创建。",
+        "description": "微信一键登录（**主通道**）。\n\nopenid 已绑家长 → 直接发登录态；未绑 → `{need_bind: true, bind_ticket}`，\n小程序接着走「微信手机号快速验证」（`/login/wechat/phone`，2026-10-29 起为主通道）；\n短信绑定（`/login/bind`）仅在 `SMS_ENABLED=true` 时作为兼容通道。\n家长档案仍由馆员到店建档创建。",
         "operationId": "login_wechat_api_miniapp_login_wechat_post",
         "requestBody": {
           "content": {
@@ -14995,6 +15012,46 @@
           }
         },
         "summary": "Login Wechat",
+        "tags": [
+          "identity-miniapp"
+        ]
+      }
+    },
+    "/api/miniapp/login/wechat/phone": {
+      "post": {
+        "description": "微信手机号快速验证绑定：绑定凭证 + 微信临时 code → 落 openid 并发登录态。\n\n2026-10-29 甲方裁定「短信退役」后的首次登录主通道；手机号仍必须已在馆建档。",
+        "operationId": "login_wechat_phone_api_miniapp_login_wechat_phone_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeChatPhoneBindRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login Wechat Phone",
         "tags": [
           "identity-miniapp"
         ]

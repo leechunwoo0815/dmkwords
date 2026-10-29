@@ -1,7 +1,8 @@
-// pages/login/login.js — 微信一键登录（主）+ 手机号验证码（兜底/首次绑定）
+// pages/login/login.js — 微信一键登录（主）+ 微信手机号快速验证（首次绑定）
 // 2026-10-08 接线（审查 P0-1）：生产环境固定验证码关闭后，这里是唯一的入口。
-//   ① 主通道：wx.login → /login/wechat → 已绑 → 直接进首页；未绑 → 绑定面板（手机号 + 短信码）
-//   ② 兜底：手机号 + 短信验证码（/sms/send + /login），开发期固定码 1234 仍可用
+//   ① 主通道：wx.login → /login/wechat → 已绑 → 直接进首页；
+//      未绑 → 绑定面板 → getPhoneNumber → /login/wechat/phone（2026-10-29 短信退役）
+//   ② 短信兼容：仅 SMS_ENABLED=true 时显示（/sms/send + /login 与 /login/bind）
 const api = require('../../utils/api')
 const { loadConfigs, getConfigs } = require('../../utils/configs')
 
@@ -77,7 +78,34 @@ Page({
     }
   },
 
-  // 首次绑定：绑定凭证 + 手机号 + 短信码
+  // 首次绑定（主通道，2026-10-29 短信退役）：微信手机号快速验证
+  async onGetPhoneNumber(e) {
+    if (this.data.submitting) return
+    const detail = (e && e.detail) || {}
+    if (!detail.code) {
+      const denied = (detail.errMsg || '').indexOf('deny') >= 0
+      const msg = denied ? '你取消了手机号授权，可重试或联系馆员' : '手机号验证未完成，请重试或联系馆员'
+      wx.showToast({ title: msg, icon: 'none', duration: 2500 })
+      this.setData({ loginError: msg })
+      return
+    }
+    if (!this.data.agreed) {
+      wx.showToast({ title: '请先同意隐私政策', icon: 'none' }); return
+    }
+    this.setData({ submitting: true, loginError: '' })
+    try {
+      const res = await api.bindByWechatPhone(this.data.bindTicket, detail.code)
+      this._enterApp(res)
+    } catch (err) {
+      const msg = (err && err.message) || '手机号绑定失败，请重试或联系馆员'
+      wx.showToast({ title: msg, icon: 'none', duration: 2500 })
+      this.setData({ loginError: msg })
+    } finally {
+      this.setData({ submitting: false })
+    }
+  },
+
+  // 首次绑定（短信兼容通道）：绑定凭证 + 手机号 + 短信码
   async onBind() {
     const { phone, code, bindTicket, submitting, agreed } = this.data
     if (submitting) return

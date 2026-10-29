@@ -207,17 +207,14 @@ def login_by_wechat(db, code: str) -> dict:
     return {"need_bind": True, "bind_ticket": make_bind_ticket(openid)}
 
 
-def bind_wechat(db, bind_ticket: str, phone: str, code: str) -> dict:
-    """首次绑定：校验绑定凭证 + 短信验证码 + 手机号已在馆建档 → 落 openid 并发登录态。
+def _bind_openid_to_parent(db, openid: str, phone: str) -> dict:
+    """把已验证归属的手机号与 openid 绑定（手机号必须已在馆建档）。
 
     家长档案由馆员"到店建档"创建（phone 唯一）——家长端**不允许自助注册**，
     所以这里只做"认领"：手机号必须已存在。同一 openid 已绑别的家长 → 拒绝（防顶号）。
     """
-    from backend.domain.identity.models import SmsCode
-    from backend.domain.identity.sms_service import SmsCodeService, parent_by_openid
+    from backend.domain.identity.sms_service import parent_by_openid
 
-    openid = parse_bind_ticket(bind_ticket)
-    SmsCodeService(db).verify(phone, code, SmsCode.PURPOSE_BIND)
     parent = db.query(Parent).filter(Parent.phone == phone, Parent.is_deleted == 0).first()
     if not parent:
         raise ValidationError("该手机号未注册（请到店建档）")
@@ -240,3 +237,34 @@ def bind_wechat(db, bind_ticket: str, phone: str, code: str) -> dict:
         db.rollback()
         raise ValidationError("该微信刚刚已被绑定，请重新登录或联系馆员处理") from exc
     return _login_payload(db, parent)
+
+
+def bind_wechat(db, bind_ticket: str, phone: str, code: str) -> dict:
+    """短信绑定（兼容通道）：绑定凭证 + 短信验证码 → 落 openid 并发登录态。
+
+    `SMS_ENABLED=false` 时由 `SmsCodeService.verify` fail-closed；首次登录请走
+    `bind_wechat_by_phone_code`（微信手机号快速验证，2026-10-29 起为主通道）。
+    """
+    from backend.domain.identity.models import SmsCode
+    from backend.domain.identity.sms_service import SmsCodeService
+
+    openid = parse_bind_ticket(bind_ticket)
+    SmsCodeService(db).verify(phone, code, SmsCode.PURPOSE_BIND)
+    return _bind_openid_to_parent(db, openid, phone)
+
+
+def bind_wechat_by_phone_code(db, bind_ticket: str, phone_code: str) -> dict:
+    """微信手机号快速验证绑定（2026-10-29 短信退役后的首次登录主通道）。
+
+    `phone_code` 是小程序 `<button open-type="getPhoneNumber">` 回调里的 `e.detail.code`；
+    服务端用它向微信换取该微信绑定的手机号，再按"手机号必须已在馆建档"认领，不依赖短信。
+    """
+    import asyncio
+
+    from backend.integrations.wechat.auth import WeChatAuth
+
+    openid = parse_bind_ticket(bind_ticket)
+    phone = asyncio.run(WeChatAuth.get_phone_number(phone_code))
+    if not phone:
+        raise ValidationError("微信手机号获取失败，请重试或联系馆员")
+    return _bind_openid_to_parent(db, openid, phone)

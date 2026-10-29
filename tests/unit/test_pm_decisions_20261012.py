@@ -24,18 +24,26 @@ from tests.unit.test_wm10_concurrency import _family, _h
 # ---------- P1 / P1b 短信开关 ----------
 
 
-def test_production_rejects_sms_disabled(monkeypatch):
-    """生产 + 短信关闭 → 拒绝启动（修复前该开关会短路全部短信自检）。"""
-    from backend.config import get_settings
+def test_production_allows_sms_disabled():
+    """2026-10-29 甲方裁定：短信退役（全部微信一键登录）→ 生产允许关闭短信。
 
-    s = get_settings()
-    monkeypatch.setattr(s, "APP_ENV", "production")
-    monkeypatch.setattr(s, "SMS_ENABLED", False)
-    try:
-        s.validate_production()
-        raise AssertionError("生产环境不该允许在关闭短信的状态下启动")
-    except RuntimeError as exc:
-        assert "短信通道已关闭" in str(exc), str(exc)
+    关闭时的安全性由 `/sms/send` 与 `SmsCodeService.verify` 的 fail-closed 保证
+    （见 `test_login_wechat_sms.py::test_sms_disabled_fails_closed`）。
+    """
+    from backend.config import Settings
+
+    Settings(
+        DEBUG=False,
+        SECRET_KEY="real-secret-0123456789abcdef0123456789",
+        DB_PASSWORD="pw",
+        WECHAT_APP_ID="wx",
+        WECHAT_APP_SECRET="sk",
+        LOGIN_DEV_CODE="",
+        CORS_ORIGINS="https://admin.example.com",
+        PAYMENT_ENABLED=False,
+        SMS_ENABLED=False,
+        SMS_PROVIDER="mock",
+    ).validate_production()
 
 
 def test_login_options_exposes_sms_switch(client):

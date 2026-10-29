@@ -19,7 +19,7 @@ function listCall(path, options, opts) {
 }
 
 module.exports = {
-  // 登录（2026-10-08 接线）：微信一键登录为主，短信验证码为兜底
+  // 登录（2026-10-08 接线；2026-10-29 短信退役）：微信一键登录为主，首次绑定用微信手机号快速验证
   // ① 微信主通道：wx.login 拿 code → openid 已绑 → 直接登录态；未绑 → need_bind + bind_ticket
   // 登录选项（2026-10-12 拍板 P1）：服务端下发短信通道开关 → 关闭时隐藏手机号入口
   getLoginOptions() {
@@ -36,7 +36,15 @@ module.exports = {
   loginByWechat(wxCode) {
     return req.post('/api/miniapp/login/wechat', { code: wxCode }, { auth: false })
   },
-  // ② 首次绑定：绑定凭证 + 手机号 + 短信码（手机号必须已在馆建档）
+  // ①b 首次绑定（2026-10-29 短信退役后的主通道）：微信手机号快速验证。
+  // phoneCode = <button open-type="getPhoneNumber"> 回调里的 e.detail.code
+  bindByWechatPhone(bindTicket, phoneCode) {
+    return req.post('/api/miniapp/login/wechat/phone', {
+      bind_ticket: bindTicket,
+      phone_code: phoneCode,
+    }, { auth: false })
+  },
+  // ② 首次绑定（短信兼容通道）：绑定凭证 + 手机号 + 短信码（手机号必须已在馆建档）
   bindByWechat(bindTicket, phone, code) {
     return req.post('/api/miniapp/login/bind', { bind_ticket: bindTicket, phone, code }, { auth: false })
   },

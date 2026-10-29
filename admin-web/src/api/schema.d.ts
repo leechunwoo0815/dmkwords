@@ -3187,7 +3187,7 @@ export interface paths {
         put?: never;
         /**
          * Login Bind
-         * @description 微信首次绑定手机号：绑定凭证 + 短信验证码 → 落 openid 并发登录态。
+         * @description 微信首次绑定手机号（短信兼容通道）：绑定凭证 + 短信验证码 → 落 openid 并发登录态。
          */
         post: operations["login_bind_api_miniapp_login_bind_post"];
         delete?: never;
@@ -3230,9 +3230,33 @@ export interface paths {
          * @description 微信一键登录（**主通道**）。
          *
          *     openid 已绑家长 → 直接发登录态；未绑 → `{need_bind: true, bind_ticket}`，
-         *     小程序接着走「手机号 + 短信码」的绑定（`/login/bind`）。家长档案仍由馆员到店建档创建。
+         *     小程序接着走「微信手机号快速验证」（`/login/wechat/phone`，2026-10-29 起为主通道）；
+         *     短信绑定（`/login/bind`）仅在 `SMS_ENABLED=true` 时作为兼容通道。
+         *     家长档案仍由馆员到店建档创建。
          */
         post: operations["login_wechat_api_miniapp_login_wechat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/miniapp/login/wechat/phone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login Wechat Phone
+         * @description 微信手机号快速验证绑定：绑定凭证 + 微信临时 code → 落 openid 并发登录态。
+         *
+         *     2026-10-29 甲方裁定「短信退役」后的首次登录主通道；手机号仍必须已在馆建档。
+         */
+        post: operations["login_wechat_phone_api_miniapp_login_wechat_phone_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6209,6 +6233,19 @@ export interface components {
              * @default
              */
             code: string;
+        };
+        /** WeChatPhoneBindRequest */
+        WeChatPhoneBindRequest: {
+            /**
+             * Bind Ticket
+             * @default
+             */
+            bind_ticket: string;
+            /**
+             * Phone Code
+             * @default
+             */
+            phone_code: string;
         };
         /** WithdrawalApplyRequest */
         WithdrawalApplyRequest: {
@@ -12048,6 +12085,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["WeChatLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_wechat_phone_api_miniapp_login_wechat_phone_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeChatPhoneBindRequest"];
             };
         };
         responses: {

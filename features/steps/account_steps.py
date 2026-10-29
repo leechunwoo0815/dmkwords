@@ -478,7 +478,8 @@ def step_only_parent_channels(context):
         decoded = _decode_parent_token(payload["token"])
         assert decoded["type"] == "parent", decoded
 
-    # 登录面收敛：小程序的登录端点就是这四个（没有第五条通道）
+    # 登录面收敛：小程序的登录端点就是这五个（微信手机号快速验证是首登绑定的子路径，
+    # 不是第五条登录通道；2026-10-29 短信退役后它取代短信成为首绑主通道）
     # 取 OpenAPI 契约面而不是 `app.routes`——本版 FastAPI 的 included router 在
     # `app.routes` 里是 `_IncludedRouter` 包装（无 path 属性），契约面才是可枚举的接口全集。
     paths = set(context.client.app.openapi()["paths"])
@@ -486,6 +487,7 @@ def step_only_parent_channels(context):
     assert login_paths == {
         "/api/miniapp/login",
         "/api/miniapp/login/wechat",
+        "/api/miniapp/login/wechat/phone",
         "/api/miniapp/login/bind",
         "/api/miniapp/login/options",
     }, login_paths

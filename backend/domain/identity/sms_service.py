@@ -9,8 +9,11 @@
   **未建档手机号**取更紧档 `sms_daily_limit_unregistered`，第九轮 P2-1）/ 校验失败次数上限
   （`sms_max_attempts`，超限即作废该码）。
 - **一次性**：校验通过立即写 `used_at`，同码不可复用。
+- **2026-10-29 甲方裁定**：短信退役（全部微信一键登录）。生产允许 `SMS_ENABLED=false`；
+  关闭时 `send` / `verify` 一律 fail-closed。首次登录改走微信手机号快速验证
+  （`/api/miniapp/login/wechat/phone`）。
 - **开发态**：`SMS_PROVIDER=mock` 时验证码打在日志里（`[MockSms]`），便于本地与模拟器联调；
-  生产 `SMS_PROVIDER` 必须接真实网关（`validate_production` 把关）。
+  若保留短信兼容通道，生产 `SMS_PROVIDER` 必须接真实网关（`validate_production` 把关）。
 """
 
 from __future__ import annotations
@@ -58,6 +61,10 @@ class SmsCodeService:
         """发一条验证码。返回 {sent: True, ttl_seconds, provider}（**不回传验证码**）。"""
         from backend.integrations.sms import get_sms_gateway
 
+        # 2026-10-29 甲方裁定：短信退役。关闭时**必须 fail-closed**——不能走 mock 网关
+        # 回"已发送"（家长永远收不到码的假成功）。
+        if not get_settings().SMS_ENABLED:
+            raise ConflictError("短信通道未启用，请使用微信一键登录")
         phone = (phone or "").strip()
         if not phone or len(phone) < 11 or not phone.isdigit():
             raise ValidationError("请输入 11 位手机号")
@@ -189,6 +196,9 @@ class SmsCodeService:
           —— rowcount=0 即"已被试爆/已被消费"，一律按超限拒绝。
         InnoDB 的 UPDATE 在行锁上按**最新已提交版本**重新判定条件，所以计数不会超过上限。
         """
+        # 2026-10-29 甲方裁定：短信退役。关闭时任何校验入口都 fail-closed。
+        if not get_settings().SMS_ENABLED:
+            raise ValidationError("短信通道未启用，请使用微信一键登录")
         phone = (phone or "").strip()
         code = (code or "").strip()
         if not code:

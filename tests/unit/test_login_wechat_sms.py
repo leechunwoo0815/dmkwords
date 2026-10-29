@@ -111,6 +111,97 @@ def test_wechat_login_bind_then_login(client: TestClient, monkeypatch):
     assert me.status_code == 200 and me.json()["children"]
 
 
+def test_wechat_phone_bind_without_sms(client: TestClient, monkeypatch):
+    """2026-10-29 短信退役：首次登录用微信手机号快速验证绑定，完全不依赖短信。"""
+    phone = "13800008205"
+    parent, _child = _parent_with_child(client, phone, name="手机号绑定家长")
+    state = {"openid": "oTest_8205"}
+
+    async def _fake_session(code: str) -> dict:
+        return {"openid": state["openid"]}
+
+    async def _fake_phone(phone_code: str) -> str | None:
+        assert phone_code == "pc-8205"
+        return phone
+
+    monkeypatch.setattr(
+        "backend.integrations.wechat.auth.WeChatAuth.code_to_session",
+        staticmethod(_fake_session),
+    )
+    monkeypatch.setattr(
+        "backend.integrations.wechat.auth.WeChatAuth.get_phone_number",
+        staticmethod(_fake_phone),
+    )
+
+    first = client.post("/api/miniapp/login/wechat", json={"code": "wx"})
+    assert first.status_code == 200, first.text
+    ticket = first.json()["bind_ticket"]
+
+    bind = client.post(
+        "/api/miniapp/login/wechat/phone",
+        json={"bind_ticket": ticket, "phone_code": "pc-8205"},
+    )
+    assert bind.status_code == 200, bind.text
+    assert bind.json()["parent"]["id"] == parent["id"]
+    assert bind.json()["token"]
+
+    again = client.post("/api/miniapp/login/wechat", json={"code": "wx2"})
+    assert again.status_code == 200, again.text
+    assert again.json()["parent"]["id"] == parent["id"]
+
+    # 微信手机号接口失败 → 422，不落绑定（换一个未绑 openid）
+    state["openid"] = "oTest_8206"
+
+    async def _fail_phone(phone_code: str) -> None:
+        return None
+
+    monkeypatch.setattr(
+        "backend.integrations.wechat.auth.WeChatAuth.get_phone_number",
+        staticmethod(_fail_phone),
+    )
+    ticket2 = client.post("/api/miniapp/login/wechat", json={"code": "wx3"}).json()["bind_ticket"]
+    fail = client.post(
+        "/api/miniapp/login/wechat/phone",
+        json={"bind_ticket": ticket2, "phone_code": "bad"},
+    )
+    assert fail.status_code == 422 and "手机号获取失败" in fail.json()["detail"]
+
+    # 手机号未在馆建档 → 拒（家长端不开放自助注册）
+    async def _unknown_phone(phone_code: str) -> str:
+        return "13800008299"
+
+    monkeypatch.setattr(
+        "backend.integrations.wechat.auth.WeChatAuth.get_phone_number",
+        staticmethod(_unknown_phone),
+    )
+    state["openid"] = "oTest_8207"
+    ticket3 = client.post("/api/miniapp/login/wechat", json={"code": "wx4"}).json()["bind_ticket"]
+    unknown = client.post(
+        "/api/miniapp/login/wechat/phone",
+        json={"bind_ticket": ticket3, "phone_code": "pc-unknown"},
+    )
+    assert unknown.status_code == 422 and "未注册" in unknown.json()["detail"]
+
+
+def test_sms_disabled_fails_closed(client: TestClient, db, monkeypatch):
+    """2026-10-29 短信退役：SMS_ENABLED=false 时发送/校验都必须明确拒绝，不能假成功。"""
+    from backend.config import get_settings
+    from backend.domain.identity.models import SmsCode
+    from backend.domain.identity.sms_service import SmsCodeService
+
+    monkeypatch.setattr(get_settings(), "SMS_ENABLED", False)
+    _clear_rate_limit()
+
+    sent = client.post("/api/miniapp/sms/send", json={"phone": "13800008207", "purpose": "login"})
+    assert sent.status_code == 409
+    assert "短信通道未启用" in sent.json()["detail"]
+
+    from backend.common.exceptions import ValidationError
+
+    with pytest.raises(ValidationError, match="短信通道未启用"):
+        SmsCodeService(db).verify("13800008207", "123456", SmsCode.PURPOSE_LOGIN)
+
+
 def test_wechat_bind_rejects_wrong_phone_and_rebind(client: TestClient, monkeypatch, db):
     # 用一个可切换的假 code2session：state["openid"] 换一下就是"另一个微信号"
     state = {"openid": "oTest_8202"}
@@ -278,7 +369,7 @@ def test_production_rejects_mock_sms_gateway():
 
     base = dict(
         DEBUG=False,
-        SECRET_KEY="real-secret",
+        SECRET_KEY="real-secret-0123456789abcdef0123456789",
         DB_PASSWORD="pw",
         WECHAT_APP_ID="wx",
         WECHAT_APP_SECRET="sk",
@@ -290,10 +381,9 @@ def test_production_rejects_mock_sms_gateway():
     with pytest.raises(RuntimeError) as exc:
         Settings(SMS_ENABLED=True, SMS_PROVIDER="mock", **base).validate_production()
     assert "SMS_PROVIDER" in str(exc.value)
-    # 2026-10-12 拍板（P1）：**关掉短信不再放行**（关闭=拒绝启动）——原口径"纯微信登录也算合规"已废
-    with pytest.raises(RuntimeError) as exc2:
-        Settings(SMS_ENABLED=False, SMS_PROVIDER="mock", **base).validate_production()
-    assert "短信通道已关闭" in str(exc2.value)
+    # 2026-10-29 甲方裁定：**短信退役**（全部微信一键登录）——生产允许关闭；
+    # 关闭时 `/sms/send` 与 `SmsCodeService.verify` fail-closed（另有判据）。
+    Settings(SMS_ENABLED=False, SMS_PROVIDER="mock", **base).validate_production()
     # 接真实网关但缺凭据 → 拒
     with pytest.raises(RuntimeError) as exc2:
         Settings(SMS_ENABLED=True, SMS_PROVIDER="aliyun", **base).validate_production()

@@ -166,19 +166,10 @@ class Settings(BaseSettings):
             problems.append("生产环境 LOGIN_DEV_CODE 必须置空（禁用固定验证码）")
         if any("localhost" in o for o in self.cors_origins):
             problems.append("生产环境 CORS_ORIGINS 不得含 localhost（改成正式管理端域名）")
-        # 2026-10-12 拍板（P1）：**关掉短信 = 拒绝启动**。原先 SMS_ENABLED=false 会短路下面
-        # 全部短信自检（既不拦发送、也不拦 mock 网关）——生产能正常起来、接口回"已发送"，
-        # 但家长永远收不到码（假成功从侧门回来）。若确实要停用短信登录，属于**产品口径变更**：
-        # 先在小程序隐藏手机号入口（`/api/miniapp/login/options` 的 sms_enabled 已联动），
-        # 再按新口径调整本判据。
-        if not self.SMS_ENABLED:
-            problems.append(
-                "短信通道已关闭（SMS_ENABLED=false）：生产不允许在关闭短信的状态下启动"
-                '（会静默走 mock 网关回"已发送"而家长收不到验证码）'
-            )
+        # 2026-10-29 甲方裁定：**短信退役**（全部微信一键登录），允许生产关闭。
+        # 关闭时 `/sms/send` 与 `SmsCodeService.verify` 一律 fail-closed（不会走 mock 假成功）；
+        # 首次登录改由微信手机号快速验证绑定（`/api/miniapp/login/wechat/phone`）。
         if self.SMS_ENABLED and self.SMS_PROVIDER.strip().lower() == "mock":
-            # 第八轮审查 P2-14：原文案指路 `SMS_ENABLED=false`，而上面那条硬校验正是
-            # "SMS_ENABLED=false 拒启" → 按报错改会**再次拒启**（死循环）。改成本条真实出路。
             problems.append(
                 "生产环境 SMS_PROVIDER 不能是 mock（短信发不出去）——请配置真实短信网关凭据"
                 "（SMS_PROVIDER=aliyun/tencent + SMS_APP_ID/SMS_APP_KEY/SMS_SIGN_NAME）"
