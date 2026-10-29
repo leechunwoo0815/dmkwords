@@ -27,7 +27,11 @@ _log = logging.getLogger(__name__)
 
 SS = 3  # 超采样倍数
 
-_FONT_CN = ["/System/Library/Fonts/Hiragino Sans GB.ttc"]
+_FONT_CN = [
+    "/System/Library/Fonts/Hiragino Sans GB.ttc",
+    "/usr/share/fonts/wqy-zenhei/wqy-zenhei.ttc",
+    "/usr/share/fonts/wqy-microhei/wqy-microhei.ttc",
+]
 _FONT_ROUND = [
     "/System/Library/Fonts/SFNSRounded.ttf",
     "/System/Library/Fonts/SFCompactRounded.ttf",
@@ -116,11 +120,16 @@ def font_cn(size: int) -> ImageFont.FreeTypeFont:
     if key not in _font_cache:
         f = None
         for path in _FONT_CN:
-            try:
-                f = ImageFont.truetype(path, size, index=2)  # index 2 = W6
+            # macOS Hiragino 用 index 2 = W6；Linux WQY 的 index 2 也可用，
+            # 但部分 TTC 只有 1-2 个 face——每个候选再兜底 index 0。
+            for index in (2, 0):
+                try:
+                    f = ImageFont.truetype(path, size, index=index)
+                    break
+                except OSError:
+                    continue
+            if f is not None:
                 break
-            except OSError:
-                continue
         if f is None:
             # B8（第九轮审查 P3 族）：候选字体全失败会**静默**降级到 PIL 默认字体（海报字形退化）
             _log.warning("CN 字体全部加载失败，回退默认字体（海报字形会退化）")

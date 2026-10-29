@@ -85,7 +85,14 @@ Page({
     // 否则时长/进度显示 0（书架/首页入口常见），用户会以为播放器坏了。
     if ((!book.audio_url || !book.audio_duration) && book.id) {
       api.getBookDetail(book.id).then((fresh) => {
-        this.setData({ book: media.formatBook({ ...this.data.book, ...fresh }) })
+        const merged = media.formatBook({ ...this.data.book, ...fresh })
+        const dur = merged.audio_duration || this.data.duration || 0
+        this.setData({
+          book: merged,
+          duration: dur,
+          displayDuration: fmt(dur),
+          sliderMax: Math.max(1, Math.floor(dur)),
+        })
         this._initAudio()
       }).catch(() => {})
     }
@@ -144,8 +151,16 @@ Page({
     // child_id 必填（会员门禁上下文）——漏拼即全量 403「缺少 child_id」，
     // 插修 15 后端加必填参数时未枚举到此消费端，音频自该批起全量哑火
     const url = `${base}?child_id=${childId}&token=${encodeURIComponent(token)}`
+    // iOS：全局音频选项比 InnerAudioContext 的 per-context 属性更可靠；
+    // 静音键打开时仍要出声（甲方实测"进度在走但没声音"即此族）。
+    if (wx.setInnerAudioOption) {
+      try {
+        wx.setInnerAudioOption({ obeyMuteSwitch: false, mixWithOther: true, speakerOn: true })
+      } catch (e) { /* 老基础库无此 API：忽略 */ }
+    }
     const audio = wx.createInnerAudioContext()
     audio.src = url
+    audio.volume = 1.0
     audio.playbackRate = 1.0
     audio.obeyMuteSwitch = false
 
@@ -246,23 +261,27 @@ Page({
     })
     audio.onTimeUpdate(() => {
       const cur = audio.currentTime || 0
-      // 时长校准兜底：onCanplay 在部分基础库不触发，sliderMax 会停在初始值，滑块看似不动
+      // 时长校准兜底：onCanplay 在部分基础库不触发，sliderMax 会停在初始值，滑块看似不动。
+      // iOS 上个别 MP3 的 audio.duration 恒为 0——用后端下发的 book.audio_duration 兜底，
+      // 否则会出现"已经在播 0:35，时长仍 0:00、滑块卡在最右"的假故障。
       const realDur = audio.duration || 0
+      const uiDur = realDur > 0 ? realDur : (this.data.duration || 0)
       // F-L12/T34：高频路径（~250ms）双 setData 合并为一次
-      if (realDur > 0 && Math.floor(realDur) !== this.data.sliderMax) {
+      if (uiDur > 0 && Math.floor(uiDur) !== this.data.sliderMax) {
         this.setData({
-          duration: realDur,
-          displayDuration: fmt(realDur),
-          sliderMax: Math.floor(realDur),
+          ...(realDur > 0 ? { duration: realDur, displayDuration: fmt(realDur) } : {}),
+          sliderMax: Math.max(1, Math.floor(uiDur)),
           currentTime: cur,
           displayTime: fmt(cur),
-          sliderValue: Math.floor(cur),
+          sliderValue: Math.min(Math.floor(cur), Math.max(1, Math.floor(uiDur))),
         })
       } else {
         this.setData({
           currentTime: cur,
           displayTime: fmt(cur),
-          sliderValue: Math.floor(cur),
+          sliderValue: this.data.sliderMax > 1
+            ? Math.min(Math.floor(cur), this.data.sliderMax)
+            : Math.floor(cur),
         })
       }
       // F-H5/T26：onTimeUpdate 实际触发频率 ~250ms 而非 1s，原计数法上报量 ~4×；
