@@ -1,6 +1,6 @@
 // frontend/app.js
 // 生产环境通过 project.config.json 的编译环境注入 baseURL
-const PROD_BASE_URL = 'https://api.dmkwords.cn'
+const PROD_BASE_URL = 'https://saisenyoo.cn'
 // 开发版连本地后端。
 // - 模拟器（platform=devtools）：http 127.0.0.1 即可（image 组件不信任自签 https）
 // - 真机（ios/android）：媒体栈拦 http，必须走本地 https :8443
