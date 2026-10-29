@@ -85,6 +85,7 @@
 }
 .no-audio-icon { font-size: 80rpx; display: block; margin-bottom: 20rpx; }
 .no-audio-text { font-size: 28rpx; color: var(--muted); }
+.audio-loading { padding: 16rpx 0; text-align: center; font-size: 26rpx; color: var(--muted); }
 
 /* 查词 */
 .lookup-section {

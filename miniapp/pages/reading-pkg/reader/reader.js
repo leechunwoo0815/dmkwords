@@ -43,6 +43,7 @@ Page({
     completion: null,
     lastPosition: 0,
     anomalyMsg: '',
+    audioLoading: false,
   },
 
   async onLoad(options) {
@@ -80,7 +81,9 @@ Page({
     // 与有没有 title 无关——判据只留这一个。
     // E-20260909-02：补全后必须重建音频实例（首轮 audio_url 为空已跳过 init，
     // 不重建则 src 永远无效——book-detail 主入口全量哑火根因之一）
-    if (!book.audio_url && book.id) {
+    // 2026-10-29：入口只带 audio_url、没带 audio_duration 时也要补详情——
+    // 否则时长/进度显示 0（书架/首页入口常见），用户会以为播放器坏了。
+    if ((!book.audio_url || !book.audio_duration) && book.id) {
       api.getBookDetail(book.id).then((fresh) => {
         this.setData({ book: media.formatBook({ ...this.data.book, ...fresh }) })
         this._initAudio()
@@ -135,6 +138,7 @@ Page({
     }
     // E-20260909-02：id-only 进入首轮 book.audio_url 为空——跳过，等补详情回调再 init
     if (!book.audio_url) return
+    this.setData({ audioLoading: true, anomalyMsg: '' })
     const base = book.audio_url.split('?')[0]
     // E-20260909-02（媒体消费点断链族 §六十二同族新案）：C-13 收口后音频流
     // child_id 必填（会员门禁上下文）——漏拼即全量 403「缺少 child_id」，
@@ -146,17 +150,24 @@ Page({
     audio.obeyMuteSwitch = false
 
     audio.onCanplay(() => {
+      const patch = { audioLoading: false }
       if (this.data.duration <= 0 && audio.duration) {
-        this.setData({ duration: audio.duration, displayDuration: fmt(audio.duration), sliderMax: Math.floor(audio.duration) })
+        patch.duration = audio.duration
+        patch.displayDuration = fmt(audio.duration)
+        patch.sliderMax = Math.floor(audio.duration)
       }
+      this.setData(patch)
       this._applyResume()
+    })
+    audio.onWaiting(() => {
+      this.setData({ audioLoading: true })
     })
     audio.onPlay(() => {
       // R5（插修7）：无条件重设——ended 后再 play 微信从头播（currentTime=0），
       // 若沿用 onEnded 尾部推进的 _sessionStart=旧endPos，则再播完
       // endPos>sessionStart 恒 false，上报+测验引导弹窗链整体跳过（再读不弹根因）
       this._sessionStart = Math.floor(audio.currentTime || 0)
-      this.setData({ playing: true })
+      this.setData({ playing: true, audioLoading: false })
     })
     audio.onPause(() => {
       this._reportNow()
@@ -223,10 +234,13 @@ Page({
     })
     audio.onError((err) => {
       // R3（插修 16）：403（无收听权限）与真加载失败区分提示——预检端点
-      // 是主防线（book-detail onPlay），此处兜底直链进入场景
+      // 是主防线（book-detail onPlay），此处兜底直链进入场景。
+      // 2026-10-29：把微信错误码显示出来，方便定位"能请求 200 但播放器不响"。
+      const code = err && err.errCode !== undefined ? err.errCode : ''
       this.setData({
         playing: false,
-        anomalyMsg: '无法播放（可能无收听权限），请返回重新进入',
+        audioLoading: false,
+        anomalyMsg: `无法播放${code !== '' ? `（错误码 ${code}）` : ''}，请返回重试或联系馆员`,
       })
       console.error('[audio error]', err)
     })

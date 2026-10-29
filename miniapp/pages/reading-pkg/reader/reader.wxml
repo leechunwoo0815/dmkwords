@@ -32,6 +32,8 @@
         data-rate="{{item}}" bindtap="onSpeedTap">{{item}}x</view>
     </view>
 
+    <view wx:if="{{audioLoading}}" class="audio-loading">音频加载中…</view>
+
     <view wx:if="{{anomalyMsg}}" class="no-audio">
       <image class="no-audio-icon" src="/icons/ui/warning.png" mode="aspectFit" />
       <text class="no-audio-text">{{anomalyMsg}}</text>
