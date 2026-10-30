@@ -116,14 +116,18 @@ const img = require(path.join(__dirname, '..', 'miniapp', 'utils', 'img.js'))
       onSeeked: (f) => { handlers.seeked = f },
       play: () => { a.playCalls += 1 },
       pause: () => {},
-      seek: (t) => { a.seekCalls.push(t); a.currentTime = t; if (handlers.seeked) handlers.seeked() },
+      seek: (t) => { a.seekCalls.push(t); if (a.dropSeek) return; a.currentTime = t; if (handlers.seeked) handlers.seeked() },
       destroy: () => { a.destroyed = true },
       emit: (name) => handlers[name] && handlers[name](),
     }
     return a
   }
   global.wx.setInnerAudioOption = () => {}
-  global.wx.createInnerAudioContext = () => { lastAudio = makeAudio(); return lastAudio }
+  global.wx.createInnerAudioContext = () => {
+    lastAudio = makeAudio()
+    if (global.__dropNextSeek) { lastAudio.dropSeek = true; global.__dropNextSeek = false }
+    return lastAudio
+  }
   global.wx.vibrateShort = () => {}
   global.wx.showModal = () => {}
   global.wx.navigateTo = () => {}
@@ -190,10 +194,52 @@ const img = require(path.join(__dirname, '..', 'miniapp', 'utils', 'img.js'))
     p2.data.durationKnown === true && p2.data.displayDuration === '1:40' && p2.data.sliderMax === 100,
     JSON.stringify({ d: p2.data.displayDuration, m: p2.data.sliderMax }))
 
+  // 续播竞态（甲方 2026-10-30 报障）：进度接口先回、音频实例后建，或 iOS canplay 要等 play
+  // 才触发——两种顺序都必须在"按下播放"之前落到 last_position，不能从头出声。
+  let resolveDetail = null
+  api.getBookDetail = () => new Promise((r) => { resolveDetail = r })
+  api.getProgress = async () => ({ coverage_percent: 20, finished: false, last_position: 30 })
+  const p3 = newReader()
+  await p3.onLoad({ book_id: '31', child_id: '7' })
+  await tick()
+  check('续播竞态：进度先到、音频未建时不崩且记住进度',
+    p3._audio === null && p3.data.lastPosition === 30,
+    JSON.stringify({ audio: !!p3._audio, last: p3.data.lastPosition }))
+  resolveDetail({ ...detail, audio_url: '/api/miniapp/books/31/audio', audio_duration: 178 })
+  await tick(); await tick()
+  check('音频实例建好即补续播（seek 30 先于任何 play）',
+    !!p3._audio && lastAudio.seekCalls.indexOf(30) !== -1 && p3.data.displayTime === '0:30',
+    JSON.stringify({ seeks: lastAudio.seekCalls, t: p3.data.displayTime }))
+  // 起播闸：即使前面的续播都没赶上，按播放键前也必须 seek 到 last_position
+  p3._resumeApplied = false
+  p3.setData({ lastPosition: 30, finished: false })
+  lastAudio.seekCalls.length = 0
+  p3.onTogglePlay()
+  check('按播放前兜底续播：seek(30) 与 play 同批发生',
+    lastAudio.seekCalls.indexOf(30) !== -1 && lastAudio.playCalls > 0,
+    JSON.stringify({ seeks: lastAudio.seekCalls, plays: lastAudio.playCalls }))
+
+  // 音频未就绪时 seek 会被播放器丢弃（2026-10-30 模拟器实证）：不能凭调用过 seek 就认账，
+  // 必须在 onSeeked 确认落点；否则 canplay/onPlay 的补 seek 全被跳过 = 永远从头听。
+  api.getProgress = async () => ({ coverage_percent: 20, finished: false, last_position: 30 })
+  api.getBookDetail = async () => ({ ...detail, audio_url: '/api/miniapp/books/31/audio', audio_duration: 178 })
+  global.__dropNextSeek = true
+  const p4 = newReader()
+  await p4.onLoad({ book_id: '31', child_id: '7' })
+  await tick(); await tick()
+  check('seek 被丢弃时不认账（等确认）',
+    !!lastAudio && p4.data.lastPosition === 30 && p4._resumeApplied === false,
+    JSON.stringify({ applies: p4._resumeApplied, seeks: lastAudio && lastAudio.seekCalls }))
+  lastAudio.dropSeek = false
+  lastAudio.emit('play')
+  check('起播后补 seek 并确认续播',
+    lastAudio.seekCalls.indexOf(30) !== lastAudio.seekCalls.lastIndexOf(30) && p4._resumeApplied === true,
+    JSON.stringify({ seeks: lastAudio.seekCalls, applies: p4._resumeApplied }))
+
   if (failures.length) {
     console.log(`\nFAIL: ${failures.length} 项行为断言未通过`)
     failures.forEach((f) => console.log(`  - ${f}`))
     process.exit(1)
   }
-  console.log('\nPASS: 小程序工具层行为自检全绿（withHeaders / listMeta / onImgError / reader 播放器）✓')
+  console.log('\nPASS: 小程序工具层行为自检全绿（withHeaders / listMeta / onImgError / reader 播放器 / 续播竞态）✓')
 })()

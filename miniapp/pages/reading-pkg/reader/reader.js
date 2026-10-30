@@ -87,6 +87,8 @@ Page({
     this._finishPrompted = false // B1：同一次会话只弹一次完播引导（onLoad 重置）
     this._audio = null
     this._resumeApplied = false
+    this._resumeAttempts = 0
+    this._resumeTarget = null
     this._seeking = false
     this._reporting = false
     this._seekEpoch = 0
@@ -174,16 +176,25 @@ Page({
   },
 
   _applyResume() {
-    // 有历史进度则从 last_position 续播（onCanplay 与 loadProgress 双保险，防基础库不触发）
+    // 有历史进度则从 last_position 续播（onCanplay / 实例建成 / 按下播放 三处触发，防基础库时序差异）
     // R6（插修7）：已读完的书不续播——last_position≈99% 时点播放只剩几秒
     // "一闪而过伪音"，还需二次点击才从头；"再次阅读"应从头开始，续播仅服务未读完的书
     const { lastPosition, finished, duration, durationKnown } = this.data
     if (lastPosition <= 0 || finished || !this._audio || this._resumeApplied) return
     // 续播点贴尾（≤3 秒）视同读完：seek 过去会立刻 ended，体验像"点了没反应"
     if (durationKnown && lastPosition >= duration - 3) return
+    // 音频未就绪时 seek 会被播放器丢弃（2026-10-30 模拟器实证：currentTime 仍从 0 走）——
+    // 所以这里**不置 _resumeApplied**，由 onSeeked 确认落点后才算完成；
+    // 未确认就等 canplay/onPlay 再补，最多 3 次，避免用户反复拖动时刷屏。
+    if ((this._resumeAttempts || 0) >= 4) return
+    this._resumeAttempts = (this._resumeAttempts || 0) + 1
+    this._resumeTarget = lastPosition
     this._audio.seek(lastPosition)
-    this._resumeApplied = true
-    this.setData({ sliderValue: Math.floor(lastPosition), displayTime: fmt(lastPosition) })
+    this.setData({
+      currentTime: lastPosition,
+      displayTime: fmt(lastPosition),
+      sliderValue: Math.floor(lastPosition),
+    })
   },
 
   _initAudio() {
@@ -233,6 +244,8 @@ Page({
       // endPos>sessionStart 恒 false，上报+测验引导弹窗链整体跳过（再读不弹根因）
       this._sessionStart = Math.floor(audio.currentTime || 0)
       this.setData({ playing: true, playState: 'playing', audioLoading: false, canRetry: false })
+      // 起播后再补一次续播：iOS 的 canplay 常在 play 之后才到，之前那次 seek 会被丢弃
+      if (!this._resumeApplied) this._applyResume()
     })
     audio.onPause(() => {
       this._reportNow()
@@ -344,11 +357,29 @@ Page({
     })
     audio.onSeeked(() => {
       // seek 后重置连续段起点：旧区间已在 onSliderChange 前上报
+      const cur = audio.currentTime || 0
+      // 续播只有**真的落在 last_position 附近**才算完成——音频未就绪时 seek 会被丢弃，
+      // 不能凭"调用过 seek"就认账（否则 canplay/onPlay 的补 seek 全被跳过，用户永远从头听）
+      if (!this._resumeApplied && this._resumeTarget != null && Math.abs(cur - this._resumeTarget) <= 2) {
+        this._resumeApplied = true
+        this._resumeTarget = null
+      }
       this._seekEpoch += 1
-      this._sessionStart = Math.floor(audio.currentTime || 0)
+      this._sessionStart = Math.floor(cur)
       this._lastBeatAt = Date.now()
     })
     this._audio = audio
+    // 进度可能比音频实例先到（进度接口与详情接口竞态）：实例一建好就补一次续播。
+    // 只有 canplay 才续播是不够的——iOS 上 canplay 往往要等用户按下播放才触发，
+    // 那一下已经从头出声了（甲方报障「进去点播放还是从头」的根因）。
+    this._applyResume()
+  },
+
+  /** 用户主动定位（拖动/快进快退/重听）：勾掉自动续播，别让补 seek 把人拖回去。 */
+  _userSeek(target) {
+    this._resumeApplied = true
+    this._resumeTarget = null
+    this._seekEpoch += 1
   },
 
   onTogglePlay() {
@@ -364,9 +395,13 @@ Page({
     }
     // 播完再点 = 从头重听（微信 ended 后 play 本身会回 0，这里显式对齐 UI）
     if (this.data.playState === 'ended') {
+      this._userSeek(0)
       audio.seek(0)
       this._sessionStart = 0
       this.setData({ currentTime: 0, displayTime: '0:00', sliderValue: 0 })
+    } else if (!this._resumeApplied) {
+      // 起播前最后一道续播闸：用户手速快于 canplay/进度回调时，先 seek 再 play
+      this._applyResume()
     }
     audio.play()
   },
@@ -381,7 +416,7 @@ Page({
     if (!audio) return
     this._reportNow()
     const target = Math.max(0, (audio.currentTime || 0) - 15)
-    this._seekEpoch += 1
+    this._userSeek(target)
     audio.seek(target)
     this.setData({ currentTime: target, displayTime: fmt(target), sliderValue: Math.floor(target) })
   },
@@ -397,7 +432,7 @@ Page({
     const target = dur > 0
       ? Math.min(dur, (audio.currentTime || 0) + 15)
       : (audio.currentTime || 0) + 15
-    this._seekEpoch += 1
+    this._userSeek(target)
     audio.seek(target)
     this.setData({ currentTime: target, displayTime: fmt(target), sliderValue: Math.floor(target) })
   },
@@ -421,7 +456,7 @@ Page({
     const target = this.data.durationKnown ? Math.min(v, this.data.duration) : v
     this.setData({ currentTime: target, displayTime: fmt(target), sliderValue: Math.floor(target) })
     if (!audio) return
-    this._seekEpoch += 1
+    this._userSeek(target)
     audio.seek(target)
   },
 
