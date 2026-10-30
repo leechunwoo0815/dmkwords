@@ -185,7 +185,7 @@ Page({
     if (durationKnown && lastPosition >= duration - 3) return
     // 音频未就绪时 seek 会被播放器丢弃（2026-10-30 模拟器实证：currentTime 仍从 0 走）——
     // 所以这里**不置 _resumeApplied**，由 onSeeked 确认落点后才算完成；
-    // 未确认就等 canplay/onPlay 再补，最多 3 次，避免用户反复拖动时刷屏。
+    // 未确认就等 canplay/onPlay 再补，最多 4 次，避免用户反复拖动时刷屏。
     if ((this._resumeAttempts || 0) >= 4) return
     this._resumeAttempts = (this._resumeAttempts || 0) + 1
     this._resumeTarget = lastPosition
@@ -376,7 +376,7 @@ Page({
   },
 
   /** 用户主动定位（拖动/快进快退/重听）：勾掉自动续播，别让补 seek 把人拖回去。 */
-  _userSeek(target) {
+  _userSeek() {
     this._resumeApplied = true
     this._resumeTarget = null
     this._seekEpoch += 1
@@ -395,7 +395,7 @@ Page({
     }
     // 播完再点 = 从头重听（微信 ended 后 play 本身会回 0，这里显式对齐 UI）
     if (this.data.playState === 'ended') {
-      this._userSeek(0)
+      this._userSeek()
       audio.seek(0)
       this._sessionStart = 0
       this.setData({ currentTime: 0, displayTime: '0:00', sliderValue: 0 })
@@ -416,7 +416,7 @@ Page({
     if (!audio) return
     this._reportNow()
     const target = Math.max(0, (audio.currentTime || 0) - 15)
-    this._userSeek(target)
+    this._userSeek()
     audio.seek(target)
     this.setData({ currentTime: target, displayTime: fmt(target), sliderValue: Math.floor(target) })
   },
@@ -432,7 +432,7 @@ Page({
     const target = dur > 0
       ? Math.min(dur, (audio.currentTime || 0) + 15)
       : (audio.currentTime || 0) + 15
-    this._userSeek(target)
+    this._userSeek()
     audio.seek(target)
     this.setData({ currentTime: target, displayTime: fmt(target), sliderValue: Math.floor(target) })
   },
@@ -456,7 +456,7 @@ Page({
     const target = this.data.durationKnown ? Math.min(v, this.data.duration) : v
     this.setData({ currentTime: target, displayTime: fmt(target), sliderValue: Math.floor(target) })
     if (!audio) return
-    this._userSeek(target)
+    this._userSeek()
     audio.seek(target)
   },
 
