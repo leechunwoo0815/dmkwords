@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 
 from sqlalchemy.orm import Session
@@ -19,6 +20,8 @@ from sqlalchemy.orm import Session
 from backend.common.exceptions import NotFoundError
 from backend.common.media_paths import is_within
 from backend.domain.reading_circle.models import CirclePost
+
+_log = logging.getLogger(__name__)
 
 # 卡片类型 → 吉祥物（每类卡一个动物，形成系列感；与头像库同一套美术语言）
 CARD_MASCOT = {
@@ -290,17 +293,85 @@ def _uploads_root() -> str:
     return os.path.abspath(get_settings().UPLOADS_DIR)
 
 
-def post_thumb_image(db: Session, post_id: int) -> str:
-    """取帖子缩略图相对路径（信息流小图；旧帖无缩略图 → 回落大图，前端仍留 wx:if 防空）。"""
+def _rel_exists(rel: str | None) -> bool:
+    """uploads/ 下的相对路径是否真有一份文件（越界路径一律视为不存在）。"""
+    if not rel:
+        return False
+    root = _uploads_root()
+    full = os.path.abspath(os.path.join(root, rel))
+    return is_within(root, full) and os.path.isfile(full)
+
+
+def ensure_post_images(db: Session, post: CirclePost) -> bool:
+    """单帖图片**缺失即重建**（2026-10-30：可再生目录 + 不自愈端点的事故根治）。
+
+    背景：`uploads/circle` 在 `media_paths.REGENERABLE_PREFIXES` 里（允许清空重生成），
+    但 2026-10-29 为修字体清空后，管理端/小程序 image 端点只回库里的 `image_path`、
+    不重建 → 全量 404「卡片图文件不存在」。**可再生目录必须配可自愈的消费端点**。
+
+    只在文件真缺失时渲染（正常请求零额外开销）；内容寻址命名 ⇒ 内容没变同名复用。
+    只回写缺失的列：已有大图不动它的 URL（避免全端缓存被动失效）。
+    返回是否发生了重建；渲染失败不抛出（记录日志，端点仍走 404 兜底）。
+    """
+    root = _uploads_root()
+    missing_full = not _rel_exists(post.image_path)
+    missing_thumb = not _rel_exists(post.thumb_path)
+    if not missing_full and not missing_thumb:
+        return False
+    try:
+        card_data = json.loads(post.card_data or "{}")
+        if not isinstance(card_data, dict) or not card_data.get("card_type"):
+            return False  # 快照损坏的帖子不渲染（会出空卡，不如 404 让问题可见）
+        from backend.common.file_storage import generated_jpeg_quality
+
+        quality = generated_jpeg_quality(db, DEFAULT_JPEG_QUALITY)
+        if missing_full:
+            paths = render_card(card_data, jpeg_quality=quality)
+            post.image_path = paths["image_path"]
+            if missing_thumb:
+                post.thumb_path = paths["thumb_path"]
+        else:
+            # 只缺缩略图 → 不再多写一份没人引用的大图（纸纹噪点使内容指纹每次不同）
+            post.thumb_path = render_thumb(card_data, jpeg_quality=quality)
+    except Exception:  # 渲染失败不应把 GET 变成 500——端点按文件不存在返回 404
+        _log.exception("circle image self-heal failed: post_id=%s", post.id)
+        return False
+    db.commit()
+    _log.warning(
+        "circle image self-heal: post_id=%s full=%s thumb=%s root=%s",
+        post.id,
+        missing_full,
+        missing_thumb,
+        root,
+    )
+    return True
+
+
+def _get_post(db: Session, post_id: int) -> CirclePost:
     p = db.query(CirclePost).filter(CirclePost.id == post_id, CirclePost.is_deleted == 0).first()
     if not p:
         raise NotFoundError("帖子不存在")
+    return p
+
+
+def post_thumb_image(db: Session, post_id: int) -> str:
+    """取帖子缩略图相对路径（信息流小图；旧帖无缩略图 → 回落大图，前端仍留 wx:if 防空）。
+
+    文件缺失时先自愈重渲（见 `ensure_post_images`），再回路径；仍缺失由端点 404。
+    """
+    p = _get_post(db, post_id)
+    rel = p.thumb_path or p.image_path
+    if not _rel_exists(rel):
+        ensure_post_images(db, p)
     return p.thumb_path or p.image_path
 
 
 def post_card_image(db: Session, post_id: int) -> str:
-    """取帖子的卡片图相对路径（双端 image 端点共用；ORM 不进 Router）。"""
-    p = db.query(CirclePost).filter(CirclePost.id == post_id, CirclePost.is_deleted == 0).first()
-    if not p:
-        raise NotFoundError("帖子不存在")
+    """取帖子的卡片图相对路径（双端 image 端点共用；ORM 不进 Router）。
+
+    文件缺失时先自愈重渲（见 `ensure_post_images`），再回路径；仍缺失由端点 404。
+    """
+    p = _get_post(db, post_id)
+    if not _rel_exists(p.image_path):
+        ensure_post_images(db, p)
     return p.image_path

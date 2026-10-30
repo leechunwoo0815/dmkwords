@@ -86,6 +86,22 @@
 .no-audio-icon { font-size: 80rpx; display: block; margin-bottom: 20rpx; }
 .no-audio-text { font-size: 28rpx; color: var(--muted); }
 .audio-loading { padding: 16rpx 0; text-align: center; font-size: 26rpx; color: var(--muted); }
+/* 播放失败重试（2026-10-30 播放器重做）：错误态必须给出可点的出口 */
+.audio-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 160rpx;
+  min-height: 72rpx;
+  margin-top: 20rpx;
+  padding: 12rpx 36rpx;
+  border-radius: 999rpx;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 26rpx;
+  font-weight: 600;
+}
+.audio-retry:active { transform: scale(0.96); }
 
 /* 查词 */
 .lookup-section {

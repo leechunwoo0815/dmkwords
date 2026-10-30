@@ -318,9 +318,11 @@ Page({
       }
     } catch (e) { /* 预检失败放行进 reader（audio 流端点兜底 403） */ }
     // F-L19 同款：detail→reader 改传 id（整对象进 URL 白屏风险收口）
+    // 2026-10-30：顺带带上时长——reader 进页即显示总时长，不等详情接口回来再补
     wx.navigateTo({
       url: `/pages/reading-pkg/reader/reader?book_id=${book.book_id ?? book.id}`
-        + `&child_id=${childId}&child_name=${encodeURIComponent(childName)}`,
+        + `&child_id=${childId}&child_name=${encodeURIComponent(childName)}`
+        + `&audio_duration=${book.audio_duration || 0}`,
     })
   },
 

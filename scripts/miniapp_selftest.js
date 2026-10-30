@@ -88,10 +88,112 @@ const img = require(path.join(__dirname, '..', 'miniapp', 'utils', 'img.js'))
   img.onImgError.call({ setData: (o) => calls3.push(o) }, {})
   check('onImgError 空事件对象 → 不抛异常且不 setData', calls3.length === 0)
 
+  // ④ reader 播放器：时长真源 / 进度条边界 / 拖动不被心跳顶回 / 结束重置
+  // 2026-10-30 甲方退回「进度条、时长、进度显示不对」——原逻辑时长只认入口对象
+  // （三个入口都只传 book_id ⇒ 恒为 0:00，滑块 max=1 卡最右）。这里用桩件真跑 page.onLoad。
+  const apiPath = path.join(__dirname, '..', 'miniapp', 'utils', 'api.js')
+  const api = require(apiPath)
+  api.getConfigs = async () => ({})
+  api.getProgress = async () => ({ coverage_percent: 0, finished: false, last_position: 0 })
+  api.reportProgress = async () => ({ coverage_percent: 0, finished: false })
+  const detail = { id: 31, title: 'Book 31', has_audio: true }
+  api.getBookDetail = async () => ({ ...detail })
+
+  let lastAudio = null
+  function makeAudio() {
+    const handlers = {}
+    const a = {
+      currentTime: 0, duration: 0, playbackRate: 1, volume: 1, obeyMuteSwitch: true,
+      seekCalls: [], playCalls: 0, destroyed: false,
+      onCanplay: (f) => { handlers.canplay = f },
+      onWaiting: (f) => { handlers.waiting = f },
+      onPlay: (f) => { handlers.play = f },
+      onPause: (f) => { handlers.pause = f },
+      onStop: (f) => { handlers.stop = f },
+      onEnded: (f) => { handlers.ended = f },
+      onError: (f) => { handlers.error = f },
+      onTimeUpdate: (f) => { handlers.timeupdate = f },
+      onSeeked: (f) => { handlers.seeked = f },
+      play: () => { a.playCalls += 1 },
+      pause: () => {},
+      seek: (t) => { a.seekCalls.push(t); a.currentTime = t; if (handlers.seeked) handlers.seeked() },
+      destroy: () => { a.destroyed = true },
+      emit: (name) => handlers[name] && handlers[name](),
+    }
+    return a
+  }
+  global.wx.setInnerAudioOption = () => {}
+  global.wx.createInnerAudioContext = () => { lastAudio = makeAudio(); return lastAudio }
+  global.wx.vibrateShort = () => {}
+  global.wx.showModal = () => {}
+  global.wx.navigateTo = () => {}
+  let readerCfg = null
+  global.Page = (opts) => { readerCfg = opts }
+  require(path.join(__dirname, '..', 'miniapp', 'pages', 'reading-pkg', 'reader', 'reader.js'))
+  const tick = () => new Promise((r) => setTimeout(r, 0))
+  function newReader() {
+    const p = Object.create(readerCfg)
+    p.data = JSON.parse(JSON.stringify(readerCfg.data))
+    p.setData = function (patch) { Object.assign(this.data, patch) }
+    return p
+  }
+
+  // 入口只带 book_id/child_id（书架/首页）→ 时长必须从详情补全
+  api.getBookDetail = async () => ({ ...detail, audio_url: '/api/miniapp/books/31/audio', audio_duration: 178 })
+  const p1 = newReader()
+  await p1.onLoad({ book_id: '31', child_id: '7' })
+  await tick(); await tick()
+  check('reader 详情补全 → 总时长 2:58 / 滑块满量程 178',
+    p1.data.displayDuration === '2:58' && p1.data.sliderMax === 178 && p1.data.durationKnown === true,
+    JSON.stringify({ d: p1.data.displayDuration, m: p1.data.sliderMax }))
+  check('reader 音频实例带 child_id（会员门禁上下文）',
+    !!lastAudio && String(lastAudio.src).indexOf('child_id=7') !== -1, lastAudio && lastAudio.src)
+
+  // iOS：audio.duration 恒 0 → 进度/时长仍要正确、滑块不许卡最右
+  lastAudio.currentTime = 35
+  lastAudio.emit('timeupdate')
+  check('iOS duration=0 → 已播 0:35 / 总时长 2:58 / 滑块 35',
+    p1.data.displayTime === '0:35' && p1.data.displayDuration === '2:58' && p1.data.sliderValue === 35,
+    JSON.stringify({ cur: p1.data.displayTime, dur: p1.data.displayDuration, v: p1.data.sliderValue }))
+
+  // 拖动：时间回调不许把拇指顶回去；松手才 seek
+  lastAudio.emit('play')
+  p1.onSliderChanging({ detail: { value: 90 } })
+  lastAudio.currentTime = 40
+  lastAudio.emit('timeupdate')
+  check('拖动中 onTimeUpdate 不回写滑块', p1.data.sliderValue === 35,
+    String(p1.data.sliderValue))
+  p1.onSliderChange({ detail: { value: 90 } })
+  check('松手 seek 到 90 秒且 UI 同步',
+    lastAudio.seekCalls.indexOf(90) !== -1 && p1.data.sliderValue === 90 && p1.data.displayTime === '1:30',
+    JSON.stringify({ seeks: lastAudio.seekCalls, v: p1.data.sliderValue }))
+
+  // 结束：回满格 + 结束态（主键变重听）
+  lastAudio.duration = 178
+  lastAudio.currentTime = 0
+  lastAudio.emit('ended')
+  check('播完 → 满格/2:58/ended 态',
+    p1.data.playState === 'ended' && p1.data.sliderValue === 178 && p1.data.displayTime === '2:58',
+    JSON.stringify({ s: p1.data.playState, v: p1.data.sliderValue, t: p1.data.displayTime }))
+
+  // 详情也没给时长（老书/探测失败）→ 显示 --:-- + 滑块禁用，不许假装 0:00/最右
+  api.getBookDetail = async () => ({ ...detail, audio_url: '/api/miniapp/books/31/audio', audio_duration: null })
+  const p2 = newReader()
+  await p2.onLoad({ book_id: '31', child_id: '7' })
+  await tick(); await tick()
+  check('时长未知 → 显示 --:-- 且滑块值 0',
+    p2.data.displayDuration === '--:--' && p2.data.sliderValue === 0 && p2.data.durationKnown === false,
+    JSON.stringify({ d: p2.data.displayDuration, v: p2.data.sliderValue }))
+  lastAudio.duration = 100
+  lastAudio.emit('canplay')
+  check('时长未知 → 播放器自报时长回填 1:40',
+    p2.data.durationKnown === true && p2.data.displayDuration === '1:40' && p2.data.sliderMax === 100,
+    JSON.stringify({ d: p2.data.displayDuration, m: p2.data.sliderMax }))
+
   if (failures.length) {
     console.log(`\nFAIL: ${failures.length} 项行为断言未通过`)
     failures.forEach((f) => console.log(`  - ${f}`))
     process.exit(1)
   }
-  console.log('\nPASS: 小程序工具层行为自检全绿（withHeaders / listMeta / onImgError）✓')
+  console.log('\nPASS: 小程序工具层行为自检全绿（withHeaders / listMeta / onImgError / reader 播放器）✓')
 })()

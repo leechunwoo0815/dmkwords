@@ -1,6 +1,14 @@
 // pages/reading-pkg/reader/reader.js — 音频播放器（WM6 防刷心跳链路）
 // 协议（PRD R-151）：每 10 秒心跳上报；暂停/seek/退出/切倍速/结束时立即上报。
 // 客户端如实上报连续段区间 [session_start, position]；seek 段由服务端区间并集排除。
+//
+// 2026-10-30 播放器重做（甲方验收退回「进度条、时长、进度显示不对」）：
+//   · 时长唯一真源 = 后端 `books.audio_duration_seconds`（详情接口的 audio_duration）。
+//     iOS 的 InnerAudioContext.duration 对部分 MP3 恒为 0，不能当总时长用；
+//   · 三个入口（书详情/首页/书架）都只传 book_id ⇒ **进页必拉详情**，不再靠入口对象；
+//   · 时长未知时显示 `--:--` 且滑块禁用——不再用 `0:00 + max=1` 假装"拖到最右"；
+//   · 状态机 idle/loading/playing/paused/ended/error，结束可重听、失败可重试；
+//   · 拖动期间不被 250ms 的 onTimeUpdate 顶回去。
 const api = require('../../../utils/api')
 const media = require('../../../utils/media')
 const { loadConfigs, getConfigs } = require('../../../utils/configs')
@@ -10,9 +18,11 @@ const HEARTBEAT_SEC = 10
 const SPEEDS = [0.75, 1.0, 1.25, 1.5, 2.0]
 
 function fmt(sec) {
-  if (!sec || sec < 0) sec = 0
-  const m = Math.floor(sec / 60)
-  const s = Math.floor(sec % 60)
+  const n = Number(sec)
+  if (!n || !isFinite(n) || n < 0) return '0:00'
+  const total = Math.floor(n)
+  const m = Math.floor(total / 60)
+  const s = total % 60
   return `${m}:${s < 10 ? '0' : ''}${s}`
 }
 
@@ -29,12 +39,14 @@ Page({
     bookId: null,
     childName: '',
     playing: false,
+    playState: 'idle',   // idle | loading | playing | paused | ended | error
     currentTime: 0,
     duration: 0,
+    durationKnown: false,
     displayTime: '0:00',
-    displayDuration: '0:00',
+    displayDuration: '--:--',
     sliderValue: 0,
-    sliderMax: 0,
+    sliderMax: 1,
     speed: 1.0,
     speeds: SPEEDS,
     coveragePercent: 0,
@@ -44,6 +56,7 @@ Page({
     lastPosition: 0,
     anomalyMsg: '',
     audioLoading: false,
+    canRetry: false,
   },
 
   async onLoad(options) {
@@ -57,45 +70,31 @@ Page({
     // 两个入口（书架/首页）已改传 id，这里兜底防再次传入对象时静默无 id。
     if (!book.id && book.book_id) book.id = Number(book.book_id)
     if (!book.title && options.book_title) book.title = decodeURIComponent(options.book_title)
+    // 入口若带了时长（book-detail 会带），先立即可见；真源仍以详情接口为准
+    if (!book.audio_duration && options.audio_duration) {
+      book.audio_duration = Number(options.audio_duration) || 0
+    }
     book = media.formatBook(book)
-    const duration = book.audio_duration || 0
     this.setData({
       book,
       bookId: book.id || null,
       childId: session.resolveChildId(options),
       childName: options.child_name ? decodeURIComponent(options.child_name) : '',
-      duration,
-      displayDuration: fmt(duration),
-      sliderMax: Math.max(1, Math.floor(duration)),
     })
+    this._applyDuration(book.audio_duration)
     this._sessionStart = null
     this._lastBeatAt = 0
     this._finishPrompted = false // B1：同一次会话只弹一次完播引导（onLoad 重置）
     this._audio = null
     this._resumeApplied = false
-    this._initAudio()
+    this._seeking = false
+    this._reporting = false
+    this._seekEpoch = 0
+    this._rawCurrent = 0
+    this._setAudioOption()
+    // 三个入口都只带 book_id ⇒ 详情必拉（音频地址/时长/书名都从详情补全）
+    this.loadDetailAndInit()
     this.loadProgress()
-    // P1-6（第八轮大审查）：**判据归一为"缺 audio_url 就补详情"**。
-    // 原判据是 `!book.title`，于是"有 title 但没有 audio_url"的入口（书架/首页传整对象）
-    // 永不补详情 → 音频永不初始化（P1-6 的根因）。**能播的判断标准只有 audio_url**，
-    // 与有没有 title 无关——判据只留这一个。
-    // E-20260909-02：补全后必须重建音频实例（首轮 audio_url 为空已跳过 init，
-    // 不重建则 src 永远无效——book-detail 主入口全量哑火根因之一）
-    // 2026-10-29：入口只带 audio_url、没带 audio_duration 时也要补详情——
-    // 否则时长/进度显示 0（书架/首页入口常见），用户会以为播放器坏了。
-    if ((!book.audio_url || !book.audio_duration) && book.id) {
-      api.getBookDetail(book.id).then((fresh) => {
-        const merged = media.formatBook({ ...this.data.book, ...fresh })
-        const dur = merged.audio_duration || this.data.duration || 0
-        this.setData({
-          book: merged,
-          duration: dur,
-          displayDuration: fmt(dur),
-          sliderMax: Math.max(1, Math.floor(dur)),
-        })
-        this._initAudio()
-      }).catch(() => {})
-    }
   },
 
   onUnload() {
@@ -108,6 +107,56 @@ Page({
 
   onHide() {
     this._reportNow(true)
+  },
+
+  // iOS：全局音频选项比 InnerAudioContext 的 per-context 属性可靠；
+  // 静音键打开时仍要出声（甲方实测"进度在走但没声音"即此族）。
+  _setAudioOption() {
+    if (!wx.setInnerAudioOption) return
+    try {
+      wx.setInnerAudioOption({ obeyMuteSwitch: false, mixWithOther: true, speakerOn: true })
+    } catch (e) { /* 老基础库无此 API：忽略 */ }
+  },
+
+  async loadDetailAndInit() {
+    let fresh = null
+    if (this.data.bookId) {
+      try {
+        fresh = await api.getBookDetail(this.data.bookId)
+      } catch (e) {
+        // 详情失败：若入口自带可播信息仍可起播；否则给可见失败态 + 重试
+        if (!this.data.book || !this.data.book.audio_url) {
+          this.setData({
+            playState: 'error',
+            canRetry: true,
+            anomalyMsg: (e && e.message) || '书籍信息加载失败，请重试',
+          })
+          return
+        }
+      }
+    }
+    if (fresh) {
+      const merged = media.formatBook({ ...this.data.book, ...fresh })
+      this.setData({ book: merged })
+      this._applyDuration(merged.audio_duration)
+    }
+    this._initAudio()
+  },
+
+  /** 总时长落地（唯一写入口）：后端秒数优先，audio.duration 只在后端缺值时兜底。 */
+  _applyDuration(sec) {
+    const d = Number(sec)
+    if (!d || !isFinite(d) || d <= 0) return
+    if (this.data.durationKnown && Math.abs(d - this.data.duration) < 0.5) return
+    const max = Math.max(1, Math.floor(d))
+    const patch = {
+      duration: d,
+      durationKnown: true,
+      displayDuration: fmt(d),
+      sliderMax: max,
+      sliderValue: Math.min(this.data.sliderValue, max),
+    }
+    this.setData(patch)
   },
 
   async loadProgress() {
@@ -128,74 +177,84 @@ Page({
     // 有历史进度则从 last_position 续播（onCanplay 与 loadProgress 双保险，防基础库不触发）
     // R6（插修7）：已读完的书不续播——last_position≈99% 时点播放只剩几秒
     // "一闪而过伪音"，还需二次点击才从头；"再次阅读"应从头开始，续播仅服务未读完的书
-    const { lastPosition, finished } = this.data
-    if (lastPosition > 0 && !finished && this._audio && !this._resumeApplied) {
-      this._audio.seek(lastPosition)
-      this._resumeApplied = true
-    }
+    const { lastPosition, finished, duration, durationKnown } = this.data
+    if (lastPosition <= 0 || finished || !this._audio || this._resumeApplied) return
+    // 续播点贴尾（≤3 秒）视同读完：seek 过去会立刻 ended，体验像"点了没反应"
+    if (durationKnown && lastPosition >= duration - 3) return
+    this._audio.seek(lastPosition)
+    this._resumeApplied = true
+    this.setData({ sliderValue: Math.floor(lastPosition), displayTime: fmt(lastPosition) })
   },
 
   _initAudio() {
     const { book, childId } = this.data
     const token = wx.getStorageSync('token')
-    // E-20260909-02：防重复实例——补详情后二次 init 前先销毁旧 context（防双实例双上报）
+    // E-20260909-02：防重复实例——二次 init 前先销毁旧 context（防双实例双上报）
     if (this._audio) {
       this._audio.destroy()
       this._audio = null
     }
-    // E-20260909-02：id-only 进入首轮 book.audio_url 为空——跳过，等补详情回调再 init
-    if (!book.audio_url) return
-    this.setData({ audioLoading: true, anomalyMsg: '' })
+    if (!book || !book.audio_url) {
+      this.setData({
+        playState: 'error',
+        canRetry: true,
+        anomalyMsg: '这本书暂时没有可播放的音频，请联系馆员',
+      })
+      return
+    }
+    this.setData({ audioLoading: true, playState: 'loading', anomalyMsg: '', canRetry: false })
     const base = book.audio_url.split('?')[0]
     // E-20260909-02（媒体消费点断链族 §六十二同族新案）：C-13 收口后音频流
     // child_id 必填（会员门禁上下文）——漏拼即全量 403「缺少 child_id」，
     // 插修 15 后端加必填参数时未枚举到此消费端，音频自该批起全量哑火
     const url = `${base}?child_id=${childId}&token=${encodeURIComponent(token)}`
-    // iOS：全局音频选项比 InnerAudioContext 的 per-context 属性更可靠；
-    // 静音键打开时仍要出声（甲方实测"进度在走但没声音"即此族）。
-    if (wx.setInnerAudioOption) {
-      try {
-        wx.setInnerAudioOption({ obeyMuteSwitch: false, mixWithOther: true, speakerOn: true })
-      } catch (e) { /* 老基础库无此 API：忽略 */ }
-    }
     const audio = wx.createInnerAudioContext()
     audio.src = url
     audio.volume = 1.0
-    audio.playbackRate = 1.0
+    audio.playbackRate = this.data.speed
     audio.obeyMuteSwitch = false
 
     audio.onCanplay(() => {
-      const patch = { audioLoading: false }
-      if (this.data.duration <= 0 && audio.duration) {
-        patch.duration = audio.duration
-        patch.displayDuration = fmt(audio.duration)
-        patch.sliderMax = Math.floor(audio.duration)
-      }
-      this.setData(patch)
+      const ad = Number(audio.duration)
+      if (!this.data.durationKnown && ad > 0 && isFinite(ad)) this._applyDuration(ad)
+      this.setData({ audioLoading: false })
+      if (this.data.playState === 'loading') this.setData({ playState: 'idle' })
       this._applyResume()
     })
     audio.onWaiting(() => {
-      this.setData({ audioLoading: true })
+      // 只有"用户想听"时才算加载中；暂停时的缓冲不打断 UI
+      if (this.data.playState === 'playing' || this.data.playState === 'loading') {
+        this.setData({ audioLoading: true })
+      }
     })
     audio.onPlay(() => {
       // R5（插修7）：无条件重设——ended 后再 play 微信从头播（currentTime=0），
       // 若沿用 onEnded 尾部推进的 _sessionStart=旧endPos，则再播完
       // endPos>sessionStart 恒 false，上报+测验引导弹窗链整体跳过（再读不弹根因）
       this._sessionStart = Math.floor(audio.currentTime || 0)
-      this.setData({ playing: true, audioLoading: false })
+      this.setData({ playing: true, playState: 'playing', audioLoading: false, canRetry: false })
     })
     audio.onPause(() => {
       this._reportNow()
-      this.setData({ playing: false })
+      this.setData({ playing: false, playState: 'paused' })
     })
     audio.onStop(() => {
       this._reportNow()
-      this.setData({ playing: false })
+      this.setData({ playing: false, playState: 'paused' })
     })
     audio.onEnded(() => {
       // 播放结束 currentTime 已归零，_reportNow 会因 position<=sessionStart 跳过，
       // 最后一段永远丢失（4 秒音频只记到 3 秒，95% 完播判定失败）——用总时长兜底
-      const endPos = Math.floor(audio.duration || this.data.duration || 0)
+      const total = this.data.duration || Number(audio.duration) || 0
+      const endPos = Math.floor(total || audio.currentTime || 0)
+      this.setData({
+        playing: false,
+        playState: 'ended',
+        audioLoading: false,
+        currentTime: total,
+        displayTime: fmt(total),
+        sliderValue: this.data.sliderMax,
+      })
       if (this._sessionStart !== null && endPos > this._sessionStart) {
         // E-20260830-11：上报成功后再刷新 UI，避免 loadProgress 竞态拿到旧值
         api
@@ -245,7 +304,6 @@ Page({
         this._sessionStart = endPos
         this._lastBeatAt = Date.now()
       }
-      this.setData({ playing: false })
     })
     audio.onError((err) => {
       // R3（插修 16）：403（无收听权限）与真加载失败区分提示——预检端点
@@ -254,36 +312,28 @@ Page({
       const code = err && err.errCode !== undefined ? err.errCode : ''
       this.setData({
         playing: false,
+        playState: 'error',
         audioLoading: false,
-        anomalyMsg: `无法播放${code !== '' ? `（错误码 ${code}）` : ''}，请返回重试或联系馆员`,
+        canRetry: true,
+        anomalyMsg: `无法播放${code !== '' ? `（错误码 ${code}）` : ''}，请点重试或返回`,
       })
       console.error('[audio error]', err)
     })
     audio.onTimeUpdate(() => {
       const cur = audio.currentTime || 0
-      // 时长校准兜底：onCanplay 在部分基础库不触发，sliderMax 会停在初始值，滑块看似不动。
-      // iOS 上个别 MP3 的 audio.duration 恒为 0——用后端下发的 book.audio_duration 兜底，
-      // 否则会出现"已经在播 0:35，时长仍 0:00、滑块卡在最右"的假故障。
-      const realDur = audio.duration || 0
-      const uiDur = realDur > 0 ? realDur : (this.data.duration || 0)
-      // F-L12/T34：高频路径（~250ms）双 setData 合并为一次
-      if (uiDur > 0 && Math.floor(uiDur) !== this.data.sliderMax) {
-        this.setData({
-          ...(realDur > 0 ? { duration: realDur, displayDuration: fmt(realDur) } : {}),
-          sliderMax: Math.max(1, Math.floor(uiDur)),
-          currentTime: cur,
-          displayTime: fmt(cur),
-          sliderValue: Math.min(Math.floor(cur), Math.max(1, Math.floor(uiDur))),
-        })
-      } else {
-        this.setData({
-          currentTime: cur,
-          displayTime: fmt(cur),
-          sliderValue: this.data.sliderMax > 1
-            ? Math.min(Math.floor(cur), this.data.sliderMax)
-            : Math.floor(cur),
-        })
+      this._rawCurrent = cur
+      // 时长校准兜底：后端没给时长时，用播放器自报时长补（部分基础库 onCanplay 不触发）
+      if (!this.data.durationKnown) {
+        const ad = Number(audio.duration)
+        if (ad > 0 && isFinite(ad)) this._applyDuration(ad)
       }
+      const patch = { currentTime: cur, displayTime: fmt(cur) }
+      // 拖动中不回写滑块（否则 250ms 一次的时间回调会把拇指顶回去）
+      if (!this._seeking) {
+        patch.sliderValue = Math.min(Math.floor(cur), Math.max(0, this.data.sliderMax))
+      }
+      // F-L12/T34：高频路径（~250ms）多次 setData 合并为一次
+      this.setData(patch)
       // F-H5/T26：onTimeUpdate 实际触发频率 ~250ms 而非 1s，原计数法上报量 ~4×；
       // 改墙钟差值判断（HEARTBEAT_SEC 秒真实间隔一次）
       if (!this._lastBeatAt) this._lastBeatAt = Date.now()
@@ -293,7 +343,8 @@ Page({
       }
     })
     audio.onSeeked(() => {
-      // seek 后重置连续段起点：旧区间已在 onSliderChanging 前上报
+      // seek 后重置连续段起点：旧区间已在 onSliderChange 前上报
+      this._seekEpoch += 1
       this._sessionStart = Math.floor(audio.currentTime || 0)
       this._lastBeatAt = Date.now()
     })
@@ -302,12 +353,27 @@ Page({
 
   onTogglePlay() {
     const audio = this._audio
-    if (!audio) return
+    // 详情失败/音频缺失时：点播放键 = 重试整条链路
+    if (!audio) {
+      this.loadDetailAndInit()
+      return
+    }
     if (this.data.playing) {
       audio.pause()
-    } else {
-      audio.play()
+      return
     }
+    // 播完再点 = 从头重听（微信 ended 后 play 本身会回 0，这里显式对齐 UI）
+    if (this.data.playState === 'ended') {
+      audio.seek(0)
+      this._sessionStart = 0
+      this.setData({ currentTime: 0, displayTime: '0:00', sliderValue: 0 })
+    }
+    audio.play()
+  },
+
+  onRetry() {
+    this.setData({ anomalyMsg: '', canRetry: false, playState: 'idle', audioLoading: true })
+    this.loadDetailAndInit()
   },
 
   onSkipBack() {
@@ -315,7 +381,9 @@ Page({
     if (!audio) return
     this._reportNow()
     const target = Math.max(0, (audio.currentTime || 0) - 15)
+    this._seekEpoch += 1
     audio.seek(target)
+    this.setData({ currentTime: target, displayTime: fmt(target), sliderValue: Math.floor(target) })
   },
 
   // W7-07（第十轮 P2，2026-10-24）：右侧「15s ↻」原先**没有 bindtap**——wxml 里只是个带
@@ -325,23 +393,36 @@ Page({
     const audio = this._audio
     if (!audio) return
     this._reportNow()
-    const dur = audio.duration || this.data.duration || 0
-    const target = (audio.currentTime || 0) + 15
-    audio.seek(dur > 0 ? Math.min(dur, target) : target)
+    const dur = this.data.durationKnown ? this.data.duration : (audio.duration || 0)
+    const target = dur > 0
+      ? Math.min(dur, (audio.currentTime || 0) + 15)
+      : (audio.currentTime || 0) + 15
+    this._seekEpoch += 1
+    audio.seek(target)
+    this.setData({ currentTime: target, displayTime: fmt(target), sliderValue: Math.floor(target) })
   },
 
   onSliderChanging(e) {
-    // 拖动中先上报当前区间（防刷：seek 前的位置区间如实入账）
+    // 拖动中只更新文字：滑块由原生组件跟手，回写 value 会抖动。
+    // 防刷：seek 前的位置区间先如实入账（仅播放中）。
+    this._seeking = true
     if (this._sessionStart !== null && this._audio && this.data.playing) {
       this._reportNow()
     }
-    this._pendingSlider = e.detail.value
+    const v = Number(e.detail.value) || 0
+    this.setData({ displayTime: fmt(v), currentTime: v })
+    this._pendingSlider = v
   },
 
   onSliderChange(e) {
     const audio = this._audio
+    this._seeking = false
+    const v = Math.max(0, Number(e.detail.value) || 0)
+    const target = this.data.durationKnown ? Math.min(v, this.data.duration) : v
+    this.setData({ currentTime: target, displayTime: fmt(target), sliderValue: Math.floor(target) })
     if (!audio) return
-    audio.seek(e.detail.value)
+    this._seekEpoch += 1
+    audio.seek(target)
   },
 
   onSpeedTap(e) {
@@ -356,17 +437,24 @@ Page({
   async _reportNow(sync = false) {
     const audio = this._audio
     if (!audio) return
-    const { book, childId } = this.data
+    const { childId } = this.data
     if (!childId || this._sessionStart === null) return
     const position = Math.floor(audio.currentTime || 0)
     const sessionStart = this._sessionStart
     if (position <= sessionStart) return
+    // 拖动会连续触发上报：同刻只允许一拍在途（sync = 退出/暂停/切倍速，必须如实上报，不受限）
+    if (this._reporting && !sync) return
+    this._reporting = true
     // R11-d/M2：会话起点只有**上报成功**后才推进（原先 await 前就推进——
     // 网络失败/5xx 时这一段永久不计，离线收听整段作废）。失败时保留旧起点，
     // 下一次心跳会把"失败区间 + 新播放区间"一起上报。
     this._lastBeatAt = Date.now()
+    // 在途期间用户 seek 过：服务端已收下旧区间，但起点必须留在 seek 后的位置，
+    // 否则旧位置会覆盖 onSeeked 刚设好的起点 → 跳过的区间被算成已覆盖（防刷口径）。
+    const epoch = this._seekEpoch
     const done = (res) => {
-      this._sessionStart = position
+      this._reporting = false
+      if (epoch === this._seekEpoch) this._sessionStart = position
       if (!res) return
       this.setData({
         coveragePercent: res.coverage_percent || 0,
@@ -378,13 +466,14 @@ Page({
           completion: {
             streak: (res.checkin && res.checkin.streak) || 1,
             checkedIn: !!(res.checkin && res.checkin.checked_in),
-            minutes: res.reading_minutes || Math.floor((book.audio_duration || 0) / 60),
+            minutes: res.reading_minutes || Math.floor((this.data.duration || 0) / 60),
           },
         })
         wx.vibrateShort({ type: 'medium' })
       }
     }
     const fail = (err) => {
+      this._reporting = false
       const msg = (err && err.message) || ''
       if (msg.indexOf('异常') !== -1) {
         this.setData({ anomalyMsg: msg })
