@@ -12,7 +12,7 @@ import {
   apiAdjustPoints, apiCheckMilestones, apiGenerateReport, apiGetChildGrowth,
   apiRecalcLevels, apiResetQuizAttempts, type ChildGrowth, type ReportData,
 } from "../api/growth";
-import { getToken } from "../api/client";
+import { getToken, handleAuthStatus } from "../api/client";
 import { apiGetChild, apiListChildren, type Child } from "../api/members";
 import { useAuth } from "../auth";
 import { usePaintPagination } from "../hooks/usePaintPagination";
@@ -148,6 +148,7 @@ export default function GrowthManage() {
       // uploads 需鉴权头，img 标签带不了 → blob + objectURL
       const token = getToken();
       const res = await fetch(r.url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      handleAuthStatus(res.status);
       if (!res.ok) throw new Error("报告图片加载失败");
       const blob = await res.blob();
       if (reportUrl) URL.revokeObjectURL(reportUrl);

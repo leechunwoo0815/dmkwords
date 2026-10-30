@@ -56,7 +56,9 @@ Page({
         unlocked: awarded.indexOf(n) !== -1,
         dateText: dateByNode[n] ? String(dateByNode[n]).slice(0, 10) : '',
       }))
-      this.setData({ summary: s, badges })
+      // 2026-10-30 大审查 P2-4：成功分支必须清失败态——否则一次网络失败后，
+      // 重试成功仍被 wxml 的 `wx:if="{{loadError}}"` 整页挡住（看起来像重试没反应）。
+      this.setData({ summary: s, badges, loadError: '' })
     } catch (e) {
       this.setData({
         summary: null, badges: [],

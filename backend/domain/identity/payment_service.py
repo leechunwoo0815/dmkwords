@@ -535,12 +535,7 @@ class PaymentService(PaymentNotifyMixin):
         locked = self._locked_by_order_no(data.out_trade_no)
         if locked.status == Order.STATUS_PAID:
             # ③ 幂等层：已入账的重复回调直接成功（不重复入账、不触发重试风暴）
-            if locked.transaction_id and locked.transaction_id != data.transaction_id:
-                self._audit_anomaly(
-                    "订单已支付但回调流水号不同（需人工核对）",
-                    target_id=locked.order_no,
-                    reason=f"库内={locked.transaction_id} 回调={data.transaction_id}",
-                )
+            self._flag_duplicate_paid(locked, data.transaction_id)
             return 200, {"code": "SUCCESS", "message": "成功"}
         if locked.status == Order.STATUS_REFUNDED or locked.refund_status in (
             Order.REFUND_STATUS_PROCESSING,

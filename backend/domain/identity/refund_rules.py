@@ -22,6 +22,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy.orm import Session
 
 from backend.common.config_service import ConfigService
+from backend.common.exceptions import ValidationError
 from backend.domain.identity.models import Order
 
 
@@ -119,3 +120,14 @@ def rule_text(db: Session, order: Order) -> str:
     if order.order_type == Order.TYPE_FIRST_ACTIVITY:
         return "未参加全额退（已参加过不退，审核时核对）"
     return "活动费：未签到且未开始全额退"
+
+
+def assert_activity_refundable(db: Session, order: Order) -> None:
+    """活动费**执行退款前**的矩阵复核（2026-10-30 大审查 P1-2）。
+
+    申请入口查过一次，但"活动开始前申请、参加后再审核执行"是合法时序——
+    执行链必须再查一次，否则已签到的报名照样全额出款。判据仍只有 `activity_refund_block` 一份。
+    """
+    block = activity_refund_block(db, order)
+    if block:
+        raise ValidationError(block)

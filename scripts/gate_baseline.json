@@ -1,5 +1,5 @@
 {
-  "min_passed": 1294,
+  "min_passed": 1300,
   "updated_at": "2026-10-30",
   "note": "单测数量下限（R11-e S3，防测试被删/未被收集）。新增测试时只升不降；如确需删测，同步下调本值并在提交信息写明理由。判据：tests/unit/test_gate_selftest_20261026.py。",
   "allowed_skips": {

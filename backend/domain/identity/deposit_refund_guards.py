@@ -146,3 +146,41 @@ def publish_deposit_overdraft(db: Session, *, admin, req, dep) -> None:
         },
         reason="押金退款超额（可退金额不足仍执行）——疑似重复退款单，请人工核对",
     )
+
+
+def reset_deposit_if_active_member(
+    db: Session, child_id: int, withdrawal_id: int | None = None
+) -> None:
+    """押金退款成功时若孩子已重新入会 → 账户复位为「未缴」（2026-10-30 大审查 P1-4）。
+
+    竞态来源：押金退款在途（`refunding`）时孩子重新入会，入会复位只认 `refunded` 会跳过；
+    退款随后落 `refunded` 就成了终态——四条缴款入口全拒、借书无担保。
+
+    两条必须同时成立的闸，缺一就会误伤正常退会：
+    ① **不属于进行中的退会流程**——正常退会的押金退款终态就是 `refunded`
+       （BDD `features/deposit.feature:53` 明确断言），只有退会已结束/无退会关联时才可能存在
+       "重新入会后又执行旧押金退款"的时序；
+    ② **只清"退空"的账户**（`available_amount == 0`）——部分退（如退 1100 留 100）是合法路径，
+       余额必须留在台账上（判据 `test_p0b2_t24_ledger_locks`）。
+    """
+    from backend.domain.billing.models import Deposit
+    from backend.domain.billing.service import DepositService
+    from backend.domain.identity.models import Child, WithdrawalRequest
+
+    if withdrawal_id:
+        w = db.query(WithdrawalRequest).filter(WithdrawalRequest.id == withdrawal_id).first()
+        if w is not None and w.status in (
+            WithdrawalRequest.STATUS_APPLYING,
+            WithdrawalRequest.STATUS_PENDING_SETTLE,
+            WithdrawalRequest.STATUS_REFUNDING,
+        ):
+            return
+    child = db.query(Child).filter(Child.id == child_id).first()
+    if child is None or not child.is_active_member:
+        return
+    dep = db.query(Deposit).filter(Deposit.child_id == child_id, Deposit.is_deleted == 0).first()
+    if dep is None or dep.status != Deposit.STATUS_REFUNDED:
+        return
+    if dep.available_amount != 0:
+        return
+    DepositService(db).reset_refunded_on_rejoin(child_id)

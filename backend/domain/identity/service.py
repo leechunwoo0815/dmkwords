@@ -97,8 +97,14 @@ class ParentService:
             revived.remark = req.remark
             parent = revived
         else:
+            # 2026-10-30 大审查 P2-3：上面"活跃查重"是普通读，并发建档会在唯一索引上撞 1062 → 500。
+            # 用 SAVEPOINT 兜底（与 growth.ensure_state 同一套），冲突转成可读的 409 语义。
+            from backend.common.sql_utils import add_with_unique_fallback
+
             parent = Parent(name=req.name, phone=req.phone, remark=req.remark)
-            self.db.add(parent)
+            if not add_with_unique_fallback(self.db, parent):
+                self.db.expunge(parent)
+                raise ConflictError(f"手机号 {req.phone} 已存在家长账号")
         self.db.flush()
         publish_audit(
             self.db,

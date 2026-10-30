@@ -428,6 +428,10 @@ class WithdrawalService:
                 Order.order_type.in_(refundable_types),
                 Order.status == Order.STATUS_PAID,
                 Order.is_deleted == 0,
+                # 2026-10-30 大审查 P1-1：已随权益转让处置的订单不得再退——
+                # 家长入口（wm10_service.apply_refund）与管理端受理（order_guards.assert_refund_allowed）
+                # 都有这道闸，唯独自动结算没有 → 转让 + 退会 = 同一笔年费双得利。
+                Order.refund_status != Order.REFUND_STATUS_TRANSFERRED,
             )
             .order_by(Order.id)
             .all()

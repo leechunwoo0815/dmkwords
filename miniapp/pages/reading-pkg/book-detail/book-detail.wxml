@@ -58,6 +58,7 @@
     <view class="section-card-title">{{childName}} 的阅读进度</view>
     <!-- 2026-09-15：已通过测验的书若没有本地进度记录（词账可由榜单/里程碑造数产生），
          不能说「还没开始听 / 已听 0%」——它明明已经测过关了，前后自相矛盾。 -->
+    <view wx:if="{{progressError}}" class="muted-line progress-error" bindtap="loadProgress">{{progressError}}</view>
     <view wx:if="{{progress && progress.coverage_seconds > 0}}" class="progress-section">
       <view class="reading-progress">
         <view class="rp-bar"><view class="rp-fill" style="width: {{progress.displayPercent}}%"></view></view>

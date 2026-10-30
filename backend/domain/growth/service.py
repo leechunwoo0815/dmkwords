@@ -98,7 +98,13 @@ class GrowthService:
         related_id: int | None = None,
         operator_id: int | None = None,
     ) -> None:
-        state.points_total += points
+        # 2026-10-30 大审查 P2-2：积分是读改写，并发（手动调整/测验/打卡）会丢更新。
+        # 用**原子自增**落库（不是"读绝对值再覆盖"），再把内存值同步成库内真值；
+        # 这样即使两个事务基于同一旧快照，最终也是两次相加而不是后写覆盖。
+        self.db.query(ChildGrowthState).filter(ChildGrowthState.id == state.id).update(
+            {ChildGrowthState.points_total: ChildGrowthState.points_total + points},
+            synchronize_session="fetch",
+        )
         self.db.add(
             PointLedger(
                 child_id=state.child_id,

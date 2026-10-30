@@ -25,6 +25,7 @@ Page({
     childId: null,
     childName: '',
     progress: null,
+    progressError: '',  // 2026-10-30 大审查 P2-5：进度加载失败必须可见（原静默吞掉）
     reserving: false,
     inFav: false,
     durationText: '',
@@ -113,8 +114,12 @@ Page({
       // audio_finish_threshold_percent），显示层以
       // finished 为权威态——读完的书进度条满格 100%（后端防刷口径不动）
       p.displayPercent = p.finished ? 100 : p.coverage_percent
-      this.setData({ progress: p })
-    } catch (e) { /* 静默 */ }
+      this.setData({ progress: p, progressError: '' })
+    } catch (e) {
+      // 2026-10-30 大审查 P2-5：原静默 → 已读完的书会被 onQuiz 的进度闸拦住、
+      // 收藏态回落成"未收藏"。失败要给可见出口（点一下重试）。
+      this.setData({ progressError: (e && e.message) || '阅读进度加载失败，点此重试' })
+    }
   },
 
   async checkFavorite() {
@@ -257,12 +262,21 @@ Page({
         wx.showToast({ title: '已加入收藏（想读）', icon: 'none' })
         this.setData({ inFav: true })
       }
-    } catch (e) { /* toast 已弹 */ }
+    } catch (e) {
+      // 收藏态加载失败时可能"看起来未收藏、其实已收藏"：409 就当已收藏处理
+      const msg = (e && e.message) || ''
+      if (!inFav && msg.indexOf('已收藏') !== -1) this.setData({ inFav: true })
+    }
   },
 
   onQuiz() {
     const { book, childId, childName, progress, quizStatus } = this.data
     if (!childId) { wx.showToast({ title: '请先选择孩子', icon: 'none' }); return }
+    // 进度没加载出来时不能拿"progress 为空"当"没读完"（会误拦已读完的孩子）
+    if (this.data.progressError) {
+      wx.showToast({ title: '阅读进度加载失败，请先点进度卡片重试', icon: 'none' })
+      return
+    }
     // 2026-09-15（用户实测两种错法）：这个入口在已通过时叫「看成绩单」，
     // 但它原来①只认**本地播放进度**，词账已入账/已通过却没有本地进度的书会被
     // 「需先听完音频（95%）」拦住 ②有进度时跳的是**测验页**（显示"你已经通过啦"），

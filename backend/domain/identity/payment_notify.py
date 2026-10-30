@@ -220,6 +220,26 @@ class PaymentNotifyMixin:
             logger.error("支付回调解密失败: %s", exc, exc_info=True)
             return None
 
+    def _flag_duplicate_paid(self, locked, callback_transaction_id: str) -> None:
+        """已 PAID 订单收到支付回调时的留痕口径（2026-10-30 大审查 P1-3）。
+
+        人工确认收款（`confirm-payment`）不写流水号；此后若又收到线上支付成功回调，
+        很可能**线下+线上双收**。原逻辑只在"库内流水号非空且不同"时留痕，人工收款
+        这一族静默 200 → 钱多收了没人知道。两条分支都必须进资金异常待办。
+        """
+        if not locked.transaction_id:
+            self._audit_anomaly(
+                "订单已人工确认收款又收到线上支付回调（需核对是否重复收款）",
+                target_id=locked.order_no,
+                reason=f"库内无流水号 回调={callback_transaction_id}",
+            )
+        elif locked.transaction_id != callback_transaction_id:
+            self._audit_anomaly(
+                "订单已支付但回调流水号不同（需人工核对）",
+                target_id=locked.order_no,
+                reason=f"库内={locked.transaction_id} 回调={callback_transaction_id}",
+            )
+
     def _audit_anomaly(
         self,
         message: str,

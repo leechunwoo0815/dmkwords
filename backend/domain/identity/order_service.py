@@ -21,7 +21,7 @@ from backend.domain.identity import refund_rules
 from backend.domain.identity.models import Child, Order, Parent, RefundRequest
 from backend.domain.identity.order_guards import (
     OrderGuardMixin,
-    assert_no_inflight_deposit_order,
+    assert_deposit_order_allowed,
 )
 from backend.domain.identity.order_views import deposit_refund_map, name_maps
 from backend.domain.identity.wm_notify import parent_openid
@@ -101,7 +101,7 @@ class OrderService(OrderGuardMixin):
         ):
             # 第八轮审查 P2-1：押金类造单也要过在途单闸（原先只有家长端在线建单有这道闸）
             if req.order_type == Order.TYPE_DEPOSIT:
-                assert_no_inflight_deposit_order(self.db, child.id)
+                assert_deposit_order_allowed(self.db, child.id)
             amount = self.price_member_order(parent, child, req.order_type)
         elif req.order_type == Order.TYPE_ACTIVITY:
             # 管理端活动单收线下到场家长的钱——不联动报名（边界默认值，简报声明）

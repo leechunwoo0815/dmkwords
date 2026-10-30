@@ -12,7 +12,7 @@ import {
   type PaymentReconcileReport,
 } from "../api/admin";
 import { hasPermission, useAuth } from "../auth";
-import { getToken } from "../api/client";
+import { getToken, handleAuthStatus } from "../api/client";
 
 const NUM: CSSProperties = { fontFamily: "var(--font-mono)" };
 const MUTED: CSSProperties = { color: "rgba(0,0,0,0.45)" };
@@ -126,6 +126,7 @@ export default function PaymentReconcilePanel() {
                 headers: token ? { Authorization: `Bearer ${token}` } : {},
               })
                 .then(async (r) => {
+                  handleAuthStatus(r.status);
                   if (!r.ok) throw new Error(`导出失败（HTTP ${r.status}）`);
                   const url = URL.createObjectURL(await r.blob());
                   const a = document.createElement("a");

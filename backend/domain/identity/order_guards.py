@@ -171,3 +171,22 @@ def assert_settle_transition(order: Order) -> None:
         raise ConflictError("订单已结算为已支付，不能重复结算（调用方应先判 status 幂等）")
     if not order.can_transition(Order.STATUS_PAID):
         raise ConflictError(f"订单当前状态为 {order.status}，不能结算为已支付（需人工处理）")
+
+
+def assert_deposit_payable(db: Session, child_id: int) -> None:
+    """押金账户状态闸（2026-10-30 大审查 P1-5）——与 `billing.create_deposit_order` 同一口径。
+
+    管理端通用造单原先只查"在途押金单"，已缴/已扣/已退押金仍能造全额单并收钱，
+    到 confirm-payment 才被拒（钱已收、账未记）。
+    """
+    from backend.domain.billing.models import Deposit
+
+    dep = db.query(Deposit).filter(Deposit.child_id == child_id, Deposit.is_deleted == 0).first()
+    if dep is not None and dep.status != Deposit.STATUS_UNPAID:
+        raise ValidationError(f"押金当前状态为 {dep.status}，无需重复缴纳（补缴请走押金补缴入口）")
+
+
+def assert_deposit_order_allowed(db: Session, child_id: int) -> None:
+    """押金造单的全部前置闸（唯一入口）：在途押金单 + 押金账户状态。"""
+    assert_no_inflight_deposit_order(db, child_id)
+    assert_deposit_payable(db, child_id)

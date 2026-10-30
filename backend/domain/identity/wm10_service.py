@@ -396,6 +396,17 @@ class RefundService:
             RefundRequest.STATUS_FAILED,
         ):
             raise ValidationError("退款申请不存在或状态不可执行（需先审核通过）")
+        # 2026-10-30 大审查 P1-2：活动费**执行前**必须重跑退款矩阵。
+        # 申请时查过一次（apply_refund），但允许"活动开始前申请、参加后再审核执行"——
+        # 六项复核又明确不含活动单，于是已签到的报名也会全额出款（成本已发生）。
+        # 与家长申请入口共用同一判据（refund_rules.activity_refund_block），不另写规则。
+        if req.kind == RefundRequest.KIND_ORDER and req.order_id:
+            _act_order = self.db.query(Order).filter(Order.id == req.order_id).first()
+            if _act_order and _act_order.order_type in (
+                Order.TYPE_ACTIVITY,
+                Order.TYPE_FIRST_ACTIVITY,
+            ):
+                refund_rules.assert_activity_refundable(self.db, _act_order)
         # T41（H-1·R-310 机器化）：退款执行六项复核——会员资格类（observation/
         # formal）与押金单（担保语义：未还书退押金=担保落空，Q4 批复）触发；
         # 活动费/自定义单不触发（退款不动会员态）。不过 → 422 列出未清项
@@ -491,7 +502,10 @@ class RefundService:
                         self._complete_refund_withdrawal(admin, req, order)
             elif req.kind == RefundRequest.KIND_DEPOSIT and req.deposit_id:
                 from backend.domain.billing.models import Deposit
-                from backend.domain.identity.deposit_refund_guards import lock_deposit
+                from backend.domain.identity.deposit_refund_guards import (
+                    lock_deposit,
+                    reset_deposit_if_active_member,
+                )
 
                 # B8（2026-10-28）：押金分支原先普通读 → 两笔 PROCESSING 退款回调可各自
                 # 读到同一余额（lost update）。与复核侧同用一把行锁（锁定读 + populate_existing）。
@@ -520,6 +534,8 @@ class RefundService:
                             operator_id=admin.id,
                         )
                     )
+                    # 2026-10-30 大审查 P1-4：退款在途时重新入会 → 账户不能永久卡 refunded
+                    reset_deposit_if_active_member(self.db, req.child_id, req.withdrawal_id)
         else:
             if not remark or not remark.strip():
                 raise ValidationError("执行失败必须填写原因（留痕）")
