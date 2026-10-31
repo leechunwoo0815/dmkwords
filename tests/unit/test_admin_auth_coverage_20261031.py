@@ -19,12 +19,16 @@ from fastapi.routing import APIRoute
 from backend.main import app
 
 #: 声明式鉴权依赖的内层函数名（require_perm/require_super_admin 返回闭包，
-#: FastAPI Depend 记录的是闭包 `__name__`；query-token 变体同口径）。
+#: FastAPI Depend 记录的是闭包 `__name__`）。
+#: R-11（复审 docs/29 §七.B）：原集合里的 `super_admin_checker`/`admin_query_checker`
+#: 是**死名**——实际闭包叫 `super_checker`/`checker`（admin_rbac.py:81/32）。
+#: `checker` 名字过于通用不收（避免撞别的依赖；require_perm_or_query_token 的
+#: uploads 端点走白名单）；require_super_admin 路径的子依赖都含 `get_current_admin`
+#: 由它兜底——删死名后 137/8 判定结果不变（本文件两条用例即验证）。
 AUTH_DEP_NAMES = {
     "get_current_admin",  # backend/middleware/admin_auth.py
-    "perm_checker",  # require_perm(...) 内层（admin_rbac.py）
-    "super_admin_checker",  # require_super_admin(...) 内层
-    "admin_query_checker",  # require_perm_or_query_token(...) 内层
+    "perm_checker",  # require_perm(...) 内层（admin_rbac.py:62）
+    "super_checker",  # require_super_admin(...) 内层（admin_rbac.py:81）
     "admin_from_query_token",  # 双通道直接入口
 }
 
