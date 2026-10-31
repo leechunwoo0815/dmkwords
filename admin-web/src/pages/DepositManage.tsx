@@ -1,7 +1,7 @@
 import PaintEmpty from "../components/PaintEmpty";
 import { cfgNum, money, useConfigs } from "../hooks/useConfigs";
 import PaintPagination from "../components/PaintPagination";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   App as AntdApp,
   Button,
@@ -63,6 +63,10 @@ export default function DepositManage() {
   // （`await` 抛错后 setLedgers 没执行，旧数据原样在），且失败后显示「暂无流水」也是在说谎
   const [ledgerError, setLedgerError] = useState("");
   const [deductChild, setDeductChild] = useState<Deposit | null>(null);
+  // B6（2026-10-31 第一百五十二批）：赔偿登记 in-flight 防重——antd 普通 Modal 的 OkBtn
+  // 不做 promise→loading（那是 ConfirmDialog 专属），异步 onOk 期间可再点 → 双击双扣
+  // （后端无幂等键）。守卫在首个 await 前置位才关得住双击窗口。
+  const deductInFlight = useRef(false);
   const [deductForm] = Form.useForm();
 
   const load = useCallback(
@@ -225,15 +229,20 @@ export default function DepositManage() {
         title={`赔偿登记 — ${deductChild?.child_name ?? ""}（可用余额 ￥${deductChild ? Number(deductChild.available_amount).toLocaleString() : 0}）`}
         open={deductChild !== null} okText="登记赔偿" cancelText="取消" destroyOnHidden
         onOk={async () => {
-          if (!deductChild) return;
-          const v = await deductForm.validateFields();
+          if (!deductChild || deductInFlight.current) return;
+          deductInFlight.current = true;
           try {
-            const dep = await apiDeductDeposit(deductChild.child_id, { amount: String(v.amount), reason: v.reason });
-            message.success(`已扣除 ￥${v.amount.toLocaleString()}${Number(dep.unpaid_balance) > 0 ? `，待结清 ￥${Number(dep.unpaid_balance).toLocaleString()}` : ""}`);
-            setDeductChild(null);
-            load(page);
-          } catch (e) {
-            message.error(e instanceof Error ? e.message : "登记失败");
+            const v = await deductForm.validateFields();
+            try {
+              const dep = await apiDeductDeposit(deductChild.child_id, { amount: String(v.amount), reason: v.reason });
+              message.success(`已扣除 ￥${v.amount.toLocaleString()}${Number(dep.unpaid_balance) > 0 ? `，待结清 ￥${Number(dep.unpaid_balance).toLocaleString()}` : ""}`);
+              setDeductChild(null);
+              load(page);
+            } catch (e) {
+              message.error(e instanceof Error ? e.message : "登记失败");
+            }
+          } finally {
+            deductInFlight.current = false;
           }
         }}
         onCancel={() => setDeductChild(null)}

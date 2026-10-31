@@ -114,11 +114,20 @@ Page({
     } catch (e) { /* 轮播失败静默（非关键路径） */ }
   },
 
+  // B10（2026-10-31 第一百五十二批）：切孩后旧孩子的迟到响应不得上屏——
+  // 三个加载器都带 childId 发起，await 之后先比对当前孩子，不匹配一律丢弃。
+  _childChanged(childId) {
+    const cur = session.getCurrentChild() || {}
+    return cur.id !== childId
+  },
+
   async loadCheckin(childId) {
     try {
       const res = await api.getCheckins(childId, 60)
+      if (this._childChanged(childId)) return // 过期响应：孩子已切换，丢弃
       this.setData({ todayChecked: !!res.today_checked, currentStreak: res.current_streak || 0 })
     } catch (e) {
+      if (this._childChanged(childId)) return
       // 拉不到 → 未知（null 渲染「—」）。**不许保留上一个孩子的天数**：静默 catch 会把
       // 别人的数据留在屏幕上（2026-09-21 用户实测的那半个 bug）
       this.setData({ todayChecked: false, currentStreak: null })
@@ -128,6 +137,7 @@ Page({
   async loadGrowth(childId) {
     try {
       const g = await api.growthSummary(childId)
+      if (this._childChanged(childId)) return // 过期响应：孩子已切换，丢弃
       this.setData({
         totalWords: g.words_total || 0,
         points: g.points_total || 0,
@@ -135,6 +145,7 @@ Page({
         growthError: '',
       })
     } catch (e) {
+      if (this._childChanged(childId)) return
       // P2-45（第八轮）：**必须区分两种"拿不到"**——
       //  · 422 = 未入会（业务态）→ 显示「—」并讲清原因（"入会后可查看"）；
       //  · 其它（网络/5xx）= 失败态 → 如实说"加载失败，可重试"。
@@ -163,6 +174,7 @@ Page({
       api.continueListening(childId),
       api.currentBorrows(childId),
     ])
+    if (this._childChanged(childId)) return // 过期响应：孩子已切换，丢弃
     const cont = contR.status === 'fulfilled' ? contR.value : null
     const borrows = borrowR.status === 'fulfilled' ? borrowR.value : null
     const failed = contR.status === 'rejected' || borrowR.status === 'rejected'

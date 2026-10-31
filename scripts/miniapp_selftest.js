@@ -236,10 +236,119 @@ const img = require(path.join(__dirname, '..', 'miniapp', 'utils', 'img.js'))
     lastAudio.seekCalls.indexOf(30) !== lastAudio.seekCalls.lastIndexOf(30) && p4._resumeApplied === true,
     JSON.stringify({ seeks: lastAudio.seekCalls, applies: p4._resumeApplied }))
 
+  // ---------- B7–B10（2026-10-31 第一百五十二批）：页面级竞态 ----------
+  // 统一修法（docs/09 第一百五十二批）：请求序号/孩子比对——迟到的旧响应一律丢弃。
+  // 构造手法：可控 Promise 的 api 桩 + 乱序 resolve（旧请求后回），断言过期响应不上屏。
+  const sessionMod = require(path.join(__dirname, '..', 'miniapp', 'utils', 'session.js'))
+  const mediaMod = require(path.join(__dirname, '..', 'miniapp', 'utils', 'media.js'))
+  mediaMod.formatBooks = (items) => items
+  mediaMod.formatBook = (b) => b || null
+
+  function capturePage(rel) {
+    let cfg = null
+    const prevPage = global.Page
+    global.Page = (opts) => { cfg = opts }
+    require(path.join(__dirname, '..', 'miniapp', ...rel.split('/')))
+    global.Page = prevPage
+    if (!cfg) throw new Error('Page() 未被调用: ' + rel)
+    const inst = Object.create(cfg)
+    inst.data = JSON.parse(JSON.stringify(cfg.data || {}))
+    inst.setData = function (patch) { Object.assign(this.data, patch) }
+    return inst
+  }
+
+  function resolvableApi(fn) {
+    // 每次调用产生一个可手动 resolve 的 Promise，并记录调用参数
+    const calls = []
+    const resolvers = []
+    const stub = (...args) => new Promise((res) => { calls.push(args); resolvers.push(res) })
+    stub.calls = calls
+    stub.resolvers = resolvers
+    stub.setImpl = fn
+    return stub
+  }
+
+  // B7 打卡切月：旧月份响应不得按新月份渲染（勾错日期）
+  api.getCheckins = resolvableApi()
+  const checkin = capturePage('pages/member-pkg/checkin/checkin.js')
+  checkin._childId = 7
+  checkin._setMonth(2026, 9)
+  const b7old = checkin.load()
+  checkin._setMonth(2026, 10)
+  const b7new = checkin.load()
+  // 旧（9 月）请求后回：过期响应必须整体丢弃
+  api.getCheckins.resolvers[0]({ dates: ['2026-09-05', '2026-09-06'], today_checked: false, current_streak: 9 })
+  await b7old
+  check('B7 切月后旧月份迟到响应不上屏',
+    checkin.data.checkinDates.length === 0 && checkin.data.days.every((d) => d.blank || !d.checked),
+    JSON.stringify({ dates: checkin.data.checkinDates, streak: checkin.data.currentStreak }))
+  // 新（10 月）请求正常回：正常渲染
+  api.getCheckins.resolvers[1]({ dates: ['2026-10-01'], today_checked: true, current_streak: 3 })
+  await b7new
+  check('B7 新月份响应正常渲染（勾对日期）',
+    checkin.data.checkinDates.length === 1 && checkin.data.days.some((d) => !d.blank && d.checked) &&
+      checkin.data.currentStreak === 3,
+    JSON.stringify({ dates: checkin.data.checkinDates, streak: checkin.data.currentStreak }))
+
+  // B8 书库：翻页途中改筛选，旧 page-2 响应不得 concat 进新列表、page/noMore 不得写乱
+  api.listBooks = resolvableApi()
+  const books = capturePage('pages/books/books.js')
+  books.setData({ books: [{ id: 1, title: '第一页' }], page: 1, loading: false, noMore: false, loaded: true })
+  const b8page2 = books.onReachBottom()
+  books.onArChange({ detail: { value: 1 } }) // 翻页在途时改筛选 → reload（page 1，筛选 B）
+  api.listBooks.resolvers[0]({ items: [{ id: 2, title: '旧筛选第二页' }, { id: 3 }, { id: 4 }, { id: 5 }, { id: 6 }, { id: 7 }, { id: 8 }, { id: 9 }, { id: 10 }, { id: 11 }], total: 99 })
+  await tick()
+  check('B8 翻页途中改筛选：旧 page-2 响应被丢弃',
+    books.data.books.length === 1 && books.data.books[0].id === 1 && books.data.page === 1,
+    JSON.stringify({ len: books.data.books.length, page: books.data.page, noMore: books.data.noMore }))
+  api.listBooks.resolvers[1]({ items: [{ id: 11, title: '新筛选第一页' }], total: 1 })
+  await tick()
+  check('B8 新筛选响应正常上屏（page=1 / noMore 正确）',
+    books.data.books.length === 1 && books.data.books[0].id === 11 && books.data.page === 1 &&
+      books.data.noMore === true,
+    JSON.stringify({ len: books.data.books.length, page: books.data.page, noMore: books.data.noMore }))
+
+  // B9 消息切分类：旧分类响应不得覆盖新分类列表与未读数
+  api.notifications = resolvableApi()
+  const messages = capturePage('pages/order-pkg/messages/messages.js')
+  messages.setData({ activeCat: '', list: [], total: 0, unread: 0, loading: false })
+  const b9old = messages.load(true)
+  messages.switchCat({ currentTarget: { dataset: { key: '资金' } } })
+  api.notifications.resolvers[0]({ items: [{ id: 1, title: '旧分类消息' }], total: 5, unread: 3 })
+  await b9old
+  check('B9 切分类后旧分类迟到响应被丢弃',
+    messages.data.list.length === 0 && messages.data.total === 0 && messages.data.unread === 0,
+    JSON.stringify({ list: messages.data.list.length, total: messages.data.total, unread: messages.data.unread }))
+  api.notifications.resolvers[1]({ items: [{ id: 2, title: '资金消息' }], total: 1, unread: 1 })
+  await tick()
+  check('B9 新分类响应正常上屏',
+    messages.data.list.length === 1 && messages.data.list[0].id === 2 && messages.data.unread === 1,
+    JSON.stringify({ list: messages.data.list.length, unread: messages.data.unread }))
+
+  // B10 首页切孩：旧孩子的迟到响应不得把数字写上屏
+  let currentChildNow = { id: 1, name: '大孩' }
+  sessionMod.getCurrentChild = () => currentChildNow
+  api.growthSummary = resolvableApi()
+  const index = capturePage('pages/index/index.js')
+  index.setData({ totalWords: null, points: null })
+  const b10old = index.loadGrowth(1)
+  currentChildNow = { id: 2, name: '二孩' } // 旧请求在途时切孩
+  api.growthSummary.resolvers[0]({ words_total: 999, points_total: 77 })
+  await b10old
+  check('B10 切孩后旧孩子成长数字不上屏',
+    index.data.totalWords === null && index.data.points === null && index.data.growthError === '',
+    JSON.stringify({ w: index.data.totalWords, p: index.data.points }))
+  const b10new = index.loadGrowth(2)
+  api.growthSummary.resolvers[1]({ words_total: 50, points_total: 5 })
+  await b10new
+  check('B10 新孩子响应正常上屏',
+    index.data.totalWords === 50 && index.data.points === 5,
+    JSON.stringify({ w: index.data.totalWords, p: index.data.points }))
+
   if (failures.length) {
     console.log(`\nFAIL: ${failures.length} 项行为断言未通过`)
     failures.forEach((f) => console.log(`  - ${f}`))
     process.exit(1)
   }
-  console.log('\nPASS: 小程序工具层行为自检全绿（withHeaders / listMeta / onImgError / reader 播放器 / 续播竞态）✓')
+  console.log('\nPASS: 小程序工具层行为自检全绿（withHeaders / listMeta / onImgError / reader 播放器 / 续播竞态 / B7–B10 竞态）✓')
 })()

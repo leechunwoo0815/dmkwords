@@ -130,9 +130,13 @@ Page({
   },
 
   async load(reset) {
+    // B9（2026-10-31 第一百五十二批）：请求序号——切分类/翻页共用，迟到旧响应丢弃
+    // （原先切分类后旧分类响应覆盖新列表与未读数）。
+    const seq = (this._loadSeq = (this._loadSeq || 0) + 1)
     this.setData({ loading: true, error: false, listError: '' })
     try {
       const r = await api.notifications(this._page, PAGE_SIZE, this.data.activeCat)
+      if (seq !== this._loadSeq) return // 过期响应：分类已切换，丢弃
       const items = decorate(reset ? r.items : this.data.list.concat(r.items))
       this.setData({
         list: items,
@@ -141,6 +145,7 @@ Page({
         loading: false,
       })
     } catch (e) {
+      if (seq !== this._loadSeq) return
       // W7-01（第十轮 P2，2026-10-24）：原先写的是 `error: !reset`——**判据取反**：
       // 首屏/切分类（reset=true）失败会置 `error=false` → 渲染成「暂无消息」（把故障说成"没消息"）；
       // 翻页失败（reset=false）反而置 `error=true`，而 wxml 的失败分支要求 `list.length===0`

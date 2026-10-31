@@ -126,12 +126,21 @@ Page({
     this.reload()
   },
 
+  // B8（2026-10-31 第一百五十二批）：请求序号——翻页/改筛选共用一把序号，
+  // 迟到的旧响应一律丢弃（原先翻页途中改筛选，旧 page-2 响应 concat 进新列表）。
+  _nextReq() {
+    this._reqSeq = (this._reqSeq || 0) + 1
+    return this._reqSeq
+  },
+
   async reload() {
+    const seq = this._nextReq()
     const filters = this.currentFilters()
     this.syncChips(filters)
     this.setData({ page: 1, loading: true, noMore: false, loadError: false })
     try {
       const res = await api.listBooks({ keyword: this.data.keyword, page: 1, page_size: PAGE_SIZE, ...filters })
+      if (seq !== this._reqSeq) return // 过期响应：筛选已变，丢弃
       this.setData({
         books: media.formatBooks(res.items || []),
         total: res.total || 0,
@@ -139,10 +148,11 @@ Page({
         noMore: (res.items || []).length < PAGE_SIZE,
       })
     } catch (e) {
+      if (seq !== this._reqSeq) return
       // F-M12/T26：fetch 失败进错误态（点击重试），不再静默置空渲染为合法空态（禁假 0）
       this.setData({ loadError: true, books: [], total: 0, loaded: true, noMore: true })
     } finally {
-      this.setData({ loading: false })
+      if (seq === this._reqSeq) this.setData({ loading: false })
     }
   },
 
@@ -153,9 +163,11 @@ Page({
   async onReachBottom() {
     if (this.data.loading || this.data.noMore || !this.data.loaded) return
     const next = this.data.page + 1
+    const seq = this._nextReq()
     this.setData({ loading: true })
     try {
       const res = await api.listBooks({ keyword: this.data.keyword, page: next, page_size: PAGE_SIZE, ...this.currentFilters() })
+      if (seq !== this._reqSeq) return // 过期响应：翻页途中筛选已变，丢弃
       const items = media.formatBooks(res.items || [])
       this.setData({
         books: this.data.books.concat(items),
@@ -163,7 +175,7 @@ Page({
         noMore: items.length < PAGE_SIZE,
       })
     } catch (e) { /* 加载失败保持当前页 */ } finally {
-      this.setData({ loading: false })
+      if (seq === this._reqSeq) this.setData({ loading: false })
     }
   },
 

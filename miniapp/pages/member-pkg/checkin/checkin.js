@@ -69,11 +69,16 @@ Page({
       this.setData({ noChild: true, loadError: '', checkinDates: [], todayChecked: false, currentStreak: 0 })
       return
     }
+    // B7（2026-10-31 第一百五十二批）：请求时快照年月 + 请求序号。原先 key 在 await 之后
+    // 才读 this.data——快速切月时旧月份的迟到响应按**新月份**渲染，勾错日期。
+    const seq = (this._loadSeq = (this._loadSeq || 0) + 1)
+    const shot = { year: this.data.year, month: this.data.month }
     this.setData({ loadError: '' })
     try {
       const res = await api.getCheckins(this._childId, 60, this._monthRange())
+      if (seq !== this._loadSeq) return // 过期响应：月份已切换，丢弃
       const dates = res.dates || []
-      const key = `${this.data.year}-${String(this.data.month).padStart(2, '0')}`
+      const key = `${shot.year}-${String(shot.month).padStart(2, '0')}`
       const days = this.data.days.map((d) =>
         d.blank ? d : { ...d, checked: dates.indexOf(`${key}-${String(d.day).padStart(2, '0')}`) !== -1 }
       )
@@ -84,6 +89,7 @@ Page({
         currentStreak: res.current_streak || 0,
       })
     } catch (e) {
+      if (seq !== this._loadSeq) return
       // P2-45：失败**不许**渲染成"连续 0 天 / 本月没打卡"（家长以为记录丢了）
       this.setData({ loadError: (e && e.message) || '加载失败', checkinDates: [] })
     }
