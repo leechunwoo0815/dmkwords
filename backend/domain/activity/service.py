@@ -676,6 +676,20 @@ class ActivityService(ActivityCancelMixin):
         )
         finished = 0
         for a in acts:
+            # B3（2026-10-31 第一百五十一批）：扫描（MVCC 普通读）与写入之间，cancel_activity
+            # （锁活动行）可能已把状态推进为 cancelled——此处盲写 `a.status=finished` 的 UPDATE
+            # WHERE 只有 id，会把 cancelled **覆盖成 finished**（丢失更新，判据
+            # test_b3_auto_finish_never_overwrites_cancelled 实证）。写入前重锁重读：
+            # 活动行锁同时把 enroll（报名也锁活动行）挡在外面，count 在锁内一致。
+            fresh = (
+                self.db.query(Activity)
+                .filter(Activity.id == a.id, Activity.is_deleted == 0)
+                .with_for_update()
+                .populate_existing()
+                .first()
+            )
+            if fresh is None or fresh.status != Activity.STATUS_PUBLISHED:
+                continue
             active_cnt = (
                 self.db.query(func.count(ActivityEnrollment.id))
                 .filter(
@@ -686,8 +700,8 @@ class ActivityService(ActivityCancelMixin):
                 .scalar()
             )
             if active_cnt == 0:
-                a.assert_transition(Activity.STATUS_FINISHED)
-                a.status = Activity.STATUS_FINISHED
+                fresh.assert_transition(Activity.STATUS_FINISHED)
+                fresh.status = Activity.STATUS_FINISHED
                 finished += 1
         if finished:
             self.db.commit()
