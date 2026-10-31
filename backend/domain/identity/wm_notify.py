@@ -20,7 +20,7 @@ def parent_openid(db: Session, parent_id: int) -> str | None:
     """家长微信 openid（微信订阅"尽力通道"的接收人）。**通知的 openid 一律从这里取**。
 
     第八轮审查 P2-10（2026-10-19）：全仓 18 个 `NotificationService.send` 调用点里有 **10 个**
-    没传 `openid` → `_wechat_push` 在"无 openid"分支直接写 `skipped: 家长未授权（无 openid）`，
+    没传 `openid` → 微信推送在"无 openid"分支直接写 `skipped: 家长未授权（无 openid）`，
     这些场景的微信通道**恒为空转**（站内信不受影响），且跳过原因是**假原因**（家长其实绑了微信、
     模板也已配）。统一从这里取，避免各域各写一份；跨域调用方按本项目惯例**函数内延迟 import**。
     """

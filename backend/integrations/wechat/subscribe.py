@@ -79,7 +79,7 @@ def precheck_subscribe(openid: str, scene: str) -> tuple[bool, str, str | None]:
     """订阅推送前置判定（**单一事实源**）：`(可入队, 模板ID 或 真实原因, 状态提示)`。
 
     为什么单列一个函数（P2-42，2026-10-20 第八轮）：这套判定原先写死在
-    `push_subscribe_message` 里，调用方 `NotificationService._wechat_push` 又**另抄一份**
+    `push_subscribe_message` 里，调用方（通知服务的推送方法）又**另抄一份**
     "通道未启用 / 无 openid"的判定 → 同一口径两处实现（改一处漏一处）。
     现在调用方直接调本函数取 `(状态, 原因)`，`push_subscribe_message` 也走它。
     """

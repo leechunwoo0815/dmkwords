@@ -1,7 +1,10 @@
 # backend/common/notifications.py — 通知服务（WM11）
 """站内消息必达 + 微信订阅尽力送达 + 发送状态全记录。
 
-- NotificationService.send(): 幂等写入站内消息 + 微信尽力发送；
+- NotificationService.send(): 幂等写入站内消息；微信推送**在事务提交成功后**统一发出
+  （P2-1，2026-10-31 第一百五十批：回滚不推送、提交恰好一次、推送失败不影响业务提交——
+  此前是 INSERT 后立即推，调用方 commit 在其后，主事务回滚时微信已告知「付款成功」
+  而站内信与业务状态回滚消失）；
 - 事件 → 通知的订阅器在 backend/tasks/notify_handlers.py（公共编排层，避免 common 依赖业务域）；
 - 微信通道：WECHAT_SUBSCRIBE_ENABLED=false 时记 skipped（通道未启用），
   模板 ID 缺失记 skipped，真实调用失败记 failed + 原因；站内消息永不因微信失败而丢。
@@ -13,7 +16,7 @@ import json
 import logging
 import time
 
-from sqlalchemy import func, update
+from sqlalchemy import event, func, select, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.orm import Session
 
@@ -21,6 +24,172 @@ from backend.common.events import DomainEvent
 from backend.common.notification_models import Notification
 
 logger = logging.getLogger(__name__)
+
+# P2-1（2026-10-31 第一百五十批）：微信推送从「INSERT 后立即推」改为「事务提交后推」。
+# 待发队列挂在 session.info（session 私有字典；请求/任务内单线程使用，无并发），
+# after_commit 统一 dispatch、after_rollback 清空。
+_PENDING_WECHAT_KEY = "pending_wechat_pushes"
+
+
+@event.listens_for(Session, "after_commit")
+def _flush_pending_wechat(session: Session) -> None:
+    """提交成功 → 统一推送本事务积攒的微信消息（P2-1）。
+
+    R-1（2026-10-31 复审 `docs/29`）：SAVEPOINT（`begin_nested`）的**提交**同样派发
+    `after_commit`——此时外层事务尚未提交，行对独立 session 不可见；若照常 pop+dispatch
+    会命中"行不存在就跳过"，队列被清空后外层真正提交时**永远不推**。用
+    `in_nested_transaction()` 判别：SAVEPOINT 提交时保留队列，最外层 commit 统一 dispatch。
+
+    为什么不能用 `in_transaction()`（复审原文按字面实现会让全部推送失效）：
+    两轮探针实测 `after_commit` 派发期间 `in_transaction()` **恒为 True**（最外层 commit
+    的钩子里也是 True——SQLAlchemy 在事件之后才收尾事务状态）；能区分两者的只有
+    `in_nested_transaction()`（nested commit=True / outer commit=False）。
+
+    dispatch 内部**吞一切异常**：走到这里事务已经提交成功，向调用方抛错只会让
+    `commit()` 在成功之后报错——微信是尽力通道，落日志兜底即可。
+    """
+    if session.in_nested_transaction():
+        return
+    pending = session.info.pop(_PENDING_WECHAT_KEY, None)
+    if pending:
+        _dispatch_pending(pending)
+
+
+@event.listens_for(Session, "after_rollback")
+def _drop_pending_wechat_on_rollback(session: Session) -> None:
+    """事务回滚 → 待发通知全部丢弃，**永不推送**（P2-1 的核心语义）。
+
+    R-1（2026-10-31 复审）：SAVEPOINT 回滚**同样派发 `after_rollback`**（实测，此前
+    注释宣称只走 `after_soft_rollback` 是错的）——此时**不能**清队：savepoint 之前
+    入队的条目还活着（外层事务随后可能提交），savepoint 内已回滚的死条目由 dispatch
+    的存在性校验兜住（行不存在 → 跳过不推）。只在最外层回滚时清空。
+    """
+    if session.in_nested_transaction():
+        return
+    pending = session.info.pop(_PENDING_WECHAT_KEY, None)
+    if pending:
+        logger.warning(
+            "wechat push dropped: 事务回滚，%s 条待发通知不推送（ids=%s）",
+            len(pending),
+            [item[0] for item in pending],
+        )
+
+
+def _dispatch_pending(pending: list[tuple[int, str, str, str | None, str]]) -> None:
+    """推送一个已提交事务积攒的全部微信消息（P2-1）。
+
+    三条保证：
+    - **行必须已提交且未软删才推**：一次 IN 查询过滤不存在的 id——savepoint 回滚的
+      死条目、任何队列残留都推不出去（杜绝「给回滚掉的通知推微信」的幽灵推送）；
+    - **初始状态用条件 UPDATE**（仅当 `wechat_status='none'`，见 `_set_wechat_if_untouched`）：
+      dispatch 与微信回执回写（`_writeback`）是两个独立 session，回执是真实结果必须赢；
+    - **独立 session + 末尾一次 commit**：状态写入不依赖、不污染任何业务事务；
+      批量场景（过期提醒一次事务上千条）一次落库，不逐条开事务。
+    """
+    if not pending:
+        return
+    from backend.database import get_session
+
+    db = get_session()
+    try:
+        ids = [item[0] for item in pending]
+        existing = set(
+            db.execute(
+                select(Notification.id).where(
+                    Notification.id.in_(ids), Notification.is_deleted == 0
+                )
+            ).scalars()
+        )
+        for notification_id, title, content, openid, scene in pending:
+            if notification_id not in existing:
+                logger.warning(
+                    "wechat push skipped: 通知行 #%s 不存在（savepoint 回滚/已软删），不推送",
+                    notification_id,
+                )
+                continue
+            _dispatch_wechat(db, notification_id, title, content, openid, scene)
+        db.commit()
+    except Exception:  # noqa: BLE001 — 提交后副作用绝不反向影响调用方
+        db.rollback()
+        logger.exception("wechat dispatch 失败（%s 条，wechat_status 维持 none）", len(pending))
+    finally:
+        db.close()
+
+
+def _dispatch_wechat(
+    db: Session,
+    notification_id: int,
+    title: str,
+    content: str,
+    openid: str | None,
+    scene: str = "",
+) -> None:
+    """单条微信订阅尽力送达（判定与状态三态如实；P2-1 起在事务提交后调用）。
+
+    P2-24（2026-10-17 第六十九批·大审查）：此前把"**已入队**"当成"**已送达**"写库
+    （`push_subscribe_message` 起线程后立刻 `return True` → 管理端渲染绿色「微信已送达」
+    并进 Excel 导出，真实结果只在进程日志里）；反方向则把"标题未命中模板映射"写成
+    `failed` + 假原因"额度不足/用户拒收"。现在三态如实：
+    - **跳过**（通道未启用/无 openid/模板未配/场景未映射）→ `skipped` + **真实**原因；
+    - **已提交**（线程池已受理、结果未知）→ `queued` + "等待微信回执"，worker 拿到真实
+      结果后**回写** sent/failed/skipped（见 `_writeback`，独立 session）；
+    - **异常/队列满** → `failed` + 真实原因。
+
+    P2-42（2026-10-20 第八轮）：判定与并发都在订阅模块（`precheck_subscribe` 单一事实源
+    + 有界线程池）；本方法只负责把订阅模块给出的**状态与原因如实落库**——第三项返回值
+    就是"该记什么状态"，不再由本方法二次判断。
+    """
+    try:
+        from backend.integrations.wechat.subscribe import push_subscribe_message
+
+        queued, reason, hint = push_subscribe_message(
+            openid,
+            title,
+            content,
+            scene,
+            on_result=lambda ok, err, status=None: NotificationService._writeback(
+                notification_id, ok, err, status
+            ),
+        )
+    except Exception as exc:  # 网关异常不阻断站内消息
+        logger.warning("wechat push failed: %s", exc)
+        _set_wechat_if_untouched(
+            db, notification_id, Notification.WECHAT_FAILED, f"发送异常: {str(exc)[:200]}"
+        )
+        return
+    if not queued:
+        # 未入队：状态与原因都来自订阅模块（skipped=主动跳过；failed=本该发没发成）
+        _set_wechat_if_untouched(db, notification_id, hint or Notification.WECHAT_SKIPPED, reason)
+        return
+    _set_wechat_if_untouched(
+        db, notification_id, Notification.WECHAT_QUEUED, "已提交微信，等待回执"
+    )
+
+
+def _is_mysql_deadlock(exc: BaseException) -> bool:
+    """MySQL 错误码 1213（InnoDB 死锁）：服务端已回滚**整个事务**，不是语句级失败。"""
+    orig = getattr(exc, "orig", None)
+    args = getattr(orig, "args", None)
+    return bool(args) and args[0] == 1213
+
+
+def _set_wechat_if_untouched(db: Session, notification_id: int, status: str, error: str) -> None:
+    """写微信通道初始状态——**仅当行仍是 `none`**（P2-1 引入的条件写）。
+
+    dispatch 与 `_writeback`（回执回写）是两个独立 session，没有同一把事务锁：
+    极端时序下回执可能先于 dispatch 的初始状态落库（真实结果），无条件 UPDATE 会
+    把 `sent`/`failed` 覆盖回 `queued` 且永远无人再改。条件写让「后到的旧事实」
+    自动失效：初始状态只补空白，不覆盖任何已知结果。
+    （Core UPDATE + `synchronize_session=False`，同原 `_set_wechat`——不碰 ORM 身份映射。）"""
+    db.execute(
+        update(Notification)
+        .where(
+            Notification.id == notification_id,
+            Notification.wechat_status == Notification.WECHAT_NONE,
+        )
+        .values(wechat_status=status, wechat_error=error)
+        .execution_options(synchronize_session=False)
+    )
 
 
 def _record_writeback_dead_letter(notification_id: int, error: object) -> None:
@@ -95,71 +264,10 @@ SCENE_CIRCLE_LIKED = "circle.liked"
 
 
 class NotificationService:
-    """通知写入 + 微信尽力发送 + 幂等去重。"""
+    """通知写入 + 微信尽力发送（事务提交后） + 幂等去重。"""
 
     def __init__(self, db: Session):
         self.db = db
-
-    def _wechat_push(
-        self,
-        notification_id: int,
-        title: str,
-        content: str,
-        openid: str | None,
-        scene: str = "",
-    ) -> None:
-        """微信订阅尽力送达（Core UPDATE 回写状态，不碰 ORM 事务状态）。
-
-        P2-24（2026-10-17 第六十九批·大审查）：此前把"**已入队**"当成"**已送达**"写库
-        （`push_subscribe_message` 起线程后立刻 `return True` → 管理端渲染绿色「微信已送达」
-        并进 Excel 导出，真实结果只在进程日志里）；反方向则把"标题未命中模板映射"写成
-        `failed` + 假原因"额度不足/用户拒收"。现在三态如实：
-        - **跳过**（通道未启用/无 openid/模板未配/场景未映射）→ `skipped` + **真实**原因；
-        - **已提交**（线程池已受理、结果未知）→ `queued` + "等待微信回执"，worker 拿到真实
-          结果后**回写** sent/failed/skipped（见 `_writeback`，独立 session）；
-        - **异常/队列满** → `failed` + 真实原因。
-
-        P2-42（2026-10-20 第八轮）：判定与并发都在订阅模块（`precheck_subscribe` 单一事实源
-        + 有界线程池）；本方法只负责把订阅模块给出的**状态与原因如实落库**——第三项返回值
-        就是"该记什么状态"，不再由本方法二次判断（原先这里另抄了一份"通道未启用/无 openid"
-        的判定，同一口径两处实现）。
-        """
-        try:
-            from backend.integrations.wechat.subscribe import push_subscribe_message
-
-            queued, reason, hint = push_subscribe_message(
-                openid,
-                title,
-                content,
-                scene,
-                on_result=lambda ok, err, status=None: self._writeback(
-                    notification_id, ok, err, status
-                ),
-            )
-        except Exception as exc:  # 网关异常不阻断站内消息
-            logger.warning("wechat push failed: %s", exc)
-            self._set_wechat(
-                notification_id, Notification.WECHAT_FAILED, f"发送异常: {str(exc)[:200]}"
-            )
-            return
-        if not queued:
-            # 未入队：状态与原因都来自订阅模块（skipped=主动跳过；failed=本该发没发成）
-            self._set_wechat(notification_id, hint or Notification.WECHAT_SKIPPED, reason)
-            return
-        self._set_wechat(notification_id, Notification.WECHAT_QUEUED, "已提交微信，等待回执")
-
-    def _set_wechat(self, notification_id: int, status: str, error: str) -> None:
-        # W6 压测（2026-10-18）：`synchronize_session=False` 正是本类 docstring 说的
-        # "Core UPDATE，不碰 ORM 事务状态"——ORM 版 UPDATE 默认会在 session 身份映射里
-        # **逐对象求值 WHERE**，批量通知场景（6000 条）实测 O(N²)，与 `overdue_mark` 同族
-        # （完整分析见 `domain/circulation/overdue_notify.py`）。本方法只回写
-        # wechat_status/error，调用方随后不读该属性（真回写走独立 session）。
-        self.db.execute(
-            update(Notification)
-            .where(Notification.id == notification_id)
-            .values(wechat_status=status, wechat_error=error)
-            .execution_options(synchronize_session=False)
-        )
 
     @staticmethod
     def existing_keys(
@@ -282,6 +390,11 @@ class NotificationService:
         并发安全：MySQL INSERT IGNORE（宪法 MySQL-only）撞唯一约束静默忽略
         （rowcount=0），零异常、零 ORM flush、不污染事务——EventBus 同步共享
         事务下不会连坐回滚主业务写入（审查 P0 修复）。
+
+        P2-1（2026-10-31 第一百五十批）：微信推送**不在本方法内发生**——调用方的
+        `commit()` 在其后，立即推会在「主事务回滚」时留下已发出的「付款成功/退款到账」。
+        新写入的行记入 `session.info` 待发队列，由模块级 `after_commit` 监听器在
+        提交成功后统一 dispatch（回滚则由 `after_rollback` 丢弃，永不推送）。
         """
         exists = (
             self.db.query(func.count(Notification.id))
@@ -315,7 +428,10 @@ class NotificationService:
         if result.rowcount == 0:
             return False  # 并发窗口撞唯一索引，已由他事务写入
         new_id = result.inserted_primary_key[0]
-        self._wechat_push(new_id, title, content, openid, scene)
+        # P2-1：只入队不推送——commit 成功后由 after_commit 监听器统一 dispatch，
+        # 回滚时由 after_rollback 丢弃。通知行状态初始为 none（行可见前的中间态）。
+        pending = self.db.info.setdefault(_PENDING_WECHAT_KEY, [])
+        pending.append((new_id, title, content, openid, scene))
         return True
 
     def send_event(
@@ -354,6 +470,13 @@ class NotificationService:
                 openid=openid,
             )
         except Exception as exc:
+            if _is_mysql_deadlock(exc):
+                # B1（2026-10-31 第一百五十一批）：死锁时 InnoDB 已回滚**整个事务**——这里吞掉
+                # 会让调用方 commit() 静默成功、此前 flush 过的业务写入全部丢失（订单写成功的
+                # 假象）。必须 re-raise：EventBus 共享事务模式（events.publish）会 dead-letter
+                # 后原样上抛，业务调用方可见失败 → 回滚重试。普通失败（唯一键/网关）仍吞
+                # （通知尽力语义不变；这层吞的是"通知发不出"，不是"事务已死"）。
+                raise
             logger.error("notification send failed for event=%s: %s", event.event_type, exc)
 
     def list_mine(
