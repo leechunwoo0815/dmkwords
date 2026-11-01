@@ -130,9 +130,18 @@ def report(kind: str, child_id: int, auth: Any = Depends(get_current_parent)):
 
 @router.get("/reports/{kind}/image")
 def report_image(kind: str, child_id: int, token: str = "", db: Session = Depends(get_db)):
-    """周报/月报图片（query token：图片组件无法带头）。"""
+    """周报/月报图片（query token：图片组件无法带头）。
+
+    A-3（2026-10-31 第一百五十六批，docs/27 §六）：补 `REPORT_VIEW` 会员门禁——
+    数据端点（本文件 `/reports/{kind}`）有该闸而图片端点没有，是"预检与下行流同源
+    禁漂移"（音频域先例）漏掉的对齐：unpaid 孩子的报告图原先仍可拉。
+    `child_of_parent` 已挡跨家枚举，本闸只拦自家 unpaid/退会外的漂移。
+    """
     parent = _parent_from_token(token, db)
     child = child_of_parent(db, parent.id, child_id)
+    from backend.domain.identity import guards
+
+    guards.require_member_action(db, child, guards.REPORT_VIEW)
     rel = ReportService(db).generate_image(child, kind)
     import os
 

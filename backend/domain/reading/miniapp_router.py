@@ -1,5 +1,6 @@
 # backend/domain/reading/miniapp_router.py — 小程序家长端 API（/api/miniapp）
-"""开发期登录简化：手机号 + 验证码（固定 1234，上线前接微信 code2session）。
+"""家长登录（手机号 + 验证码）。验证码校验走 `identity/auth.py`：`LOGIN_DEV_CODE`
+配置的开发后门码（生产必须置空，启动硬校验拒启）或短信码，非"固定 1234"。
 家长 token = JWT（type=parent）。"""
 
 from __future__ import annotations
@@ -39,7 +40,7 @@ router = APIRouter(tags=["miniapp"])
 
 class LoginRequest(BaseSchema):
     phone: str = Field(..., pattern=r"^\d{11}$")
-    code: str = Field(..., description="短信验证码（开发期固定 1234）")
+    code: str = Field(..., description="短信验证码（开发期可用 LOGIN_DEV_CODE 配置的后门码）")
 
 
 class ProgressReportRequest(BaseSchema):

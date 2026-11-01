@@ -77,10 +77,15 @@ class PaymentError(BusinessException):
 
 
 class RateLimitError(BusinessException):
-    """请求频率超限 (429)"""
+    """请求频率超限 (429)
 
-    def __init__(self, message: str = "请求过于频繁，请稍后再试"):
+    A-2（2026-10-31 第一百五十六批，docs/27 §六）：`retry_after`（秒）让逐端点 429 与
+    全局写限流 429（`rate_limit.py` 中间件手工带头）同形——客户端拿得到该等多久。
+    默认 None = 不带头（既有调用方零影响）。"""
+
+    def __init__(self, message: str = "请求过于频繁，请稍后再试", retry_after: int | None = None):
         super().__init__(message, 429)
+        self.retry_after = retry_after
 
 
 class OwnershipError(BusinessException):
@@ -118,7 +123,13 @@ async def business_exception_handler(request: Request, exc: BusinessException) -
     content: dict = {"detail": exc.message}
     if exc.error_code is not None:
         content["error_code"] = exc.error_code
+    headers: dict = {}
+    # A-2（2026-10-31 第一百五十六批）：429 且异常携带窗口 → 补 Retry-After，
+    # 与全局写限流 429（rate_limit.py 中间件）同形；其他异常/未带窗口不带头。
+    if exc.code == 429 and getattr(exc, "retry_after", None):
+        headers["Retry-After"] = str(exc.retry_after)
     return JSONResponse(
         status_code=exc.code,
         content=content,
+        headers=headers,
     )

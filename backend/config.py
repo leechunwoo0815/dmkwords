@@ -166,6 +166,10 @@ class Settings(BaseSettings):
             problems.append("生产环境 LOGIN_DEV_CODE 必须置空（禁用固定验证码）")
         if any("localhost" in o for o in self.cors_origins):
             problems.append("生产环境 CORS_ORIGINS 不得含 localhost（改成正式管理端域名）")
+        # A-1（2026-10-31 第一百五十六批，docs/27 §六）：`*` 放任意第三方站的 JS 读取全部
+        # 非凭证 API 响应（allow_credentials 未启用所以无组合风险，但暴露面不应存在）。
+        if "*" in self.cors_origins:
+            problems.append("生产环境 CORS_ORIGINS 不得为通配符 *（逐个列出正式域名）")
         # 2026-10-29 甲方裁定：**短信退役**（全部微信一键登录），允许生产关闭。
         # 关闭时 `/sms/send` 与 `SmsCodeService.verify` 一律 fail-closed（不会走 mock 假成功）；
         # 首次登录改由微信手机号快速验证绑定（`/api/miniapp/login/wechat/phone`）。

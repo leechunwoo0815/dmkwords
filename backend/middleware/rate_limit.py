@@ -78,7 +78,9 @@ class RateLimiter:
                 max_requests,
                 window_seconds,
             )
-            raise RateLimitError(f"请求过于频繁，请 {window_seconds} 秒后再试")
+            raise RateLimitError(
+                f"请求过于频繁，请 {window_seconds} 秒后再试", retry_after=window_seconds
+            )
 
     def _sweep_locked(self, now: float) -> None:
         """惰性清扫：窗口外的陈旧桶整键回收（键数有界，内存不随历史身份/路径累积）。

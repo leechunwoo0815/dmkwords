@@ -618,6 +618,16 @@ def test_report_image_with_token_is_private(client: TestClient, admin_headers: d
     c = client.post(
         f"/api/admin/members/parents/{p['id']}/children", json={"name": "B2 报告孩"}, headers=h
     ).json()
+    # A-3（2026-10-31 第一百五十六批）：报告图现在要过 `REPORT_VIEW` 会员门禁（与数据端点
+    # 同源，unpaid → 422）——本测试考的是**缓存头**语义，夹具从"建档未缴费"换成观察期会员
+    # 以过闸；缓存头断言原样保留，非弱化。unpaid 的漂移判据在
+    # `test_a1_a4_audit_fixes_20261031.py::test_a3_report_image_same_gate_as_data_endpoint`。
+    _o = client.post(
+        "/api/admin/orders", json={"child_id": c["id"], "order_type": "observation_fee"}, headers=h
+    ).json()
+    client.post(
+        f"/api/admin/orders/{_o['id']}/confirm-payment", json={"pay_method": "scan"}, headers=h
+    )
     tok = client.post("/api/miniapp/login", json={"phone": "13900003333", "code": "1234"}).json()[
         "token"
     ]
