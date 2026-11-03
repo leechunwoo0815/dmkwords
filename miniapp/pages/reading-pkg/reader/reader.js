@@ -102,6 +102,7 @@ Page({
     this._rawCurrent = 0
     this._desiredSpeed = 1.0   // iOS 倍速真实生效点：见 _applySpeed
     this._speedDirty = false
+    this._speedRetryAt = 0
     this._speedTimers = []
     this._setAudioOption()
     // 三个入口都只带 book_id ⇒ 详情必拉（音频地址/时长/书名都从详情补全）
@@ -146,6 +147,7 @@ Page({
     const v = Number(rate)
     this._desiredSpeed = v && isFinite(v) && v > 0 ? v : 1.0
     this._speedDirty = true
+    this._speedRetryAt = 0
     this._applySpeed()
   },
 
@@ -401,8 +403,12 @@ Page({
     audio.onTimeUpdate(() => {
       const cur = audio.currentTime || 0
       this._rawCurrent = cur
-      // 兜底：系统打断/切后台回来可能静默把倍速打回 1.0 且不再触发 onPlay
-      if (this._speedDirty) this._applySpeed()
+      // 兜底：系统打断/切后台回来可能静默把倍速打回 1.0 且不再触发 onPlay。
+      // 1 秒最多补写一次——老基础库不支持倍速时 readback 恒不等，避免每 tick 空写。
+      if (this._speedDirty && Date.now() >= (this._speedRetryAt || 0)) {
+        this._speedRetryAt = Date.now() + 1000
+        this._applySpeed()
+      }
       // 时长校准兜底：后端没给时长时，用播放器自报时长补（部分基础库 onCanplay 不触发）
       if (!this.data.durationKnown) {
         const ad = Number(audio.duration)

@@ -290,6 +290,11 @@ const img = require(path.join(__dirname, '..', 'miniapp', 'utils', 'img.js'))
   realRate = 1 // 模拟锁屏回来系统重置倍速且没有 onPlay
   p7.onShow()
   check('回前台（锁屏恢复）重设倍速', realRate === 1.5, JSON.stringify({ rate: realRate }))
+  realRate = 1
+  p7._speedDirty = true
+  p7._speedRetryAt = 0
+  lastAudio.emit('timeupdate')
+  check('时间轴兜底重设倍速（无 onPlay 的中断恢复）', realRate === 1.5, JSON.stringify({ rate: realRate }))
   p7._clearSpeedTimers()
 
   // ---------- B7–B10（2026-10-31 第一百五十二批）：页面级竞态 ----------
