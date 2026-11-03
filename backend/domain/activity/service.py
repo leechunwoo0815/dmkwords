@@ -36,7 +36,8 @@ def _ticket_code(activity_id: int, child_id: int) -> str:
 
 
 #: 「已结束」判定小时数（2026-09-20 C 批抽成常量）：活动开始超过该时长即视为往期。
-#: 与 `activity_auto_finish` 的 cutoff **同源**——两处各写一份，迟早出现"状态说结束了、往期列表说没有"。
+#: 用于家长端「近期活动」与列表 `is_past` 展示；**activity_auto_finish 不再用它**——
+#: 收口以签到窗结束（`end+30min`）为准，否则活动结束后还要多挂近一天（2026-11-03 报障）。
 PAST_AFTER_HOURS = 24
 
 #: 产品口径（docs/23 §二，2026-10-27 拍板）：签到窗 = 开始前 60 分钟 ~ 结束后 30 分钟。
@@ -303,7 +304,7 @@ class ActivityService(ActivityCancelMixin):
         if now < window_start:
             raise ValidationError("签到通道未开启（活动开始前 60 分钟开放）")
         if now > window_end:
-            raise ValidationError("签到通道已关闭（活动结束后 30 分钟关闭）")
+            raise ValidationError("活动已结束，签到通道已关闭（结束后 30 分钟关闭）")
         child = self.db.query(Child).filter(Child.id == e.child_id).first()
         e.assert_transition(ActivityEnrollment.STATUS_CHECKED_IN)
         e.status = ActivityEnrollment.STATUS_CHECKED_IN
@@ -663,49 +664,16 @@ class ActivityService(ActivityCancelMixin):
         return sent
 
     def activity_auto_finish(self) -> int:
-        """已开始超过 1 天且无进行中报名 → finished（活动状态机收口）。"""
-        cutoff = datetime.now() - timedelta(hours=PAST_AFTER_HOURS)
-        acts = (
-            self.db.query(Activity)
-            .filter(
-                Activity.is_deleted == 0,
-                Activity.status == Activity.STATUS_PUBLISHED,
-                Activity.start_at < cutoff,
-            )
-            .all()
-        )
-        finished = 0
-        for a in acts:
-            # B3（2026-10-31 第一百五十一批）：扫描（MVCC 普通读）与写入之间，cancel_activity
-            # （锁活动行）可能已把状态推进为 cancelled——此处盲写 `a.status=finished` 的 UPDATE
-            # WHERE 只有 id，会把 cancelled **覆盖成 finished**（丢失更新，判据
-            # test_b3_auto_finish_never_overwrites_cancelled 实证）。写入前重锁重读：
-            # 活动行锁同时把 enroll（报名也锁活动行）挡在外面，count 在锁内一致。
-            fresh = (
-                self.db.query(Activity)
-                .filter(Activity.id == a.id, Activity.is_deleted == 0)
-                .with_for_update()
-                .populate_existing()
-                .first()
-            )
-            if fresh is None or fresh.status != Activity.STATUS_PUBLISHED:
-                continue
-            active_cnt = (
-                self.db.query(func.count(ActivityEnrollment.id))
-                .filter(
-                    ActivityEnrollment.activity_id == a.id,
-                    ActivityEnrollment.status.in_(ActivityEnrollment.ACTIVE_STATUSES),
-                    ActivityEnrollment.is_deleted == 0,
-                )
-                .scalar()
-            )
-            if active_cnt == 0:
-                fresh.assert_transition(Activity.STATUS_FINISHED)
-                fresh.status = Activity.STATUS_FINISHED
-                finished += 1
-        if finished:
-            self.db.commit()
-        return finished
+        """活动结束（签到窗关闭）后自动收口：finished + 通知报名家长。
+
+        2026-11-03 修复：旧实现要求「无任何活跃报名」才结束——只要有人报名
+        （enrolled/checked_in），活动就永远停在 published。新口径（时间、资金在途守卫、
+        通知去重）见 `finish_flow.auto_finish_activities`；本方法只做委托
+        （service 已触发 800 行 god-file 上限，按 `refund_rules.py` 先例拆分）。
+        """
+        from backend.domain.activity.finish_flow import auto_finish_activities
+
+        return auto_finish_activities(self.db)
 
     def my_enrollments(self, child: Child) -> list[dict]:
         rows = (

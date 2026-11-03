@@ -276,8 +276,9 @@ TASKS: dict[str, TaskSpec] = {
         _withdrawal_review_timeout_warn,
     ),
     "activity_remind": TaskSpec("activity_remind", "活动开始提醒", "活动", 3600, _activity_remind),
+    # 600s：签到窗在结束后 30 分钟关闭；旧 3600 会让「报名中」最多多挂 1 小时
     "activity_auto_finish": TaskSpec(
-        "activity_auto_finish", "活动自动结束", "活动", 3600, _activity_auto_finish
+        "activity_auto_finish", "活动自动结束", "活动", 600, _activity_auto_finish
     ),
     "first_activity_90d_remind": TaskSpec(
         "first_activity_90d_remind", "99元活动90天提醒", "会员", 86400, _first_activity_90d_remind

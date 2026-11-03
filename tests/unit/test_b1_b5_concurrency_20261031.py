@@ -168,10 +168,14 @@ def test_b3_auto_finish_never_overwrites_cancelled(client: TestClient):
     from datetime import datetime, timedelta
 
     past = datetime.now() - timedelta(hours=30)
+    # 2026-11-03 第一百五十八批：auto_finish 的收口时间从 `start+24h` 改为
+    # `end+30min`（签到窗关闭），夹具必须把 end_at 也挪到过去，否则扫描阶段就跳过、
+    # 永远走不到被测的行锁窗口。断言不变。
+    past_end = datetime.now() - timedelta(hours=28)
     with SessionLocal() as db_seed:
         db_seed.execute(
-            text("UPDATE activities SET start_at = :s WHERE id = :i"),
-            {"s": past, "i": act["id"]},
+            text("UPDATE activities SET start_at = :s, end_at = :e WHERE id = :i"),
+            {"s": past, "e": past_end, "i": act["id"]},
         )
         db_seed.commit()
 

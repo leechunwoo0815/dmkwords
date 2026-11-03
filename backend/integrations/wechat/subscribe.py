@@ -46,6 +46,7 @@ _SCENE_TEMPLATE_RULES: dict[str, str] = {
 #   · 「图书损坏通知」走的是**管理待办**通道（`AdminNotification`），不进家长订阅消息；
 #   · 「您等候的图书到货啦」与「预约成功」是同一个场景（`reservation.created`），不重复映射；
 #   · 其余场景（借还成功/逾期/成长/报表/阅读圈等）不在"及时触达"清单内。
+#   · 活动结束（activity.finish）只落站内信——结束通知不占"一次授权一次推送"的额度。
 
 
 def get_template_for_scene(scene: str) -> str:
