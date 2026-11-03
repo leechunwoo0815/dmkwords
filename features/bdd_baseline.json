@@ -3,7 +3,7 @@
   "active": {
     "features": 27,
     "scenarios": 249,
-    "steps": 950
+    "steps": 951
   },
   "active_steps": {
     "features/account.feature::一个账号添加多个孩子": "2cfe736c4ac19981",
@@ -201,12 +201,12 @@
     "features/reservation.feature::到店核销转借阅": "070d388d5ccb2e1d",
     "features/reservation.feature::同孩子同书单一预约": "b55b85e223d4d657",
     "features/reservation.feature::家长取消预约": "47c4e787f10b0e95",
-    "features/reservation.feature::有逾期时仍可预约（逾期只占额度）": "8bd4abc79b8047a9",
-    "features/reservation.feature::正常预约": "ed7cbce6894d8c3e",
+    "features/reservation.feature::有逾期时仍可预约（逾期只占 1 个在借名额）": "5dc284b3f56212e1",
+    "features/reservation.feature::正常预约": "31303b5e6e75da6b",
     "features/reservation.feature::预约到期自动释放": "e4b8a04ccc7da228",
-    "features/reservation.feature::预约占用额度校验": "99ae119dac38d170",
-    "features/reservation.feature::预约期间副本转维护（同书还有在馆副本）": "a518bfa473a4d405",
+    "features/reservation.feature::预约期间副本转维护（同书还有在馆副本）": "177eb81bfbe0c834",
     "features/reservation.feature::预约期间副本转维护（无其他副本可换）": "b8c9fc3efd3d3d52",
+    "features/reservation.feature::预约独立上限校验（不占可借额度）": "1832f9bebbdb8807",
     "features/smoke.feature::健康检查": "acb814d6c89dfe5f",
     "features/transfer.feature::审核超时自动取消": "76590429f9774a5e",
     "features/transfer.feature::审核通过同一事务完成十二步": "c7a9f8b135008e84",

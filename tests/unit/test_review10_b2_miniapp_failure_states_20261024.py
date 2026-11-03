@@ -122,21 +122,25 @@ async function main() {
       out.push({ id: spec.id, ok: false, error: String(e && e.message) });
     }
   }
-  // 7) reader 快进：桩一个音频对象，断言 seek 被调到 currentTime+15（并夹到 duration）
+  // 7) reader 只读控制（2026-11-03 甲方裁定：禁用拖动与 ±15s，只留播放/暂停/倍速）
   try {
     const r = loadPage('pages/reading-pkg/reader/reader.js', { toasts: [] });
-    const calls = [];
-    r._audio = { currentTime: 30, duration: 100, seek: (t) => calls.push(t) };
-    r.data.duration = 100;
-    r._reportNow = () => {};
-    r.onSkipForward();
-    r._audio = { currentTime: 95, duration: 100, seek: (t) => calls.push(t) };
-    r.onSkipForward();
-    r._audio = null;
-    r.onSkipForward(); // 无音频对象时不许抛
-    out.push({ id: 'reader-forward', ok: true, fields: { seeks: calls } });
+    const removed = ['onSkipForward', 'onSkipBack', 'onSliderChange', 'onSliderChanging']
+      .filter((k) => typeof r[k] === 'function');
+    const wxml = fs.readFileSync(
+      path.join(MINIAPP, 'pages/reading-pkg/reader/reader.wxml'), 'utf8');
+    out.push({
+      id: 'reader-readonly',
+      ok: removed.length === 0 &&
+        typeof r.onTogglePlay === 'function' &&
+        typeof r.onSpeedTap === 'function' &&
+        typeof r._applySpeed === 'function' &&
+        wxml.indexOf('<slider') === -1 &&
+        wxml.indexOf('onSkip') === -1,
+      fields: { removed, wxmlHasSliderOrSkip: /<slider|onSkip/.test(wxml) },
+    });
   } catch (e) {
-    out.push({ id: 'reader-forward', ok: false, error: String(e && e.message) });
+    out.push({ id: 'reader-readonly', ok: false, error: String(e && e.message) });
   }
   // 8) 恢复腿（W7-01）：接口恢复后重试必须清掉失败态
   try {
@@ -245,19 +249,19 @@ def test_pages_land_on_visible_failure_state():
             assert f["loading"] is False, f"share 失败后不许停在骨架屏：{f}"
 
 
-def test_reader_skip_forward_seeks_15s_and_clamps():
-    """W7-07：右侧「15s ↻」的 handler 必须真的 seek（+15s，末尾夹到 duration；无音频不抛）。
+def test_reader_has_only_play_pause_and_speed():
+    """2026-11-03 甲方裁定：播放器禁拖动、去 ±15s，只保留播放/暂停/倍速。
 
-    RED：把 wxml 的 `bindtap="onSkipForward"` 去掉 ⇒ `check_miniapp_bindings` 判红（W1）；
-    把本 handler 删掉 ⇒ 本用例红（找不到方法/不 seek）。
+    原用例锁「onSkipForward 真的 seek +15s」——该控件已按甲方口径删除，改为锁
+    「拖动/快进控件不得回归 + 倍速重设入口存在」。RED：把任一 skip/slider handler
+    或 `<slider>` 加回来 ⇒ 本用例红。
     """
     results = {r["id"]: r for r in _run(SPECS)}
     assert results["messages"]["ok"], results
-    r = results["reader-forward"]
-    assert r["id"] == "reader-forward" and r["ok"], r
-    assert r["fields"]["seeks"] == [45, 100], (
-        f"快进必须是 currentTime+15 且夹到 duration：{r['fields']}"
-    )
+    r = results["reader-readonly"]
+    assert r["ok"], r
+    assert r["fields"]["removed"] == [], f"拖动/±15s handler 不得回归：{r['fields']}"
+    assert not r["fields"]["wxmlHasSliderOrSkip"], f"WXML 不得出现滑块/快进绑定：{r['fields']}"
 
 
 def test_failure_state_clears_after_recovery():

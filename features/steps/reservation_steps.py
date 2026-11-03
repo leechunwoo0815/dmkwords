@@ -1,13 +1,14 @@
 # features/steps/reservation_steps.py — FEAT-036 小程序预约 步骤定义
 """2026-10-13（第五十二轮）BDD 解封第二批 · **预约域** 7 个场景（1 个保留 `@draft`）。
 
-预约是"线上占位"：锁一个副本 72 小时、占一个借阅额度，到店核销转借阅、超时释放、家长可取消。
+预约是"线上占位"：锁一个副本 72 小时、占一条**独立预约名额**，到店核销转借阅、超时释放、家长可取消。
 四件事都走真链路（真实 MySQL + TestClient），释放走**真实定时任务**（管理端"手动触发"端点）。
 
 **判据必须与实现同源（红线 108）——动手前逐条亲验**：
-- 额度公式：`可借 = borrow_limit(30) − 在借(含逾期) − 预约中`（`circulation/service.py:345`）。
+- 额度公式（2026-11-03 甲方改口径）：`可借 = borrow_limit(30) − 在借(含逾期)`；
+  **预约不占可借额度**，另有独立上限 `reservation_limit=3`（`reservation_service.create`）。
 - 预约创建时的闸门顺序：`operation_locked → 有效会员 → 书目上架 → 押金(未缴/扣光/欠款硬拦)
-  → 同书单一预约 → 副本在馆 → 额度`。
+  → 同书单一预约 → 副本在馆 → 独立预约上限`。
 - **逾期不拦预约**（2026-09-21 甲方口径，PRD §5.4）：原场景写"有逾期禁止预约"是被作废的旧口径，
   本批按现行口径**改写场景文本**（不是弱化断言——旧口径本身已裁定作废）。
 - 超时释放没有读侧惰性触发（只有 `reservation_expire_check` 任务，周期 300s），
@@ -204,11 +205,12 @@ def step_reserved(context, status, hours):
     assert abs(delta.total_seconds() - hours * 3600) < 120, f"锁定应 {hours}h：{delta}"
 
 
-@then("预约占用借阅额度 在借加预约合计 {total:d} 本")
-def step_quota_occupied(context, total):
+@then("预约不占可借额度 可借数仍为 {quota:d} 且预约中 {reserved:d}")
+def step_quota_occupied(context, quota, reserved):
     card = _card(context)
-    assert card["active_borrows"] + _active_reservation_count(context) == total, card
-    assert card["available_quota"] == card["borrow_limit"] - total, card
+    assert card["available_quota"] == quota, card
+    assert card["available_quota"] == card["borrow_limit"] - card["active_borrows"], card
+    assert card["reservation_count"] == reserved, card
 
 
 # ---------- 场景：预约占用额度校验 ----------
@@ -229,12 +231,17 @@ def step_reserve_many(context, count):
         context.attempts.append((r, book_id, copy_id))
 
 
-@then("仅允许成功 {ok:d} 本 第三本被拒")
+@then("仅允许成功 {ok:d} 本 其余被拒")
 def step_quota_limit(context, ok):
     codes = [r.status_code for r, _, _ in context.attempts]
     assert codes[:ok] == [200] * ok and codes[ok:] == [422] * (len(codes) - ok), codes
-    rejected = context.attempts[ok][0]
-    assert "借阅额度已满" in rejected.json()["detail"], rejected.text
+    context.rejected = context.attempts[ok][0]
+    assert "预约已达上限" in context.rejected.json()["detail"], context.rejected.text
+
+
+@then("拒绝原因是预约已达上限")
+def step_quota_reason(context):
+    assert "预约已达上限" in context.rejected.json()["detail"], context.rejected.text
 
 
 # ---------- 场景：有逾期时仍可预约（2026-09-21 口径） ----------
@@ -261,10 +268,11 @@ def step_reserve_ok(context):
     context.reservation = context.reservation_response.json()
 
 
-@then("逾期只占 {count:d} 个额度（可借数 = 30 − 在借含逾期 − 预约）")
+@then("逾期只占 {count:d} 个在借名额 预约不占可借额度（可借数 = 30 − 在借含逾期）")
 def step_overdue_only_quota(context, count):
     card = _card(context)
-    assert card["available_quota"] == card["borrow_limit"] - card["active_borrows"] - 1, card
+    assert card["available_quota"] == card["borrow_limit"] - card["active_borrows"], card
+    assert card["reservation_count"] == 1, card
     assert card["overdue_count"] >= count, card
 
 
@@ -434,11 +442,12 @@ def step_switched_to_other_copy(context):
     assert _copy_status(context, context.book_id, context.copy_id) == "maintenance"
 
 
-@then("预约仍然有效 名额继续占用")
+@then("预约仍然有效 继续显示在预约中（不占可借额度）")
 def step_still_occupied(context):
     card = _card(context)
-    assert _active_reservation_count(context) == 1, "换锁不释放名额"
-    assert card["available_quota"] == card["borrow_limit"] - card["active_borrows"] - 1, card
+    assert _active_reservation_count(context) == 1, "换锁不释放预约"
+    assert card["reservation_count"] == 1, card
+    assert card["available_quota"] == card["borrow_limit"] - card["active_borrows"], card
 
 
 @then("无其他副本时预约转异常状态并通知家长与馆员")

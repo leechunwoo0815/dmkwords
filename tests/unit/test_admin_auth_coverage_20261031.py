@@ -55,6 +55,10 @@ IN_BODY_AUTH_ALLOWLIST: dict[tuple[str, str], str] = {
     ): "活动详情图（体内 authorize_media）",
     ("GET", "/api/admin/activities/{activity_id}/cover-media"): "活动封面（体内 authorize_media）",
     ("GET", "/api/admin/circle/posts/{post_id}/image"): "阅读圈卡片图（体内 authorize_media）",
+    (
+        "GET",
+        "/api/admin/children/{child_id}/observation-images/{path:path}",
+    ): "评估报告图下行（require_perm_or_query_token + 按该孩子报告行精确路径校验）",
 }
 
 
