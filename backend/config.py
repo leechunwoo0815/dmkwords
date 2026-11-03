@@ -66,7 +66,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
-    ADMIN_TOKEN_EXPIRE_HOURS: int = 8
+    # 2026-11-03 甲方裁定：后台登录 30 天（内部 1–2 人使用，多设备同时在线不互踢）。
+    # 配置中心同名键优先（见 AuthService._token_expire_hours）；此处只作回落默认。
+    ADMIN_TOKEN_EXPIRE_HOURS: int = 720
 
     # 微信开放平台
     WECHAT_APP_ID: str = ""

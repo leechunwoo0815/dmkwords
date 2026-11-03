@@ -347,7 +347,7 @@ def upload_audio(
     from backend.common.file_storage import ensure_upload_size_within_limit
 
     ensure_upload_size_within_limit(
-        file, key="audio_upload_max_mb", default_mb=50, label="音频文件", db=db
+        file, key="audio_upload_max_mb", default_mb=20, label="音频文件", db=db
     )
     data = file.file.read()
     book = BookService(db).upload_audio(admin, book_id, data, file.filename or "")

@@ -100,6 +100,9 @@ Page({
     this._reporting = false
     this._seekEpoch = 0
     this._rawCurrent = 0
+    this._desiredSpeed = 1.0   // iOS 倍速真实生效点：见 _applySpeed
+    this._speedDirty = false
+    this._speedTimers = []
     this._setAudioOption()
     // 三个入口都只带 book_id ⇒ 详情必拉（音频地址/时长/书名都从详情补全）
     this.loadDetailAndInit()
@@ -108,6 +111,7 @@ Page({
 
   onUnload() {
     this._reportNow(true)
+    this._clearSpeedTimers()
     if (this._audio) {
       this._audio.destroy()
       this._audio = null
@@ -118,6 +122,12 @@ Page({
     this._reportNow(true)
   },
 
+  // 锁屏/切后台回来后系统可能把 playbackRate 打回 1.0，且不一定再触发 onPlay——
+  // 回前台统一补一次（甲方真机：锁屏再打开倍速"突然生效"，之后再点又失效）。
+  onShow() {
+    if (this._audio) this._reapplySpeedSoon()
+  },
+
   // iOS：全局音频选项比 InnerAudioContext 的 per-context 属性可靠；
   // 静音键打开时仍要出声（甲方实测"进度在走但没声音"即此族）。
   _setAudioOption() {
@@ -125,6 +135,44 @@ Page({
     try {
       wx.setInnerAudioOption({ obeyMuteSwitch: false, mixWithOther: true, speakerOn: true })
     } catch (e) { /* 老基础库无此 API：忽略 */ }
+  },
+
+  // ---------- 倍速（iOS 专项） ----------
+  // 甲方 2026-11-03 真机报障：点倍速没反应，锁屏再打开突然生效，再点其它倍速又失灵。
+  // 根因：InnerAudioContext.playbackRate 在"未真正起播/暂停/系统打断"时写入会被静默
+  // 忽略，只在创建 context 和点击那一下设置不够。唯一稳的做法是记住目标值，在
+  // canplay/play/seeked/回前台后反复重设并读回校验。
+  _setDesiredSpeed(rate) {
+    const v = Number(rate)
+    this._desiredSpeed = v && isFinite(v) && v > 0 ? v : 1.0
+    this._speedDirty = true
+    this._applySpeed()
+  },
+
+  _applySpeed() {
+    const audio = this._audio
+    if (!audio) return
+    const rate = this._desiredSpeed || 1.0
+    try {
+      if (Number(audio.playbackRate) !== rate) audio.playbackRate = rate
+      // iOS 偶发丢弃第一次写入：立刻读回，不一致再补一次
+      if (Number(audio.playbackRate) !== rate) audio.playbackRate = rate
+      this._speedDirty = Number(audio.playbackRate) !== rate
+    } catch (e) { /* 老基础库不支持倍速：保持 1.0 */ }
+  },
+
+  /** 起播瞬间系统时序未稳，连拍三次覆盖"设置被吞"的窗口。 */
+  _reapplySpeedSoon() {
+    this._clearSpeedTimers()
+    this._applySpeed()
+    ;[120, 350, 800].forEach((ms) => {
+      this._speedTimers.push(setTimeout(() => this._applySpeed(), ms))
+    })
+  },
+
+  _clearSpeedTimers() {
+    (this._speedTimers || []).forEach((t) => clearTimeout(t))
+    this._speedTimers = []
   },
 
   async loadDetailAndInit() {
@@ -237,7 +285,7 @@ Page({
     const audio = wx.createInnerAudioContext()
     audio.src = url
     audio.volume = 1.0
-    audio.playbackRate = this.data.speed
+    audio.playbackRate = this._desiredSpeed || this.data.speed
     audio.obeyMuteSwitch = false
 
     audio.onCanplay(() => {
@@ -245,6 +293,7 @@ Page({
       if (!this.data.durationKnown && ad > 0 && isFinite(ad)) this._applyDuration(ad)
       this.setData({ audioLoading: false })
       if (this.data.playState === 'loading') this.setData({ playState: 'idle' })
+      this._applySpeed()
       this._applyResume()
     })
     audio.onWaiting(() => {
@@ -259,6 +308,8 @@ Page({
       // endPos>sessionStart 恒 false，上报+测验引导弹窗链整体跳过（再读不弹根因）
       this._sessionStart = Math.floor(audio.currentTime || 0)
       this.setData({ playing: true, playState: 'playing', audioLoading: false, canRetry: false })
+      // iOS：倍速必须等真正起播后再设（创建/暂停时写入常被忽略），且要连拍几次
+      this._reapplySpeedSoon()
       // 起播后再补一次续播：iOS 的 canplay 常在 play 之后才到，之前那次 seek 会被丢弃
       if (!this._resumeApplied) this._applyResume()
     })
@@ -350,6 +401,8 @@ Page({
     audio.onTimeUpdate(() => {
       const cur = audio.currentTime || 0
       this._rawCurrent = cur
+      // 兜底：系统打断/切后台回来可能静默把倍速打回 1.0 且不再触发 onPlay
+      if (this._speedDirty) this._applySpeed()
       // 时长校准兜底：后端没给时长时，用播放器自报时长补（部分基础库 onCanplay 不触发）
       if (!this.data.durationKnown) {
         const ad = Number(audio.duration)
@@ -382,6 +435,8 @@ Page({
       this._seekEpoch += 1
       this._sessionStart = Math.floor(cur)
       this._lastBeatAt = Date.now()
+      // 部分基础库 seek 后把 playbackRate 重置为 1.0（续播/重听都会 seek）
+      this._applySpeed()
       this.setData({
         currentTime: cur,
         displayTime: fmt(cur),
@@ -433,11 +488,12 @@ Page({
 
   onSpeedTap(e) {
     const rate = Number(e.currentTarget.dataset.rate)
-    const audio = this._audio
-    if (!audio || rate === this.data.speed) return
+    if (!rate || rate === this.data.speed) return
     this._reportNow() // 切倍速时上报（R-151 上报时机 5）
-    audio.playbackRate = rate
     this.setData({ speed: rate })
+    this._setDesiredSpeed(rate)
+    // 暂停时点倍速：只记目标值（iOS 暂停态写入会被忽略），等下一次 onPlay 落地
+    if (this.data.playing) this._reapplySpeedSoon()
   },
 
   async _reportNow(sync = false) {

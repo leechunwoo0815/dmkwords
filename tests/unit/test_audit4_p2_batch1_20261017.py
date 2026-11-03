@@ -447,6 +447,20 @@ def test_admin_token_expire_hours_from_config_center(client: TestClient):
     delta_h = (exp - now).total_seconds() / 3600
     assert 0.8 < delta_h <= 1.01, f"配置 1 小时没生效：{delta_h}"
 
+    # 2026-11-03 甲方裁定：后台登录 30 天（720h）；多设备同时在线不互踢
+    client.put(
+        "/api/admin/configs/admin_token_expire_hours",
+        json={"value": "720", "reason": "管理员 30 天登录"},
+        headers=h,
+    )
+    token30 = client.post(
+        "/api/admin/login", json={"username": "admin", "password": "dmkwords123"}
+    ).json()["token"]
+    payload30 = jwt.decode(token30, options={"verify_signature": False})
+    exp30 = datetime.fromtimestamp(payload30["exp"], UTC)
+    delta30 = (exp30 - now).total_seconds() / 3600
+    assert 719.9 < delta30 <= 720.01, f"配置 720 小时（30 天）没生效：{delta30}"
+
     # 非法值（0）→ 回落环境默认，绝不因一条配置把登录锁死
     client.put(
         "/api/admin/configs/admin_token_expire_hours",
@@ -467,11 +481,11 @@ def test_admin_token_expire_hours_from_config_center(client: TestClient):
     # 复原配置（避免影响其它用例/演示库）
     client.put(
         "/api/admin/configs/admin_token_expire_hours",
-        json={"value": "8", "reason": "P2-28 回归-复原"},
+        json={"value": "720", "reason": "P2-28 回归-复原"},
         headers=h,
     )
     db = _db()
     try:
-        assert ConfigService(db).get_int("admin_token_expire_hours") == 8
+        assert ConfigService(db).get_int("admin_token_expire_hours") == 720
     finally:
         db.close()

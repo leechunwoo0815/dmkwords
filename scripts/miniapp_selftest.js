@@ -258,6 +258,40 @@ const img = require(path.join(__dirname, '..', 'miniapp', 'utils', 'img.js'))
     !!lastAudio && lastAudio.seekCalls.indexOf(145) !== -1 && p6.data.displayTime === '2:25',
     JSON.stringify({ seeks: lastAudio && lastAudio.seekCalls, t: p6.data.displayTime }))
 
+  // iOS 倍速（甲方 2026-11-03 真机报障）：只在创建/点击那一下设置 playbackRate 会被系统
+  // 静默忽略——锁屏回来"突然生效"，再点又失灵。修法：记住 desiredSpeed，在 canplay/play/
+  // seeked/回前台后重设并读回。下面用"丢弃第一次写入"的桩件模拟 iOS。
+  api.getProgress = async () => ({ coverage_percent: 0, finished: false, last_position: 0 })
+  const p7 = newReader()
+  await p7.onLoad({ book_id: '31', child_id: '7' })
+  await tick(); await tick()
+  let realRate = 1
+  let drops = 0
+  Object.defineProperty(lastAudio, 'playbackRate', {
+    configurable: true,
+    get: () => realRate,
+    set: (v) => {
+      if (drops > 0) { drops -= 1; return }  // 模拟 iOS 丢弃写入
+      realRate = v
+    },
+  })
+  drops = 2 // 暂停态写入全部被吞（含 _applySpeed 内的读回补写）
+  p7.onSpeedTap({ currentTarget: { dataset: { rate: 1.5 } } })
+  check('暂停时点倍速 → 记住目标值（不依赖点击瞬间写入）',
+    p7.data.speed === 1.5 && p7._desiredSpeed === 1.5 && realRate === 1,
+    JSON.stringify({ speed: p7.data.speed, desired: p7._desiredSpeed, rate: realRate }))
+  lastAudio.emit('play')
+  check('起播后自动重设倍速（iOS 丢弃一次写入仍生效）',
+    realRate === 1.5 && p7._desiredSpeed === 1.5,
+    JSON.stringify({ rate: realRate, desired: p7._desiredSpeed }))
+  realRate = 1 // 模拟 seek 后基础库把倍速打回 1.0
+  lastAudio.emit('seeked')
+  check('seek/续播后重设倍速', realRate === 1.5, JSON.stringify({ rate: realRate }))
+  realRate = 1 // 模拟锁屏回来系统重置倍速且没有 onPlay
+  p7.onShow()
+  check('回前台（锁屏恢复）重设倍速', realRate === 1.5, JSON.stringify({ rate: realRate }))
+  p7._clearSpeedTimers()
+
   // ---------- B7–B10（2026-10-31 第一百五十二批）：页面级竞态 ----------
   // 统一修法（docs/09 第一百五十二批）：请求序号/孩子比对——迟到的旧响应一律丢弃。
   // 构造手法：可控 Promise 的 api 桩 + 乱序 resolve（旧请求后回），断言过期响应不上屏。
