@@ -7249,7 +7249,106 @@
         ]
       }
     },
+    "/api/admin/children/{child_id}/observation-images/{path}": {
+      "get": {
+        "description": "管理端评估报告图（`<img>` 无法带头 → 支持 `?token=`；归属按孩子报告行校验）。",
+        "operationId": "admin_observation_image_api_admin_children__child_id__observation_images__path__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "child_id",
+            "required": true,
+            "schema": {
+              "title": "Child Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Admin Observation Image",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
     "/api/admin/children/{child_id}/observation-reports": {
+      "get": {
+        "description": "管理端查看已上传评估报告（2026-11-03：此前只有上传，后台看不到历史）。",
+        "operationId": "list_observation_reports_api_admin_children__child_id__observation_reports_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "child_id",
+            "required": true,
+            "schema": {
+              "title": "Child Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Observation Reports",
+        "tags": [
+          "identity"
+        ]
+      },
       "post": {
         "description": "观察期评估报告上传（≤9 张图；家长端可见）。",
         "operationId": "upload_observation_report_api_admin_children__child_id__observation_reports_post",

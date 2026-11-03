@@ -603,6 +603,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/children/{child_id}/observation-images/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin Observation Image
+         * @description 管理端评估报告图（`<img>` 无法带头 → 支持 `?token=`；归属按孩子报告行校验）。
+         */
+        get: operations["admin_observation_image_api_admin_children__child_id__observation_images__path__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/children/{child_id}/observation-reports": {
         parameters: {
             query?: never;
@@ -610,7 +630,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Observation Reports
+         * @description 管理端查看已上传评估报告（2026-11-03：此前只有上传，后台看不到历史）。
+         */
+        get: operations["list_observation_reports_api_admin_children__child_id__observation_reports_get"];
         put?: never;
         /**
          * Upload Observation Report
@@ -7511,6 +7535,69 @@ export interface operations {
         };
     };
     check_milestones_api_admin_children__child_id__milestones_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_observation_image_api_admin_children__child_id__observation_images__path__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: number;
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_observation_reports_api_admin_children__child_id__observation_reports_get: {
         parameters: {
             query?: never;
             header?: never;

@@ -5,8 +5,10 @@ import {
   App as AntdApp,
   Button,
   Descriptions,
+  Divider,
   Drawer,
   Form,
+  Image,
   Input,
   InputNumber,
   List,
@@ -34,7 +36,7 @@ import {
   apiGetChildReading,
   type ChildReadingProfile,
 } from "../api/reservations";
-import { apiUploadObservation } from "../api/observation";
+import { apiUploadObservation, apiListObservation, apiObservationImageUrl, type ObservationReportRow } from "../api/observation";
 import { apiListActivities } from "../api/activities";
 import {
   apiCancelOrder,
@@ -223,6 +225,10 @@ export default function MemberManage() {
   const [obsChild, setObsChild] = useState<Child | null>(null);
   const [obsFileList, setObsFileList] = useState<UploadFile[]>([]);
   const [obsRemark, setObsRemark] = useState("");
+  // 2026-11-03：管理端此前只有上传、没有查看入口；打开弹窗即拉已上传报告
+  const [obsReports, setObsReports] = useState<ObservationReportRow[]>([]);
+  const [obsLoading, setObsLoading] = useState(false);
+  const [obsError, setObsError] = useState("");
   const [readingChild, setReadingChild] = useState<Child | null>(null);
   const [readingProfile, setReadingProfile] = useState<ChildReadingProfile | null>(null);
   const [readingLoading, setReadingLoading] = useState(false);
@@ -311,6 +317,22 @@ export default function MemberManage() {
     });
   };
 
+  const openObservation = useCallback(async (r: Child) => {
+    setObsChild(r);
+    setObsFileList([]);
+    setObsRemark("");
+    setObsReports([]);
+    setObsError("");
+    setObsLoading(true);
+    try {
+      setObsReports(await apiListObservation(r.id));
+    } catch (e) {
+      setObsError((e as Error).message || "已上传报告加载失败");
+    } finally {
+      setObsLoading(false);
+    }
+  }, []);
+
   const onUploadObservation = async () => {
     if (!obsFileList.length) {
       message.warning("请先选择图片（≤9 张）");
@@ -324,7 +346,13 @@ export default function MemberManage() {
     try {
       const r = await apiUploadObservation(obsChild!.id, fd);
       message.success(`已上传 ${r.images.length} 张，家长端可见`);
-      setObsChild(null);
+      setObsFileList([]);
+      setObsRemark("");
+      // 上传成功但列表刷新失败不能误报"上传失败"——保留弹窗，下次打开会重拉
+      try {
+        setObsReports(await apiListObservation(obsChild!.id));
+        setObsError("");
+      } catch { /* 上传已成功，忽略刷新失败 */ }
     } catch (e) {
       message.error((e as Error).message);
     }
@@ -581,7 +609,7 @@ export default function MemberManage() {
                       <Button type="link" size="small" onClick={() => onEvaluateApprove(r)}>评估通过</Button>
                     )}
                     <Button type="link" size="small" onClick={() => openReadingProfile(r)}>阅读档案</Button>
-                    <Button type="link" size="small" onClick={() => { setObsChild(r); setObsFileList([]); setObsRemark(""); }}>评估报告</Button>
+                    <Button type="link" size="small" onClick={() => void openObservation(r)}>评估报告</Button>
                     <Button type="link" size="small" onClick={() => {
                       setEditChild(r);
                       editForm.setFieldsValue({
@@ -1028,14 +1056,46 @@ export default function MemberManage() {
       </Modal>
 
       <Modal
-        title={obsChild ? `为 ${obsChild.name} 上传评估报告` : ""}
-        open={!!obsChild} okText="上传" cancelText="取消" destroyOnHidden
+        title={obsChild ? `评估报告 — ${obsChild.name}` : ""}
+        open={!!obsChild} okText="上传新报告" cancelText="取消" destroyOnHidden
         onOk={onUploadObservation}
         onCancel={() => confirmDiscardIfDirty(
           obsFileList.length > 0 || obsRemark.trim() !== "",
           () => { setObsChild(null); setObsFileList([]); setObsRemark(""); }
         )}
       >
+        <Typography.Title level={5} style={{ marginTop: 0 }}>已上传报告</Typography.Title>
+        {obsLoading && <Typography.Text type="secondary">加载中…</Typography.Text>}
+        {obsError && (
+          <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+            {obsError} · 历史报告未加载（不代表没有）——请重试
+            {obsChild && (
+              <Typography.Link onClick={() => void openObservation(obsChild)} style={{ marginLeft: 8 }}>
+                重试
+              </Typography.Link>
+            )}
+          </Typography.Text>
+        )}
+        {!obsLoading && !obsError && obsReports.length === 0 && (
+          <Typography.Text type="secondary">还没有上传过评估报告</Typography.Text>
+        )}
+        {obsReports.map((r) => (
+          <div key={r.id} style={{ marginBottom: 12 }}>
+            <Typography.Text type="secondary">
+              {r.created_at.slice(0, 16).replace("T", " ")} · {r.remark || "无备注"} · {r.images.length} 张
+            </Typography.Text>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+              {r.images.map((img) => (
+                <Image
+                  key={img} width={88} height={88}
+                  style={{ objectFit: "cover", borderRadius: 6 }}
+                  src={apiObservationImageUrl(obsChild!.id, img)}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+        <Divider style={{ margin: "16px 0 12px" }}>上传新报告</Divider>
         <Upload
           listType="picture-card" fileList={obsFileList}
           beforeUpload={() => false}

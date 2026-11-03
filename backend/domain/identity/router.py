@@ -32,7 +32,11 @@ from backend.domain.identity.schemas import (
 from backend.domain.identity.service import ChildService, OrderService, ParentService
 from backend.domain.identity.transfer_service import TransferService
 from backend.domain.identity.wm10_service import RefundService, WithdrawalService
-from backend.middleware.admin_rbac import require_perm, require_super_admin
+from backend.middleware.admin_rbac import (
+    require_perm,
+    require_perm_or_query_token,
+    require_super_admin,
+)
 
 router = APIRouter(tags=["identity"])
 
@@ -646,6 +650,34 @@ def admin_list_reconciliations(
     from backend.domain.identity.payment_reconcile_service import PaymentReconcileService
 
     return {"items": PaymentReconcileService(db).latest(limit)}
+
+
+@router.get("/children/{child_id}/observation-reports")
+def list_observation_reports(
+    child_id: int,
+    admin: Any = Depends(require_perm("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """管理端查看已上传评估报告（2026-11-03：此前只有上传，后台看不到历史）。"""
+    return ObservationReportService(db).list_for_admin(child_id)
+
+
+@router.get("/children/{child_id}/observation-images/{path:path}")
+def admin_observation_image(
+    child_id: int,
+    path: str,
+    admin: Any = Depends(require_perm_or_query_token("member.manage")),
+    db: Session = Depends(get_db),
+):
+    """管理端评估报告图（`<img>` 无法带头 → 支持 `?token=`；归属按孩子报告行校验）。"""
+    from fastapi.responses import FileResponse
+
+    from backend.common.exceptions import NotFoundError
+
+    full = ObservationReportService(db).admin_image_path(child_id, f"observation/{path}")
+    if full is None:
+        raise NotFoundError("图片不存在")
+    return FileResponse(full, media_type="image/jpeg")
 
 
 @router.post("/children/{child_id}/observation-reports")

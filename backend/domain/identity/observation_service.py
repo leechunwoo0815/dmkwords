@@ -142,6 +142,37 @@ class ObservationReportService:
             for r in rows
         ]
 
+    def list_for_admin(self, child_id: int) -> list[dict]:
+        """管理端查看已上传报告（2026-11-03 补：此前只有上传、没有查询入口）。"""
+        return self.list_for_child(child_id)
+
+    def admin_image_path(self, child_id: int, rel_path: str) -> str | None:
+        """管理端取报告图：必须先命中该孩子某条报告的 images 精确路径。
+
+        `observation/` 在受保护目录里，`/api/admin/uploads/*` 不下发；后台图片
+        走本方法配套的专用端点。查无归属/越界/文件丢失一律 None（端点转 404）。
+        """
+        from backend.common.media_paths import is_within
+
+        rows = (
+            self.db.query(ObservationReport)
+            .filter(ObservationReport.child_id == child_id, ObservationReport.is_deleted == 0)
+            .all()
+        )
+        allowed: set[str] = set()
+        for r in rows:
+            try:
+                allowed.update(json.loads(r.images or "[]"))
+            except (json.JSONDecodeError, TypeError):
+                continue
+        if rel_path not in allowed:
+            return None
+        root = os.path.abspath(get_settings().UPLOADS_DIR)
+        full = os.path.abspath(os.path.join(root, rel_path))
+        if not is_within(root, full) or not os.path.isfile(full):
+            return None
+        return full
+
     def image_owned_by(self, parent_id: int, stored_path: str, path_fragment: str) -> bool:
         """C-12/T25（P0-F1 同族第五案）：报告图片归属校验。
 
