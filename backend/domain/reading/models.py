@@ -55,7 +55,7 @@ class CheckIn(BaseModel):
 
 
 class Reservation(BaseModel):
-    """预约（72h 锁定，占借阅额度）。"""
+    """预约（72h 锁定；**不占借阅额度**，受独立 `reservation_limit` 约束）。"""
 
     __tablename__ = "reservations"
 

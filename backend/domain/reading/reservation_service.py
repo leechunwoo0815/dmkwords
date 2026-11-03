@@ -129,17 +129,11 @@ class ReservationService:
         )
         if dup:
             raise ConflictError("该书已有进行中的预约")
-        # 额度
-        borrow_limit = int(ConfigService(self.db).get_value("borrow_limit"))
-        active_borrows = (
-            self.db.query(func.count(BorrowRecord.id))
-            .filter(
-                BorrowRecord.child_id == child.id,
-                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
-                BorrowRecord.is_deleted == 0,
-            )
-            .scalar()
-        )
+        # 预约额度（2026-11-03 甲方改口径）：预约**不占可借额度**，改为独立上限。
+        # 旧口径 `在借 + 预约 <= borrow_limit` 会让"新用户有 1 条预约就只显示可借 29"，
+        # 感官上像额度算错（生产报障）。现在：借阅上限只管在借（borrow() 侧校验）；
+        # 预约另有 `reservation_limit`（默认 3）防囤积；核销转借阅时再校验借阅上限。
+        reservation_limit = int(ConfigService(self.db).get_value("reservation_limit", "3"))
         active_reservations = (
             self.db.query(func.count(Reservation.id))
             .filter(
@@ -149,9 +143,10 @@ class ReservationService:
             )
             .scalar()
         )
-        if active_borrows + active_reservations >= borrow_limit:
+        if active_reservations >= reservation_limit:
             raise ValidationError(
-                f"借阅额度已满（在借 {active_borrows} + 预约 {active_reservations} / 上限 {borrow_limit}）"
+                f"预约已达上限（在约 {active_reservations} / 上限 {reservation_limit}），"
+                "请先取消或等待到期"
             )
 
         # 锁副本

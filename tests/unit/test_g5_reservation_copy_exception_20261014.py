@@ -151,8 +151,10 @@ def test_copy_maintenance_switches_reservation_to_another_copy(client: TestClien
     assert after.expires_at == before.expires_at, "改锁不该动到期时间"
     assert _copy_row(copies[1]).status == "reserved", "新副本必须被锁成 reserved"
     assert _copy_row(copies[0]).status == "maintenance"
-    # 额度不变（仍占 1 个预约名额）
-    assert _quota(client, h, child["id"])["available_quota"] == 29
+    # 2026-11-03 改口径：预约不占可借额度 → 换锁前后可借都是 30；
+    # 预约仍 active 由 reservation_count 锁住（比只看可借数更直接）。
+    card = _quota(client, h, child["id"])
+    assert card["available_quota"] == 30 and card["reservation_count"] == 1, card
 
 
 def test_no_alternative_copy_turns_exception_and_notifies_both_sides(client: TestClient):
@@ -164,7 +166,10 @@ def test_no_alternative_copy_turns_exception_and_notifies_both_sides(client: Tes
     child, mini = _member_child(client, h, "13800009102")
     book_id, copies = _book(client, h, "单册样例", copies=1)
     res = _reserve(client, mini, child["id"], book_id)
-    assert _quota(client, h, child["id"])["available_quota"] == 29, "预约先占 1 个额度"
+    card = _quota(client, h, child["id"])
+    assert card["available_quota"] == 30 and card["reservation_count"] == 1, (
+        "预约不占可借额度，但仍应显示为预约中"
+    )
 
     r = _set_copy_status(client, h, copies[0], "maintenance")
     assert r.status_code == 200, r.text
@@ -176,8 +181,9 @@ def test_no_alternative_copy_turns_exception_and_notifies_both_sides(client: Tes
     admins = _notifications(AdminNotification.SCENE_RESERVATION_EXCEPTION, parent_side=False)
     assert len(admins) == 1, "馆员必须收到「预约异常待跟进」待办"
     assert admins[0].ref_type == "reservation" and admins[0].ref_id == str(res["id"])
-    # PRD §5.4 公式：可借 = 上限 − 在借(含逾期) − 预约(**active**)。异常态不再是 active → 立即释放
-    assert _quota(client, h, child["id"])["available_quota"] == 30, "异常态必须立即释放名额"
+    # 异常态不再是 active → 预约名额立即释放（可借额度本来就不含预约，仍是 30）
+    card = _quota(client, h, child["id"])
+    assert card["available_quota"] == 30 and card["reservation_count"] == 0, card
 
 
 def test_report_damage_path_also_handles_reservation(client: TestClient):

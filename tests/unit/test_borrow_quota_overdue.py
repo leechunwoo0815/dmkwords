@@ -78,13 +78,13 @@ def test_card_quota_counts_overdue_once(client: TestClient):
     assert card["available_quota"] == 28
 
 
-def test_card_quota_subtracts_reservation(client: TestClient):
-    """预约占额度：有 1 个在预约时卡面少 1（旧实现不减预约 → 多报 1）。"""
+def test_card_quota_ignores_reservation(client: TestClient):
+    """2026-11-03 改口径：预约不占可借额度——有 1 条预约时 available 仍 30，但预约可见。"""
     h = _h(client)
-    _p, c, mini = _family(client, h, "13981013003", "预约占额孩")
+    _p, c, mini = _family(client, h, "13981013003", "预约不占额孩")
     _pay(client, h, c["id"], "observation_fee")
     _pay_deposit(client, h, c["id"])
-    b_want = _book_with_copies(client, h, "预约占额书", 1)
+    b_want = _book_with_copies(client, h, "预约不占额书", 1)
 
     before = client.get(f"/api/admin/circulation/children/{c['id']}/card", headers=h).json()
     assert before["available_quota"] == 30
@@ -96,7 +96,9 @@ def test_card_quota_subtracts_reservation(client: TestClient):
     assert r.status_code == 200, r.text
     after = client.get(f"/api/admin/circulation/children/{c['id']}/card", headers=h).json()
     assert after["active_borrows"] == 0
-    assert after["available_quota"] == 29, f"预约应占 1 个额度，实 {after['available_quota']}"
+    assert after["available_quota"] == 30, f"预约不占可借额度，实 {after['available_quota']}"
+    assert after["reservation_count"] == 1, after
+    assert after["reservations"][0]["book_title"] == "预约不占额书", after["reservations"]
 
 
 def test_overdue_does_not_block_reservation(client: TestClient):

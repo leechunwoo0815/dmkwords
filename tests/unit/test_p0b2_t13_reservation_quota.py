@@ -1,13 +1,16 @@
-# tests/unit/test_p0b2_t13_reservation_quota.py — P0 第二批 T13（B-11）借书额度计入预约
-"""红测试：宪法"预约占额度"只在预约 create 侧执行（在借+预约 ≤ 上限），
-borrow 侧只数 active 在借 → 28 在借+2 预约的孩子还能借第 29、30 本（实际占用 32）。
+# tests/unit/test_p0b2_t13_reservation_quota.py — 预约额度（2026-11-03 甲方改口径）
+"""2026-11-03 甲方改口径：预约**不占可借额度**，改为独立 `reservation_limit`（默认 3）。
 
-修复：borrow 额度公式 quota = borrow_limit - active_count - reservation_count。
+旧口径（T13 原始）：`在借 + 预约 <= borrow_limit`——新用户只要有 1 条预约，借阅操作台
+就显示「可借 29」，感官上像额度算错（生产报障）。
 
-测试设计（borrow_limit 调 6 缩小规模）：
-- 4 在借 + 2 active 预约 = 上限 6 → 借第 5 本 422（RED：当前 quota=6-4=2 → 200）
-- 预约核销（checkout）后额度净变化 0：checkout 1 单（5 在借+1 预约=6）仍 422；
-  checkout 第 2 单（6 在借+0 预约=6）仍 422；还 1 本（5 在借）→ 200 恢复
+新口径：
+- 借阅上限只管在借：4 在借 + 2 预约（limit 6）仍可借到第 5、6 本；
+- 预约独立上限 3，第 4 条预约 422；
+- 核销预约转借阅时由 `borrow()` 校验借阅上限（6 在借时核销 422，还 1 本后可核销）；
+- 卡片 `available_quota = 上限 − 在借`，且 `reservation_count/reservations` 可见。
+
+测试设计（borrow_limit 调 6 缩小规模）。
 """
 
 from fastapi.testclient import TestClient
@@ -31,47 +34,54 @@ def _borrow(client, h, child_id, book_id):
     )
 
 
-def test_reservation_counts_toward_borrow_quota(client: TestClient):
+def _reserve(client, mini, child_id, book_id):
+    return client.post(
+        "/api/miniapp/reservations", json={"child_id": child_id, "book_id": book_id}, headers=mini
+    )
+
+
+def test_reservations_do_not_consume_borrow_quota(client: TestClient):
     h = _h(client)
-    p, c, mini = _family(client, h, "13981013001", "预约占额孩")
+    _, c, mini = _family(client, h, "13981013001", "预约不占额孩")
     _pay(client, h, c["id"], "observation_fee")
     _pay_deposit(client, h, c["id"])
     r_cfg = client.put(
-        "/api/admin/configs/borrow_limit", json={"value": "6", "reason": "T13 测试"}, headers=h
+        "/api/admin/configs/borrow_limit", json={"value": "6", "reason": "T13 改口径"}, headers=h
     )
     assert r_cfg.status_code == 200, r_cfg.text
 
-    hold_books = [_book_with_copies(client, h, f"占额持书{i}", 1) for i in range(4)]
-    resv_books = [_book_with_copies(client, h, f"占额约书{i}", 2) for i in range(2)]
+    hold_books = [_book_with_copies(client, h, f"不占额持书{i}", 1) for i in range(4)]
+    resv_books = [_book_with_copies(client, h, f"不占额约书{i}", 1) for i in range(2)]
+    extra_books = [_book_with_copies(client, h, f"不占额新书{i}", 1) for i in range(3)]
     for bid in hold_books:
         assert _borrow(client, h, c["id"], bid).status_code == 200
     for bid in resv_books:
-        rr = client.post(
-            "/api/miniapp/reservations", json={"child_id": c["id"], "book_id": bid}, headers=mini
-        )
+        rr = _reserve(client, mini, c["id"], bid)
         assert rr.status_code == 200, rr.text
 
-    extra = _book_with_copies(client, h, "占额新书", 1)
-    r = _borrow(client, h, c["id"], extra)
-    assert r.status_code == 422, (
-        f"4 在借+2 预约=上限 6，应 422，实 {r.status_code} {r.text[:80]}（RED=额度不含预约）"
-    )
+    # 卡面：4 在借 + 2 预约 → 可借 = 6-4 = 2（不是 0）；预约书目可见
+    card = client.get(f"/api/admin/circulation/children/{c['id']}/card", headers=h).json()
+    assert card["available_quota"] == 2, card
+    assert card["reservation_count"] == 2, card
+    assert len(card["reservations"]) == 2, card
+    assert all(r["book_title"] for r in card["reservations"]), card["reservations"]
 
-    # 核销净变化 0：checkout 1 单 → 5 在借 + 1 预约 = 6 仍满
+    # 预约不再占额度：第 5、6 本照常借出；第 7 本才撞在借上限
+    r5 = _borrow(client, h, c["id"], extra_books[0])
+    assert r5.status_code == 200, f"4 在借+2 预约仍应能借第 5 本：{r5.status_code} {r5.text[:80]}"
+    r6 = _borrow(client, h, c["id"], extra_books[1])
+    assert r6.status_code == 200, f"5 在借+2 预约仍应能借第 6 本：{r6.status_code} {r6.text[:80]}"
+    r7 = _borrow(client, h, c["id"], extra_books[2])
+    assert r7.status_code == 422, f"6 在借=上限，第 7 本应 422：{r7.status_code} {r7.text[:80]}"
+
+    # 核销仍校验借阅上限：6 在借时核销 422，预约保持 active（事务回滚）
     rid1 = client.get(f"/api/miniapp/reservations?child_id={c['id']}", headers=mini).json()[0]["id"]
     ck1 = client.post(f"/api/admin/reservations/{rid1}/checkout", headers=h)
-    assert ck1.status_code == 200, ck1.text
-    r2 = _borrow(client, h, c["id"], extra)
-    assert r2.status_code == 422, f"核销后 5 在借+1 预约=6 仍满，实 {r2.status_code}"
+    assert ck1.status_code == 422, f"6 在借时核销应 422：{ck1.status_code} {ck1.text[:80]}"
+    still = client.get(f"/api/miniapp/reservations?child_id={c['id']}", headers=mini).json()
+    assert any(x["id"] == rid1 for x in still), "核销失败后预约必须仍 active（不能白丢锁定）"
 
-    # checkout 第 2 单 → 6 在借 + 0 预约 = 6 仍满
-    rid2 = client.get(f"/api/miniapp/reservations?child_id={c['id']}", headers=mini).json()[0]["id"]
-    ck2 = client.post(f"/api/admin/reservations/{rid2}/checkout", headers=h)
-    assert ck2.status_code == 200, ck2.text
-    r3 = _borrow(client, h, c["id"], extra)
-    assert r3.status_code == 422, f"核销后 6 在借=6 仍满，实 {r3.status_code}"
-
-    # 还 1 本在借书 → 5 在借 < 6 → 恢复可借（回归：正常路径不受影响）
+    # 还 1 本 → 5 在借，核销第 1 单成功（转为 6 在借）；第 2 单再核销 422
     from backend.domain.circulation.models import BorrowRecord
 
     with _db() as db:
@@ -88,8 +98,26 @@ def test_reservation_counts_toward_borrow_quota(client: TestClient):
         copy_id = rec.copy_id
     rb = client.post("/api/admin/circulation/return", json={"copy_id": copy_id}, headers=h)
     assert rb.status_code == 200, rb.text
-    r4 = _borrow(client, h, c["id"], extra)
-    assert r4.status_code == 200, f"还 1 本后 5 在借<6 应可借，实 {r4.status_code} {r4.text[:80]}"
+    ck2 = client.post(f"/api/admin/reservations/{rid1}/checkout", headers=h)
+    assert ck2.status_code == 200, ck2.text
+    rid2 = client.get(f"/api/miniapp/reservations?child_id={c['id']}", headers=mini).json()[0]["id"]
+    ck3 = client.post(f"/api/admin/reservations/{rid2}/checkout", headers=h)
+    assert ck3.status_code == 422, f"核销后 6 在借，第二单应 422：{ck3.status_code}"
+
+
+def test_reservation_limit_is_independent(client: TestClient):
+    """预约独立上限：默认 3，第 4 条 422；与在借数无关。"""
+    h = _h(client)
+    _, c, mini = _family(client, h, "13981013002", "预约上限孩")
+    _pay(client, h, c["id"], "observation_fee")
+    _pay_deposit(client, h, c["id"])
+    books = [_book_with_copies(client, h, f"预约上限书{i}", 1) for i in range(4)]
+    for bid in books[:3]:
+        rr = _reserve(client, mini, c["id"], bid)
+        assert rr.status_code == 200, rr.text
+    r4 = _reserve(client, mini, c["id"], books[3])
+    assert r4.status_code == 422, f"第 4 条预约应 422：{r4.status_code} {r4.text[:100]}"
+    assert "预约已达上限" in r4.text
 
 
 # ---- B7（插修5）：预约管理孩子/家长模糊搜索 + 状态"全部" ----

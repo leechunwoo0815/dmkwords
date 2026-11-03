@@ -470,6 +470,8 @@ export default function CirculationDesk() {
               <Col span={4}><Card size="small"><Typography.Text type="secondary">在借</Typography.Text><div style={{ fontSize: 22, fontWeight: 700 }}>{card.active_borrows}</div></Card></Col>
               <Col span={4}><Card size="small"><Typography.Text type="secondary">其中逾期</Typography.Text><div style={{ fontSize: 22, fontWeight: 700, color: card.overdue_count > 0 ? "var(--paint-danger)" : undefined }}>{card.overdue_count}</div></Card></Col>
               <Col span={4}><Card size="small"><Typography.Text type="secondary">可借</Typography.Text><div style={{ fontSize: 22, fontWeight: 700, color: card.borrow_block ? "var(--paint-ink-light)" : "var(--paint-secondary)" }}>{card.available_quota}</div></Card></Col>
+              {/* 2026-11-03：预约不占可借额度，但必须显性化，否则"新用户可借 29"像算错 */}
+              <Col span={4}><Card size="small"><Typography.Text type="secondary">预约中</Typography.Text><div style={{ fontSize: 22, fontWeight: 700 }}>{card.reservation_count}</div></Card></Col>
               <Col span={4}><Card size="small"><Typography.Text type="secondary">押金</Typography.Text><div style={{ marginTop: 6 }}>{card.deposit_status === "paid" ? <Tag color="green">已缴 ￥{Number(card.deposit_available).toLocaleString()}</Tag> : <Tag color="red">{card.deposit_status === "unpaid" ? "未缴" : "异常"}</Tag>}</div></Card></Col>
             </Row>
             {/* 2026-09-21 用户反馈：未入会竟然显示"可借 30 本"——额度是数字，资格才是能不能借。
@@ -526,6 +528,18 @@ export default function CirculationDesk() {
             ]}
            scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
+          {card.reservation_count > 0 && (
+            <Card size="small" title="预约中（不占可借额度）" style={{ marginTop: 16 }}>
+              <Table rowKey="id" size="small" pagination={false} dataSource={card.reservations}
+                columns={[
+                  { title: "书名", dataIndex: "book_title", render: (v: string) => v || "—" },
+                  { title: "副本码", dataIndex: "copy_code", width: 180, render: (v: string) => v || "—" },
+                  { title: "锁定到期", dataIndex: "expires_at", width: 170, render: (v: string) => fmtShort(v) },
+                ]}
+                scroll={{ x: "max-content" }}/>
+              <PaintHScrollbar auto />
+            </Card>
+          )}
         </>
       )}
 

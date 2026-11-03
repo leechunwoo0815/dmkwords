@@ -501,8 +501,9 @@ class BookService:
         copy = self.copy_repo.get_by_id_or_raise(copy_id)
         # 第四轮大审查 P1-9/P2-7（2026-10-17）：**收窄到运维安全子集**——`borrowed`（借出）与
         # `reserved`（预约锁定）是**业务动线置位**的状态，不能由这个管理端接口手工写：
-        # ① `reserved→borrowed` 不触预约善后 → 预约单仍 active（占额度、家长端仍显示"预约中"），
-        #    家长到店核销必 409，而且 2026-10-15 P1 #8 对 `reserved→available` 的修复被这条边绕过；
+        # ① `reserved→borrowed` 不触预约善后 → 预约单仍 active（家长端仍显示"预约中"、
+        #    占独立预约上限），家长到店核销必 409，而且 2026-10-15 P1 #8 对
+        #    `reserved→available` 的修复被这条边绕过；
         # ② `available→borrowed` 造出**无借阅记录的"已借出"副本**——借还台拒收（只收 available）、
         #    `return_book` 报"该副本没有进行中的借阅"，仪表盘却算作已借出。
         # 前端下拉早就只给安全子集（`BookDetail.tsx` 的 `COPY_STATUS_TRANSITIONS`），但 API 面不设防
@@ -532,7 +533,7 @@ class BookService:
             handle_copy_unavailable(self.db, copy, reason=f"副本状态改为{new_status}", admin=admin)
         elif new_status == BookCopy.STATUS_AVAILABLE and old == BookCopy.STATUS_RESERVED:
             # P1 #8（2026-10-15 大审查，亲验）：管理端「释放锁定」（reserved→available）此前**只掐副本、
-            # 不动预约单**——预约单仍 active（占 1 个借阅额度、家长端仍显示"预约中"），副本却已能被
+            # 不动预约单**——预约单仍 active（家长端仍显示"预约中"、占独立预约上限），副本却已能被
             # 任何孩子借走；该家长到店核销必 409，只能取消重约。与"副本退场"是同一个善后：
             # 有同书其他在馆副本 → 改锁那册；没有 → 转异常 + 通知家长 + 馆员待办（名额同时释放）。
             handle_copy_unavailable(

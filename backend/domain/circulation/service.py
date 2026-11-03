@@ -78,22 +78,19 @@ class CirculationService:
             .filter(Deposit.child_id == child_id, Deposit.is_deleted == 0)
             .first()
         )
-        # 预约占额度：卡面与 borrow() 必须同公式（上限 − 在借总数(含逾期) − 预约中）。
-        # 2026-09-21 甲方口径修订：逾期只占它自己那一个在借名额，不再额外扣减。
-        # 历史 bug（两个方向）：旧式 max(0, borrow_limit - len(overdue) - len(active)) 里 active 已含逾期
-        #   → 每本逾期多扣 1（无预约时卡面比 borrow() 放行的少 1，用户 2026-09-21 报障"扣 2 本"）；
-        #   同时又完全没减预约中 → 有预约时反而多报。两类误差在"1 本逾期 + 1 个预约"时正好抵消
-        #   （演示孩现场就是这种巧合），所以只能靠同源公式 + 回归测试锁死，不能靠肉眼对数字。
+        # 2026-11-03 甲方改口径：预约**不占可借额度**（独立 reservation_limit）。
+        # 卡面必须把预约书目显示出来，否则"新用户可借 29"看起来像额度算错（生产报障）。
         from backend.domain.reading.models import Reservation
 
-        reservation_count = (
-            self.db.query(func.count(Reservation.id))
+        reservations = (
+            self.db.query(Reservation)
             .filter(
                 Reservation.child_id == child_id,
                 Reservation.status == Reservation.STATUS_ACTIVE,
                 Reservation.is_deleted == 0,
             )
-            .scalar()
+            .order_by(Reservation.expires_at)
+            .all()
         )
         # 借书资格（单一来源；顺序与 borrow() 一致：先会员状态、后押金）
         _gate_m = member_gate(
@@ -121,8 +118,8 @@ class CirculationService:
         _block = (_hit.reason, _hit.kind == HARD) if _hit else None
 
         # 在借记录附上书名/副本码（2026-09-21 用户反馈：在借表只显示日期看不出是哪本书）
-        _book_ids = {r.book_id for r in active}
-        _copy_ids = {r.copy_id for r in active}
+        _book_ids = {r.book_id for r in active} | {r.book_id for r in reservations}
+        _copy_ids = {r.copy_id for r in active} | {r.copy_id for r in reservations}
         _titles = (
             {
                 bid: title
@@ -146,13 +143,18 @@ class CirculationService:
         for _r in active:
             _r.book_title = _titles.get(_r.book_id, "")
             _r.copy_code = _codes.get(_r.copy_id, "")
+        for _r in reservations:
+            _r.book_title = _titles.get(_r.book_id, "")
+            _r.copy_code = _codes.get(_r.copy_id, "")
         return {
             "child": child,
             "parent": parent,
             "active_borrows": len(active),
             "overdue_count": len(overdue),
-            "available_quota": max(0, borrow_limit - len(active) - reservation_count),
+            "available_quota": max(0, borrow_limit - len(active)),
             "borrow_limit": borrow_limit,
+            "reservation_count": len(reservations),
+            "reservations": reservations,
             "deposit_status": dep.status if dep else "unpaid",
             "deposit_available": str(dep.available_amount) if dep else "0",
             # 卡面"能不能借、为什么不能"（2026-09-21 用户反馈：未入会竟然显示可借 30 本）——
@@ -345,10 +347,8 @@ class CirculationService:
         if gate_d.code and not gate_d.reason:
             warnings.append(f"{gate_d.code.removeprefix('deposit_')}，馆员放行")
 
-        # 借阅上限：30 − 在借数 − active 预约数（E-9 单次扣减 + B-11/T13 预约占额度
-        # 双向执行：预约 create 已计入，borrow 侧同步计入，防 28 在借+2 预约仍可再借）
-        from backend.domain.reading.models import Reservation
-
+        # 借阅上限：30 − 在借数（2026-11-03 甲方改口径：预约**不占**可借额度；
+        # 预约另有独立上限，核销转借阅时由本函数校验借阅上限）。
         borrow_limit = int(ConfigService(self.db).get_value("borrow_limit"))
         now = datetime.now()
         active_count = (
@@ -360,23 +360,11 @@ class CirculationService:
             )
             .scalar()
         )
-        reservation_count = (
-            self.db.query(func.count(Reservation.id))
-            .filter(
-                Reservation.child_id == child_id,
-                Reservation.status == Reservation.STATUS_ACTIVE,
-                Reservation.is_deleted == 0,
-            )
-            .scalar()
-        )
-        quota = borrow_limit - active_count - reservation_count
+        quota = borrow_limit - active_count
         if quota <= 0 and not override_reason:
-            raise ValidationError(
-                f"可借上限已满（上限 {borrow_limit}，在借 {active_count} 本，"
-                f"预约占 {reservation_count} 本）"
-            )
+            raise ValidationError(f"可借上限已满（上限 {borrow_limit}，在借 {active_count} 本）")
         if quota <= 0:
-            warnings.append(f"超上限放行（在借 {active_count}，预约 {reservation_count}）")
+            warnings.append(f"超上限放行（在借 {active_count}）")
 
         # 副本状态（C2：状态名中文化，禁止英文状态码泄漏给馆员）
         if copy.status != BookCopy.STATUS_AVAILABLE:
@@ -433,8 +421,9 @@ class CirculationService:
         )
         # 借到手 = 预约目的达成：把该孩子对**这本书**的在用预约一并关掉（转"已借出"）。
         # 为什么要在这里做（用户 2026-09-21 反馈"预约的书成功借阅了就应该释放预约"）：
-        # 预约占额度（FEAT-036），若借到书后预约还停在 active，它会**一直占着 1 个名额**，
-        # 且预约管理页长期挂着一条永远核销不掉的单；走预约核销的路径已在 checkout 里置过，
+        # 预约目的一达成就要关单（FEAT-036）：若借到书后预约还停在 active，家长端会一直显示
+        # "预约中"（2026-11-03 起预约不占可借额度，但仍占独立预约上限），且预约管理页长期挂着
+        # 一条永远核销不掉的单；走预约核销的路径已在 checkout 里置过，
         # 这里兜住"没走核销、直接借出/扫码借出"的路径（幂等：只改 ACTIVE）。
         # P2 #17（2026-10-16，第三轮大审查）：锁定读 + 状态守卫（不是快照读 + 无条件覆盖写）——
         # 并发下（家长此刻取消预约 / 定时任务超时释放）不能把已 cancelled/expired 的单覆盖回

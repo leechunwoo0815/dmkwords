@@ -66,6 +66,17 @@ class BorrowRecordResponse(BaseSchema):
     )
 
 
+class ReservationItemResponse(BaseSchema):
+    """操作台卡片的预约行（2026-11-03：预约不占可借额度，但必须可见）。"""
+
+    id: int
+    book_id: int
+    book_title: str
+    copy_id: int
+    copy_code: str
+    expires_at: datetime
+
+
 class ChildCardResponse(BaseSchema):
     child_id: int
     name: str
@@ -77,6 +88,8 @@ class ChildCardResponse(BaseSchema):
     overdue_count: int
     available_quota: int
     borrow_limit: int
+    reservation_count: int
+    reservations: list[ReservationItemResponse]
     deposit_status: str
     deposit_available: str
     # 借书资格提示（2026-09-21）：不可借时给中文原因；hard=True 表示放行也没用
@@ -148,6 +161,18 @@ def _card_payload(card: dict) -> ChildCardResponse:
         overdue_count=card["overdue_count"],
         available_quota=card["available_quota"],
         borrow_limit=card["borrow_limit"],
+        reservation_count=card["reservation_count"],
+        reservations=[
+            ReservationItemResponse(
+                id=r.id,
+                book_id=r.book_id,
+                book_title=getattr(r, "book_title", ""),
+                copy_id=r.copy_id,
+                copy_code=getattr(r, "copy_code", ""),
+                expires_at=r.expires_at,
+            )
+            for r in card["reservations"]
+        ],
         deposit_status=card["deposit_status"],
         deposit_available=card["deposit_available"],
         borrow_block=card.get("borrow_block"),

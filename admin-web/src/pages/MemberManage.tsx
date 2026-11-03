@@ -742,10 +742,18 @@ export default function MemberManage() {
               { title: "名下孩子", dataIndex: "children_count", width: 90 },
               { title: "创建时间", dataIndex: "create_time", width: 170, render: (v) => String(v ?? "").slice(0, 19).replace("T", " ") },
               {
-                title: "操作", key: "op", width: 160,
+                title: "操作", key: "op", width: 240,
                 render: (_, r) => (
                   <Space>
-                    <Tooltip title={r.has_orders ? "名下孩子已创建订单，禁止修改" : undefined}>
+                    {/* 2026-11-03：家长有订单时只锁"改资料/删家长"，不锁"加孩子"—— */}
+                    {/* 订单守卫不该把建档入口一起关掉（甲方报障）。 */}
+                    <Button type="link" size="small" onClick={() => {
+                      setParentOptions([{ id: r.id, name: r.name, phone: r.phone } as unknown as Parent]);
+                      childForm.resetFields();
+                      childForm.setFieldsValue({ parent_id: r.id });
+                      setChildOpen(true);
+                    }}>添加孩子</Button>
+                    <Tooltip title={r.has_orders ? "名下孩子已创建订单，禁止修改（仍可添加孩子）" : undefined}>
                       <Button type="link" size="small" disabled={r.has_orders} onClick={() => {
                         setEditParent(r);
                         parentEditForm.setFieldsValue({ name: r.name, phone: r.phone, remark: r.remark || "" });

@@ -1174,6 +1174,17 @@
             },
             "title": "Records",
             "type": "array"
+          },
+          "reservation_count": {
+            "title": "Reservation Count",
+            "type": "integer"
+          },
+          "reservations": {
+            "items": {
+              "$ref": "#/components/schemas/backend__domain__circulation__router__ReservationItemResponse"
+            },
+            "title": "Reservations",
+            "type": "array"
           }
         },
         "required": [
@@ -1187,6 +1198,8 @@
           "overdue_count",
           "available_quota",
           "borrow_limit",
+          "reservation_count",
+          "reservations",
           "deposit_status",
           "deposit_available",
           "records"
@@ -4413,77 +4426,6 @@
         "title": "ReservationCreateRequest",
         "type": "object"
       },
-      "ReservationItemResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "book_id": {
-            "title": "Book Id",
-            "type": "integer"
-          },
-          "book_title": {
-            "title": "Book Title",
-            "type": "string"
-          },
-          "child_id": {
-            "title": "Child Id",
-            "type": "integer"
-          },
-          "child_name": {
-            "title": "Child Name",
-            "type": "string"
-          },
-          "copy_id": {
-            "title": "Copy Id",
-            "type": "integer"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "expired": {
-            "title": "Expired",
-            "type": "boolean"
-          },
-          "expires_at": {
-            "format": "date-time",
-            "title": "Expires At",
-            "type": "string"
-          },
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "parent_name": {
-            "title": "Parent Name",
-            "type": "string"
-          },
-          "parent_phone": {
-            "title": "Parent Phone",
-            "type": "string"
-          },
-          "status": {
-            "title": "Status",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "child_id",
-          "child_name",
-          "parent_name",
-          "parent_phone",
-          "book_id",
-          "book_title",
-          "copy_id",
-          "status",
-          "created_at",
-          "expires_at",
-          "expired"
-        ],
-        "title": "ReservationItemResponse",
-        "type": "object"
-      },
       "ResetAttemptsRequest": {
         "additionalProperties": false,
         "properties": {
@@ -5069,6 +5011,47 @@
         "title": "LoginRequest",
         "type": "object"
       },
+      "backend__domain__circulation__router__ReservationItemResponse": {
+        "additionalProperties": false,
+        "description": "操作台卡片的预约行（2026-11-03：预约不占可借额度，但必须可见）。",
+        "properties": {
+          "book_id": {
+            "title": "Book Id",
+            "type": "integer"
+          },
+          "book_title": {
+            "title": "Book Title",
+            "type": "string"
+          },
+          "copy_code": {
+            "title": "Copy Code",
+            "type": "string"
+          },
+          "copy_id": {
+            "title": "Copy Id",
+            "type": "integer"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "book_id",
+          "book_title",
+          "copy_id",
+          "copy_code",
+          "expires_at"
+        ],
+        "title": "ReservationItemResponse",
+        "type": "object"
+      },
       "backend__domain__reading__miniapp_router__LoginRequest": {
         "additionalProperties": false,
         "properties": {
@@ -5088,6 +5071,77 @@
           "code"
         ],
         "title": "LoginRequest",
+        "type": "object"
+      },
+      "backend__domain__reading__router__ReservationItemResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "book_id": {
+            "title": "Book Id",
+            "type": "integer"
+          },
+          "book_title": {
+            "title": "Book Title",
+            "type": "string"
+          },
+          "child_id": {
+            "title": "Child Id",
+            "type": "integer"
+          },
+          "child_name": {
+            "title": "Child Name",
+            "type": "string"
+          },
+          "copy_id": {
+            "title": "Copy Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expired": {
+            "title": "Expired",
+            "type": "boolean"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "parent_name": {
+            "title": "Parent Name",
+            "type": "string"
+          },
+          "parent_phone": {
+            "title": "Parent Phone",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "child_id",
+          "child_name",
+          "parent_name",
+          "parent_phone",
+          "book_id",
+          "book_title",
+          "copy_id",
+          "status",
+          "created_at",
+          "expires_at",
+          "expired"
+        ],
+        "title": "ReservationItemResponse",
         "type": "object"
       }
     },
@@ -11626,7 +11680,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/ReservationItemResponse"
+                    "$ref": "#/components/schemas/backend__domain__reading__router__ReservationItemResponse"
                   },
                   "title": "Response List Reservations Api Admin Reservations Get",
                   "type": "array"

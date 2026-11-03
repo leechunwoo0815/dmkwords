@@ -4458,6 +4458,10 @@ export interface components {
             parent_phone: string;
             /** Records */
             records: components["schemas"]["BorrowRecordResponse"][];
+            /** Reservation Count */
+            reservation_count: number;
+            /** Reservations */
+            reservations: components["schemas"]["backend__domain__circulation__router__ReservationItemResponse"][];
         };
         /** ChildCreateRequest */
         ChildCreateRequest: {
@@ -5990,39 +5994,6 @@ export interface components {
             /** Child Id */
             child_id: number;
         };
-        /** ReservationItemResponse */
-        ReservationItemResponse: {
-            /** Book Id */
-            book_id: number;
-            /** Book Title */
-            book_title: string;
-            /** Child Id */
-            child_id: number;
-            /** Child Name */
-            child_name: string;
-            /** Copy Id */
-            copy_id: number;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Expired */
-            expired: boolean;
-            /**
-             * Expires At
-             * Format: date-time
-             */
-            expires_at: string;
-            /** Id */
-            id: number;
-            /** Parent Name */
-            parent_name: string;
-            /** Parent Phone */
-            parent_phone: string;
-            /** Status */
-            status: string;
-        };
         /** ResetAttemptsRequest */
         ResetAttemptsRequest: {
             /** Book Id */
@@ -6271,6 +6242,27 @@ export interface components {
             /** Username */
             username: string;
         };
+        /**
+         * ReservationItemResponse
+         * @description 操作台卡片的预约行（2026-11-03：预约不占可借额度，但必须可见）。
+         */
+        backend__domain__circulation__router__ReservationItemResponse: {
+            /** Book Id */
+            book_id: number;
+            /** Book Title */
+            book_title: string;
+            /** Copy Code */
+            copy_code: string;
+            /** Copy Id */
+            copy_id: number;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Id */
+            id: number;
+        };
         /** LoginRequest */
         backend__domain__reading__miniapp_router__LoginRequest: {
             /**
@@ -6280,6 +6272,39 @@ export interface components {
             code: string;
             /** Phone */
             phone: string;
+        };
+        /** ReservationItemResponse */
+        backend__domain__reading__router__ReservationItemResponse: {
+            /** Book Id */
+            book_id: number;
+            /** Book Title */
+            book_title: string;
+            /** Child Id */
+            child_id: number;
+            /** Child Name */
+            child_name: string;
+            /** Copy Id */
+            copy_id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Expired */
+            expired: boolean;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Id */
+            id: number;
+            /** Parent Name */
+            parent_name: string;
+            /** Parent Phone */
+            parent_phone: string;
+            /** Status */
+            status: string;
         };
     };
     responses: never;
@@ -10095,7 +10120,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ReservationItemResponse"][];
+                    "application/json": components["schemas"]["backend__domain__reading__router__ReservationItemResponse"][];
                 };
             };
             /** @description Validation Error */
