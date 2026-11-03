@@ -44,27 +44,18 @@
   color: var(--muted);
   margin-bottom: 20rpx;
 }
-.audio-slider {
+.audio-progress {
   flex: 1;
-  margin: 0 16rpx;
-}
-.audio-slider .progress-track {
   height: 12rpx;
+  margin: 0 16rpx;
   background: var(--border);
   border-radius: 6rpx;
+  overflow: hidden;
 }
-.audio-slider .progress-fill {
+.audio-progress-fill {
   height: 100%;
   background: var(--accent);
   border-radius: 6rpx;
-}
-.audio-slider .progress-handle {
-  width: 32rpx;
-  height: 32rpx;
-  border-radius: 50%;
-  background: var(--accent);
-  border: 5rpx solid var(--surface);
-  box-shadow: 0 2rpx 8rpx rgba(var(--fg-rgb), 0.15);
 }
 .audio-btn-main.playing {
   box-shadow: 0 12rpx 64rpx rgba(var(--accent-rgb), 0.5);
@@ -180,29 +171,8 @@
 .playback-controls {
   display: flex;
   align-items: center;
-  gap: 40rpx;
-  margin-bottom: 36rpx;
-}
-.ctrl-skip {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2rpx;
-  /* W7-08：命中区 ≥88rpx（视觉尺寸不变，用最小盒撑开） */
-  min-width: 88rpx;
-  min-height: 88rpx;
   justify-content: center;
-  padding: 12rpx 20rpx;
-  border-radius: var(--radius-sm);
-  transition: background 0.12s;
-}
-.ctrl-skip:active { background: var(--accent-soft); }
-.ctrl-skip svg { width: 44rpx; height: 44rpx; color: var(--fg); }
-.ctrl-skip .skip-label {
-  font-size: 18rpx;
-  color: var(--muted);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  margin-bottom: 36rpx;
 }
 .ctrl-play {
   width: 112rpx;

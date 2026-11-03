@@ -228,7 +228,25 @@ class ReadingService:
         event_bus.publish(CheckInEvent(child_id=child.id, streak_days=streak), db=self.db)
         return {"checked_in": True, "streak": streak, "date": str(today)}
 
+    @staticmethod
+    def _covered_end(intervals_json: str) -> int:
+        """已覆盖区间的最远终点（续播用）。坏数据按 0 处理，不阻断进度读取。"""
+        end = 0
+        try:
+            for seg in json.loads(intervals_json or "[]"):
+                if isinstance(seg, (list, tuple)) and len(seg) == 2:
+                    end = max(end, int(seg[1]))
+        except (ValueError, TypeError):
+            return 0
+        return end
+
     def _progress_view(self, p: ReadingProgress) -> dict:
+        # 续播点取「已覆盖最远点」，而不是只看 last_position：历史拖动可能只推进了覆盖、
+        # 没推进 last_position（甲方实测 81.5% 覆盖 / 24s 播放头），按 last_position 续播
+        # 会让用户觉得"显示听了 81.5%，点进去却不是"（2026-11-03 报障）。
+        resume_position = max(int(p.last_position or 0), self._covered_end(p.intervals))
+        if p.total_seconds and resume_position > p.total_seconds:
+            resume_position = p.total_seconds
         return {
             "coverage_seconds": p.coverage_seconds,
             "total_seconds": p.total_seconds,
@@ -237,6 +255,7 @@ class ReadingService:
             else 0,
             "finished": bool(p.finished),
             "last_position": p.last_position,
+            "resume_position": resume_position,
             "reading_minutes": p.reading_minutes,
         }
 

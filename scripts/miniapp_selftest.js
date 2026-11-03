@@ -147,52 +147,50 @@ const img = require(path.join(__dirname, '..', 'miniapp', 'utils', 'img.js'))
   const p1 = newReader()
   await p1.onLoad({ book_id: '31', child_id: '7' })
   await tick(); await tick()
-  check('reader 详情补全 → 总时长 2:58 / 滑块满量程 178',
-    p1.data.displayDuration === '2:58' && p1.data.sliderMax === 178 && p1.data.durationKnown === true,
-    JSON.stringify({ d: p1.data.displayDuration, m: p1.data.sliderMax }))
+  check('reader 详情补全 → 总时长 2:58 / 时长已知',
+    p1.data.displayDuration === '2:58' && p1.data.duration === 178 && p1.data.durationKnown === true,
+    JSON.stringify({ d: p1.data.displayDuration, dur: p1.data.duration }))
   check('reader 音频实例带 child_id（会员门禁上下文）',
     !!lastAudio && String(lastAudio.src).indexOf('child_id=7') !== -1, lastAudio && lastAudio.src)
 
-  // iOS：audio.duration 恒 0 → 进度/时长仍要正确、滑块不许卡最右
+  // iOS：audio.duration 恒 0 → 进度/时长仍要正确；进度条只读，不再有滑块状态
   lastAudio.currentTime = 35
   lastAudio.emit('timeupdate')
-  check('iOS duration=0 → 已播 0:35 / 总时长 2:58 / 滑块 35',
-    p1.data.displayTime === '0:35' && p1.data.displayDuration === '2:58' && p1.data.sliderValue === 35,
-    JSON.stringify({ cur: p1.data.displayTime, dur: p1.data.displayDuration, v: p1.data.sliderValue }))
+  check('iOS duration=0 → 已播 0:35 / 总时长 2:58 / 进度 19.7%',
+    p1.data.displayTime === '0:35' && p1.data.displayDuration === '2:58' && p1.data.progressPercent === 19.7,
+    JSON.stringify({ cur: p1.data.displayTime, dur: p1.data.displayDuration, p: p1.data.progressPercent }))
 
-  // 拖动：时间回调不许把拇指顶回去；松手才 seek
-  lastAudio.emit('play')
-  p1.onSliderChanging({ detail: { value: 90 } })
-  lastAudio.currentTime = 40
-  lastAudio.emit('timeupdate')
-  check('拖动中 onTimeUpdate 不回写滑块', p1.data.sliderValue === 35,
-    String(p1.data.sliderValue))
-  p1.onSliderChange({ detail: { value: 90 } })
-  check('松手 seek 到 90 秒且 UI 同步',
-    lastAudio.seekCalls.indexOf(90) !== -1 && p1.data.sliderValue === 90 && p1.data.displayTime === '1:30',
-    JSON.stringify({ seeks: lastAudio.seekCalls, v: p1.data.sliderValue }))
+  // 2026-11-03 甲方裁定：拖动与 ±15s 全部移除，只留播放/暂停/倍速（WXML 静态断言）
+  const fs = require('fs')
+  const readerWxml = fs.readFileSync(
+    path.join(__dirname, '..', 'miniapp', 'pages', 'reading-pkg', 'reader', 'reader.wxml'), 'utf8')
+  check('播放器不再提供拖动/±15s（只读进度条）',
+    readerWxml.indexOf('<slider') === -1 &&
+      readerWxml.indexOf('onSlider') === -1 &&
+      readerWxml.indexOf('onSkip') === -1,
+    readerWxml.length)
 
-  // 结束：回满格 + 结束态（主键变重听）
+  // 结束：满格 + 结束态（主键变重听）
   lastAudio.duration = 178
   lastAudio.currentTime = 0
   lastAudio.emit('ended')
-  check('播完 → 满格/2:58/ended 态',
-    p1.data.playState === 'ended' && p1.data.sliderValue === 178 && p1.data.displayTime === '2:58',
-    JSON.stringify({ s: p1.data.playState, v: p1.data.sliderValue, t: p1.data.displayTime }))
+  check('播完 → 100%/2:58/ended 态',
+    p1.data.playState === 'ended' && p1.data.progressPercent === 100 && p1.data.displayTime === '2:58',
+    JSON.stringify({ s: p1.data.playState, p: p1.data.progressPercent, t: p1.data.displayTime }))
 
-  // 详情也没给时长（老书/探测失败）→ 显示 --:-- + 滑块禁用，不许假装 0:00/最右
+  // 详情也没给时长（老书/探测失败）→ 显示 --:-- + 进度 0%，不许假装 0:00/最右
   api.getBookDetail = async () => ({ ...detail, audio_url: '/api/miniapp/books/31/audio', audio_duration: null })
   const p2 = newReader()
   await p2.onLoad({ book_id: '31', child_id: '7' })
   await tick(); await tick()
-  check('时长未知 → 显示 --:-- 且滑块值 0',
-    p2.data.displayDuration === '--:--' && p2.data.sliderValue === 0 && p2.data.durationKnown === false,
-    JSON.stringify({ d: p2.data.displayDuration, v: p2.data.sliderValue }))
+  check('时长未知 → 显示 --:-- 且进度 0%',
+    p2.data.displayDuration === '--:--' && p2.data.progressPercent === 0 && p2.data.durationKnown === false,
+    JSON.stringify({ d: p2.data.displayDuration, p: p2.data.progressPercent }))
   lastAudio.duration = 100
   lastAudio.emit('canplay')
   check('时长未知 → 播放器自报时长回填 1:40',
-    p2.data.durationKnown === true && p2.data.displayDuration === '1:40' && p2.data.sliderMax === 100,
-    JSON.stringify({ d: p2.data.displayDuration, m: p2.data.sliderMax }))
+    p2.data.durationKnown === true && p2.data.displayDuration === '1:40' && p2.data.duration === 100,
+    JSON.stringify({ d: p2.data.displayDuration, dur: p2.data.duration }))
 
   // 续播竞态（甲方 2026-10-30 报障）：进度接口先回、音频实例后建，或 iOS canplay 要等 play
   // 才触发——两种顺序都必须在"按下播放"之前落到 last_position，不能从头出声。
@@ -235,6 +233,30 @@ const img = require(path.join(__dirname, '..', 'miniapp', 'utils', 'img.js'))
   check('起播后补 seek 并确认续播',
     lastAudio.seekCalls.indexOf(30) !== lastAudio.seekCalls.lastIndexOf(30) && p4._resumeApplied === true,
     JSON.stringify({ seeks: lastAudio.seekCalls, applies: p4._resumeApplied }))
+
+  // 续播取已覆盖最远点（2026-11-03 甲方报障：覆盖 81.5%、last_position 仅 24s）
+  api.getBookDetail = async () => ({ ...detail, audio_url: '/api/miniapp/books/31/audio', audio_duration: 178 })
+  api.getProgress = async () => ({
+    coverage_percent: 81.5, coverage_seconds: 145, total_seconds: 178,
+    finished: false, last_position: 24, resume_position: 145,
+  })
+  const p5 = newReader()
+  await p5.onLoad({ book_id: '31', child_id: '7' })
+  await tick(); await tick()
+  check('续播取已覆盖最远点（81.5% → 2:25）',
+    !!lastAudio && lastAudio.seekCalls.indexOf(145) !== -1 && p5.data.displayTime === '2:25',
+    JSON.stringify({ seeks: lastAudio && lastAudio.seekCalls, t: p5.data.displayTime }))
+
+  // 旧后端没有 resume_position → 回退 max(last_position, coverage_seconds)
+  api.getProgress = async () => ({
+    coverage_percent: 81.5, coverage_seconds: 145, finished: false, last_position: 24,
+  })
+  const p6 = newReader()
+  await p6.onLoad({ book_id: '31', child_id: '7' })
+  await tick(); await tick()
+  check('旧后端无 resume_position → 回退覆盖秒数续播',
+    !!lastAudio && lastAudio.seekCalls.indexOf(145) !== -1 && p6.data.displayTime === '2:25',
+    JSON.stringify({ seeks: lastAudio && lastAudio.seekCalls, t: p6.data.displayTime }))
 
   // ---------- B7–B10（2026-10-31 第一百五十二批）：页面级竞态 ----------
   // 统一修法（docs/09 第一百五十二批）：请求序号/孩子比对——迟到的旧响应一律丢弃。
