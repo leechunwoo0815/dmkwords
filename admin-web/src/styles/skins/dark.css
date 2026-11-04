@@ -1,0 +1,73 @@
+/* =============================================================================
+ * 「大屏深色」皮肤（[data-theme="dark"]）—— 第一百六十四批
+ *
+ * 用途：店里电视/投屏。深底 + 提亮的数据色，远处看比浅底清楚。
+ * 与 paint 皮肤同一套做法：所有选择器限定在 [data-theme="dark"] 下，不影响其它主题。
+ * 深色下"阴影"几乎不可见，层次改用：底色差分（layout < container < elevated）+ 1px 描边。
+ * ============================================================================= */
+
+/* 页面底：极轻的径向渐变，避免大面积死黑（投屏上死黑显得像没开机） */
+[data-theme="dark"] body {
+  background:
+    radial-gradient(1200px 600px at 20% -10%, #172434 0%, transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, #1a1f2e 0%, transparent 55%),
+    var(--color-bg-layout);
+}
+
+/* 内容面：比页面底略亮一档 + 描边 */
+[data-theme="dark"] .page-surface {
+  background: var(--color-bg-container);
+  border-color: var(--color-border);
+}
+
+/* 侧栏/顶栏：再深一档，形成"框住内容"的效果 */
+[data-theme="dark"] .paint-sider {
+  border-right-color: var(--color-border);
+}
+[data-theme="dark"] .paint-header-theme {
+  background: var(--color-bg-container);
+}
+[data-theme="dark"] .paint-brand-mark {
+  box-shadow: 0 0 12px rgba(76, 141, 255, 0.45);
+}
+
+/* 卡片：描边为主，hover 提亮；深色下不要"浮起"（阴影不可见） */
+[data-theme="dark"] .ant-card,
+[data-theme="dark"] .kpi-tile {
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border);
+}
+[data-theme="dark"] .kpi-tile:hover,
+[data-theme="dark"] .dash-cell:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: 0 0 0 1px rgba(76, 141, 255, 0.18);
+}
+
+/* 图表：给数据线/环轻微辉光——只在深色下成立，浅色下会显脏 */
+[data-theme="dark"] .chart-trend svg path[stroke],
+[data-theme="dark"] .chart-donut svg circle[stroke^="url"],
+[data-theme="dark"] .gauge svg path[stroke] {
+  filter: drop-shadow(0 0 4px rgba(76, 141, 255, 0.35));
+}
+[data-theme="dark"] .chart-grid-line {
+  stroke: var(--color-divider);
+}
+
+/* 表头/表格：深色下用比卡片更深的底色区分表头 */
+[data-theme="dark"] .ant-table-thead > tr > th {
+  background: var(--color-bg-subtle) !important;
+  color: var(--color-text-secondary) !important;
+}
+[data-theme="dark"] .page-surface .ant-table-wrapper,
+[data-theme="dark"] .page-surface .ant-pagination {
+  border-color: var(--color-border);
+  background: var(--color-bg-container);
+}
+
+/* 数值强调：深色下大数字用亮白，避免发灰 */
+[data-theme="dark"] .kpi-tile-value,
+[data-theme="dark"] .chart-center-num,
+[data-theme="dark"] .gauge-num {
+  fill: var(--color-text);
+  color: var(--color-text);
+}

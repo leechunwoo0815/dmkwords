@@ -1,0 +1,471 @@
+/* =============================================================================
+ * 「绘本风」皮肤（[data-theme="paint"]）—— 第一百六十四批补做
+ *
+ * 背景：第一版只做了"令牌级复原"，丢掉了绘本风最有辨识度的东西（手绘字体、卡通插画、
+ * 彩色图标圆圈、水彩纹理、行卡片化表格、橙色填充菜单）。本文件把这些**装饰性特征**按
+ * 皮肤层恢复：只在 `[data-theme="paint"]` 下生效，企业风一行不受影响。
+ *
+ * 为什么允许这里出现 `!important` 与写死色：
+ *   · `!important` —— 要压过 antd 由 CSS-in-JS 注入的组件样式（与旧版同理）；
+ *   · 写死色 —— 皮肤本身就是一份色板，且旧的 `--paint-*` 变量已在这里别名到新令牌，
+ *     只有少数"贴纸色"（标签底色等）保留字面值。全局 `styles/paint.css` 仍保持零写死色。
+ * ============================================================================= */
+
+/* 旧变量名 → 新令牌的别名：下面恢复的规则直接沿用旧写法，改主题时值仍由令牌驱动 */
+[data-theme="paint"] {
+  --paint-ink: var(--color-text);
+  --paint-ink-light: var(--color-text-secondary);
+  --paint-canvas: var(--color-bg-layout);
+  --paint-paper: var(--color-bg-container);
+  --paint-paper-dim: var(--color-bg-subtle);
+  --paint-border: var(--color-border);
+  --paint-primary: var(--color-primary);
+  --paint-primary-hover: var(--color-primary-hover);
+  --paint-primary-soft: var(--color-primary-soft);
+  --paint-secondary: var(--color-success);
+  --paint-secondary-soft: var(--color-success-soft);
+  --paint-yellow: var(--color-warning);
+  --paint-blue: var(--color-info);
+  --paint-pink: var(--color-danger);
+  --paint-danger: var(--color-danger);
+  --paint-danger-hover: var(--color-danger-hover);
+  --paint-shadow: var(--shadow-base);
+  --paint-shadow-sm: var(--shadow-sm);
+  --paint-shadow-lg: var(--shadow-lg);
+  --paint-card-shadow: var(--shadow-card);
+  --paint-display: "ZCOOL KuaiLe", "Nunito", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+[data-theme="paint"] .page-head-icon {
+  background: var(--paint-paper-dim);
+  border: 2px solid var(--paint-ink);
+  color: var(--paint-ink);
+  border-radius: 50%;
+}
+
+/* 内容面：绘本风里是一张"纸"（粗描边 + 硬阴影 + 大圆角） */
+[data-theme="paint"] .page-surface {
+  border: 2px solid var(--paint-ink);
+  border-radius: 20px;
+  box-shadow: var(--paint-card-shadow);
+  background: var(--paint-paper);
+}
+
+/* 列表卡：绘本风里也是一张"纸"（粗描边 + 硬阴影） */
+[data-theme="paint"] .list-card {
+  border: 2px solid var(--paint-ink);
+  border-radius: 20px;
+  box-shadow: var(--paint-card-shadow);
+  background: var(--paint-paper);
+}
+[data-theme="paint"] .list-card-head {
+  border-bottom: 2px dashed var(--paint-border);
+}
+[data-theme="paint"] .list-card-filter {
+  background: var(--paint-paper-dim);
+  border-bottom: 2px dashed var(--paint-border);
+}
+[data-theme="paint"] .page-surface .list-card .ant-pagination {
+  border-top: 2px dashed var(--paint-border) !important;
+}
+
+/* 绘本风的表格容器：粗描边 + 硬阴影，与行卡片同一个语言 */
+[data-theme="paint"] .page-surface .ant-table-wrapper {
+  border: 2px solid var(--paint-ink);
+  border-radius: 16px;
+  box-shadow: var(--paint-card-shadow);
+}
+[data-theme="paint"] .page-surface .ant-pagination {
+  border: 2px solid var(--paint-ink);
+  border-top: none;
+  border-radius: 0 0 16px 16px;
+  background: var(--paint-paper);
+}
+
+/* 分组标题也用暖墨色 */
+[data-theme="paint"] .ant-menu-item-group-title {
+  color: var(--paint-ink-light) !important;
+  font-weight: 600;
+}
+
+/* ---------- 水彩纹理（Layout 的 Sider 上挂 .paint-texture） ---------- */
+[data-theme="paint"] .paint-texture {
+  position: relative;
+  z-index: 0;
+}
+[data-theme="paint"] .paint-texture::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.08;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- 标题字体：手绘体 ---------- */
+[data-theme="paint"] h1,
+[data-theme="paint"] h2,
+[data-theme="paint"] h3,
+[data-theme="paint"] h4,
+[data-theme="paint"] h5,
+[data-theme="paint"] h6,
+[data-theme="paint"] .ant-typography h1,
+[data-theme="paint"] .ant-typography h2,
+[data-theme="paint"] .ant-typography h3,
+[data-theme="paint"] .ant-typography h4 {
+  font-family: var(--paint-display);
+  color: var(--paint-ink);
+}
+
+/* ---------- 品牌区：旧版无方块 Logo，字标用橙色手绘体 ---------- */
+[data-theme="paint"] .paint-brand {
+  padding: 22px 18px 18px;
+  border-bottom: none;
+}
+[data-theme="paint"] .paint-brand-name {
+  display: block;
+  font-family: var(--paint-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--paint-primary);
+  letter-spacing: 1px;
+}
+[data-theme="paint"] .paint-brand-mark {
+  display: none;
+}
+[data-theme="paint"] .paint-brand-sub {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--paint-ink-light);
+}
+
+/* ---------- 按钮：胶囊 + 2px 描边 + 硬阴影 + 按压缩回 ---------- */
+[data-theme="paint"] .ant-btn {
+  border-width: 2px;
+  border-color: var(--paint-ink);
+  border-radius: 999px;
+  font-weight: 700;
+}
+[data-theme="paint"] .ant-btn:not(.ant-btn-link):not(.ant-btn-text) {
+  box-shadow: var(--paint-shadow-sm);
+}
+[data-theme="paint"] .ant-btn:not(.ant-btn-link):not(.ant-btn-text):active {
+  box-shadow: 1px 1px 0 var(--paint-ink);
+}
+[data-theme="paint"] .ant-btn-primary {
+  background: var(--paint-primary);
+  color: #fff;
+  border-color: var(--paint-ink);
+  box-shadow: var(--paint-shadow);
+}
+[data-theme="paint"] .ant-btn-primary:hover {
+  background: var(--paint-primary-hover);
+  transform: scale(1.02);
+}
+[data-theme="paint"] .ant-btn-default {
+  background: var(--paint-paper);
+  color: var(--paint-ink);
+}
+[data-theme="paint"] .ant-btn-default:hover {
+  background: var(--paint-paper-dim);
+  transform: scale(1.02);
+}
+[data-theme="paint"] .ant-btn-dangerous:not(.ant-btn-link):not(.ant-btn-text) {
+  background: var(--paint-danger);
+  color: #fff;
+  box-shadow: var(--paint-shadow);
+}
+[data-theme="paint"] .ant-btn-link,
+[data-theme="paint"] .ant-btn-text {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* ---------- 输入框：2px 暖灰描边 + 橙色聚焦环 ---------- */
+[data-theme="paint"] .ant-input,
+[data-theme="paint"] .ant-input-number,
+[data-theme="paint"] .ant-select-selector,
+[data-theme="paint"] .ant-picker,
+[data-theme="paint"] .ant-input-affix-wrapper {
+  border-width: 2px;
+  border-color: var(--paint-border);
+  background: var(--paint-paper);
+}
+[data-theme="paint"] .ant-input:hover,
+[data-theme="paint"] .ant-input-number:hover,
+[data-theme="paint"] .ant-select-selector:hover,
+[data-theme="paint"] .ant-picker:hover,
+[data-theme="paint"] .ant-input-affix-wrapper:hover {
+  border-color: var(--paint-ink);
+}
+[data-theme="paint"] .ant-input:focus,
+[data-theme="paint"] .ant-input-focused,
+[data-theme="paint"] .ant-input-number-focused,
+[data-theme="paint"] .ant-select-focused .ant-select-selector,
+[data-theme="paint"] .ant-picker-focused,
+[data-theme="paint"] .ant-input-affix-wrapper-focused {
+  border-color: var(--paint-ink);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.18);
+}
+
+/* ---------- 标签：贴纸胶囊 ---------- */
+[data-theme="paint"] .ant-tag {
+  border: 2px solid var(--paint-ink);
+  border-radius: 999px;
+  font-weight: 700;
+  padding: 2px 10px;
+}
+[data-theme="paint"] .ant-tag-green,
+[data-theme="paint"] .ant-tag-success {
+  background: var(--paint-secondary-soft);
+  color: #166534;
+}
+[data-theme="paint"] .ant-tag-orange,
+[data-theme="paint"] .ant-tag-warning {
+  background: #ffedd5;
+  color: #9a3412;
+}
+[data-theme="paint"] .ant-tag-red,
+[data-theme="paint"] .ant-tag-error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+[data-theme="paint"] .ant-tag-blue,
+[data-theme="paint"] .ant-tag-processing {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+/* ---------- 卡片：粗描边 + 硬阴影 + 悬停上浮 ---------- */
+[data-theme="paint"] .ant-card {
+  border-width: 2px;
+  border-color: var(--paint-ink);
+  background: var(--paint-paper);
+}
+[data-theme="paint"] .ant-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 5px 5px 0 rgba(59, 47, 47, 0.12);
+}
+
+/* ---------- Modal：2.5px 描边 + 虚线分隔 ---------- */
+[data-theme="paint"] .ant-modal-content {
+  border: 2.5px solid var(--paint-ink);
+  border-radius: 24px;
+  box-shadow: var(--paint-shadow-lg);
+  background: var(--paint-paper);
+}
+[data-theme="paint"] .ant-modal-header {
+  border-bottom: 2px dashed var(--paint-border);
+  border-radius: 24px 24px 0 0;
+}
+[data-theme="paint"] .ant-modal-footer {
+  border-top: 2px dashed var(--paint-border);
+}
+
+/* ---------- Tabs：贴纸胶囊 ---------- */
+[data-theme="paint"] .ant-tabs-tab {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-weight: 700;
+}
+[data-theme="paint"] .ant-tabs-tab:hover {
+  background: var(--paint-paper-dim);
+}
+[data-theme="paint"] .ant-tabs-tab-active {
+  background: var(--paint-primary-soft);
+  border-color: var(--paint-ink);
+  box-shadow: var(--paint-shadow-sm);
+}
+[data-theme="paint"] .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--paint-ink);
+}
+[data-theme="paint"] .ant-tabs-ink-bar {
+  display: none;
+}
+
+/* ---------- 表格：行卡片化（行间留白 + 圆角描边） ---------- */
+[data-theme="paint"] .ant-table {
+  background: transparent;
+  border-collapse: separate;
+  border-spacing: 0 10px;
+}
+[data-theme="paint"] .ant-table-container {
+  border: none;
+}
+[data-theme="paint"] .ant-table-thead > tr > th {
+  border: none;
+  background: var(--paint-paper-dim);
+  font-weight: 700;
+  color: var(--paint-ink);
+  border-radius: 12px;
+}
+[data-theme="paint"] .ant-table-tbody > tr.ant-table-row > td {
+  border-top: 2px solid var(--paint-ink);
+  border-bottom: 2px solid var(--paint-ink);
+  background: var(--paint-paper);
+}
+[data-theme="paint"] .ant-table-tbody > tr.ant-table-row > td:first-child {
+  border-left: 2px solid var(--paint-ink);
+  border-radius: 12px 0 0 12px;
+}
+[data-theme="paint"] .ant-table-tbody > tr.ant-table-row > td:last-child {
+  border-right: 2px solid var(--paint-ink);
+  border-radius: 0 12px 12px 0;
+}
+[data-theme="paint"] .ant-table-tbody > tr.ant-table-row:hover > td {
+  background: #fff9f0;
+}
+
+/* ---------- 分页 ---------- */
+[data-theme="paint"] .ant-pagination-item,
+[data-theme="paint"] .ant-pagination-prev,
+[data-theme="paint"] .ant-pagination-next {
+  border: 2px solid var(--paint-ink);
+  border-radius: 10px;
+  background: var(--paint-paper);
+}
+[data-theme="paint"] .ant-pagination-item-active {
+  background: var(--paint-primary);
+  border-color: var(--paint-ink);
+}
+[data-theme="paint"] .ant-pagination-item-active a {
+  color: #fff;
+}
+
+/* ---------- 侧栏菜单：胶囊项 + 黄色 hover + 橙色选中 + 彩色图标圆圈 ---------- */
+[data-theme="paint"] .ant-menu-item {
+  border-radius: 999px;
+  margin: 6px 16px 6px 12px;
+  width: auto;
+  padding-left: 14px;
+  font-weight: 700;
+  color: var(--paint-ink);
+}
+[data-theme="paint"] .ant-menu-item:hover {
+  background: var(--paint-yellow);
+}
+[data-theme="paint"] .ant-menu-item-selected {
+  background: var(--paint-primary);
+  color: #fff;
+  box-shadow: 2px 2px 0 rgba(59, 47, 47, 0.25);
+}
+[data-theme="paint"] .ant-menu-item-selected .ant-menu-title-content {
+  color: #fff;
+}
+/* 图标圆圈：底色/字色由 Layout.tsx 按路由传入（旧版同款），默认米黄 */
+[data-theme="paint"] .paint-menu-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--paint-ink);
+  margin-right: 10px;
+  font-size: 16px;
+  background: var(--paint-yellow);
+  color: var(--paint-ink);
+}
+
+/* ---------- Header：2px 墨线 + 纸面半透明 ---------- */
+[data-theme="paint"] .ant-layout-header {
+  border-bottom: 2px solid var(--paint-ink);
+  background: rgba(255, 253, 247, 0.96);
+  backdrop-filter: blur(6px);
+}
+
+/* 主题按钮：绘本风里也是胶囊 + 硬阴影 */
+[data-theme="paint"] .paint-header-theme {
+  border: 2px solid var(--paint-ink);
+  border-radius: 999px;
+  background: var(--paint-paper);
+  box-shadow: var(--paint-shadow-sm);
+  color: var(--paint-ink);
+}
+[data-theme="paint"] .paint-header-theme:hover {
+  background: var(--paint-yellow);
+  color: var(--paint-ink);
+}
+
+/* ---------- Upload / Dropdown / Form ---------- */
+[data-theme="paint"] .ant-upload-drag {
+  border: 3px dashed var(--paint-border);
+  border-radius: 20px;
+  background: var(--paint-paper);
+}
+[data-theme="paint"] .ant-upload-drag:hover {
+  border-color: var(--paint-primary);
+  background: var(--paint-primary-soft);
+}
+[data-theme="paint"] .ant-dropdown-menu,
+[data-theme="paint"] .ant-popover-inner {
+  border: 2px solid var(--paint-ink);
+  border-radius: 12px;
+  box-shadow: var(--paint-shadow);
+  background: var(--paint-paper);
+}
+[data-theme="paint"] .ant-form-item-label > label {
+  font-weight: 700;
+  color: var(--paint-ink);
+}
+
+/* ---------- 页面大标题：纸面贴纸（旧版 .page-title-chip 的形态） ---------- */
+[data-theme="paint"] .page-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 18px 6px 14px;
+  margin-bottom: 12px;
+  background: linear-gradient(180deg, var(--paint-paper) 0%, var(--paint-paper-dim) 100%);
+  border: 3px solid var(--paint-ink);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 rgba(59, 47, 47, 0.35);
+}
+[data-theme="paint"] .page-title::before {
+  width: 6px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--paint-primary);
+}
+[data-theme="paint"] .page-title .ant-typography {
+  font-family: var(--paint-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--paint-ink);
+}
+
+/* ---------- 角色动画（卡通空态/加载态用） ---------- */
+@keyframes paint-wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-3deg);
+  }
+  75% {
+    transform: rotate(3deg);
+  }
+}
+@keyframes paint-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+[data-theme="paint"] .paint-character-idle {
+  animation: paint-wiggle 3s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+[data-theme="paint"] .paint-character-float {
+  animation: paint-float 2.5s ease-in-out infinite;
+}
