@@ -241,7 +241,7 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 | 数据库 | **MySQL 8.0 (utf8mb4) only**；alembic 管全部 schema（禁 create_all）；开发 OrbStack / CI service / 生产 Compose 同构 |
 | 缓存/锁 | **第一版不引入 Redis**（ADR-005：单机进程内锁 + JWT 无状态；预留演进） |
 | 定时任务 | 进程内 APScheduler（ADR-008；任务逻辑放域 service，调度器只做注册表） |
-| 前端 | 小程序原生（家长微信登录）+ React 18 + TS + Vite + AntD（`admin-web/src/theme-paint.ts` 暖纸书房） |
+| 前端 | 小程序原生（家长微信登录）+ React 18 + TS + Vite + AntD（`admin-web/src/theme/` 企业级令牌：飞书蓝 + 紧凑 32px） |
 | 文件存储 | 本地磁盘 `uploads/`（ADR-004；音频上百 GB，预留存储抽象层） |
 | 支付 | 微信支付 V3（安卓线上）+ 企微人工确认（苹果）+ 线下收款登记（复用 design-reuse 集成资产） |
 | 测试 | pytest + behave（中文 Gherkin）；覆盖率门禁见第八节 |

@@ -1,8 +1,15 @@
-# DmkWords 绘本视觉系统规范 V1.2
+# DmkWords 绘本视觉系统规范 V1.2（**管理端部分已被取代**）
 
-> 适用范围：admin-web（管理后台）+ miniapp（微信小程序）  
+> ⚠️ **历史文档（2026-11-04 起）**：**admin-web 的绘本风已被「企业级改版」取代**——
+> 主色飞书蓝 `#3370FF`、紧凑 32px、1px 描边、线性图标、系统字体；令牌体系见
+> `admin-web/src/theme/`，方案与实施记录见 `docs/31-管理端企业级改版方案-20261104.md`。
+> **miniapp 部分仍然有效**（小程序继续沿用绘本风）。
+>
+> 适用范围：admin-web（管理后台，历史）+ miniapp（微信小程序，有效）  
 > 核心目标：让界面"活"起来——像翻开一本少儿绘本，不是走进一间档案室  
 > 原则：形态 > 颜色 > 字体。先改组件骨架，再填色，最后加插画。
+
+<!-- docs-code-ignore: admin-web/src/theme-paint.ts -->
 
 ---
 
@@ -467,7 +474,7 @@
 
 **目标**：改组件形态，不加插画。
 
-1. **新建 `theme-paint.ts`**：基于当前 ``admin-web/src/theme-paint.ts``，覆盖：
+1. **新建 `theme-paint.ts`**：基于当前主题文件（原 `admin-web/src/theme-paint.ts`，**164 批已删除，改由 `src/theme/` 承载**），覆盖：
    - 圆角系统（Button 16、Card 20、Modal 24、Tag 999px）
    - 边框系统（所有组件加粗边框 token）
    - 阴影系统（硬边偏移）
@@ -542,7 +549,7 @@ admin-web 端未按本规范原定的 4 个迭代分阶段实施，而是一次�
 
 ### 已落地范围
 
-- `admin-web/src/theme-paint.ts`：绘本调色板、圆角/边框/阴影 token
+- 主题文件（原 `theme-paint.ts`，164 批删除）：绘本调色板、圆角/边框/阴影 token
 - `admin-web/src/styles/paint.css`：Button/Input/Tag/Card/Modal/Tabs/Table/Pagination/Menu/Upload/Dropdown/Form/Typography 全局覆盖
 - `admin-web/src/components/PaintEmpty.tsx`：8 角色空状态插画
 - `admin-web/src/components/PaintLoading.tsx`：7 角色加载态插画
