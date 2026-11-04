@@ -391,5 +391,5 @@ def test_observation_report_upload_notifies_each_time(client: TestClient):
         "/api/miniapp/notifications", params={"child_id": c["id"]}, headers=mini
     ).json()
     items = msgs["items"] if isinstance(msgs, dict) else msgs
-    uploaded = [m for m in items if "评估报告" in str(m.get("title", ""))]
+    uploaded = [m for m in items if "阅读记录" in str(m.get("title", ""))]
     assert len(uploaded) == 2, [m.get("title") for m in items]

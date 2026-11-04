@@ -70,8 +70,8 @@ class ObservationReportService:
         NotificationService(self.db).send(
             parent_id=child.parent_id,
             scene=SCENE_OTHER_EVALUATION_UPLOADED,
-            title="评估报告已上传",
-            content=f"孩子的评估报告已更新（{len(paths)} 张图片），可在「我的 → 评估报告」查看。",
+            title="阅读记录已更新",
+            content=f"孩子的阅读记录已更新（{len(paths)} 张图片），可在「我的 → 阅读记录」查看。",
             category=Notification.CATEGORY_OTHER,
             child_id=child.id,
             ref_type="child",
