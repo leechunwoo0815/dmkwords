@@ -39,7 +39,7 @@
     <view class="section-body">
       <view class="info-card">
         <view class="price-row">
-          <text class="price-label">费用</text>
+          <text class="price-label">活动费（到店缴纳）</text>
           <text class="price-value">{{activity.fee_display}}</text>
         </view>
         <view class="capacity-wrap" wx:if="{{!activity.is_past}}">
@@ -93,7 +93,7 @@
     </block>
     <block wx:elif="{{!activity.my_enrollment}}">
       <button class="btn-primary" bindtap="onEnroll" disabled="{{enrolling}}">
-        {{enrolling ? '报名中…' : activity.full ? '已满（到店咨询）' : '立即报名'}}
+        {{enrolling ? '报名中…' : activity.full ? '已满（到店咨询）' : (activity.fee * 1 > 0 ? '报名（到店缴费）' : '立即报名')}}
       </button>
     </block>
     <block wx:elif="{{activity.my_enrollment.status === 'enrolled'}}">
@@ -101,7 +101,7 @@
            原话"取消报名并申请退款"），免费直接取消；后端不变（两链已有） -->
       <button class="btn-primary" bindtap="onRefund"
         wx:if="{{activity.fee * 1 > 0}}">
-        取消报名并申请退款
+        取消报名（到店办理退款）
       </button>
       <button class="btn-outline" bindtap="onCancel" wx:else>取消报名</button>
     </block>

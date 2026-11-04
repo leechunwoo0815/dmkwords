@@ -43,6 +43,14 @@
   margin-top: 12rpx;
 }
 
+.member-only-tip {
+  font-size: 24rpx;
+  color: var(--muted);
+  margin-top: 16rpx;
+  padding: 0 40rpx;
+  line-height: 1.5;
+}
+
 .login-form {
   width: 100%;
   display: flex;

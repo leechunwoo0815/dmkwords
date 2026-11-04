@@ -303,15 +303,14 @@ Page({
     if (!childId) { wx.showToast({ title: '请先选择孩子', icon: 'none' }); return }
     if (!book.has_audio) { wx.showToast({ title: '该书暂无音频', icon: 'none' }); return }
     // R3（插修 16）：播放入口前置预检——allowed=false 不进播放页，按 reason
-    // 分流引导文案（R-301：退会可重新入会→"重新入会"文案；购买界面未上线
-    // TODO 占位跳转，上线后替换目标）
+    // 分流引导文案（2026-11-04 审核口径：小程序不开线上支付，统一引导到"会员服务办理"说明页）
     try {
       const perm = await api.audioPermission(childId, book.id)
       if (!perm.allowed) {
         const guide = {
-          unpaid: { title: '收听音频需要入会', btn: '了解入会', buy: true },
-          withdrawn: { title: '会员已退会，重新入会请到店咨询', btn: '知道了', buy: true },
-          expired: { title: '会员已过期，续费请到店咨询', btn: '知道了', buy: true },
+          unpaid: { title: '收听配套音频需办理会员服务', btn: '了解服务', buy: true },
+          withdrawn: { title: '会员服务已退，重新办理请到店咨询', btn: '知道了', buy: true },
+          expired: { title: '会员服务已到期，续期请到店咨询', btn: '知道了', buy: true },
           // G15（2026-10-15 第六十一批）：下架即停播（PRD §4.4）。这不是权限问题，
           // **不能**把人引去购买页（`buy` 缺省即 falsy）；恢复上架后进度照旧接得上
           off_shelf: { title: '该书已下架，暂不能播放', btn: '知道了' },
@@ -324,7 +323,7 @@ Page({
           success: () => {
             if (!guide.buy) return
             // 2026-10-12 拍板（P12）：原跳 `/pages/member/member` 是 **tabBar 页**，
-            // `wx.navigateTo` 对 tabBar 页必然失败（点了什么都不发生）；购买页早已存在。
+            // `wx.navigateTo` 对 tabBar 页必然失败（点了什么都不发生）；会员服务说明页早已存在。
             wx.navigateTo({ url: `/pages/member-pkg/purchase/purchase?child_id=${this.data.childId}` })
           },
         })

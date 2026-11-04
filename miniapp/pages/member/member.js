@@ -72,7 +72,7 @@ Page({
       return `${dt.getFullYear()}-${m}-${day}`
     }
     if (c.member_status === 'none' || c.member_status === 'withdrawn') return ''
-    if (c.member_status === 'expired') return '已过期（请联系店内处理）'
+    if (c.member_status === 'expired') return '服务已到期（请到店办理）'
     const today = new Date()
     if (c.member_status === 'observation' && !c.member_expire) {
       const d = new Date(today.getTime() + 30 * 24 * 3600 * 1000)
@@ -80,14 +80,14 @@ Page({
       // → ReferenceError（观察期且无到期日的孩子必踩）。取不到口径时按 30 天兜底。
       const cfg = this.data.cfg || {}
       const days = cfg.observation_period_days || 30
-      return `会员到期(观察期 ${days} 天) ${fmt(d)}`
+      return `服务到期（体验借阅 ${days} 天）${fmt(d)}`
     }
     if (!c.member_expire) return ''
     const diff = Math.ceil((new Date(String(c.member_expire).replace(/-/g, '/')).getTime() - today.getTime()) / 86400000)
     if (c.member_status === 'formal' && diff >= 0 && diff <= 7) {
-      return `会员到期 ${fmt(c.member_expire)} · 即将到期，请联系馆员续费`
+      return `服务到期 ${fmt(c.member_expire)} · 即将到期，请到店办理续期`
     }
-    return `会员到期 ${fmt(c.member_expire)}`
+    return `服务到期 ${fmt(c.member_expire)}`
   },
 
   onSwitchChild(e) {

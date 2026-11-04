@@ -13,7 +13,7 @@
   <view class="filter-bar">
     <picker mode="selector" range="{{gradeOptions}}" value="{{gradeIdx}}" bindchange="onGradeChange">
       <view class="filter-pill {{gradeLabel ? 'filter-on' : ''}}">
-        <text>{{gradeLabel || '年级'}}</text><text class="caret">▾</text>
+        <text>{{gradeLabel || '适读年龄'}}</text><text class="caret">▾</text>
       </view>
     </picker>
     <picker mode="selector" range="{{topicOptions}}" value="{{topicIdx}}" bindchange="onTopicChange">
@@ -23,7 +23,7 @@
     </picker>
     <picker mode="selector" range="{{arOptions}}" value="{{arIdx}}" bindchange="onArChange">
       <view class="filter-pill {{arLabel ? 'filter-on' : ''}}">
-        <text>{{arLabel || 'AR'}}</text><text class="caret">▾</text>
+        <text>{{arLabel || '难度'}}</text><text class="caret">▾</text>
       </view>
     </picker>
     <picker mode="selector" range="{{sortOptions}}" value="{{sortIdx}}" bindchange="onSortChange">
@@ -61,7 +61,7 @@
         <view class="card-author">{{item.author || '佚名'}}</view>
         <view class="card-tags">
           <text class="tag tag-words">{{item.word_count}} 词</text>
-          <text wx:if="{{item.ar_level}}" class="tag tag-ar">AR {{item.ar_level}}</text>
+          <text wx:if="{{item.ar_level}}" class="tag tag-ar">难度 {{item.ar_level}}</text>
         </view>
       </view>
     </view>

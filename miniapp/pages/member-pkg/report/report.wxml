@@ -11,7 +11,7 @@
   </view>
 
   <view class="section-card x-c92966" wx:if="{{report}}">
-    <view class="section-title">阅读概要</view>
+    <view class="section-title">阅读小结</view>
     <view class="rp-stats">
       <view class="rp-stat">
         <text class="rp-num">{{report.books}}</text>
@@ -19,7 +19,7 @@
       </view>
       <view class="rp-stat">
         <text class="rp-num">{{report.words}}</text>
-        <text class="rp-label">新学词数</text>
+        <text class="rp-label">词句积累</text>
       </view>
       <view class="rp-stat">
         <text class="rp-num">{{report.checkin_days}}</text>
@@ -31,24 +31,24 @@
       </view>
       <view class="rp-stat">
         <text class="rp-num">{{report.quiz_avg_percent || '—'}}{{report.quiz_avg_percent ? '%' : ''}}</text>
-        <text class="rp-label">小挑战均分</text>
+        <text class="rp-label">挑战平均完成度</text>
       </view>
       <view class="rp-stat">
         <text class="rp-num">{{report.level || '—'}}</text>
-        <text class="rp-label">当前等级</text>
+        <text class="rp-label">阅读等级</text>
       </view>
     </view>
     <view class="rp-note">累计：{{report.total_words}} 词 · {{report.points_total}} 积分</view>
   </view>
 
   <error-view wx:if="{{noChild}}" type="empty" title="还没有选择孩子"
-    desc="请先在「我的」里添加或选择孩子，报告按孩子生成" showRetry="{{false}}" />
+    desc="请先在「我的」里添加或选择孩子，小结按孩子生成" showRetry="{{false}}" />
 
-  <error-view wx:if="{{loadError}}" type="network" title="报告加载失败"
+  <error-view wx:if="{{loadError}}" type="network" title="小结加载失败"
     desc="{{loadError}}（不是「正在生成」，请重试）" bind:onRetry="onRetryLoad" />
 
   <view class="section-card x-c92966" wx:if="{{!loadError}}">
-    <view class="section-title">报告图片</view>
+    <view class="section-title">记录图片</view>
     <error-view wx:if="{{imgError}}" type="network" title="报告图片加载失败"
       desc="图片没有生成成功（不是「正在生成」），可重试" bind:onRetry="onRetryLoad" />
     <block wx:elif="{{imageUrl}}">

@@ -41,7 +41,7 @@
   <!-- 查词（下半屏；音频不中断） -->
   <view class="lookup-section">
     <view class="dict-input-row">
-      <input class="dict-input" placeholder="遇到生词？输入查一查（自动进生词本）"
+      <input class="dict-input" placeholder="遇到不认识的词？输入查一查（自动进词句收藏）"
         value="{{dictWord}}" bindinput="onDictInput" confirm-type="search" bindconfirm="onDictSearch" />
       <view class="lookup-btn" bindtap="onDictSearch">查</view>
     </view>

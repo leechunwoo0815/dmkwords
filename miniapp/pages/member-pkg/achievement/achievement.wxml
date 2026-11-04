@@ -38,7 +38,7 @@
     </view>
   </view>
 
-  <view class="section-label x-03f368">里程碑勋章</view>
+  <view class="section-label x-03f368">阅读里程碑</view>
   <view class="badges-grid">
     <view wx:for="{{badges}}" wx:key="node"
       class="badge-card {{item.unlocked ? 'is-unlocked' : 'is-locked'}}">

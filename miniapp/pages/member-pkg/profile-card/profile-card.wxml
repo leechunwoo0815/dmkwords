@@ -42,7 +42,7 @@
     <view class="card-divider"></view>
 
     <view class="level-section">
-      <view class="level-title">成长等级 {{passport.level}} 级</view>
+      <view class="level-title">阅读等级 {{passport.level}} 级</view>
       <view class="level-subtitle">
         {{passport.is_z_capped ? '已达 Z 级封顶，继续累计' : '每 ' + passport.level_books_threshold + ' 本升一级，只升不降'}}
       </view>

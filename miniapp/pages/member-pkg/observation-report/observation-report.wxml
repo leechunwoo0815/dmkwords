@@ -1,10 +1,10 @@
-<!-- 评估报告（WM10/FEAT-066）：竖版整页展示（docs/15 §十九 报告类图片展示规范） -->
+<!-- 阅读记录（WM10/FEAT-066）：竖版整页展示（docs/15 §十九 报告类图片展示规范） -->
 <view class="page-bg">
   <view class="obs-hero">
     <image class="obs-hero-icon" src="/icons/ui/clipboard.png" mode="aspectFit" />
     <view class="obs-hero-main">
-      <view class="obs-hero-title">{{childName}} 的评估报告</view>
-      <view class="obs-hero-sub">由馆内馆员评估上传 · 每一阶段的成长记录</view>
+      <view class="obs-hero-title">{{childName}} 的阅读记录</view>
+      <view class="obs-hero-sub">由馆内馆员记录的到店阅读情况 · 每一阶段的成长记录</view>
     </view>
     <view class="obs-hero-count" wx:if="{{reports.length}}">
       <text class="obs-hero-count-num">{{reports.length}}</text>
@@ -15,11 +15,11 @@
   <view class="obs-loading" wx:if="{{loading}}">加载中…</view>
 
   <!-- P2-45：失败态显式呈现（原先失败静默 → "还没有报告"） -->
-  <error-view wx:if="{{!loading && loadError}}" type="network" title="观察报告加载失败"
-    desc="{{loadError}}（报告未加载，不代表没有报告）" bind:onRetry="onRetryLoad" />
+  <error-view wx:if="{{!loading && loadError}}" type="network" title="阅读记录加载失败"
+    desc="{{loadError}}（记录未加载，不代表没有记录）" bind:onRetry="onRetryLoad" />
 
   <empty-state wx:if="{{!loading && !loadError && !reports.length}}"
-    icon-name="clipboard" title="还没有评估报告" desc="馆员上传后这里会展示" />
+    icon-name="clipboard" title="还没有阅读记录" desc="馆员记录后这里会展示" />
 
   <!-- 最新一期：整页展开（家长第一眼要看清的就是它） -->
   <view class="obs-paper" wx:if="{{latest}}">
@@ -55,7 +55,7 @@
   <!-- 往期：默认收起，点标题行展开 -->
   <view class="obs-hist" wx:if="{{history.length}}">
     <view class="obs-hist-head" bindtap="toggleHistory">
-      <text class="obs-hist-title">往期报告（{{history.length}} 期）</text>
+      <text class="obs-hist-title">往期记录（{{history.length}} 期）</text>
       <image class="obs-hist-arrow {{historyOpen ? 'is-open' : ''}}"
         src="/icons/ui/arrow-down.png" mode="aspectFit" />
     </view>

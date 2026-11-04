@@ -16,7 +16,7 @@
       {{result.passed ? '挑战成功' : '再试一次'}}
     </view>
     <view class="result-sub" wx:if="{{result.from_server}}">本机无本次作答记录，显示服务端历史挑战结果</view>
-    <view class="result-sub">{{result.book_title}} · 答对 {{result.score}} / {{result.total}} 题</view>
+    <view class="result-sub">{{result.book_title}} · 完成 {{result.score}} / {{result.total}} 题</view>
 
     <!-- 2026-09-16 接线修复：WXSS 早就写好三层环形（ring 渐变 + inner 挖洞 + 数值），
          但 WXML 只渲染了数值层 → 环形退化成实心灰盘（用户报障「中性灰成绩徽章发闷」）。

@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "会员购买/续费",
+  "navigationBarTitleText": "会员服务办理",
   "usingComponents": {
     "pay-button": "/components/pay-button/pay-button",
     "error-view": "/components/error-view/error-view"

@@ -129,7 +129,7 @@
           </view>
           <view class="rec-title">{{item.title}}</view>
           <view class="rec-tags">
-            <text class="rec-tag">{{item.ar_level || 'AR—'}}</text>
+            <text class="rec-tag">{{item.ar_level ? '难度 ' + item.ar_level : '难度—'}}</text>
             <text class="rec-tag rec-tag-words">{{item.word_count}} 词</text>
           </view>
         </view>
@@ -154,10 +154,10 @@
         <view class="entry-icon e-gold"><image class="entry-icon-img" src="/icons/ui/bookmark.png" mode="aspectFit" /></view><text class="entry-name">我的预约</text>
       </view>
       <view class="entry" bindtap="goAchievement">
-        <view class="entry-icon e-gold"><image class="entry-icon-img" src="/icons/ui/trophy.png" mode="aspectFit" /></view><text class="entry-name">等级勋章</text>
+        <view class="entry-icon e-gold"><image class="entry-icon-img" src="/icons/ui/trophy.png" mode="aspectFit" /></view><text class="entry-name">阅读徽章</text>
       </view>
       <view class="entry" bindtap="goLeaderboard">
-        <view class="entry-icon e-pink"><image class="entry-icon-img" src="/icons/ui/chart.png" mode="aspectFit" /></view><text class="entry-name">排行榜</text>
+        <view class="entry-icon e-pink"><image class="entry-icon-img" src="/icons/ui/chart.png" mode="aspectFit" /></view><text class="entry-name">阅读榜</text>
       </view>
       <view class="entry" bindtap="goPassport">
         <view class="entry-icon e-purple"><image class="entry-icon-img" src="/icons/ui/card.png" mode="aspectFit" /></view><text class="entry-name">阅读护照</text>
@@ -168,5 +168,5 @@
     </view>
   </view>
 
-  <view class="page-footer">DmkWords · 让孩子爱上英文阅读</view>
+  <view class="page-footer">DmkWords · 本店会员专属 · 借阅与到店服务工具</view>
 </scroll-view>

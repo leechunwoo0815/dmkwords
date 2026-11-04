@@ -75,10 +75,8 @@ Page({
     const ios = isIOS()
     this.setData({
       childName: decodeURIComponent(options.child_name || ''),
-      showPay: canPay && !ios,
-      payHint: canPay
-        ? (ios ? 'iOS 端不提供线上支付，可到店办理。' : '')
-        : '线上支付仅支持微信一键登录的家长：可在登录页选择「微信一键登录」，或到店办理。',
+      showPay: false,
+      payHint: '本店订单均为线下办理：支付、退款请到店联系馆员。',
     })
     this._refreshPayGate()
   },
@@ -96,9 +94,9 @@ Page({
       this.setData({
         showPay: enabled && canPay && !ios,
         payHint: !enabled
-          ? '当前为到店支付模式：可在门店办理，或咨询馆员。'
+          ? '本店订单均为线下办理：支付、退款请到店联系馆员。'
           : canPay
-            ? (ios ? 'iOS 端不提供线上支付，可到店办理。' : '')
+            ? (ios ? '本店订单为线下办理：支付、退款请到店联系馆员。' : '')
             : '线上支付仅支持微信一键登录的家长：可在登录页选择「微信一键登录」，或到店办理。',
       })
     } catch (e) { /* 取不到就保留首屏本地判据 */ }

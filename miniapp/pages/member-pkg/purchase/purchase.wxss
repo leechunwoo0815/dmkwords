@@ -80,38 +80,7 @@
   border-top: 3rpx solid var(--fg);
   z-index: 99;
 }
-/* WM12-A：每个方案一个「立即开通」（iOS 不渲染该按钮，走底部到店引导） */
-.plan-cta {
-  margin-top: 24rpx;
-  text-align: center;
-  padding: 20rpx 0;
-  border-radius: 999rpx;
-  background: var(--accent);
-  color: var(--surface);
-  font-size: 28rpx;
-  font-weight: 700;
-  border: 3rpx solid var(--fg);
-  box-shadow: var(--shadow-hard-sm);
-}
-.plan-cta-off {
-  background: var(--muted-light);
-  box-shadow: none;
-}
-/* WM12-C（审查 P2-10）：请求期间按钮置灰 + 不响应（双击不再刷出两个预支付单） */
-.plan-cta-busy {
-  opacity: 0.6;
-}
-/* WM12-C（审查 P0-3）：未绑微信的登录态 → 不出现支付入口，只给一键登录引导 */
-.login-hint {
-  margin-top: 16rpx;
-  padding: 20rpx 24rpx;
-  border-radius: 16rpx;
-  background: var(--muted-light);
-  color: var(--fg);
-  font-size: 24rpx;
-  line-height: 1.6;
-  border: 3rpx dashed var(--fg);
-}
+/* 2026-11-04：线上支付入口已移除（会员服务费到店缴纳），对应的 plan-cta / login-hint 样式一并删除 */
 .plan-reason {
   margin-top: 12rpx;
   font-size: 22rpx;

@@ -4,7 +4,7 @@
   <view class="vocab-hero">
     <image class="vh-icon" src="/icons/ui/book.png" mode="aspectFit" />
     <view class="vh-main">
-      <view class="vh-title">{{childName}} 的生词本</view>
+      <view class="vh-title">{{childName}} 的词句收藏</view>
       <view class="vh-sub">{{heroSub}}</view>
     </view>
     <view class="vh-count" wx:if="{{!loading && !loadError}}">
@@ -38,10 +38,10 @@
   <view wx:if="{{loading && !noChild && !loadError}}" class="loading">加载中…</view>
 
   <error-view wx:if="{{loadError}}" type="network" title="加载失败"
-    desc="生词本加载失败，请重试" bind:onRetry="onRetryLoad" />
+    desc="词句收藏加载失败，请重试" bind:onRetry="onRetryLoad" />
 
   <empty-state wx:if="{{!loading && !loadError && !words.length}}"
-    icon-name="book" title="还没有生词" desc="播放页下半屏查词会自动收录" />
+    icon-name="book" title="还没有收藏的词句" desc="播放页查词会自动收录" />
 
   <view class="word-list" wx:if="{{words.length}}">
     <view class="word-item" wx:for="{{words}}" wx:key="id" data-index="{{index}}"
@@ -59,7 +59,7 @@
         </view>
       </view>
     </view>
-    <view class="list-hint">长按词条可移出生词本 · 点词看闪卡释义</view>
+    <view class="list-hint">长按词条可移出收藏 · 点词看闪卡释义</view>
     <!-- P3（第一百一十六批）：分页加载态与到底提示（生词本只增不减，整表 setData 会卡帧） -->
     <view class="list-hint" wx:if="{{loadingMore}}">正在加载更多…</view>
     <view class="list-hint" wx:elif="{{hasMore}}">上滑加载更多（已显示 {{words.length}}/{{wordCount}} 词）</view>
@@ -86,7 +86,7 @@
       </view>
       <view class="fc-actions">
         <view class="fc-btn again" catchtap="onCloseCard">知道了</view>
-        <view class="fc-btn got" catchtap="onRemoveCard">移出生词本</view>
+        <view class="fc-btn got" catchtap="onRemoveCard">移出收藏</view>
       </view>
     </view>
   </view>

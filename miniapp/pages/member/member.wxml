@@ -50,10 +50,10 @@
   </view>
 
   <view wx:if="{{currentChild}}" class="section-card">
-    <view class="section-title sec-title">会员信息</view>
+    <view class="section-title sec-title">会员服务</view>
     <view class="member-info-row">
       <view class="mi-item">
-        <text class="mi-label">会员状态</text>
+        <text class="mi-label">服务状态</text>
         <text class="mi-value {{expireWarn ? 'warn' : ''}}">{{statusText}}</text>
       </view>
       <view class="mi-item" wx:if="{{expireLine}}">
@@ -72,7 +72,7 @@
       </view>
       <view class="func-item" bindtap="goAchievement">
         <image class="fi-icon" src="/icons/ui/trophy.png" mode="aspectFit" />
-        <text class="fi-label">等级勋章</text>
+        <text class="fi-label">阅读徽章</text>
       </view>
       <view class="func-item" bindtap="goPassport">
         <image class="fi-icon" src="/icons/ui/card.png" mode="aspectFit" />
@@ -80,19 +80,19 @@
       </view>
       <view class="func-item" bindtap="goReport">
         <image class="fi-icon" src="/icons/ui/report.png" mode="aspectFit" />
-        <text class="fi-label">周报月报</text>
+        <text class="fi-label">阅读小结</text>
       </view>
       <view class="func-item" bindtap="goLeaderboard">
         <image class="fi-icon" src="/icons/ui/chart.png" mode="aspectFit" />
-        <text class="fi-label">排行榜</text>
+        <text class="fi-label">阅读榜</text>
       </view>
       <view class="func-item" bindtap="goObservation">
         <image class="fi-icon" src="/icons/ui/clipboard.png" mode="aspectFit" />
-        <text class="fi-label">评估报告</text>
+        <text class="fi-label">阅读记录</text>
       </view>
       <view class="func-item" bindtap="goVocabulary">
         <image class="fi-icon" src="/icons/ui/book.png" mode="aspectFit" />
-        <text class="fi-label">生词本</text>
+        <text class="fi-label">词句收藏</text>
       </view>
     </view>
   </view>
@@ -118,7 +118,7 @@
       </view>
       <view class="func-item" bindtap="goPurchase">
         <image class="fi-icon" src="/icons/ui/crown.png" mode="aspectFit" />
-        <text class="fi-label">会员购买/续费</text>
+        <text class="fi-label">会员服务办理</text>
       </view>
       <view class="func-item" bindtap="goWithdraw">
         <image class="fi-icon" src="/icons/ui/door.png" mode="aspectFit" />

@@ -4,7 +4,7 @@ const { isIOS } = require('../../utils/platform');
 Component({
   properties: {
     amount: { type: Number, value: 0 },
-    buttonText: { type: String, value: '立即支付' },
+    buttonText: { type: String, value: '到店办理' },
     disabled: { type: Boolean, value: false },
   },
   data: {

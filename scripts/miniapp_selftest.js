@@ -170,6 +170,50 @@ const img = require(path.join(__dirname, '..', 'miniapp', 'utils', 'img.js'))
       readerWxml.indexOf('onSkip') === -1,
     readerWxml.length)
 
+  // 2026-11-04 审核合规（第一百六十三批）：会员专属 + 无线上支付入口 + 教育话术降噪。
+  const readMini = (rel) => fs.readFileSync(path.join(__dirname, '..', 'miniapp', rel), 'utf8')
+  const loginWxml = readMini('pages/login/login.wxml')
+  check('登录页声明「仅面向本店线下会员」',
+    loginWxml.indexOf('仅面向本店线下会员') !== -1, loginWxml.length)
+  const indexWxml = readMini('pages/index/index.wxml')
+  check('首页页脚为会员专属口径，且不含「英文阅读」',
+    indexWxml.indexOf('会员专属') !== -1 && indexWxml.indexOf('英文阅读') === -1,
+    indexWxml.length)
+  const memberWxml = readMini('pages/member/member.wxml')
+  check('会员入口改为「会员服务办理」，不再出现「会员购买/续费」',
+    memberWxml.indexOf('会员服务办理') !== -1 && memberWxml.indexOf('会员购买/续费') === -1,
+    memberWxml.length)
+  const purchaseWxml = readMini('pages/member-pkg/purchase/purchase.wxml')
+  check('会员服务页无线上支付入口（保留费用标准/到店缴纳）',
+    purchaseWxml.indexOf('在线支付') === -1 &&
+      purchaseWxml.indexOf('去支付') === -1 &&
+      purchaseWxml.indexOf('立即支付') === -1 &&
+      purchaseWxml.indexOf('到店缴纳') !== -1,
+    purchaseWxml.length)
+  const activityWxml = readMini('pages/activity-pkg/activity-detail/activity-detail.wxml')
+  check('活动费用标注「到店缴纳」',
+    activityWxml.indexOf('活动费（到店缴纳）') !== -1 &&
+      activityWxml.indexOf('报名（到店缴费）') !== -1,
+    activityWxml.length)
+  const quizResultWxml = readMini('pages/reading-pkg/quiz-result/quiz-result.wxml')
+  check('挑战结果不再用「答对 X/Y 题」',
+    quizResultWxml.indexOf('答对') === -1, quizResultWxml.length)
+  const obsWxml = readMini('pages/member-pkg/observation-report/observation-report.wxml')
+  check('评估报告改为「阅读记录」',
+    obsWxml.indexOf('评估报告') === -1 && obsWxml.indexOf('阅读记录') !== -1,
+    obsWxml.length)
+  const vocabJson = readMini('pages/reading-pkg/vocabulary/vocabulary.json')
+  check('生词本改为「词句收藏」', vocabJson.indexOf('词句收藏') !== -1, vocabJson.length)
+  const agreementWxml = readMini('pages/agreement/service-agreement/service-agreement.wxml')
+  check('服务协议写明会员专属 + 不提供线上支付',
+    agreementWxml.indexOf('仅面向本馆线下会员') !== -1 &&
+      agreementWxml.indexOf('不提供线上支付') !== -1,
+    agreementWxml.length)
+  const privacyWxml = readMini('pages/agreement/privacy-policy/privacy-policy.wxml')
+  check('隐私政策无占位文本，含儿童个人信息条款',
+    privacyWxml.indexOf('占位文本') === -1 && privacyWxml.indexOf('儿童个人信息') !== -1,
+    privacyWxml.length)
+
   // 结束：满格 + 结束态（主键变重听）
   lastAudio.duration = 178
   lastAudio.currentTime = 0

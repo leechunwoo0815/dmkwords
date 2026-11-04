@@ -172,7 +172,7 @@ Page({
     const item = this.data.words[Number(e.currentTarget.dataset.index)]
     if (!item) return
     wx.showActionSheet({
-      itemList: ['移出生词本'],
+      itemList: ['移出收藏'],
       success: (res) => {
         if (res.tapIndex === 0) this._doRemove(item.id, item.word)
       },
@@ -182,7 +182,7 @@ Page({
 
   async _doRemove(id, word) {
     const res = await wx.showModal({
-      title: '移出生词本', content: `把「${word}」移出生词本？之后再查还会自动收回来。`, confirmText: '移出',
+      title: '移出收藏', content: `把「${word}」移出收藏？之后再查还会自动收回来。`, confirmText: '移出',
     })
     if (!res.confirm) return
     try {

@@ -10,25 +10,33 @@ const api = require('../../../utils/api')
 const { isIOS } = require('../../../utils/platform')
 const session = require('../../../utils/session')
 
-const HINT_ONLINE = '线上支付仅为到店会员服务的付款方式；会员权益以到店核验为准（下单时服务端复核价格）。'
-const HINT_LOGIN = '线上支付仅支持微信一键登录的家长；当前登录方式不支持，可重新用微信一键登录或到店办理。'
-const HINT_STORE = '会员方案与价格以到店公示为准；iOS 端不提供在线支付。'
+// 2026-11-04 审核口径：小程序不提供在线支付，会员服务费一律到店缴纳。
+// 本页只展示"服务方案 + 费用标准 + 到店办理指引"，不出现购买/在线支付/开通/续费字样。
+const HINT_STORE = '本页仅展示会员服务方案与费用标准；请携孩子到店，由馆员核定后缴纳会员服务费。'
 
-// 方案卖点（文案固定，价格与可用性都来自服务端）
+// 方案名称与卖点（价格与可用性来自服务端；名称不沿用"会员费/开通/购买"口径）
+const PLAN_LABELS = {
+  observation_fee: '体验借阅服务',
+  formal_fee: '年度借阅服务',
+  first_activity_fee: '首场活动服务',
+  deposit: '图书借阅押金',
+}
+
 const PLAN_FEATURES = {
   observation_fee: [
-    '面向新入会孩子的适应期方案',
+    '面向新到店孩子的体验借阅服务',
     '到店借阅 + 随书配套音频与阅读小挑战',
-    '到期后可转正式会员（馆方核定）',
+    '到期后可到店办理年度借阅服务',
   ],
   formal_fee: [
     '全馆藏书借阅额度与预约',
     '等级/积分/榜单/护照完整成长体系',
     '馆内活动优先报名',
   ],
-  first_activity_fee: ['每个账号限购一次', '线上支付仅为付款方式，活动在馆内线下举行'],
-  deposit: ['借阅前需缴纳，退会时按规则退还', '押金扣减明细可在押金页查看'],
+  first_activity_fee: ['每个账号限一次', '活动在馆内线下举行，费用到店缴纳'],
+  deposit: ['借阅前需缴纳，退会时按规则到店退还', '押金扣减明细可在押金页查看'],
 }
+
 
 Page({
   data: {
@@ -69,26 +77,23 @@ Page({
     wx.showLoading({ title: '加载中' })
     try {
       const res = await api.getPaymentPlans(this.data.childId)
-      const enabled = !!res.payment_enabled
       const plans = (res.items || []).map((p) => ({
         order_type: p.order_type,
-        label: p.label,
-        // 正式会员用金色徽章（沿用改版前的视觉区分；类名由 JS 给出，wxss 里必须有定义——R16b）
+        label: PLAN_LABELS[p.order_type] || p.label,
+        // 年度借阅服务用金色徽章（沿用改版前的视觉区分；类名由 JS 给出，wxss 里必须有定义——R16b）
         badgeCls: p.order_type === 'formal_fee' ? 'plan-badge-gold' : '',
-        priceText: p.amount ? `￥${p.amount}` : '价格以到店公示为准',
+        // 2026-11-04 审核口径：保留费用标准（线下会员费照收），但明确"到店缴纳"，不出现"购买/在线支付"
+        priceText: p.amount ? `服务费 ￥${p.amount}（到店缴纳）` : '服务费以到店公示为准',
         available: !!p.available,
         reason: p.reason || '',
         features: PLAN_FEATURES[p.order_type] || [],
       }))
-      const canPay = !!res.can_pay_online // WM12-C：家长是否已绑微信（服务端判据）
       this.setData({
         plans,
-        paymentEnabled: enabled,
-        canPayOnline: canPay,
-        showPay: enabled && canPay && !this.data.isIOS,
-        payBlocked: !enabled ? 'off' : (!canPay ? 'login' : (this.data.isIOS ? 'ios' : '')),
-        headHint: enabled && canPay && !this.data.isIOS ? HINT_ONLINE
-          : (!enabled || !canPay ? HINT_LOGIN : HINT_STORE),
+        // 页面不再提供任何线上支付入口；保留字段供旧代码路径引用，但恒为 false。
+        showPay: false,
+        payBlocked: 'off',
+        headHint: HINT_STORE,
         loading: false,
         loadError: '',
       })

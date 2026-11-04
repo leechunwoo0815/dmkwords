@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "生词本",
+  "navigationBarTitleText": "词句收藏",
   "usingComponents": {
     "error-view": "/components/error-view/error-view"
   }

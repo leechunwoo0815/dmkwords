@@ -35,7 +35,7 @@
     <view wx:if="{{dep.unpaid_balance * 1 > 0}}" class="dp-balance">未结清赔偿：￥{{dep.unpaid_balance}}</view>
     <button class="dp-btn {{(supplementDisabled || dep.status === 'unpaid') ? 'disabled' : ''}}"
       disabled="{{supplementDisabled || dep.status === 'unpaid'}}" bindtap="onSupplement">
-      {{supplementHint || (dep.status === 'unpaid' ? '未缴纳，请到店办理' : (dep.need_supplement ? '申请补缴' : '已缴足'))}}
+      {{supplementHint || (dep.status === 'unpaid' ? '未缴纳，请到店办理' : (dep.need_supplement ? '申请补缴（到店缴费）' : '已缴足'))}}
     </button>
     <view wx:if="{{supplementHint}}" class="dp-hint">{{supplementHint}}</view>
   </view>
