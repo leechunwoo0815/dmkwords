@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { App as AntdApp, Button, Input, Select, Space, Table, Tag, Typography } from "antd";
+import ListCard from "../components/ListCard";
+import PageHead from "../components/PageHead";
 import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
 
@@ -85,8 +87,16 @@ export default function Reservations() {
 
   return (
     <div>
-      <Space style={{ marginBottom: 12 }}>
-        <Input.Search
+      <PageHead
+        title="预约管理"
+        desc={`家长在小程序发起预约后，副本锁定 ${cfgNum(configs, "reservation_hours", 72)} 小时；到店取书时在此核销转借阅。`}
+      />
+      <ListCard
+        title="预约单"
+        count={`共 ${items.length} 条`}
+        filter={
+          <Space>
+            <Input.Search
           placeholder="搜孩子名 / 家长名 / 手机号" allowClear style={{ width: 240 }}
           value={kwInput}
           onChange={(e) => setKwInput(e.target.value)}
@@ -99,10 +109,9 @@ export default function Reservations() {
           options={[{ value: "", label: "全部" },
             ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))]}
         />
-        <Typography.Text type="secondary">
-          家长在小程序发起预约后，副本锁定 {cfgNum(configs, "reservation_hours", 72)} 小时；到店取书时在此核销转借阅。
-        </Typography.Text>
-      </Space>
+          </Space>
+        }
+      >
       {listError && (
         <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
           {listError} · 本次刷新失败：列表可能不是最新的（不代表没有预约单）——请重试
@@ -143,7 +152,8 @@ export default function Reservations() {
         ]}
        scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
-      <PaintPagination current={page} pageSize={pageSize} total={items.length} onChange={onPageChange} listLimit={listLimit} />
+        <PaintPagination current={page} pageSize={pageSize} total={items.length} onChange={onPageChange} listLimit={listLimit} />
+      </ListCard>
     </div>
   );
 }

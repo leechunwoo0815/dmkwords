@@ -66,7 +66,8 @@ import {
 import { PAY_METHOD_OPTIONS, payMethodLabel } from "../constants/pay";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
-import PageTitle from "../components/PageTitle";
+import ListCard from "../components/ListCard";
+import PageHead from "../components/PageHead";
 
 const MEMBER_LABEL: Record<string, string> = {
   none: "未入会", observation: "观察期", pending_evaluation: "待评估",
@@ -296,7 +297,7 @@ export default function MemberManage() {
           <div style={{ marginBottom: 8 }}>
             {o.order_no} · ￥{Number(o.amount).toLocaleString()}（仅超管；{cfgNum(configs, "first_activity_fee", 99)} 元资格随退款恢复）
           </div>
-          <div style={{ marginBottom: 8, color: "#b26a00" }}>
+          <div style={{ marginBottom: 8, color: "var(--color-warning)" }}>
             这里只**发起申请**，钱不会立即退出——需再到「退款中心」审核通过并执行。
           </div>
           <Input.TextArea rows={2} onChange={(e) => { remarkInput = e.target.value; }} placeholder="退款说明（留痕）" />
@@ -459,14 +460,10 @@ export default function MemberManage() {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <PageTitle>会员管理</PageTitle>
-      {/* P2-55：配置没取到时订单文案里的金额是**默认值**——如实提示（调价后不一致会误导收银） */}
-      {configsFailed && (
-        <Typography.Text type="warning" style={{ display: "block", marginBottom: 12 }}>
-          价格配置未取到：订单金额文案按默认值展示，可能与实际收费不一致——请刷新或到「系统配置」确认。
-        </Typography.Text>
-      )}
+      <PageHead
+        title="会员管理"
+        desc="家长建档 → 添加孩子 → 创建订单 → 确认收款（人工收款路径；微信线上支付在后期模块接入）。"
+        extra={
         <Space>
           <Button onClick={() => {
             childForm.resetFields();
@@ -484,11 +481,18 @@ export default function MemberManage() {
             新建家长账号
           </Button>
         </Space>
-      </div>
-      <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
-        家长建档 → 添加孩子 → 创建订单 → 确认收款（人工收款路径；微信线上支付在后期模块接入）。
-      </Typography.Paragraph>
+        }
+      />
+      {/* P2-55：配置没取到时订单文案里的金额是**默认值**——如实提示（调价后不一致会误导收银） */}
+      {configsFailed && (
+        <Typography.Text type="warning" style={{ display: "block", marginBottom: 12 }}>
+          价格配置未取到：订单金额文案按默认值展示，可能与实际收费不一致——请刷新或到「系统配置」确认。
+        </Typography.Text>
+      )}
 
+      <ListCard
+        title="会员台账"
+        tabs={
       <Tabs activeKey={tab} onChange={changeTab} items={[
         { key: "children", label: `孩子档案（${childTotal}）` },
         { key: "parents", label: `家长（${parentTotal}）` },
@@ -503,7 +507,7 @@ export default function MemberManage() {
                 // W6-D4：未取到 = 未知，显式写「—」（不许 0 —— 那是"确认队列空"的错误结论）
                 <Typography.Text type="warning">—（未取到）</Typography.Text>
               ) : orderCounts.pending_manual_confirm > 0 ? (
-                <span style={{ background: "#ff4d4f", color: "#fff", borderRadius: 10, padding: "0 6px" }}>
+                <span style={{ background: "var(--color-danger)", color: "var(--color-text-inverse)", borderRadius: 10, padding: "0 6px" }}>
                   {orderCounts.pending_manual_confirm}
                 </span>
               ) : (
@@ -514,6 +518,8 @@ export default function MemberManage() {
           ),
         },
       ]} />
+        }
+      >
 
       {tab === "children" && (
         <>
@@ -563,30 +569,40 @@ export default function MemberManage() {
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>{r.parent_phone}</Typography.Text>
                 </div>
               ) },
-              { title: "性别", dataIndex: "gender", width: 70, render: (g) => (g === 1 ? "男" : g === 2 ? "女" : "—") },
-              { title: "年级", dataIndex: "grade", width: 90, render: (v) => v || "—" },
-              // F4：AR 值列（BookManage 风格；空显 —）
-              { title: "AR", dataIndex: "ar_level", width: 70, render: (v) => (v ? <Typography.Text code>{v}</Typography.Text> : "—") },
+              { title: "性别", dataIndex: "gender", width: 64, render: (g) => (g === 1 ? "男" : g === 2 ? "女" : "—") },
+              // 年级 / AR 已并入「孩子」列副行（同一份数据展示两次＝浪费横向空间）
               { title: "会员状态", dataIndex: "member_status", width: 110, render: (s: string) => (
                 <Tag color={MEMBER_COLOR[s]}>{MEMBER_LABEL[s] ?? s}</Tag>
               ) },
-              { title: "会员到期", dataIndex: "member_expire", width: 150, render: (v) => {
-                if (!v) return "—";
-                const expireMs = new Date(String(v).replace(/-/g, "/")).getTime();
-                const days = Math.ceil((expireMs - Date.now()) / 86400000);
-                if (days < 0) return (
-                  <span style={{ color: "#cf1322", fontWeight: 600 }}>{v} · 已过期 {-days} 天</span>
-                );
-                const soon = days <= 7;
-                return (
-                  <span style={soon ? { color: "#d46b08", fontWeight: 600 } : undefined}>
-                    {v} · 剩 {days} 天
-                  </span>
-                );
-              } },
-              { title: "会员开始", dataIndex: "member_start", width: 120, render: (v) => v ?? "—" },
               {
-                title: "操作", key: "op", width: 280,
+                title: "会员期限", dataIndex: "member_expire", width: 176,
+                render: (v, r) => {
+                  // 开始/到期合到一列：上行到期（逾期红、7 天内黄），下行开始（弱化）
+                  const start = r.member_start ? <div className="cell-sub">起 {r.member_start}</div> : null;
+                  if (!v) return <>{start ?? "—"}</>;
+                  const expireMs = new Date(String(v).replace(/-/g, "/")).getTime();
+                  const days = Math.ceil((expireMs - Date.now()) / 86400000);
+                  if (days < 0) {
+                    return (
+                      <>
+                        <span style={{ color: "var(--color-danger)", fontWeight: 600 }}>{v} · 已过期 {-days} 天</span>
+                        {start}
+                      </>
+                    );
+                  }
+                  const soon = days <= 7;
+                  return (
+                    <>
+                      <span style={soon ? { color: "var(--color-warning)", fontWeight: 600 } : undefined}>
+                        {v} · 剩 {days} 天
+                      </span>
+                      {start}
+                    </>
+                  );
+                },
+              },
+              {
+                title: "操作", key: "op", width: 330, fixed: "right" as const,
                 render: (_, r) => (
                   <Space size={0} wrap>
                     <Button type="link" size="small" onClick={() => {
@@ -710,7 +726,7 @@ export default function MemberManage() {
               { title: "收款方式", dataIndex: "pay_method", width: 100, render: (v) => payMethodLabel(v) },
               { title: "创建时间", dataIndex: "create_time", key: "created_at", width: 170, sorter: true, render: (v) => String(v ?? "").slice(0, 19).replace("T", " ") },
               {
-                title: "操作", key: "op", width: 150,
+                title: "操作", key: "op", width: 150, fixed: "right" as const,
                 render: (_, r) => (
                   <Space>
                     {r.status === "pending_manual_confirm" && (
@@ -770,7 +786,7 @@ export default function MemberManage() {
               { title: "名下孩子", dataIndex: "children_count", width: 90 },
               { title: "创建时间", dataIndex: "create_time", width: 170, render: (v) => String(v ?? "").slice(0, 19).replace("T", " ") },
               {
-                title: "操作", key: "op", width: 240,
+                title: "操作", key: "op", width: 240, fixed: "right" as const,
                 render: (_, r) => (
                   <Space>
                     {/* 2026-11-03：家长有订单时只锁"改资料/删家长"，不锁"加孩子"—— */}
@@ -817,6 +833,8 @@ export default function MemberManage() {
       )}
 
       {/* 新建家长 */}
+      </ListCard>
+
       <Modal
         title="新建家长账号" open={parentOpen} okText="创建" cancelText="取消" destroyOnHidden
         onOk={async () => {

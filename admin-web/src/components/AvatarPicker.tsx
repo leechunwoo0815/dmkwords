@@ -38,8 +38,8 @@ export default function AvatarPicker({ value, onChange, disabled }: Props) {
               padding: 0,
               borderRadius: "50%",
               cursor: disabled ? "not-allowed" : "pointer",
-              background: "#fff",
-              border: active ? "3px solid #F2935B" : "2px solid rgba(90,74,58,.18)",
+              background: "var(--color-bg-container)",
+              border: active ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
               lineHeight: 0,
             }}
           >

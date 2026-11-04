@@ -4,6 +4,8 @@ import {
   PlusOutlined, UploadOutlined,
 } from "@ant-design/icons";
 import PaintEmpty from "../components/PaintEmpty";
+import ListCard from "../components/ListCard";
+import PageHead from "../components/PageHead";
 import PaintPagination from "../components/PaintPagination";
 import PreviewImage from "../components/PreviewImage";
 // 活动管理（WM9：发布/取消/报名/签到/退款审核）
@@ -50,6 +52,13 @@ const STATUS_COLOR: Record<string, string> = {
   pending_payment: "orange", enrolled: "blue", checked_in: "green",
   cancelled: "default", refund_pending: "red", refunded: "default",
 };
+
+
+/** 列表里的时间：单行紧凑显示（MM-DD HH:mm），完整时间进 tooltip——列窄也不会断成两行。 */
+function TimeText({ value }: { value: string }) {
+  const full = value.replace("T", " ").slice(0, 16);
+  return <span title={full}>{full.slice(5)}</span>;
+}
 
 export default function ActivityManage() {
   const { message, modal } = AntdApp.useApp();
@@ -250,35 +259,47 @@ export default function ActivityManage() {
 
   return (
     <div>
-      <Space style={{ marginBottom: 12 }} wrap>
-        <Button
-          type="primary"
-          onClick={() => {
-            // RA（插修 17）：编辑过一次后 editTarget/表单残留→弹窗还是编辑模式；
-            // 置 null 回创建模式（title/onOk 三元切换）+表单回 initialValues
-            form.resetFields();
-            setEditTarget(null);
-            setEditCover(null);
-            setCreateOpen(true);
-          }}
-        >
-          发布活动
-        </Button>
-        {/* T3：活动列表三件套——搜索+类型/状态筛选（B7 预约先例同款） */}
-        <Input.Search
-          placeholder="按活动标题搜索" style={{ width: 220 }} allowClear
-          onSearch={(v) => { setKeyword(v); activityPg.setPage(1); }}
-        />
-        {/* R9：显式「全部」选项（A4/B7 口径），替 allowClear */}
-        <Select
-          style={{ width: 140 }} value={filterType}
-          onChange={(v) => { setFilterType(v); activityPg.setPage(1); }} options={TYPE_FILTER_OPTIONS}
-        />
-        <Select
-          style={{ width: 120 }} value={filterStatus}
-          onChange={(v) => { setFilterStatus(v); activityPg.setPage(1); }} options={STATUS_FILTER_OPTIONS}
-        />
-      </Space>
+      <PageHead
+        title="线下活动"
+        desc="发布活动、确认报名、扫码签到与批量退款；报名默认仅会员，费用到店缴纳。"
+        extra={
+          <Button
+            type="primary"
+            onClick={() => {
+              // RA（插修 17）：编辑过一次后 editTarget/表单残留→弹窗还是编辑模式；
+              // 置 null 回创建模式（title/onOk 三元切换）+表单回 initialValues
+              form.resetFields();
+              setEditTarget(null);
+              setEditCover(null);
+              setCreateOpen(true);
+            }}
+          >
+            发布活动
+          </Button>
+        }
+      />
+      <ListCard
+        title="活动与报名"
+        count={`共 ${activities.length} 场`}
+        filter={
+          <Space wrap>
+            {/* T3：活动列表三件套——搜索+类型/状态筛选（B7 预约先例同款） */}
+            <Input.Search
+              placeholder="按活动标题搜索" style={{ width: 220 }} allowClear
+              onSearch={(v) => { setKeyword(v); activityPg.setPage(1); }}
+            />
+            {/* R9：显式「全部」选项（A4/B7 口径），替 allowClear */}
+            <Select
+              style={{ width: 140 }} value={filterType}
+              onChange={(v) => { setFilterType(v); activityPg.setPage(1); }} options={TYPE_FILTER_OPTIONS}
+            />
+            <Select
+              style={{ width: 120 }} value={filterStatus}
+              onChange={(v) => { setFilterStatus(v); activityPg.setPage(1); }} options={STATUS_FILTER_OPTIONS}
+            />
+          </Space>
+        }
+      >
 
       <Tabs
         items={[
@@ -297,19 +318,19 @@ export default function ActivityManage() {
                   pagination={false}
                   columns={[
                     {
-                      title: "活动", dataIndex: "title", width: 200,
+                      title: "活动", dataIndex: "title", width: 150,
                       // 用户需求：点活动名称看只读详情（领导看封面/内容/人数），不弹编辑
                       render: (t: string, r) => (
                         <Typography.Link onClick={() => openDetail(r)}>{t}</Typography.Link>
                       ),
                     },
-                    { title: "类型", dataIndex: "activity_type", width: 110, render: (t) => TYPE_OPTIONS.find((o) => o.value === t)?.label ?? t },
-                    { title: "开始时间", dataIndex: "start_at", width: 170, render: (v) => v.replace("T", " ").slice(0, 16) },
-                    { title: "结束时间", dataIndex: "end_at", width: 170, render: (v) => (v ? v.replace("T", " ").slice(0, 16) : "—") },
-                    { title: "地点", dataIndex: "location", width: 130 },
-                    { title: "费用", dataIndex: "fee_display", width: 90 },
+                    { title: "类型", dataIndex: "activity_type", width: 84, render: (t) => TYPE_OPTIONS.find((o) => o.value === t)?.label ?? t },
+                    { title: "开始时间", dataIndex: "start_at", width: 126, render: (v) => <TimeText value={v} /> },
+                    { title: "结束时间", dataIndex: "end_at", width: 126, render: (v) => (v ? <TimeText value={v} /> : "—") },
+                    { title: "地点", dataIndex: "location", width: 126, ellipsis: true },
+                    { title: "费用", dataIndex: "fee_display", width: 82 },
                     {
-                      title: "名额", key: "quota", width: 110, render: (_, r) => (
+                      title: "名额", key: "quota", width: 74, render: (_, r) => (
                         <span>
                           {r.quota_used}/{r.max_quota}
                           {r.full ? <Tag color="red" style={{ marginLeft: 6 }}>满</Tag> : null}
@@ -317,14 +338,14 @@ export default function ActivityManage() {
                       ),
                     },
                     {
-                      title: "状态", dataIndex: "status", width: 90, render: (s) => (
+                      title: "状态", dataIndex: "status", width: 84, render: (s) => (
                         <Tag color={s === "published" ? "green" : s === "cancelled" ? "default" : "blue"}>
                           {s === "published" ? "报名中" : s === "cancelled" ? "已取消" : "已结束"}
                         </Tag>
                       ),
                     },
                     {
-                      title: "操作", key: "op", width: 180, render: (_, r) => (
+                      title: "操作", key: "op", width: 180, fixed: "right" as const, render: (_, r) => (
                         <Space>
                           <Button type="link" size="small" onClick={() => openEdit(r)}>编辑</Button>
                           <Button type="link" size="small" onClick={() => openEnrollments(r)}>报名名单</Button>
@@ -344,6 +365,7 @@ export default function ActivityManage() {
 
           ]}
         />
+      </ListCard>
 
       <Drawer
         title={enrollActivity ? `《${enrollActivity.title}》报名名单` : ""}
@@ -402,14 +424,14 @@ export default function ActivityManage() {
                 width="100%"
                 height={200}
                 radius={12}
-                style={{ marginBottom: 12, border: "2px solid var(--paint-border)" }}
+                style={{ marginBottom: 12, border: "2px solid var(--color-border)" }}
               />
             ) : (
               <div style={{
                 width: "100%", height: 90, display: "flex", alignItems: "center",
-                justifyContent: "center", marginBottom: 12, color: "var(--paint-ink-light)",
-                background: "var(--paint-paper-dim)", borderRadius: "var(--paint-radius)",
-                border: "2px dashed var(--paint-border)",
+                justifyContent: "center", marginBottom: 12, color: "var(--color-text-secondary)",
+                background: "var(--color-bg-subtle)", borderRadius: "var(--radius-base)",
+                border: "2px dashed var(--color-border)",
               }}>
                 未上传封面
               </div>
@@ -449,7 +471,7 @@ export default function ActivityManage() {
               <Descriptions.Item label="待收款">{detailView.pending_count} 人</Descriptions.Item>
             </Descriptions>
 
-            <Typography.Title level={5} style={{ fontFamily: "var(--font-display)" }}>活动介绍</Typography.Title>
+            <Typography.Title level={5} style={{ fontFamily: "var(--font-heading)" }}>活动介绍</Typography.Title>
             <Typography.Paragraph style={{ whiteSpace: "pre-wrap" }}>
               {detailView.description || "（未填写活动介绍）"}
             </Typography.Paragraph>

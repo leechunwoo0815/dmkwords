@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { App as AntdApp, Select, Space, Table, Tag, Typography } from "antd";
-import PageTitle from "../components/PageTitle";
+import { App as AntdApp, Select, Table, Tag, Typography } from "antd";
+import ListCard from "../components/ListCard";
+import PageHead from "../components/PageHead";
 
 import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
@@ -220,11 +221,14 @@ export default function AuditLogPage() {
 
   return (
     <>
-      <PageTitle>审计日志</PageTitle>
-      <Typography.Paragraph type="secondary">
-        敏感操作（登录 / 配置变更 / 资金操作 / 人工放行）的留痕记录；只读不可篡改。
-      </Typography.Paragraph>
-      <Space style={{ marginBottom: 16 }}>
+      <PageHead
+        title="审计日志"
+        desc="敏感操作（登录 / 配置变更 / 资金操作 / 人工放行）的留痕记录；只读不可篡改。"
+      />
+      <ListCard
+        title="操作记录"
+        count={`共 ${total} 条`}
+        filter={
         <Select
           placeholder="按动作筛选"
           allowClear
@@ -236,7 +240,8 @@ export default function AuditLogPage() {
           }}
           options={Object.entries(ACTION_LABEL).map(([value, label]) => ({ value, label }))}
         />
-      </Space>
+        }
+      >
       {listError && (
         <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
           {listError} · 本次刷新失败：列表可能不是最新的（不代表这段时间没有操作记录）——请重试
@@ -283,7 +288,8 @@ export default function AuditLogPage() {
         ]}
        scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
-      <PaintPagination current={page} pageSize={pageSize} total={total} onChange={onPageChange} />
+        <PaintPagination current={page} pageSize={pageSize} total={total} onChange={onPageChange} />
+      </ListCard>
     </>
   );
 }

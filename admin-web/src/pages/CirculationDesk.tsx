@@ -1,6 +1,6 @@
 import PaintEmpty from "../components/PaintEmpty";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
-import PageTitle from "../components/PageTitle";
+import PageHead from "../components/PageHead";
 import ScanInput, { type ScanHandle } from "../components/ScanInput";
 import BorrowRecordPanel from "../components/BorrowRecordPanel";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -317,7 +317,10 @@ export default function CirculationDesk() {
     <>
       {/* 标题：科幻风样稿（2026-09-21 用户要求"改字体+底色框，先改一页看看"）。
           留白口径同会员管理：Title margin:0（AntD 默认 margin-top 1.2em 是顶上一大片白的真凶）。 */}
-      <PageTitle>借阅操作台</PageTitle>
+      <PageHead
+        title="借阅操作台"
+        desc="扫会员码 → 扫图书 ISBN，系统自动判断借出 / 归还 / 预约核销；异常可人工放行留痕。"
+      />
       <Tabs
         activeKey={tab}
         onChange={setTab}
@@ -336,7 +339,7 @@ export default function CirculationDesk() {
       {/* 扫码区：进页面焦点自动落在第一个框，识别成功后自动交棒给书码框（2026-09-21 C 批） */}
       <Card
         size="small"
-        style={{ marginBottom: 16, borderColor: card ? "var(--paint-secondary)" : undefined }}
+        style={{ marginBottom: 16, borderColor: card ? "var(--color-success)" : undefined }}
       >
         <Space direction="vertical" size={10} style={{ width: "100%" }}>
           <Space wrap>
@@ -456,7 +459,7 @@ export default function CirculationDesk() {
         <>
           {/* 孩子卡片 */}
           <Card
-            size="small" style={{ marginBottom: 16, border: card.overdue_count > 0 ? "1px solid var(--paint-danger)" : undefined }}
+            size="small" style={{ marginBottom: 16, border: card.overdue_count > 0 ? "1px solid var(--color-danger)" : undefined }}
             title={
               <Space>
                 <Typography.Text strong style={{ fontSize: 16 }}>{card.name}</Typography.Text>
@@ -467,11 +470,11 @@ export default function CirculationDesk() {
             extra={<Button size="small" onClick={() => setCurrentCard(null)}>关闭</Button>}
           >
             <Row gutter={16}>
-              <Col span={4}><Card size="small"><Typography.Text type="secondary">在借</Typography.Text><div style={{ fontSize: 22, fontWeight: 700 }}>{card.active_borrows}</div></Card></Col>
-              <Col span={4}><Card size="small"><Typography.Text type="secondary">其中逾期</Typography.Text><div style={{ fontSize: 22, fontWeight: 700, color: card.overdue_count > 0 ? "var(--paint-danger)" : undefined }}>{card.overdue_count}</div></Card></Col>
-              <Col span={4}><Card size="small"><Typography.Text type="secondary">可借</Typography.Text><div style={{ fontSize: 22, fontWeight: 700, color: card.borrow_block ? "var(--paint-ink-light)" : "var(--paint-secondary)" }}>{card.available_quota}</div></Card></Col>
+              <Col span={4}><Card size="small"><Typography.Text type="secondary">在借</Typography.Text><div style={{ fontSize: 22, fontWeight: 600 }}>{card.active_borrows}</div></Card></Col>
+              <Col span={4}><Card size="small"><Typography.Text type="secondary">其中逾期</Typography.Text><div style={{ fontSize: 22, fontWeight: 600, color: card.overdue_count > 0 ? "var(--color-danger)" : undefined }}>{card.overdue_count}</div></Card></Col>
+              <Col span={4}><Card size="small"><Typography.Text type="secondary">可借</Typography.Text><div style={{ fontSize: 22, fontWeight: 600, color: card.borrow_block ? "var(--color-text-secondary)" : "var(--color-success)" }}>{card.available_quota}</div></Card></Col>
               {/* 2026-11-03：预约不占可借额度，但必须显性化，否则"新用户可借 29"像算错 */}
-              <Col span={4}><Card size="small"><Typography.Text type="secondary">预约中</Typography.Text><div style={{ fontSize: 22, fontWeight: 700 }}>{card.reservation_count}</div></Card></Col>
+              <Col span={4}><Card size="small"><Typography.Text type="secondary">预约中</Typography.Text><div style={{ fontSize: 22, fontWeight: 600 }}>{card.reservation_count}</div></Card></Col>
               <Col span={4}><Card size="small"><Typography.Text type="secondary">押金</Typography.Text><div style={{ marginTop: 6 }}>{card.deposit_status === "paid" ? <Tag color="green">已缴 ￥{Number(card.deposit_available).toLocaleString()}</Tag> : <Tag color="red">{card.deposit_status === "unpaid" ? "未缴" : "异常"}</Tag>}</div></Card></Col>
             </Row>
             {/* 2026-09-21 用户反馈：未入会竟然显示"可借 30 本"——额度是数字，资格才是能不能借。
@@ -574,7 +577,7 @@ export default function CirculationDesk() {
       </Modal>
 
       {/* 逾期名单 */}
-      <Typography.Title level={5} style={{ fontFamily: "var(--font-display)", marginTop: 24 }}>
+      <Typography.Title level={5} style={{ fontFamily: "var(--font-heading)", marginTop: 24 }}>
         逾期名单（{overdueError ? "取数失败" : overdue.length}
         {!overdueError && overdueTruncated ? "，已达上限，可能还有更多" : ""}）
       </Typography.Title>

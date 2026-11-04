@@ -1,4 +1,5 @@
 import PaintEmpty from "../components/PaintEmpty";
+import TechIcon from "../components/TechIcon";
 import PaintLoading from "../components/PaintLoading";
 import PreviewImage from "../components/PreviewImage";
 import { useEffect, useRef, useState } from "react";
@@ -169,7 +170,7 @@ export default function BookDetail() {
     if (bookError) {
       return (
         <Card>
-          <Typography.Title level={5} style={{ fontFamily: "var(--font-display)" }}>
+          <Typography.Title level={5} style={{ fontFamily: "var(--font-heading)" }}>
             图书详情加载失败
           </Typography.Title>
           <Typography.Text type="warning">{bookError}</Typography.Text>
@@ -245,32 +246,34 @@ export default function BookDetail() {
 
   return (
     <>
-      <Space style={{ marginBottom: 12 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate("/books")}>返回</Button>
-        {/* 书名是**内容**不是页面名——不进标题框（2026-09-21 用户反馈一：「太大了，也很丑」；
-            反馈二：「字体可以用刚才那个，原来的字体看英文很难受，歪歪扭扭的」→ 书名改用等宽 --font-mono）。
-            等宽字 + 字距 3px 的标签框适合短页面名，长英文标题会被撑成一个大黑框）。
-            留白口径仍与全站一致：margin 0。 */}
-        <Typography.Title level={4} style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 20 }}>
-          {book.title}
-        </Typography.Title>
-        {book.status === 1 ? <Tag color="green">上架</Tag> : <Tag>下架</Tag>}
-        {/* D1：下架态展示缺失清单，指引馆员完善 */}
-        {book.status === 0 && (book.missing?.length ?? 0) > 0 && (
-          <Tag color="orange">待完善：{(book.missing ?? []).join("、")}</Tag>
-        )}
-        <Button onClick={openEdit}>编辑信息</Button>
-      </Space>
-
-      <Card size="small" style={{ marginBottom: 16 }}>
-        <Space size="large" wrap>
-          <span>作者：<Typography.Text strong>{book.author || "—"}</Typography.Text></span>
-          <span>ISBN/编号：<Typography.Text code>{book.isbn ?? book.internal_code}</Typography.Text></span>
-          <span>总词数：<Typography.Text strong>{book.word_count.toLocaleString()}</Typography.Text></span>
-          <span>AR 值：{book.ar_level ?? <Tag color="orange">待配置</Tag>}</span>
-          <span>副本：{copiesError ? "—（未加载）" : `${copies.length} 本`}</span>
+      {/* 详情页头：返回 + 书名（内容，不用页面标题框）+ 状态 + 关键属性一行摘要 + 主操作 */}
+      <div className="page-head">
+        <div className="page-head-main">
+          <div className="detail-title-row">
+            <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate("/books")} title="返回图书列表">
+              返回
+            </Button>
+            <span className="page-head-icon" aria-hidden>
+              <TechIcon name="book" size={20} />
+            </span>
+            <h2 className="detail-title">{book.title}</h2>
+            {book.status === 1 ? <Tag color="green">上架</Tag> : <Tag>下架</Tag>}
+            {/* D1：下架态展示缺失清单，指引馆员完善 */}
+            {book.status === 0 && (book.missing?.length ?? 0) > 0 && (
+              <Tag color="orange">待完善：{(book.missing ?? []).join("、")}</Tag>
+            )}
+          </div>
+          <div className="page-head-desc">
+            作者 {book.author || "—"} · ISBN/编号{" "}
+            <Typography.Text code>{book.isbn ?? book.internal_code}</Typography.Text> · 总词数{" "}
+            {book.word_count.toLocaleString()} · AR {book.ar_level ?? "待配置"} · 副本{" "}
+            {copiesError ? "—（未加载）" : `${copies.length} 本`}
+          </div>
+        </div>
+        <Space>
+          <Button onClick={openEdit}>编辑信息</Button>
         </Space>
-      </Card>
+      </div>
 
       {/* 封面与音频 */}
       <Card title="封面与音频" size="small" style={{ marginBottom: 16 }}>

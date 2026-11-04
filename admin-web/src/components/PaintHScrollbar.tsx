@@ -145,10 +145,9 @@ export const PaintHScrollbar: React.FC<PaintHScrollbarProps> = ({ target, auto, 
       style={{
         width: "100%",
         display: visible ? "block" : "none",
-        height: 24,
-        background: "var(--paint-ink-light)",
-        border: "2px solid var(--paint-ink)",
-        borderRadius: 10,
+        // 企业风：细轨道 + 中性滑块（原先是深墨粗描边 + 深灰轨道，在 Windows 上像一条黑杠）
+        height: 12,
+        borderRadius: 6,
         marginTop: 8,
         position: "relative",
         cursor: "pointer",
@@ -157,15 +156,14 @@ export const PaintHScrollbar: React.FC<PaintHScrollbarProps> = ({ target, auto, 
     >
       <div
         ref={thumbRef}
+        className="paint-hscrollbar-thumb"
         style={{
           position: "absolute",
           left: thumbLeft,
           width: thumbWidth,
-          height: 16,
-          top: 2,
-          background: "var(--paint-paper)",
-          border: "1px solid var(--paint-ink)",
-          borderRadius: 8,
+          height: 12,
+          top: 0,
+          borderRadius: 6,
           cursor: "grab",
         }}
       />

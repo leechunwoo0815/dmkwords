@@ -10,7 +10,8 @@ import {
   apiCreateStaff, apiListStaff, apiResetStaffPassword, apiSetStaffStatus, apiUpdateStaff,
   type AdminUser,
 } from "../api/admin";
-import PageTitle from "../components/PageTitle";
+import ListCard from "../components/ListCard";
+import PageHead from "../components/PageHead";
 
 const ROLE_LABEL: Record<string, string> = { superadmin: "超级管理员", staff: "运营专员" };
 
@@ -89,17 +90,14 @@ export default function Staff() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <PageTitle>员工管理</PageTitle>
-        <Space>
-          <Button type="primary" onClick={() => setCreateOpen(true)}>新建员工</Button>
-        </Space>
-      </div>
-      <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
-        员工=运营专员（借还/图书/活动/会员办理）；角色变更与停用仅超管可操作，全部操作留审计。
-      </Typography.Paragraph>
+      <PageHead
+        title="员工管理"
+        desc="员工 = 运营专员（借还 / 图书 / 活动 / 会员办理）；角色变更与停用仅超管可操作，全部操作留审计。"
+        extra={<Button type="primary" onClick={() => setCreateOpen(true)}>新建员工</Button>}
+      />
+      <ListCard title="员工账号" count={`共 ${rows.length} 个`}>
       {listError && (
-        <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+        <Typography.Text type="warning" style={{ display: "block", margin: "10px 14px" }}>
           {listError} · 本次刷新失败：列表可能不是最新的（不代表没有员工账号）——请重试
           <Typography.Link onClick={load} style={{ marginLeft: 8 }}>重试</Typography.Link>
         </Typography.Text>
@@ -115,7 +113,7 @@ export default function Staff() {
             render: (s: number) => (s === 1 ? <Tag color="green">启用</Tag> : <Tag color="red">禁用</Tag>),
           },
           {
-            title: "操作", key: "op", width: 320, render: (_, r) => (
+            title: "操作", key: "op", width: 320, fixed: "right" as const, render: (_, r) => (
               <Space>
                 <Button size="small" onClick={() => { setEditing(r); editForm.setFieldsValue({ display_name: r.display_name, role: r.role }); }}>编辑</Button>
                 <Button size="small" onClick={() => setResetTarget(r)}>重置密码</Button>
@@ -136,6 +134,7 @@ export default function Staff() {
         ]}
        scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
+      </ListCard>
 
       <Modal title="新建员工" open={createOpen} okText="创建" cancelText="取消"
         onOk={doCreate} onCancel={() => setCreateOpen(false)} destroyOnHidden>

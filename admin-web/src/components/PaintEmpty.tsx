@@ -1,6 +1,19 @@
 import { Empty } from "antd";
+import TechIcon from "./TechIcon";
 
-type Character =
+import { useAdminTheme } from "../theme/ThemeProvider";
+
+/**
+ * 空态组件
+ *
+ * 两套皮肤两种呈现（第一百六十四批）：
+ * · **企业风**：灰色线性图标 + 一句说明（原卡通插画在专业后台里显得幼稚）；
+ * · **绘本风**：恢复原来的 8 个手绘角色（书虫/星星/熊/兔子/猫/彩虹/鸟/默认脸），
+ *   带轻微摇摆动画——这才是旧版的样子。
+ *
+ * `character` 参数在企业风下被忽略（保留是为了调用方零改动）。
+ */
+export type Character =
   | "bookworm"
   | "star"
   | "bear"
@@ -12,7 +25,7 @@ type Character =
 
 const CHARACTER_SVGS: Record<Character, JSX.Element> = {
   bookworm: (
-    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden>
+    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden className="paint-character-idle">
       <circle cx="60" cy="70" r="38" fill="#4ADE80" stroke="#3B2F2F" strokeWidth="3" />
       <circle cx="48" cy="62" r="6" fill="#3B2F2F" />
       <circle cx="72" cy="62" r="6" fill="#3B2F2F" />
@@ -24,7 +37,7 @@ const CHARACTER_SVGS: Record<Character, JSX.Element> = {
     </svg>
   ),
   star: (
-    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden>
+    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden className="paint-character-idle">
       <polygon points="60,15 72,45 105,45 78,65 88,95 60,75 32,95 42,65 15,45 48,45" fill="#FCD34D" stroke="#3B2F2F" strokeWidth="3" />
       <circle cx="50" cy="52" r="5" fill="#3B2F2F" />
       <circle cx="70" cy="52" r="5" fill="#3B2F2F" />
@@ -33,7 +46,7 @@ const CHARACTER_SVGS: Record<Character, JSX.Element> = {
     </svg>
   ),
   bear: (
-    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden>
+    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden className="paint-character-idle">
       <circle cx="38" cy="38" r="14" fill="#8B5E3C" stroke="#3B2F2F" strokeWidth="3" />
       <circle cx="82" cy="38" r="14" fill="#8B5E3C" stroke="#3B2F2F" strokeWidth="3" />
       <circle cx="60" cy="68" r="34" fill="#8B5E3C" stroke="#3B2F2F" strokeWidth="3" />
@@ -46,7 +59,7 @@ const CHARACTER_SVGS: Record<Character, JSX.Element> = {
     </svg>
   ),
   rabbit: (
-    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden>
+    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden className="paint-character-idle">
       <ellipse cx="45" cy="35" rx="10" ry="28" fill="#FFF" stroke="#3B2F2F" strokeWidth="3" />
       <ellipse cx="75" cy="35" rx="10" ry="28" fill="#FFF" stroke="#3B2F2F" strokeWidth="3" />
       <circle cx="60" cy="75" r="32" fill="#FFF" stroke="#3B2F2F" strokeWidth="3" />
@@ -58,7 +71,7 @@ const CHARACTER_SVGS: Record<Character, JSX.Element> = {
     </svg>
   ),
   cat: (
-    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden>
+    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden className="paint-character-idle">
       <polygon points="35,55 25,25 50,45" fill="#FF6B35" stroke="#3B2F2F" strokeWidth="3" />
       <polygon points="85,55 95,25 70,45" fill="#FF6B35" stroke="#3B2F2F" strokeWidth="3" />
       <circle cx="60" cy="70" r="34" fill="#FF6B35" stroke="#3B2F2F" strokeWidth="3" />
@@ -66,11 +79,13 @@ const CHARACTER_SVGS: Record<Character, JSX.Element> = {
       <circle cx="70" cy="65" r="5" fill="#3B2F2F" />
       <path d="M55 78 Q60 82 65 78" fill="none" stroke="#3B2F2F" strokeWidth="3" strokeLinecap="round" />
       <circle cx="85" cy="85" r="12" fill="#FCD34D" stroke="#3B2F2F" strokeWidth="2" />
-      <text x="80" y="90" fontSize="10" fill="#3B2F2F" fontWeight="700">$</text>
+      <text x="80" y="90" fontSize="10" fill="#3B2F2F" fontWeight="700">
+        $
+      </text>
     </svg>
   ),
   rainbow: (
-    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden>
+    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden className="paint-character-idle">
       <path d="M20 90 Q20 30 60 30 Q100 30 100 90" fill="none" stroke="#EF4444" strokeWidth="8" strokeLinecap="round" />
       <path d="M30 90 Q30 45 60 45 Q90 45 90 90" fill="none" stroke="#FCD34D" strokeWidth="8" strokeLinecap="round" />
       <path d="M40 90 Q40 60 60 60 Q80 60 80 90" fill="none" stroke="#4ADE80" strokeWidth="8" strokeLinecap="round" />
@@ -79,7 +94,7 @@ const CHARACTER_SVGS: Record<Character, JSX.Element> = {
     </svg>
   ),
   bird: (
-    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden>
+    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden className="paint-character-idle">
       <ellipse cx="60" cy="65" rx="32" ry="28" fill="#60A5FA" stroke="#3B2F2F" strokeWidth="3" />
       <circle cx="75" cy="55" r="5" fill="#3B2F2F" />
       <polygon points="85,58 100,52 85,66" fill="#FCD34D" stroke="#3B2F2F" strokeWidth="2" />
@@ -89,7 +104,7 @@ const CHARACTER_SVGS: Record<Character, JSX.Element> = {
     </svg>
   ),
   default: (
-    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden>
+    <svg viewBox="0 0 120 120" width="100" height="100" aria-hidden className="paint-character-idle">
       <circle cx="60" cy="60" r="40" fill="#FFF5E6" stroke="#3B2F2F" strokeWidth="3" />
       <circle cx="48" cy="55" r="5" fill="#3B2F2F" />
       <circle cx="72" cy="55" r="5" fill="#3B2F2F" />
@@ -100,25 +115,55 @@ const CHARACTER_SVGS: Record<Character, JSX.Element> = {
 
 interface PaintEmptyProps {
   character?: Character;
+  /** 不传时按皮肤取默认文案（绘本风「这里空空如也～」/ 企业风「暂无数据」） */
   message?: string;
   description?: string;
 }
 
-export default function PaintEmpty({
-  character = "default",
-  message = "这里空空如也～",
-  description,
-}: PaintEmptyProps) {
+export default function PaintEmpty({ character = "default", message, description }: PaintEmptyProps) {
+  const { themeId } = useAdminTheme();
+  const isPaint = themeId === "paint";
+  const text = message ?? (isPaint ? "这里空空如也～" : "暂无数据");
+
+  const image = isPaint ? (
+    CHARACTER_SVGS[character]
+  ) : (
+    <span
+      aria-hidden
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        background: "var(--color-bg-subtle)",
+        color: "var(--color-text-quaternary)",
+      }}
+    >
+      <TechIcon name="empty" size={24} />
+    </span>
+  );
+
   return (
     <Empty
-      image={CHARACTER_SVGS[character]}
+      image={image}
+      styles={{ image: { height: isPaint ? 100 : 48, marginBottom: 12 } }}
       description={
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "#3B2F2F" }}>
-            {message}
+          <div
+            style={{
+              fontSize: isPaint ? 15 : 14,
+              fontWeight: isPaint ? 600 : 400,
+              color: isPaint ? "var(--color-text)" : "var(--color-text-secondary)",
+            }}
+          >
+            {text}
           </div>
           {description && (
-            <div style={{ fontSize: 13, color: "#6B5B5B", marginTop: 4 }}>{description}</div>
+            <div style={{ fontSize: 12, color: "var(--color-text-tertiary)", marginTop: 4 }}>
+              {description}
+            </div>
           )}
         </div>
       }
@@ -127,4 +172,3 @@ export default function PaintEmpty({
 }
 
 export { CHARACTER_SVGS };
-export type { Character };

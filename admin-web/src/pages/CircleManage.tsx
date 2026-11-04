@@ -16,6 +16,7 @@ import { LikeOutlined, LikeFilled, PushpinFilled, PushpinOutlined } from "@ant-d
 import type { Dayjs } from "dayjs";
 
 import PaintEmpty from "../components/PaintEmpty";
+import PageHead from "../components/PageHead";
 import PaintPagination from "../components/PaintPagination";
 import PreviewImage from "../components/PreviewImage";
 import { usePaintPagination } from "../hooks/usePaintPagination";
@@ -262,7 +263,7 @@ export default function CircleManage() {
         dataIndex: "is_pinned",
         width: 80,
         render: (v: boolean) =>
-          v ? <Tag color="red">置顶</Tag> : <span style={{ color: "rgba(0,0,0,0.4)" }}>—</span>,
+          v ? <Tag color="red">置顶</Tag> : <span style={{ color: "var(--color-text-tertiary)" }}>—</span>,
       },
       { title: "发布时间", dataIndex: "created_at", width: 150, render: fmtDateTime },
       {
@@ -310,8 +311,8 @@ export default function CircleManage() {
         ) : unlikedCount > 0 ? (
           <span
             style={{
-              background: "#ff4d4f",
-              color: "#fff",
+              background: "var(--color-danger)",
+              color: "var(--color-text-inverse)",
               borderRadius: 10,
               padding: "2px 10px",
               fontSize: 13,
@@ -396,19 +397,19 @@ export default function CircleManage() {
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
         <Card size="small" style={{ minWidth: 160 }}>
           <Typography.Text type="secondary">本周新帖数</Typography.Text>
-          <div style={{ fontSize: 30, fontWeight: 700, color: "#FF6B35" }}>
+          <div style={{ fontSize: 30, fontWeight: 600, color: "var(--chart-1)" }}>
             {overview?.week_new_posts ?? "—"}
           </div>
         </Card>
         <Card size="small" style={{ minWidth: 160 }}>
           <Typography.Text type="secondary">分享家长数</Typography.Text>
-          <div style={{ fontSize: 30, fontWeight: 700, color: "#60A5FA" }}>
+          <div style={{ fontSize: 30, fontWeight: 600, color: "var(--chart-5)" }}>
             {overview?.sharing_parents ?? "—"}
           </div>
         </Card>
         <Card size="small" style={{ minWidth: 160 }}>
           <Typography.Text type="secondary">点赞总数</Typography.Text>
-          <div style={{ fontSize: 30, fontWeight: 700, color: "#4ADE80" }}>
+          <div style={{ fontSize: 30, fontWeight: 600, color: "var(--color-success)" }}>
             {overview?.total_likes ?? "—"}
           </div>
         </Card>
@@ -417,8 +418,8 @@ export default function CircleManage() {
           <div
             style={{
               fontSize: 30,
-              fontWeight: 700,
-              color: (overview?.admin_liked_coverage ?? 0) >= 100 ? "#4ADE80" : "#FCD34D",
+              fontWeight: 600,
+              color: (overview?.admin_liked_coverage ?? 0) >= 100 ? "var(--color-success)" : "var(--color-warning)",
             }}
           >
             {overview ? `${overview.admin_liked_coverage}%` : "—"}
@@ -437,13 +438,13 @@ export default function CircleManage() {
                 style={{
                   height: 18,
                   borderRadius: 9,
-                  background: "#FF6B35",
+                  background: "var(--color-primary)",
                   width: `${(100 * count) / maxDist}%`,
                   minWidth: 8,
                   transition: "width .3s",
                 }}
               />
-              <span style={{ color: "rgba(0,0,0,0.65)" }}>{count} 帖</span>
+              <span style={{ color: "var(--color-text-secondary)" }}>{count} 帖</span>
             </div>
           ))
         ) : (
@@ -454,8 +455,13 @@ export default function CircleManage() {
   );
 
   return (
-    <Card
+    <>
+    <PageHead
       title="阅读圈"
+      desc="家长晒阅读成就（卡片全部系统生成，零 UGC）；馆长每日巡场点赞、可删除不适宜内容。"
+    />
+    <Card
+      title="帖子与运营"
       extra={
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           零 UGC 成就分享 · 卡片全部系统生成
@@ -478,7 +484,7 @@ export default function CircleManage() {
         okButtonProps={{ danger: true }}
         cancelText="取消"
       >
-        <div style={{ marginBottom: 8, color: "rgba(0,0,0,0.65)" }}>
+        <div style={{ marginBottom: 8, color: "var(--color-text-secondary)" }}>
           {deleteTarget ? `${dualName(deleteTarget)} · ${deleteTarget.card_type_label}` : ""}
         </div>
         <Input.TextArea
@@ -491,5 +497,6 @@ export default function CircleManage() {
         />
       </Modal>
     </Card>
+    </>
   );
 }

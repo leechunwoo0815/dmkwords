@@ -14,8 +14,9 @@ import {
 import { hasPermission, useAuth } from "../auth";
 import { getToken, handleAuthStatus } from "../api/client";
 
-const NUM: CSSProperties = { fontFamily: "var(--font-mono)" };
-const MUTED: CSSProperties = { color: "rgba(0,0,0,0.45)" };
+// 数字对齐：等宽特性而非等宽字体（等宽字体的 0 带斜杠，60 会看成 6Ø）
+const NUM: CSSProperties = { fontVariantNumeric: "tabular-nums" };
+const MUTED: CSSProperties = { color: "var(--color-text-tertiary)" };
 
 const SOURCE_LABEL: Record<string, string> = { local: "本地审计", wechat: "微信账单" };
 const STATUS_TAG: Record<string, { color: string; text: string }> = {
@@ -229,7 +230,7 @@ export default function PaymentReconcilePanel() {
                     dataIndex: "diff_count",
                     width: 80,
                     render: (v: number) => (
-                      <span style={{ ...NUM, color: v ? "#cf1322" : undefined }}>{v}</span>
+                      <span style={{ ...NUM, color: v ? "var(--color-danger)" : undefined }}>{v}</span>
                     ),
                   },
                   { title: "触发", dataIndex: "trigger", width: 90, render: (v: string) => (v === "scheduled" ? "定时" : "手动") },

@@ -1,3 +1,5 @@
+import ListCard from "../components/ListCard";
+import PageHead from "../components/PageHead";
 import PaintEmpty from "../components/PaintEmpty";
 import PaintPagination from "../components/PaintPagination";
 import PreviewImage from "../components/PreviewImage";
@@ -195,16 +197,21 @@ export default function GrowthManage() {
 
   return (
     <div>
-      <Space style={{ marginBottom: 12 }}>
-        <Input.Search
-          placeholder="孩子姓名 / 家长手机号" allowClear style={{ width: 260 }}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
-        />
-        {isSuperAdmin && <Button onClick={onRecalc}>等级阈值重算</Button>}
-        <Typography.Text type="secondary">
-          测验次数重置仅超管可用；所有调整必填原因留痕。
-        </Typography.Text>
-      </Space>
+      <PageHead
+        title="成长与测验"
+        desc="测验次数重置仅超管可用；所有调整必填原因留痕。"
+        extra={isSuperAdmin ? <Button onClick={onRecalc}>等级阈值重算</Button> : undefined}
+      />
+      <ListCard
+        title="孩子档案"
+        count={`共 ${childrenTotal} 人`}
+        filter={
+          <Input.Search
+            placeholder="孩子姓名 / 家长手机号" allowClear style={{ width: 260 }}
+            onSearch={(v) => { setKeyword(v); setPage(1); }}
+          />
+        }
+      >
 
       {listError && (
         <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
@@ -215,20 +222,21 @@ export default function GrowthManage() {
       <Table<Child> loading={loading} locale={{ emptyText: listError ? null : <PaintEmpty character="rabbit" /> }}
         rowKey="id" dataSource={children} size="middle"
         pagination={false}
-        onRow={(r) => ({ style: r.id === highlightId ? { background: "#fff7e6" } : {} })}
+        onRow={(r) => ({ style: r.id === highlightId ? { background: "var(--color-warning-soft)" } : {} })}
         columns={[
           { title: "孩子", dataIndex: "name", width: 110, render: (_, r) => `${r.name}${r.english_name ? `（${r.english_name}）` : ""}` },
           { title: "家长", key: "p", width: 160, render: (_, r) => `${r.parent_name} ${r.parent_phone}` },
           { title: "会员状态", dataIndex: "member_status", width: 100 },
           {
-            title: "操作", key: "op", width: 120, render: (_, r) => (
+            title: "操作", key: "op", fixed: "right" as const, width: 120, render: (_, r) => (
               <Button type="link" size="small" onClick={() => openGrowth(r)}>成长档案</Button>
             ),
           },
         ]}
        scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
-      <PaintPagination current={page} pageSize={pageSize} total={childrenTotal} onChange={onPageChange} />
+        <PaintPagination current={page} pageSize={pageSize} total={childrenTotal} onChange={onPageChange} />
+      </ListCard>
 
       <Drawer
         title={growChild ? `${growChild.name} 的成长档案` : "成长档案"}
@@ -305,7 +313,7 @@ export default function GrowthManage() {
                         { title: "类型", dataIndex: "reason_type", width: 110, render: (t) => REASON_LABEL[t] ?? t },
                         { title: "说明", dataIndex: "detail" },
                         { title: "积分", dataIndex: "points", width: 80, render: (v) => (
-                          <Typography.Text strong style={{ color: "var(--paint-secondary)" }}>
+                          <Typography.Text strong style={{ color: "var(--color-success)" }}>
                             {v > 0 ? "+" : ""}{v}
                           </Typography.Text>
                         ) },

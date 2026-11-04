@@ -15,6 +15,7 @@ import { DownloadOutlined, LinkOutlined } from "@ant-design/icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import PaintEmpty from "../components/PaintEmpty";
+import PageHead from "../components/PageHead";
 import PaintPagination from "../components/PaintPagination";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { TODO_REFRESH_EVENT, useTodoCounts } from "../hooks/useTodoCounts";
@@ -146,7 +147,7 @@ function waitCell(created: string): React.ReactNode {
   const days = Math.floor(hours / 24);
   const h = Math.floor(hours % 24);
   return (
-    <span style={{ color: "#cf1322", fontWeight: 600 }}>
+    <span style={{ color: "var(--color-danger)", fontWeight: 600 }}>
       已等待 {days} 天 {h} 小时
     </span>
   );
@@ -404,7 +405,7 @@ export default function Notifications() {
         : r.ref_type;
     return (
       <div style={{ padding: "4px 8px 8px" }}>
-        <div style={{ color: "rgba(0,0,0,0.75)" }}>
+        <div style={{ color: "var(--color-text)" }}>
           <Typography.Text>完整内容：{r.content}</Typography.Text>
         </div>
         <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
@@ -414,7 +415,7 @@ export default function Notifications() {
               查看成长档案
             </Button>
           )}
-          <span style={{ color: "rgba(0,0,0,0.45)" }}>
+          <span style={{ color: "var(--color-text-tertiary)" }}>
             {r.effective_status === "done" && r.handled_by_name
               ? `超管 ${r.handled_by_name} 已处理`
               : r.effective_status === "done"
@@ -438,7 +439,7 @@ export default function Notifications() {
       const refRoute = meta?.route?.(r);
       return (
         <div style={{ padding: "4px 8px 8px" }}>
-          <div style={{ color: "rgba(0,0,0,0.75)" }}>
+          <div style={{ color: "var(--color-text)" }}>
             <Typography.Text>完整内容：{r.content}</Typography.Text>
           </div>
           <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
@@ -482,7 +483,7 @@ export default function Notifications() {
         ) : r.linkage ? (
           <Tag color="default" bordered={false}>{v}</Tag> // T20d：联动单灰态
         ) : (
-          <span style={{ color: "rgba(0,0,0,0.45)" }}>
+          <span style={{ color: "var(--color-text-tertiary)" }}>
             {v}
             {r.effective_status === "done" && r.handled_by_name ? ` · ${r.handled_by_name}` : ""}
           </span>
@@ -556,8 +557,8 @@ export default function Notifications() {
       {todoTabCount !== null && todoTabCount > 0 && (
         <span
           style={{
-            background: "#ff4d4f",
-            color: "#fff",
+            background: "var(--color-danger)",
+            color: "var(--color-text-inverse)",
             borderRadius: 10,
             padding: "0 6px",
             marginLeft: 6,
@@ -702,8 +703,8 @@ export default function Notifications() {
       {inboxReadOnly && (
         <div
           style={{
-            background: "#fffbe6",
-            border: "1px solid #ffe58f",
+            background: "var(--color-warning-soft)",
+            border: "1px solid var(--color-warning)",
             borderRadius: 6,
             padding: "6px 12px",
             marginBottom: 12,
@@ -717,8 +718,8 @@ export default function Notifications() {
       {inboxTruncated && (
         <div
           style={{
-            background: "#f5f5f5",
-            border: "1px solid #e0e0e0",
+            background: "var(--color-bg-subtle)",
+            border: "1px solid var(--color-border)",
             borderRadius: 6,
             padding: "6px 12px",
             marginBottom: 12,
@@ -763,9 +764,9 @@ export default function Notifications() {
           onExpandedRowsChange: (keys) => setInboxExpanded([...keys]),
         }}
         onRow={(r) => {
-          if (r.effective_status === "pending") return { style: { background: "#fff7e6" } };
-          if (r.linkage) return { style: { background: "#fafafa" } }; // T20d：联动单灰行
-          if (r.effective_status === "invalid") return { style: { background: "#fafafa" } };
+          if (r.effective_status === "pending") return { style: { background: "var(--color-warning-soft)" } };
+          if (r.linkage) return { style: { background: "var(--color-bg-subtle)" } }; // T20d：联动单灰行
+          if (r.effective_status === "invalid") return { style: { background: "var(--color-bg-subtle)" } };
           return {};
         }}
         columns={inboxColumns}
@@ -775,8 +776,13 @@ export default function Notifications() {
   );
 
   return (
-    <Card
+    <>
+    <PageHead
       title="通知中心"
+      desc="家长通知与管理待办；点开某条可跳到对应处理页，处理完会回写已读。"
+    />
+    <Card
+      title="通知记录"
       extra={
         // 导出按钮：仅家长通知 tab（WM13 裁定：管理待办量小，隐藏导出不做假功能）
         box === "parent" ? (
@@ -812,8 +818,8 @@ export default function Notifications() {
                   return n > 0 ? (
                     <span
                       style={{
-                        background: "#ff4d4f",
-                        color: "#fff",
+                        background: "var(--color-danger)",
+                        color: "var(--color-text-inverse)",
                         borderRadius: 10,
                         padding: "0 6px",
                       }}
@@ -860,7 +866,7 @@ export default function Notifications() {
         okText="确认处理"
         cancelText="取消"
       >
-        <div style={{ marginBottom: 8, color: "rgba(0,0,0,0.65)" }}>
+        <div style={{ marginBottom: 8, color: "var(--color-text-secondary)" }}>
           {handleTarget?.title} · {handleTarget?.applicant_name}
           <br />
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -877,5 +883,6 @@ export default function Notifications() {
         />
       </Modal>
     </Card>
+    </>
   );
 }

@@ -28,16 +28,16 @@ export default class ErrorBoundary extends Component<Props, State> {
             justifyContent: "center", height: "100vh", gap: 12,
           }}
         >
-          <WarningOutlined style={{ fontSize: 40, color: "#FAAD14" }} />
+          <WarningOutlined style={{ fontSize: 40, color: "var(--color-warning)" }} />
           <div style={{ fontSize: 16, fontWeight: 600 }}>页面出错了</div>
-          <div style={{ color: "rgba(0,0,0,0.45)", fontSize: 13 }}>
+          <div style={{ color: "var(--color-text-tertiary)", fontSize: 13 }}>
             请刷新重试；若持续出现请联系管理员
           </div>
           <button
             onClick={() => window.location.reload()}
             style={{
               marginTop: 8, padding: "6px 20px", borderRadius: 6,
-              border: "1px solid #d9d9d9", cursor: "pointer", background: "#fff",
+              border: "1px solid var(--color-border)", cursor: "pointer", background: "var(--color-bg-container)",
             }}
           >
             刷新页面

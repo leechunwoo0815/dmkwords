@@ -7,8 +7,9 @@ import PaintEmpty from "./PaintEmpty";
 import PaintPagination from "./PaintPagination";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 
-const NUM: CSSProperties = { fontFamily: "var(--font-mono)" };
-const MUTED: CSSProperties = { color: "rgba(0,0,0,0.45)" };
+// 数字对齐：等宽特性而非等宽字体（等宽字体的 0 带斜杠，60 会看成 6Ø）
+const NUM: CSSProperties = { fontVariantNumeric: "tabular-nums" };
+const MUTED: CSSProperties = { color: "var(--color-text-tertiary)" };
 
 /**
  * 死信看板（P2-1，2026-10-18 第七十八批）。

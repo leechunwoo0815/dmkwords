@@ -36,8 +36,9 @@ function fmtBytes(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-const NUM: CSSProperties = { fontFamily: "var(--font-mono)" };
-const MUTED: CSSProperties = { color: "rgba(0,0,0,0.45)" };
+// 数字对齐：等宽特性而非等宽字体（等宽字体的 0 带斜杠，60 会看成 6Ø）
+const NUM: CSSProperties = { fontVariantNumeric: "tabular-nums" };
+const MUTED: CSSProperties = { color: "var(--color-text-tertiary)" };
 
 function Figure({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
@@ -220,7 +221,7 @@ export default function MediaHealthPanel() {
             style={{
               ...NUM,
               fontSize: 20,
-              color: census.orphan_files > 0 ? "#D4380D" : "inherit",
+              color: census.orphan_files > 0 ? "var(--color-danger)" : "inherit",
             }}
           >
             {census.orphan_files} 张
@@ -258,7 +259,7 @@ export default function MediaHealthPanel() {
                       <Figure
                         label="引用悬空"
                         value={String(census.missing_refs)}
-                        tone={census.missing_refs > 0 ? "#D4380D" : undefined}
+                        tone={census.missing_refs > 0 ? "var(--color-danger)" : undefined}
                       />
                     </div>
                     {census.missing_refs > 0 && (

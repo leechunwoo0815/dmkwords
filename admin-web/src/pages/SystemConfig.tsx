@@ -18,7 +18,8 @@ import { invalidateConfigsCache } from "../hooks/useConfigs";
 import { hasPermission, useAuth } from "../auth";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
-import PageTitle from "../components/PageTitle";
+import ListCard from "../components/ListCard";
+import PageHead from "../components/PageHead";
 
 const TYPE_LABEL: Record<string, string> = {
   int: "整数",
@@ -93,15 +94,21 @@ export default function SystemConfigPage() {
 
   return (
     <>
-      <PageTitle>系统配置</PageTitle>
-      <Typography.Paragraph type="secondary">
-        全部业务数值集中管理；修改立即生效并自动记录审计日志。
-      </Typography.Paragraph>
-      <Tabs
-        activeKey={category}
-        onChange={(c) => { setCategory(c); setPage(1); }}
-        items={categories.map((c) => ({ key: c, label: c }))}
+      <PageHead
+        title="系统配置"
+        desc="全部业务数值集中管理；修改立即生效并自动记录审计日志。"
       />
+      <ListCard
+        title="配置项"
+        count={`共 ${filtered.length} 项`}
+        tabs={
+          <Tabs
+            activeKey={category}
+            onChange={(c) => { setCategory(c); setPage(1); }}
+            items={categories.map((c) => ({ key: c, label: c }))}
+          />
+        }
+      >
       {listError && (
         <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
           {listError} · 本次刷新失败：列表可能不是最新的（请重试）
@@ -169,6 +176,7 @@ export default function SystemConfigPage() {
           { title: "说明", dataIndex: "description", ellipsis: true },
           {
             title: "操作",
+            fixed: "right" as const,
             key: "action",
             width: 80,
             render: (_, record) =>
@@ -181,7 +189,8 @@ export default function SystemConfigPage() {
         ]}
        scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
-      <PaintPagination current={page} pageSize={pageSize} total={filtered.length} onChange={onPageChange} />
+        <PaintPagination current={page} pageSize={pageSize} total={filtered.length} onChange={onPageChange} />
+      </ListCard>
       <Modal
         title={`修改：${editing?.display_name || editing?.description || ""}`}
         open={editing !== null}

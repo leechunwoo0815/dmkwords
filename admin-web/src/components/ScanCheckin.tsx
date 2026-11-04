@@ -100,7 +100,7 @@ export default function ScanCheckin({
   return (
     <Card
       size="small"
-      style={{ marginBottom: 12, borderColor: focused ? "var(--paint-secondary)" : undefined }}
+      style={{ marginBottom: 12, borderColor: focused ? "var(--color-success)" : undefined }}
       styles={{ body: { padding: 12 } }}
     >
       <Space direction="vertical" size={8} style={{ width: "100%" }}>

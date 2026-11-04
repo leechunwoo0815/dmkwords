@@ -1,3 +1,5 @@
+import ListCard from "../components/ListCard";
+import PageHead from "../components/PageHead";
 import PaintEmpty from "../components/PaintEmpty";
 import { cfgNum, money, useConfigs } from "../hooks/useConfigs";
 import PaintPagination from "../components/PaintPagination";
@@ -28,7 +30,6 @@ import {
 } from "../api/deposits";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
-import PageTitle from "../components/PageTitle";
 
 const STATUS_LABEL: Record<string, string> = {
   unpaid: "未缴纳", paid: "已缴纳",
@@ -98,10 +99,10 @@ export default function DepositManage() {
 
   return (
     <>
-      <PageTitle>押金与赔偿</PageTitle>
-      <Typography.Paragraph type="secondary">
-        押金按孩子独立（{money(cfgNum(configs, "deposit_amount", 1200))} 元/人）；遗失损坏按原价赔偿、优先扣本人押金；不足部分记「待结清」并持续提醒。
-      </Typography.Paragraph>
+      <PageHead
+        title="押金与赔偿"
+        desc={`押金按孩子独立（${money(cfgNum(configs, "deposit_amount", 1200))} 元/人）；遗失损坏按原价赔偿、优先扣本人押金；不足部分记「待结清」并持续提醒。`}
+      />
       {/* P2-55：配置没取到时金额是**默认值**——如实提示，别让运营照默认值办事 */}
       {configsFailed && (
         <Typography.Text type="warning" style={{ display: "block", marginBottom: 12 }}>
@@ -109,19 +110,25 @@ export default function DepositManage() {
         </Typography.Text>
       )}
 
-      <Space style={{ marginBottom: 12 }}>
-        <Input.Search
-          placeholder="孩子姓名" allowClear style={{ width: 200 }}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
-        />
-        <Select
-          placeholder="押金状态" style={{ width: 130 }} value={status}
-          onChange={(v) => { setStatus(v); setPage(1); }}
-          // R9 sweep：押金状态筛选补显式「全部」（A4 口径，替 allowClear）
-          options={[{ value: "", label: "全部" },
-            ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))]}
-        />
-      </Space>
+      <ListCard
+        title="押金台账"
+        count={`共 ${total} 条`}
+        filter={
+          <Space>
+            <Input.Search
+              placeholder="孩子姓名" allowClear style={{ width: 200 }}
+              onSearch={(v) => { setKeyword(v); setPage(1); }}
+            />
+            <Select
+              placeholder="押金状态" style={{ width: 130 }} value={status}
+              onChange={(v) => { setStatus(v); setPage(1); }}
+              // R9 sweep：押金状态筛选补显式「全部」（A4 口径，替 allowClear）
+              options={[{ value: "", label: "全部" },
+                ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))]}
+            />
+          </Space>
+        }
+      >
 
       {/* P2-62：取数失败**不许**渲染成空表（运营会以为"没有押金记录"） */}
       {listError && (
@@ -145,7 +152,7 @@ export default function DepositManage() {
             render: (v: string) => (Number(v) > 0 ? <Tag color="red">￥{Number(v).toLocaleString()}</Tag> : "—"),
           },
           {
-            title: "操作", key: "op", width: 230,
+            title: "操作", key: "op", fixed: "right" as const, width: 230,
             render: (_, r) => (
               <Space>
                 {r.status === "unpaid" && (
@@ -189,7 +196,8 @@ export default function DepositManage() {
         ]}
        scroll={{ x: "max-content" }}/>
           <PaintHScrollbar auto />
-      <PaintPagination current={page} pageSize={pageSize} total={total} onChange={onPageChange} />
+        <PaintPagination current={page} pageSize={pageSize} total={total} onChange={onPageChange} />
+      </ListCard>
 
       <Drawer
         title={`押金流水 — ${ledgerChild?.child_name ?? ""}`}
@@ -210,7 +218,7 @@ export default function DepositManage() {
           <Typography.Text type="secondary">暂无流水</Typography.Text>
         ) : (
           ledgers.map((l) => (
-            <div key={l.id} style={{ padding: "10px 0", borderBottom: "1px dashed var(--paint-border)" }}>
+            <div key={l.id} style={{ padding: "10px 0", borderBottom: "1px dashed var(--color-border)" }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <Tag color={l.entry_type === "deduct" ? "red" : l.entry_type === "pay" || l.entry_type === "supplement" ? "green" : "default"}>
                   {ENTRY_LABEL[l.entry_type] ?? l.entry_type}

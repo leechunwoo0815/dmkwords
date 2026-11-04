@@ -1,23 +1,23 @@
 import { useEffect, useState } from "react";
 import {
-  BookOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   DownloadOutlined,
   ReloadOutlined,
-  TeamOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import {
   App as AntdApp,
   Button,
   Card,
-  Col,
-  Row,
   Tag,
   Typography,
 } from "antd";
 import { useNavigate } from "react-router-dom";
 
+import KpiTile from "../components/KpiTile";
+import TechIcon from "../components/TechIcon";
+import type { IconName } from "../components/TechIcon";
 import PaintLoading from "../components/PaintLoading";
 import {
   apiDashboardOverview,
@@ -29,7 +29,7 @@ import { hasPermission, useAuth } from "../auth";
 import { useTodoCounts } from "../hooks/useTodoCounts";
 import type { components } from "../api/schema";
 import DashboardCharts from "../components/DashboardCharts";
-import PageTitle from "../components/PageTitle";
+import PageHead from "../components/PageHead";
 
 type Overview = components["schemas"]["DashboardOverviewResponse"];
 
@@ -57,6 +57,31 @@ const cellValue = (o: Overview | null, key: string): number | string | null => {
   if (key === "copy_maint_lost") return `${o.copy_maintenance} / ${o.copy_lost}`;
   const raw = (o as unknown as Record<string, number | null | undefined>)[key] ?? null;
   return raw;
+};
+
+/** KPI 磁贴底部比例条：只用真实比例，取不到就不画（不编造同比/目标值）。 */
+const KPI_RATIO: Record<string, (o: Overview) => number | null> = {
+  copy_total: (o) => ((o.copy_total ?? 0) > 0 ? (o.copy_available ?? 0) / (o.copy_total ?? 1) : null),
+  copy_available_borrowed: (o) => {
+    const base = (o.copy_available ?? 0) + (o.copy_borrowed ?? 0);
+    return base > 0 ? (o.copy_available ?? 0) / base : null;
+  },
+  overdue_active: (o) =>
+    (o.copy_borrowed ?? 0) > 0 ? Math.min(1, (o.overdue_active ?? 0) / (o.copy_borrowed ?? 1)) : null,
+  pending_evaluation_count: (o) =>
+    (o.member_total ?? 0) > 0 ? Math.min(1, (o.pending_evaluation_count ?? 0) / (o.member_total ?? 1)) : null,
+  member_new_week: (o) =>
+    (o.member_total ?? 0) > 0 ? Math.min(1, (o.member_new_week ?? 0) / (o.member_total ?? 1)) : null,
+  renew_rate: (o) => ((o.renew_rate ?? 0) / 100),
+  withdrawal_rate: (o) => ((o.withdrawal_rate ?? 0) / 100),
+  quiz_pass_rate: (o) => ((o.quiz_pass_rate ?? 0) / 100),
+};
+
+/** 需要被看见的值：逾期 >0 标红、待评估 >0 标黄（其余中性）。 */
+const kpiTone = (key: string, o: Overview): "default" | "warning" | "danger" | "success" => {
+  if (key === "overdue_active" && (o.overdue_active ?? 0) > 0) return "danger";
+  if (key === "pending_evaluation_count" && (o.pending_evaluation_count ?? 0) > 0) return "warning";
+  return "default";
 };
 
 /** WM13 待办卡（提案 §6.3）：实时计数+跳转；失败禁假 0（U10）；零待办绿色态。
@@ -147,9 +172,14 @@ function TodoCard({
   return (
     <Card
       size="small"
-      title="待办事项"
-      style={{ marginBottom: 12, borderColor: "var(--paint-ink)" }}
-      styles={{ body: { padding: "10px 16px" } }}
+      title={
+        <span className="todo-title">
+          待办事项
+          {counts && total > 0 && <span className="todo-total">{total}</span>}
+        </span>
+      }
+      style={{ marginBottom: 12 }}
+      styles={{ body: { padding: "12px 16px" } }}
     >
       {failed ? (
         <Button size="small" danger onClick={reload}>
@@ -162,25 +192,21 @@ function TodoCard({
           全部处理完毕
         </Tag>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        // 纵向 15 行按钮太长（占掉一屏）；改成等宽芯片网格，一屏能看全，亮色=要处理
+        <div className="todo-grid">
           {rows.map((r) => {
             const n = counts[r.key] || 0;
             return (
-              <Button
+              <button
                 key={r.key}
-                type="link"
-                size="small"
-                style={{ justifyContent: "flex-start", paddingInline: 0, width: "fit-content" }}
+                type="button"
+                className={`todo-chip${n > 0 ? " todo-chip--active" : ""}`}
                 onClick={() => navigate(r.route)}
+                title={n > 0 ? `去处理：${r.label}` : `${r.label}（无待办）`}
               >
-                {n > 0 ? (
-                  <span style={{ fontWeight: 700, color: "#cf1322" }}>
-                    {r.label} {n} 笔 →
-                  </span>
-                ) : (
-                  <span style={{ color: "rgba(0,0,0,0.4)" }}>{r.label} 0 笔</span>
-                )}
-              </Button>
+                <span className="todo-chip-label">{r.label}</span>
+                <span className="todo-chip-count">{n}</span>
+              </button>
             );
           })}
         </div>
@@ -221,35 +247,35 @@ export default function Dashboard() {
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-        <PageTitle>今日概览</PageTitle>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Button
-            icon={<DownloadOutlined />}
-            size="small"
-            onClick={() => apiExportDashboard().catch((e) => message.error((e as Error).message))}
-          >
-            导出看板
-          </Button>
-          {/* P2-58（第八轮）：审计导出后端是 `require_perm("audit.view")`——专员点了**必 403**，
-              属"能点不能用"回归族。按同一权限码隐藏（与退款中心/媒体体检同款判据）。 */}
-          {isSuper && (
+      <PageHead
+        title="今日概览"
+        desc="门店运营实时数据；经营看板覆盖藏书 / 借阅 / 会员 / 测验 / 里程碑，支持 Excel 导出。"
+        extra={
+          <>
             <Button
               icon={<DownloadOutlined />}
               size="small"
-              onClick={() => apiExportAuditLogs().catch((e) => message.error((e as Error).message))}
+              onClick={() => apiExportDashboard().catch((e) => message.error((e as Error).message))}
             >
-              导出审计日志
+              导出看板
             </Button>
-          )}
-          <Button icon={<ReloadOutlined />} size="small" type="text" onClick={load}>
-            刷新
-          </Button>
-        </div>
-      </div>
-      <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
-        门店运营实时数据；经营看板覆盖藏书/借阅/会员/测验/里程碑，支持 Excel 导出。
-      </Typography.Paragraph>
+            {/* P2-58（第八轮）：审计导出后端是 `require_perm("audit.view")`——专员点了**必 403**，
+                属"能点不能用"回归族。按同一权限码隐藏（与退款中心/媒体体检同款判据）。 */}
+            {isSuper && (
+              <Button
+                icon={<DownloadOutlined />}
+                size="small"
+                onClick={() => apiExportAuditLogs().catch((e) => message.error((e as Error).message))}
+              >
+                导出审计日志
+              </Button>
+            )}
+            <Button icon={<ReloadOutlined />} size="small" type="text" onClick={load}>
+              刷新
+            </Button>
+          </>
+        }
+      />
 
       {overviewError && (
         <Typography.Text type="warning" style={{ display: "block", marginBottom: 12 }}>
@@ -260,8 +286,34 @@ export default function Dashboard() {
         </Typography.Text>
       )}
 
+      {/* 关键指标磁贴：先给"数"再给"图"——第一屏应该能扫完经营概况。
+          比例条只用真实比例（在馆/总量、逾期/在借、新增/会员总数），不编造同比或目标值。 */}
+      {overview && (
+        <div className="kpi-grid">
+          {BUSINESS_CELLS.map((cell) => {
+            const value = cellValue(overview, cell.valueKey);
+            const unit = cell.unit;
+            const iconName: IconName =
+              unit === "人" ? "member" : unit === "%" ? "gauge" : unit === "人次" ? "calendar" : "book";
+            const ratio = KPI_RATIO[cell.valueKey]?.(overview) ?? null;
+            const tone = kpiTone(cell.valueKey, overview);
+            return (
+              <KpiTile
+                key={cell.label}
+                icon={<TechIcon name={iconName} size={15} />}
+                label={cell.label}
+                value={value}
+                unit={unit}
+                ratio={ratio}
+                tone={tone}
+              />
+            );
+          })}
+        </div>
+      )}
+
       {/* 图形区（2026-09-21 用户需求：仪表盘要有"很酷炫的图"，且要投到店外电视上）。
-          用既有 /api/admin/dashboard 的数据渲染，不改后端；数字卡片按用户裁定照旧留在下方。
+          用既有 /api/admin/dashboard 的数据渲染，不改后端。
           W6-D1：取数失败时不再"整块消失"，用同一条横幅解释为什么没有图。 */}
       {overview && <DashboardCharts data={overview} />}
 
@@ -271,57 +323,34 @@ export default function Dashboard() {
         <PaintLoading character="rainbow" />
       ) : (
         <>
-          <Row gutter={[12, 12]}>
-          <Col xs={24} sm={8}>
-            <Card size="small" styles={{ body: { padding: "14px 16px" } }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <TeamOutlined style={{ fontSize: 22, color: "var(--paint-ink)" }} />
-                <div>
-                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-mono)" }}>
-                    {overview?.admin_count ?? "—"}
-                  </div>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    后台账号（个）
-                  </Typography.Text>
-                </div>
-              </div>
-            </Card>
-          </Col>
-          <Col xs={24} sm={8}>
-            <Card size="small" styles={{ body: { padding: "14px 16px" } }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <ClockCircleOutlined style={{ fontSize: 22, color: "var(--paint-ink)" }} />
-                <div>
-                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-mono)" }}>
-                    {overview?.today_logins ?? "—"}
-                  </div>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    今日登录（次）
-                  </Typography.Text>
-                </div>
-              </div>
-            </Card>
-          </Col>
-          <Col xs={24} sm={8}>
-            <Card size="small" styles={{ body: { padding: "14px 16px" } }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <CheckCircleOutlined style={{ fontSize: 22, color: "var(--paint-secondary)" }} />
-                <div>
-                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-mono)" }}>
-                    {overview?.config_count ?? "—"}
-                  </div>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    业务配置项（项）
-                  </Typography.Text>
-                </div>
-              </div>
-            </Card>
-          </Col>
-        </Row>
+          <div className="kpi-grid kpi-grid--3">
+            <KpiTile
+              icon={<UserOutlined />}
+              label="后台账号"
+              value={overview?.admin_count ?? "—"}
+              unit="个"
+              hint="含超管与运营专员"
+            />
+            <KpiTile
+              icon={<ClockCircleOutlined />}
+              label="今日登录"
+              value={overview?.today_logins ?? "—"}
+              unit="次"
+              hint="管理员登录次数"
+            />
+            <KpiTile
+              icon={<CheckCircleOutlined />}
+              label="业务配置项"
+              value={overview?.config_count ?? "—"}
+              unit="项"
+              hint="系统配置中心可调项"
+              tone="success"
+            />
+          </div>
 
         <Typography.Title
           level={5}
-          style={{ fontFamily: "var(--font-display)", marginTop: 20, marginBottom: 8 }}
+          style={{ fontFamily: "var(--font-heading)", marginTop: 20, marginBottom: 8 }}
         >
           最近配置变更
         </Typography.Title>
@@ -337,7 +366,7 @@ export default function Dashboard() {
                   display: "flex",
                   justifyContent: "space-between",
                   padding: "8px 0",
-                  borderBottom: i < (overview?.recent_config_changes.length ?? 0) - 1 ? "1px dashed var(--paint-border)" : "none",
+                  borderBottom: i < (overview?.recent_config_changes.length ?? 0) - 1 ? "1px dashed var(--color-border)" : "none",
                 }}
               >
                 <span>
@@ -357,33 +386,6 @@ export default function Dashboard() {
           )}
         </Card>
 
-        <Typography.Title
-          level={5}
-          style={{ fontFamily: "var(--font-display)", marginTop: 20, marginBottom: 8 }}
-        >
-          经营看板
-        </Typography.Title>
-        <Row gutter={[12, 12]}>
-          {BUSINESS_CELLS.map((cell) => (
-            <Col key={cell.label} xs={12} sm={6}>
-              <Card
-                size="small"
-                styles={{ body: { padding: "12px 16px" } }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <Typography.Text type="secondary">{cell.label}</Typography.Text>
-                  <BookOutlined style={{ color: "var(--paint-ink-light)" }} />
-                </div>
-                <div style={{ marginTop: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <Typography.Text style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-mono)" }}>
-                    {cellValue(overview, cell.valueKey) ?? "—"}
-                  </Typography.Text>
-                  <Tag color="green" style={{ fontSize: 11 }}>{cell.unit}</Tag>
-                </div>
-              </Card>
-            </Col>
-          ))}
-        </Row>
         </>
       )}
     </>

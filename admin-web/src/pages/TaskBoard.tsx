@@ -11,6 +11,7 @@ import {
 } from "antd";
 import { PlayCircleOutlined, ReloadOutlined } from "@ant-design/icons";
 
+import PageHead from "../components/PageHead";
 import PaintEmpty from "../components/PaintEmpty";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
 import DeadLetterPanel from "../components/DeadLetterPanel";
@@ -50,7 +51,7 @@ function lastRunCell(
   consecutiveFailures?: number,
 ): React.ReactNode {
   if (!last) {
-    return <span style={{ color: "rgba(0,0,0,0.45)" }}>从未运行</span>;
+    return <span style={{ color: "var(--color-text-tertiary)" }}>从未运行</span>;
   }
   // 2026-10-12 拍板（P10）：连续失败 ≥2 标红——"最后一次碰巧成功"不再把连续失败洗白
   if ((consecutiveFailures ?? 0) >= 2) {
@@ -64,7 +65,7 @@ ${last.error ?? ""}`}
         }
         trigger="hover"
       >
-        <span style={{ color: "#cf1322", fontWeight: 600, cursor: "help" }}>
+        <span style={{ color: "var(--color-danger)", fontWeight: 600, cursor: "help" }}>
           <Tag color="red">连续失败 {consecutiveFailures} 次</Tag> {last.started_at}
         </span>
       </Popover>
@@ -140,6 +141,10 @@ export default function TaskBoard() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <PageHead
+        title="任务看板"
+        desc="媒体体检 / 死信队列 / 收款对账 / 定时任务；失败与积压都在这页暴露，不在别处悄悄吞掉。"
+      />
       <MediaHealthPanel />
       <DeadLetterPanel />
       <PaymentReconcilePanel />
@@ -238,7 +243,7 @@ export default function TaskBoard() {
               r.error ? (
                 <div style={{ whiteSpace: "pre-wrap" }}>失败原因：{r.error}</div>
               ) : (
-                <div style={{ color: "rgba(0,0,0,0.45)" }}>本次运行无异常</div>
+                <div style={{ color: "var(--color-text-tertiary)" }}>本次运行无异常</div>
               ),
           }}
           columns={[
@@ -251,7 +256,7 @@ export default function TaskBoard() {
               dataIndex: "error",
               ellipsis: true,
               render: (v: string | null) =>
-                v ?? <span style={{ color: "rgba(0,0,0,0.45)" }}>—</span>,
+                v ?? <span style={{ color: "var(--color-text-tertiary)" }}>—</span>,
             },
           ]}
          scroll={{ x: "max-content" }}/>

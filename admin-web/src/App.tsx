@@ -34,7 +34,7 @@ function RequirePerm({ code, children }: { code: string; children: React.ReactNo
   if (!hasPermission(permissions, code)) {
     return (
       <Card>
-        <Typography.Title level={5} style={{ fontFamily: "var(--font-display)" }}>
+        <Typography.Title level={5} style={{ fontFamily: "var(--font-heading)" }}>
           无访问权限
         </Typography.Title>
         <Typography.Text type="secondary">

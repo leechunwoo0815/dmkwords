@@ -1,4 +1,5 @@
 import PaintEmpty from "../components/PaintEmpty";
+import PageHead from "../components/PageHead";
 import PaintPagination from "../components/PaintPagination";
 // 退款中心（WM10：订单/押金退款 + 退会 + 转让，超管逐单审核）
 import { useCallback, useEffect, useState } from "react";
@@ -312,9 +313,10 @@ export default function RefundCenter() {
 
   return (
     <div>
-      <Typography.Text type="secondary" style={{ display: "block", marginBottom: 12 }}>
-        资金安全关口：仅超级管理员可审；拒绝必填原因（家长端可见）；押金退款随退会/转让通过自动发起。
-      </Typography.Text>
+      <PageHead
+        title="退款中心"
+        desc="资金安全关口：仅超级管理员可审；拒绝必填原因（家长端可见）；押金退款随退会 / 转让通过自动发起。"
+      />
       {/* P1-7：后端计数不可用时如实降级——徽标数字将只反映**本页**，不能假装是全量 */}
       {counts === null && (
         <Typography.Text type="warning" style={{ display: "block", marginBottom: 12 }}>
@@ -332,14 +334,14 @@ export default function RefundCenter() {
               <>
                 退款（待审{" "}
                 {pendingRefunds.length > 0 ? (
-                  <span style={{ background: "#ff4d4f", color: "#fff", borderRadius: 10, padding: "0 6px" }}>
+                  <span style={{ background: "var(--color-danger)", color: "var(--color-text-inverse)", borderRadius: 10, padding: "0 6px" }}>
                     {pendingRefunds.length}
                   </span>
                 ) : (
                   pendingRefunds.length
                 )}
                 {refundExecutable > 0 && (
-                  <span style={{ color: "#cf1322", fontWeight: 700 }}>
+                  <span style={{ color: "var(--color-danger)", fontWeight: 600 }}>
                     {" · 待执行 "}
                     {refundExecutable}
                   </span>
@@ -367,7 +369,7 @@ export default function RefundCenter() {
                       r.order_no ? (
                         <div>
                           <Typography.Text code style={{ fontSize: 12 }}>{r.order_no}</Typography.Text>
-                          <div style={{ fontSize: 12, color: "var(--paint-ink-light)" }}>
+                          <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
                             {ORDER_TYPE_LABEL[r.order_type ?? ""] ?? r.order_type}
                             {r.pay_method ? ` · ${payMethodLabel(r.pay_method)}` : ""}
                           </div>
@@ -395,7 +397,7 @@ export default function RefundCenter() {
                   { title: "审核备注", dataIndex: "review_remark", width: 150, render: (v) => v ?? "—" },
                   { title: "申请时间", dataIndex: "created_at", width: 165, render: (v) => v.replace("T", " ").slice(0, 19) },
                   {
-                    title: "操作", key: "op", width: 190, render: (_, r) => (
+                    title: "操作", key: "op", width: 190, fixed: "right" as const, render: (_, r) => (
                       r.status === "pending" ? (
                         <Space>
                           <Button type="primary" size="small" onClick={() => askReview("refund", r.id, true,
@@ -430,7 +432,7 @@ export default function RefundCenter() {
               <>
                 退会（待审 {pendingWithdrawals.length}
                 {withdrawalRefunding > 0 && (
-                  <span style={{ color: "#cf1322", fontWeight: 700 }}>
+                  <span style={{ color: "var(--color-danger)", fontWeight: 600 }}>
                     {" · 退款中 "}
                     {withdrawalRefunding}
                   </span>
@@ -462,7 +464,7 @@ export default function RefundCenter() {
                   { title: "审核备注", dataIndex: "review_remark", width: 150, render: (v) => v ?? "—" },
                   { title: "申请时间", dataIndex: "created_at", width: 165, render: (v) => v.replace("T", " ").slice(0, 19) },
                   {
-                    title: "操作", key: "op", width: 260, render: (_, r) => {
+                    title: "操作", key: "op", width: 260, fixed: "right" as const, render: (_, r) => {
                       if (r.status !== "applying") return <span>—</span>;
                       // R4：联动退会单（退款/转让驱动）灰态语义——超管仅"查看详情"
                       //（settle-preview 只读，无通过/拒绝）；直接退会单保持审核按钮
@@ -508,7 +510,7 @@ export default function RefundCenter() {
               <>
                 转让（待审{" "}
                 {pendingTransfers.length > 0 ? (
-              <span style={{ background: "#ff4d4f", color: "#fff", borderRadius: 10, padding: "0 6px" }}>
+              <span style={{ background: "var(--color-danger)", color: "var(--color-text-inverse)", borderRadius: 10, padding: "0 6px" }}>
                 {pendingTransfers.length}
               </span>
             ) : (
@@ -537,7 +539,7 @@ export default function RefundCenter() {
                   { title: "审核备注", dataIndex: "review_remark", width: 140, render: (v) => v ?? "—" },
                   { title: "申请时间", dataIndex: "created_at", width: 165, render: (v) => v.replace("T", " ").slice(0, 19) },
                   {
-                    title: "操作", key: "op", width: 260, render: (_, r) => (
+                    title: "操作", key: "op", width: 260, fixed: "right" as const, render: (_, r) => (
                       r.status === "pending" ? (
                         <Space>
                           <Button type="primary" size="small" onClick={() => askReview("transfer", r.id, true,
@@ -576,13 +578,13 @@ export default function RefundCenter() {
               {settlePreview.items.map((it, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                   <span>{it.kind === "deposit" ? "押金退款" : `订单 ${it.order_no ?? ""}`}</span>
-                  <span style={{ color: "#888" }}>{it.rule}</span>
+                  <span style={{ color: "var(--color-text-tertiary)" }}>{it.rule}</span>
                   <Typography.Text strong>￥{Number(it.amount).toLocaleString()}</Typography.Text>
                 </div>
               ))}
-              <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #eee", marginTop: 6, paddingTop: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid var(--color-divider)", marginTop: 6, paddingTop: 6 }}>
                 <Typography.Text strong>预估退款合计</Typography.Text>
-                <Typography.Text strong style={{ color: "#cf1322", fontSize: 16 }}>
+                <Typography.Text strong style={{ color: "var(--color-danger)", fontSize: 16 }}>
                   ￥{Number(settlePreview.total).toLocaleString()}
                 </Typography.Text>
               </div>
@@ -613,13 +615,13 @@ export default function RefundCenter() {
             {linkSettle.items.map((it, i) => (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                 <span>{it.kind === "deposit" ? "押金退款" : `订单 ${it.order_no ?? ""}`}</span>
-                <span style={{ color: "#888" }}>{it.rule}</span>
+                <span style={{ color: "var(--color-text-tertiary)" }}>{it.rule}</span>
                 <Typography.Text strong>￥{Number(it.amount).toLocaleString()}</Typography.Text>
               </div>
             ))}
-            <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #eee", marginTop: 6, paddingTop: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid var(--color-divider)", marginTop: 6, paddingTop: 6 }}>
               <Typography.Text strong>预估退款合计</Typography.Text>
-              <Typography.Text strong style={{ color: "#cf1322", fontSize: 16 }}>
+              <Typography.Text strong style={{ color: "var(--color-danger)", fontSize: 16 }}>
                 ￥{Number(linkSettle.total).toLocaleString()}
               </Typography.Text>
             </div>
