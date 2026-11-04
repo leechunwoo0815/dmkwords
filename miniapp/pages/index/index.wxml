@@ -99,7 +99,7 @@
   <!-- 数字拿不到时说清原因（未入会被守卫挡下 → 后端 422「入会后可查看」），别让家长对着「—」猜 -->
   <view class="stat-hint" wx:if="{{currentChild && growthBlocked}}">
     <image class="stat-hint-icon" src="/icons/ui/lock.png" mode="aspectFit" />
-    <text>累计词数 / 积分：入会后可查看（请到店咨询）</text>
+    <text>累计词数 / 积分：办理会员服务后可查看（请到店咨询）</text>
   </view>
   <!-- P2-45：非 422 的失败是**故障**，不能冒充"入会后可查看" -->
   <view class="stat-hint" wx:if="{{currentChild && growthError}}">

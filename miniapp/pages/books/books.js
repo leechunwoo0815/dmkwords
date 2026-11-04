@@ -10,6 +10,12 @@ const GRADE_OPTIONS = [
   '全部年龄', '3-4岁', '5-6岁', '7-8岁',
   '9-10岁', '11-12岁', '13-15岁',
 ]
+// 后端 `Book.grade` 存的是带学段后缀的原值，筛选必须发原值（显示文案可以换成"适读年龄"）。
+// 2026-11-04 审核降噪只改显示，不改存量数据；两列按下标一一对应。
+const GRADE_VALUES = [
+  '', '3-4岁（幼儿园）', '5-6岁（幼儿园大班）', '7-8岁（小学低年级）',
+  '9-10岁（小学中年级）', '11-12岁（小学高年级）', '13-15岁（初中）',
+]
 const TOPIC_OPTIONS = [
   '全部主题', '韵文启蒙', '自然认知', '想象力', '幽默桥梁书',
   '奇幻章节书', '科普百科', '成长故事', '侦探冒险',
@@ -68,7 +74,7 @@ Page({
     if (filters.ar_min !== null || filters.ar_max !== null) {
       const lo = filters.ar_min === null ? '' : filters.ar_min
       const hi = filters.ar_max === null ? '' : filters.ar_max
-      chips.push({ key: 'ar', label: `AR ${lo || '0'}-${hi || '+'}` })
+      chips.push({ key: 'ar', label: `难度 ${lo || '0'}-${hi || '+'}` })
     }
     if (filters.sort !== 'newest') {
       chips.push({ key: 'sort', label: SORT_OPTIONS[SORT_KEYS.indexOf(filters.sort)] })
@@ -80,7 +86,7 @@ Page({
   currentFilters() {
     const [ar_min, ar_max] = AR_RANGES[this.data.arIdx]
     return {
-      grade: this.data.gradeIdx > 0 ? GRADE_OPTIONS[this.data.gradeIdx] : '',
+      grade: this.data.gradeIdx > 0 ? GRADE_VALUES[this.data.gradeIdx] : '',
       topic: this.data.topicIdx > 0 ? TOPIC_OPTIONS[this.data.topicIdx] : '',
       ar_min,
       ar_max,

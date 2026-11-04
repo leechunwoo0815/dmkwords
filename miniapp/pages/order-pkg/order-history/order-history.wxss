@@ -204,27 +204,7 @@
 /* ===== 2026-09-13 内联样式迁移（机械生成，勿手改） ===== */
 .x-245e15 { padding: 80rpx 0; text-align: center; color: var(--muted); font-size: 26rpx; }
 
-/* ===== WM12-A：待支付订单「去支付」（iOS 不渲染该按钮，见 js 的 showPay） ===== */
-.order-pay-row {
-  display: flex;
-  justify-content: flex-end;
-  padding: 16rpx 24rpx 4rpx;
-}
-.order-pay-btn {
-  padding: 12rpx 40rpx;
-  border-radius: 999rpx;
-  background: var(--accent);
-  color: var(--surface);
-  font-size: 26rpx;
-  font-weight: 700;
-  border: 3rpx solid var(--fg);
-  box-shadow: var(--shadow-hard-sm);
-}
-
-/* WM12-C（审查 P2-10）：请求期间按钮置灰 + 不响应（双击不再刷出两个预支付单） */
-.order-pay-btn-busy {
-  opacity: 0.6;
-}
+/* 2026-11-04：线上支付入口已移除（订单均为线下办理），去支付按钮样式删除 */
 
 /* WM12-C（审查 P0-3）：未绑微信的登录态 → 不渲染「去支付」，给一键登录引导 */
 .pay-hint {

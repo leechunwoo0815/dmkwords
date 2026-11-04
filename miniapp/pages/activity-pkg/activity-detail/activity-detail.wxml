@@ -56,7 +56,7 @@
         </view>
         <view wx:if="{{activity.member_only}}" class="info-row kv-row">
           <text class="info-label kv-label">限制</text>
-          <text class="info-value kv-value">仅限会员报名</text>
+          <text class="info-value kv-value">仅限本店会员报名</text>
         </view>
         <view wx:if="{{activity.description}}" class="info-row kv-row">
           <text class="info-label kv-label">介绍</text>

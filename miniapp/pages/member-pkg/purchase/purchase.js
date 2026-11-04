@@ -83,7 +83,9 @@ Page({
         // 年度借阅服务用金色徽章（沿用改版前的视觉区分；类名由 JS 给出，wxss 里必须有定义——R16b）
         badgeCls: p.order_type === 'formal_fee' ? 'plan-badge-gold' : '',
         // 2026-11-04 审核口径：保留费用标准（线下会员费照收），但明确"到店缴纳"，不出现"购买/在线支付"
-        priceText: p.amount ? `服务费 ￥${p.amount}（到店缴纳）` : '服务费以到店公示为准',
+        priceText: p.amount
+          ? `${p.order_type === 'deposit' ? '押金' : '服务费'} ￥${p.amount}（到店缴纳）`
+          : `${p.order_type === 'deposit' ? '押金' : '服务费'}以到店公示为准`,
         available: !!p.available,
         reason: p.reason || '',
         features: PLAN_FEATURES[p.order_type] || [],

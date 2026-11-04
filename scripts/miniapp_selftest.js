@@ -183,6 +183,11 @@ const img = require(path.join(__dirname, '..', 'miniapp', 'utils', 'img.js'))
   check('会员入口改为「会员服务办理」，不再出现「会员购买/续费」',
     memberWxml.indexOf('会员服务办理') !== -1 && memberWxml.indexOf('会员购买/续费') === -1,
     memberWxml.length)
+  const booksJs = readMini('pages/books/books.js')
+  check('适读年龄只改显示、筛选仍发后端原值',
+    booksJs.indexOf("'7-8岁（小学低年级）'") !== -1 &&
+      booksJs.indexOf('GRADE_VALUES[this.data.gradeIdx]') !== -1,
+    booksJs.length)
   const purchaseWxml = readMini('pages/member-pkg/purchase/purchase.wxml')
   check('会员服务页无线上支付入口（保留费用标准/到店缴纳）',
     purchaseWxml.indexOf('在线支付') === -1 &&
@@ -195,6 +200,8 @@ const img = require(path.join(__dirname, '..', 'miniapp', 'utils', 'img.js'))
     activityWxml.indexOf('活动费（到店缴纳）') !== -1 &&
       activityWxml.indexOf('报名（到店缴费）') !== -1,
     activityWxml.length)
+  const orderWxml = readMini('pages/order-pkg/order-history/order-history.wxml')
+  check('订单页不再出现「去支付」按钮', orderWxml.indexOf('去支付') === -1, orderWxml.length)
   const quizResultWxml = readMini('pages/reading-pkg/quiz-result/quiz-result.wxml')
   check('挑战结果不再用「答对 X/Y 题」',
     quizResultWxml.indexOf('答对') === -1, quizResultWxml.length)

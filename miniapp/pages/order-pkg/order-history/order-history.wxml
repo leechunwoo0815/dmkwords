@@ -45,9 +45,6 @@
         </view>
         <view class="order-amount">￥{{item.amount}}</view>
       </view>
-      <view class="order-pay-row" wx:if="{{showPay && item.payable}}">
-        <view class="order-pay-btn {{paying ? 'order-pay-btn-busy' : ''}}" data-id="{{item.id}}" bindtap="onPay">去支付</view>
-      </view>
     </view>
   </view>
 

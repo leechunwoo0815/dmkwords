@@ -68,11 +68,7 @@ Page({
 
   onLoad(options) {
     this._childId = session.resolveChildId(options)
-    // WM12-C（审查 P0-3，用户裁定）：线上支付只允许**已绑微信**的家长
-    // （`parent.wechat_bound` 来自登录载荷；老缓存没有该字段 → 按未绑处理，安全侧倒）
-    const parent = wx.getStorageSync('parent') || {}
-    const canPay = !!parent.wechat_bound
-    const ios = isIOS()
+    // 2026-11-04 审核口径：订单均为线下办理，页面不再出现线上支付入口。
     this.setData({
       childName: decodeURIComponent(options.child_name || ''),
       showPay: false,
