@@ -2,8 +2,8 @@
  * 管理端主题令牌契约（第一百六十四批，2026-11-04）
  *
  * 设计口径（甲方决定）：
- *  - 一套令牌 = 一套主题；**新增主题只需在 `presets.ts` 里加一个 ThemeTokens 对象**，
- *    不需要改任何组件/CSS。
+ *  - 一套令牌 = 一套主题；**新增主题只需在 `theme/<preset>.ts` 里加一个 ThemeTokens 对象**
+ *    （照 `enterprise.ts` 抄），不需要改任何组件/CSS。
  *  - 令牌是**唯一色板来源**：antd `ConfigProvider` 的 ThemeConfig 与 CSS 变量都由
  *    本文件的结构派生（`cssVars()` / `buildAntdTheme()`），不允许在 CSS 里再写死颜色。
  *  - 控件密度由 `density` 表达：紧凑 32px（甲方 2026-11-04 选定），不再是「舒适 36–38px」。

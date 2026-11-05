@@ -104,3 +104,25 @@ export const paint: ThemeTokens = {
     easing: "cubic-bezier(0.2, 0, 0, 1)",
   },
 };
+
+/**
+ * 绘本插画色板（167 批）：PaintEmpty / PaintLoading / 侧栏图标圆圈共用。
+ *
+ * 这些是**插画固有颜色**，不是主题令牌——只有绘本风会渲染，故不随三套主题切换。
+ * 抽到这里是为了让 TSX 零字面色：换项目/换绘本配色只改这个对象，不改组件。
+ */
+export const paintIllustration = {
+  ink: "#3B2F2F",
+  paper: "#FFFDF7",
+  paperDeep: "#FFF5E6",
+  white: "#FFFFFF",
+  orange: "#FF6B35",
+  green: "#4ADE80",
+  yellow: "#FCD34D",
+  blue: "#60A5FA",
+  pink: "#F472B6",
+  purple: "#A78BFA",
+  brown: "#8B5E3C",
+  red: "#EF4444",
+  textSecondary: "#6B5B5B",
+} as const;

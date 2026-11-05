@@ -378,7 +378,7 @@ export default function BookDetail() {
             { title: "副本码", dataIndex: "copy_code", width: 160, render: (v) => <Typography.Text code>{v}</Typography.Text> },
             { title: "状态", dataIndex: "status", width: 110, render: (s: string) => <Tag color={COPY_STATUS_COLOR[s]}>{COPY_STATUS_LABEL[s] ?? s}</Tag> },
           {
-            title: "操作", key: "op", width: 250,
+            title: "操作", key: "op", width: 250, fixed: "right" as const,
             render: (_, r) => (
               <Space size={6}>
                 <Select
@@ -450,7 +450,7 @@ export default function BookDetail() {
             { title: "答案", dataIndex: "answer", width: 110 },
             { title: "状态", dataIndex: "is_active", width: 80, render: (v: number) => (v === 1 ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>) },
             {
-              title: "操作", key: "op", width: 170,
+              title: "操作", key: "op", width: 170, fixed: "right" as const,
               render: (_, r) => (
                 <Space>
                   <Button type="link" size="small" onClick={() => openQuestionEditor(r)}>编辑</Button>

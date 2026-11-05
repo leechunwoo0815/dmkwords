@@ -21,6 +21,7 @@ import { Card, Tooltip, Typography } from "antd";
 import { apiDashboardCharts, type DashboardCharts as ChartsData } from "../api/admin";
 import TechIcon from "./TechIcon";
 import type { IconName } from "./TechIcon";
+import { EXCELLENT_SUMMARY, GAUGE_RULES, gaugeTone, type GaugeMetric, type GaugeTone } from "./gaugeRules";
 
 import type { components } from "../api/schema";
 
@@ -178,17 +179,25 @@ function Donut({
 
 /* ------------------------------------------------------------------ 健康度仪表 */
 
-function Gauge({ label, value }: { label: string; value: number }) {
+const GAUGE_TONE_COLOR: Record<GaugeTone, string> = {
+  success: "var(--color-success)",
+  warning: "var(--color-warning)",
+  danger: "var(--color-danger)",
+};
+
+function Gauge({ metric, value }: { metric: GaugeMetric; value: number }) {
+  const rule = GAUGE_RULES[metric];
   const pct = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
-  // 阈值配色：<50 危险 / <80 警示 / 其余良好（续借率低、通过率低都该被看见）
-  const color = pct >= 80 ? "var(--color-success)" : pct >= 50 ? "var(--color-warning)" : "var(--color-danger)";
+  // 阈值配色按指标方向：续借/通过越高越好，退会越低越好（规则见 gaugeRules.ts）
+  const tone = gaugeTone(metric, pct);
+  const color = GAUGE_TONE_COLOR[tone];
   const cx = 60;
   const cy = 62;
   const R = 44;
   const ticks = Array.from({ length: 11 }, (_, i) => 180 + i * 18);
   return (
-    <div className="gauge">
-      <svg viewBox="0 0 120 76" width={104} height={66} role="img" aria-label={`${label} ${pct}%`}>
+    <div className="gauge" data-tone={tone}>
+      <svg viewBox="0 0 120 76" width={104} height={66} role="img" aria-label={`${rule.label} ${pct}%`}>
         {ticks.map((deg, i) => {
           const p1 = polar(cx, cy, R + 8, deg);
           const p2 = polar(cx, cy, R + (i % 5 === 0 ? 12 : 10), deg);
@@ -220,7 +229,7 @@ function Gauge({ label, value }: { label: string; value: number }) {
           <tspan className="gauge-unit">%</tspan>
         </text>
       </svg>
-      <div className="gauge-label">{label}</div>
+      <div className="gauge-label">{rule.label}</div>
     </div>
   );
 }
@@ -413,7 +422,7 @@ function Freshness({ at }: { at: Date | null }) {
   return (
     <span className="dash-freshness">
       <span className="dash-freshness-dot" aria-hidden />
-      数据更新于 {hhmmss} · 每 60 秒自动刷新
+      图形数据更新于 {hhmmss} · 每 60 秒自动刷新
     </span>
   );
 }
@@ -436,8 +445,18 @@ export default function DashboardCharts({ data }: { data: Overview }) {
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 60000);
-    return () => clearInterval(timer);
+    // 与 overview 轮询同口径：隐藏页签暂停，回到前台立即补刷。
+    const timer = setInterval(() => {
+      if (!document.hidden) load();
+    }, 60000);
+    const onVisible = () => {
+      if (!document.hidden) load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [load]);
 
   const total =
@@ -458,12 +477,12 @@ export default function DashboardCharts({ data }: { data: Overview }) {
         size="small"
         className="dash-cell"
         title={<CardTitle icon="gauge" text="健康度" />}
-        extra={<span className="dash-card-extra">优秀：续借≥60% · 通过≥80% · 退会≤10%</span>}
+        extra={<span className="dash-card-extra">{EXCELLENT_SUMMARY}</span>}
       >
         <div className="gauge-cluster">
-          <Gauge label="续借率" value={d.renew_rate ?? 0} />
-          <Gauge label="测验通过率" value={d.quiz_pass_rate ?? 0} />
-          <Gauge label="退会率" value={d.withdrawal_rate ?? 0} />
+          <Gauge metric="renew" value={d.renew_rate ?? 0} />
+          <Gauge metric="quiz" value={d.quiz_pass_rate ?? 0} />
+          <Gauge metric="withdrawal" value={d.withdrawal_rate ?? 0} />
         </div>
       </Card>
 

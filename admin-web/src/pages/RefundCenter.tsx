@@ -362,10 +362,10 @@ export default function RefundCenter() {
                 dataSource={refunds} size="middle"
                 pagination={false}
                 columns={[
-                  { title: "类型", dataIndex: "kind", width: 100, render: (k) => KIND_LABEL[k] ?? k },
-                  { title: "孩子", dataIndex: "child_name", width: 90 },
+                  { title: "类型", dataIndex: "kind", width: 84, render: (k) => KIND_LABEL[k] ?? k },
+                  { title: "孩子", dataIndex: "child_name", width: 80 },
                   {
-                    title: "关联", key: "rel", width: 190, render: (_, r) => (
+                    title: "关联", key: "rel", width: 140, ellipsis: true, render: (_, r) => (
                       r.order_no ? (
                         <div>
                           <Typography.Text code style={{ fontSize: 12 }}>{r.order_no}</Typography.Text>
@@ -377,27 +377,39 @@ export default function RefundCenter() {
                       ) : "押金账户"
                     ),
                   },
-                  { title: "金额", dataIndex: "amount", width: 100, render: (v) => <Typography.Text strong>￥{Number(v).toLocaleString()}</Typography.Text> },
-                  { title: "家长原因", dataIndex: "reason" },
+                  {
+                    title: "金额 / 渠道", dataIndex: "amount", width: 110, render: (v, r) => (
+                      <>
+                        <Typography.Text strong>￥{Number(v).toLocaleString()}</Typography.Text>
+                        <div style={{ marginTop: 2 }}>
+                          {r.refund_channel === "wechat"
+                            ? <Tag color="processing">微信原路</Tag>
+                            : <Tag>线下打款</Tag>}
+                        </div>
+                      </>
+                    ),
+                  },
+                  { title: "家长原因", dataIndex: "reason", width: 140, ellipsis: true },
                   {
                     title: "状态", dataIndex: "status", width: 140, render: (s, r) => (
                       <>
                         <Tag color={STATUS_COLOR[s]}>{STATUS_LABEL[s] ?? s}</Tag>
                         {r.gateway_unknown_at ? <Tag color="warning">结果未知</Tag> : null}
+                        {r.review_remark ? (
+                          <Typography.Text
+                            type="secondary"
+                            title={r.review_remark}
+                            style={{ display: "block", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                          >
+                            {r.review_remark}
+                          </Typography.Text>
+                        ) : null}
                       </>
                     ),
                   },
+                  { title: "申请时间", dataIndex: "created_at", width: 140, render: (v) => v.replace("T", " ").slice(0, 19) },
                   {
-                    title: "退款渠道", dataIndex: "refund_channel", width: 110,
-                    // WM12-B：线上微信支付的单 → 执行时自动原路退回；线下收款的 → 人工打款登记
-                    render: (v: string) => (v === "wechat"
-                      ? <Tag color="processing">微信原路</Tag>
-                      : <Tag>线下打款</Tag>),
-                  },
-                  { title: "审核备注", dataIndex: "review_remark", width: 150, render: (v) => v ?? "—" },
-                  { title: "申请时间", dataIndex: "created_at", width: 165, render: (v) => v.replace("T", " ").slice(0, 19) },
-                  {
-                    title: "操作", key: "op", width: 190, fixed: "right" as const, render: (_, r) => (
+                    title: "操作", key: "op", width: 160, fixed: "right" as const, render: (_, r) => (
                       r.status === "pending" ? (
                         <Space>
                           <Button type="primary" size="small" onClick={() => askReview("refund", r.id, true,
@@ -420,7 +432,7 @@ export default function RefundCenter() {
                     ),
                   },
                 ]}
-               scroll={{ x: "max-content" }}/>
+               scroll={{ x: "100%" }}/>
           <PaintHScrollbar auto />
               <PaintPagination current={refundPg.page} pageSize={refundPg.pageSize} total={refundTotal ?? refunds.length} onChange={refundPg.onChange} listLimit={refundLimit} />
             </>),
@@ -453,18 +465,28 @@ export default function RefundCenter() {
                 dataSource={withdrawals} size="middle"
                 pagination={false}
                 columns={[
-                  { title: "孩子", dataIndex: "child_name", width: 100 },
-                  { title: "当前状态", dataIndex: "member_status", width: 100 },
-                  { title: "退会原因", dataIndex: "reason" },
-                  { title: "状态", dataIndex: "status", width: 120, render: (s) => (
-                    <Tooltip title={STATUS_TOOLTIP[s]}>
-                      <Tag color={STATUS_COLOR[s]}>{STATUS_LABEL[s] ?? s}</Tag>
-                    </Tooltip>
+                  { title: "孩子", dataIndex: "child_name", width: 90 },
+                  { title: "当前状态", dataIndex: "member_status", width: 90 },
+                  { title: "退会原因", dataIndex: "reason", width: 160, ellipsis: true },
+                  { title: "状态", dataIndex: "status", width: 140, render: (s, r) => (
+                    <>
+                      <Tooltip title={STATUS_TOOLTIP[s]}>
+                        <Tag color={STATUS_COLOR[s]}>{STATUS_LABEL[s] ?? s}</Tag>
+                      </Tooltip>
+                      {r.review_remark ? (
+                        <Typography.Text
+                          type="secondary"
+                          title={r.review_remark}
+                          style={{ display: "block", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        >
+                          {r.review_remark}
+                        </Typography.Text>
+                      ) : null}
+                    </>
                   ) },
-                  { title: "审核备注", dataIndex: "review_remark", width: 150, render: (v) => v ?? "—" },
-                  { title: "申请时间", dataIndex: "created_at", width: 165, render: (v) => v.replace("T", " ").slice(0, 19) },
+                  { title: "申请时间", dataIndex: "created_at", width: 140, render: (v) => v.replace("T", " ").slice(0, 19) },
                   {
-                    title: "操作", key: "op", width: 260, fixed: "right" as const, render: (_, r) => {
+                    title: "操作", key: "op", width: 220, fixed: "right" as const, render: (_, r) => {
                       if (r.status !== "applying") return <span>—</span>;
                       // R4：联动退会单（退款/转让驱动）灰态语义——超管仅"查看详情"
                       //（settle-preview 只读，无通过/拒绝）；直接退会单保持审核按钮
@@ -498,7 +520,7 @@ export default function RefundCenter() {
                     },
                   },
                 ]}
-               scroll={{ x: "max-content" }}/>
+               scroll={{ x: "100%" }}/>
           <PaintHScrollbar auto />
               <PaintPagination current={withdrawalPg.page} pageSize={withdrawalPg.pageSize} total={withdrawalTotal ?? withdrawals.length} onChange={withdrawalPg.onChange} listLimit={withdrawalLimit} />
             </>),
@@ -532,14 +554,26 @@ export default function RefundCenter() {
                 dataSource={transfers} size="middle"
                 pagination={false}
                 columns={[
-                  { title: "转出方", dataIndex: "source_name", width: 100 },
-                  { title: "受让方", dataIndex: "target_name", width: 100 },
-                  { title: "状态", dataIndex: "status", width: 90, render: (s) => <Tag color={STATUS_COLOR[s]}>{STATUS_LABEL[s] ?? s}</Tag> },
-                  { title: "审核截止", dataIndex: "expires_at", width: 165, render: (v) => v.replace("T", " ").slice(0, 19) },
-                  { title: "审核备注", dataIndex: "review_remark", width: 140, render: (v) => v ?? "—" },
-                  { title: "申请时间", dataIndex: "created_at", width: 165, render: (v) => v.replace("T", " ").slice(0, 19) },
+                  { title: "转出方", dataIndex: "source_name", width: 90 },
+                  { title: "受让方", dataIndex: "target_name", width: 90 },
+                  { title: "状态", dataIndex: "status", width: 80, render: (s, r) => (
+                    <>
+                      <Tag color={STATUS_COLOR[s]}>{STATUS_LABEL[s] ?? s}</Tag>
+                      {r.review_remark ? (
+                        <Typography.Text
+                          type="secondary"
+                          title={r.review_remark}
+                          style={{ display: "block", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        >
+                          {r.review_remark}
+                        </Typography.Text>
+                      ) : null}
+                    </>
+                  ) },
+                  { title: "审核截止", dataIndex: "expires_at", width: 140, render: (v) => v.replace("T", " ").slice(0, 19) },
+                  { title: "申请时间", dataIndex: "created_at", width: 140, render: (v) => v.replace("T", " ").slice(0, 19) },
                   {
-                    title: "操作", key: "op", width: 260, fixed: "right" as const, render: (_, r) => (
+                    title: "操作", key: "op", width: 220, fixed: "right" as const, render: (_, r) => (
                       r.status === "pending" ? (
                         <Space>
                           <Button type="primary" size="small" onClick={() => askReview("transfer", r.id, true,
@@ -553,7 +587,7 @@ export default function RefundCenter() {
                     ),
                   },
                 ]}
-               scroll={{ x: "max-content" }}/>
+               scroll={{ x: "100%" }}/>
           <PaintHScrollbar auto />
               <PaintPagination current={transferPg.page} pageSize={transferPg.pageSize} total={transferTotal ?? transfers.length} onChange={transferPg.onChange} listLimit={transferLimit} />
             </>),

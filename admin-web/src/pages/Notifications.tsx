@@ -464,19 +464,20 @@ export default function Notifications() {
 
   // WM13 管理待办表格
   const inboxColumns = [
-    { title: "时间", dataIndex: "created_at", width: 140, render: (v: string) => (v || "").replace("T", " ").slice(0, 16) },
-    { title: "事项", dataIndex: "title", width: 130 },
-    { title: "申请人", dataIndex: "applicant_name", width: 150 },
+    { title: "时间", dataIndex: "created_at", width: 130, render: (v: string) => (v || "").replace("T", " ").slice(0, 16) },
+    { title: "事项", dataIndex: "title", width: 110, ellipsis: true },
+    { title: "申请人", dataIndex: "applicant_name", width: 120, ellipsis: true },
     {
       title: "金额",
       dataIndex: "amount",
-      width: 100,
+      width: 90,
       render: (v: string | null) => (v ? `￥${Number(v).toLocaleString()}` : "—"),
     },
     {
       title: "状态",
       dataIndex: "status_text",
-      width: 170,
+      width: 150,
+      ellipsis: true,
       render: (v: string, r: AdminInboxItem) =>
         r.effective_status === "pending" ? (
           <Tag color="orange">{v}</Tag>
@@ -492,13 +493,14 @@ export default function Notifications() {
     {
       title: "已等待",
       dataIndex: "created_at",
-      width: 150,
+      width: 120,
       render: (v: string, r: AdminInboxItem) => (r.effective_status === "pending" ? waitCell(v) : "—"),
     },
     {
       title: "操作",
       key: "action",
-      width: 200,
+      width: 180,
+      fixed: "right" as const,
       render: (_: unknown, r: AdminInboxItem) => {
         const meta = ADMIN_REF_ROUTE[r.ref_type];
         const route = meta
@@ -627,14 +629,14 @@ export default function Notifications() {
           expandedRowRender: expandContent,
         }}
         columns={[
-          { title: "时间", dataIndex: "created_at", width: 140, render: fmtDateTime },
-          { title: "家长", dataIndex: "parent_name", width: 110 },
-          { title: "分类", dataIndex: "category", width: 80 },
-          { title: "标题", dataIndex: "title", width: 150 },
+          { title: "时间", dataIndex: "created_at", width: 130, render: fmtDateTime },
+          { title: "家长", dataIndex: "parent_name", width: 96, ellipsis: true },
+          { title: "分类", dataIndex: "category", width: 72 },
+          { title: "标题", dataIndex: "title", width: 190, ellipsis: true },
           {
             title: "微信通道",
             dataIndex: "wechat_status",
-            width: 110,
+            width: 100,
             render: (v: string, r) => (
               <span title={r.wechat_error || undefined}>{wechatTag(v)}</span>
             ),
@@ -642,7 +644,8 @@ export default function Notifications() {
           {
             title: "已读",
             dataIndex: "read",
-            width: 120,
+            width: 110,
+            fixed: "right" as const,
             render: (v: boolean, r) => (
               <Button
                 size="small"
@@ -654,7 +657,7 @@ export default function Notifications() {
             ),
           },
         ]}
-       scroll={{ x: "max-content" }}/>
+       scroll={{ x: "100%" }}/>
           <PaintHScrollbar auto />
     </>
   );
@@ -770,7 +773,7 @@ export default function Notifications() {
           return {};
         }}
         columns={inboxColumns}
-       scroll={{ x: "max-content" }}/>
+       scroll={{ x: "100%" }}/>
           <PaintHScrollbar auto />
     </>
   );

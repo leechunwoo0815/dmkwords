@@ -546,7 +546,7 @@ export default function MemberManage() {
             pagination={false}
             columns={[
               // fix33 R4：头像列（与建档/编辑弹窗同源，走 public/avatars 本地资产零 token）
-              { title: "头像", key: "avatar", width: 64, render: (_, r) => (
+              { title: "头像", key: "avatar", width: 56, render: (_, r) => (
                 r.avatar ? (
                   <img
                     src={`/avatars/${r.avatar}.png`}
@@ -557,25 +557,25 @@ export default function MemberManage() {
                   />
                 ) : <Typography.Text type="secondary">—</Typography.Text>
               ) },
-              { title: "孩子", key: "child", width: 170, render: (_, r) => (
+              { title: "孩子", key: "child", width: 160, render: (_, r) => (
                 <div>
                   <div>{r.name}{r.english_name ? `（${r.english_name}）` : ""}</div>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>{r.grade || "—"}{r.ar_level ? ` · AR ${r.ar_level}` : ""}</Typography.Text>
                 </div>
               ) },
-              { title: "家长", key: "parent", width: 160, render: (_, r) => (
+              { title: "家长", key: "parent", width: 150, render: (_, r) => (
                 <div>
                   <div>{r.parent_name}</div>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>{r.parent_phone}</Typography.Text>
                 </div>
               ) },
-              { title: "性别", dataIndex: "gender", width: 64, render: (g) => (g === 1 ? "男" : g === 2 ? "女" : "—") },
+              { title: "性别", dataIndex: "gender", width: 56, render: (g) => (g === 1 ? "男" : g === 2 ? "女" : "—") },
               // 年级 / AR 已并入「孩子」列副行（同一份数据展示两次＝浪费横向空间）
-              { title: "会员状态", dataIndex: "member_status", width: 110, render: (s: string) => (
+              { title: "会员状态", dataIndex: "member_status", width: 100, render: (s: string) => (
                 <Tag color={MEMBER_COLOR[s]}>{MEMBER_LABEL[s] ?? s}</Tag>
               ) },
               {
-                title: "会员期限", dataIndex: "member_expire", width: 176,
+                title: "会员期限", dataIndex: "member_expire", width: 160,
                 render: (v, r) => {
                   // 开始/到期合到一列：上行到期（逾期红、7 天内黄），下行开始（弱化）
                   const start = r.member_start ? <div className="cell-sub">起 {r.member_start}</div> : null;
@@ -602,7 +602,7 @@ export default function MemberManage() {
                 },
               },
               {
-                title: "操作", key: "op", width: 330, fixed: "right" as const,
+                title: "操作", key: "op", width: 300, fixed: "right" as const,
                 render: (_, r) => (
                   <Space size={0} wrap>
                     <Button type="link" size="small" onClick={() => {
@@ -658,7 +658,7 @@ export default function MemberManage() {
                 ),
               },
             ]}
-           scroll={{ x: "max-content" }}/>
+           scroll={{ x: "100%" }}/>
           <PaintHScrollbar auto />
           <PaintPagination current={childPg.page} pageSize={childPg.pageSize} total={childTotal}
             onChange={(p, s) => { childPg.onChange(p, s); updateUrl({ page: String(p) }); }} />
@@ -701,8 +701,8 @@ export default function MemberManage() {
               }
             }}
             columns={[
-              { title: "订单号", dataIndex: "order_no", width: 200, render: (v) => <Typography.Text code style={{ fontSize: 12 }}>{v}</Typography.Text> },
-              { title: "类型", dataIndex: "order_type", width: 200, render: (t: string, r: Order) => (
+              { title: "订单号", dataIndex: "order_no", width: 160, ellipsis: true, render: (v) => <Typography.Text code style={{ fontSize: 12 }}>{v}</Typography.Text> },
+              { title: "类型", dataIndex: "order_type", width: 160, ellipsis: true, render: (t: string, r: Order) => (
                 <>
                   {ORDER_TYPE_LABEL[t] ?? t}
                   {t === "deposit" || t === "deposit_supplement" ? (
@@ -715,18 +715,39 @@ export default function MemberManage() {
                   ) : null}
                 </>
               ) },
-              { title: "孩子", dataIndex: "child_name", width: 90, render: (v) => v ?? "—" },
-              { title: "家长", dataIndex: "parent_name", width: 90 },
-              { title: "金额", dataIndex: "amount", key: "amount", width: 100, sorter: true, render: (v: string) => <Typography.Text strong>￥{Number(v).toLocaleString()}</Typography.Text> },
-              { title: "状态", dataIndex: "status", width: 110, render: (s: string) => (
+              {
+                title: "孩子 / 家长", key: "child_parent", width: 120,
+                render: (_, r) => (
+                  <div>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.child_name ?? undefined}>
+                      {r.child_name ?? "—"}
+                    </div>
+                    <div
+                      title={r.parent_name ?? undefined}
+                      style={{ fontSize: 12, color: "var(--color-text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    >
+                      {r.parent_name ?? "—"}
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                title: "金额 / 收款方式", dataIndex: "amount", key: "amount", width: 140, sorter: true,
+                render: (v: string, r: Order) => (
+                  <>
+                    <Typography.Text strong>￥{Number(v).toLocaleString()}</Typography.Text>
+                    <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>{payMethodLabel(r.pay_method)}</div>
+                  </>
+                ),
+              },
+              { title: "状态", dataIndex: "status", width: 104, render: (s: string) => (
                 <Tag color={s === "paid" ? "green" : s === "cancelled" ? "default" : s === "refunded" ? "volcano" : "orange"}>
                   {ORDER_STATUS_LABEL[s] ?? s}
                 </Tag>
               ) },
-              { title: "收款方式", dataIndex: "pay_method", width: 100, render: (v) => payMethodLabel(v) },
-              { title: "创建时间", dataIndex: "create_time", key: "created_at", width: 170, sorter: true, render: (v) => String(v ?? "").slice(0, 19).replace("T", " ") },
+              { title: "创建时间", dataIndex: "create_time", key: "created_at", width: 156, sorter: true, render: (v) => String(v ?? "").slice(0, 19).replace("T", " ") },
               {
-                title: "操作", key: "op", width: 150, fixed: "right" as const,
+                title: "操作", key: "op", width: 140, fixed: "right" as const,
                 render: (_, r) => (
                   <Space>
                     {r.status === "pending_manual_confirm" && (
@@ -761,7 +782,7 @@ export default function MemberManage() {
                 ),
               },
             ]}
-           scroll={{ x: "max-content" }}/>
+           scroll={{ x: "100%" }}/>
           <PaintHScrollbar auto />
           <PaintPagination current={orderPg.page} pageSize={orderPg.pageSize} total={orderTotal}
             onChange={(p, s) => { orderPg.onChange(p, s); updateUrl({ opage: String(p) }); }} />
@@ -780,13 +801,13 @@ export default function MemberManage() {
             rowKey="id" dataSource={parents} size="middle" loading={parentLoading}
             pagination={false}
             columns={[
-              { title: "姓名", dataIndex: "name", width: 140 },
-              { title: "手机号", dataIndex: "phone", width: 140 },
-              { title: "备注", dataIndex: "remark", width: 160, render: (v) => v || "—" },
-              { title: "名下孩子", dataIndex: "children_count", width: 90 },
-              { title: "创建时间", dataIndex: "create_time", width: 170, render: (v) => String(v ?? "").slice(0, 19).replace("T", " ") },
+              { title: "姓名", dataIndex: "name", width: 130 },
+              { title: "手机号", dataIndex: "phone", width: 130 },
+              { title: "备注", dataIndex: "remark", width: 160, ellipsis: true, render: (v) => v || "—" },
+              { title: "名下孩子", dataIndex: "children_count", width: 80 },
+              { title: "创建时间", dataIndex: "create_time", width: 140, render: (v) => String(v ?? "").slice(0, 19).replace("T", " ") },
               {
-                title: "操作", key: "op", width: 240, fixed: "right" as const,
+                title: "操作", key: "op", width: 230, fixed: "right" as const,
                 render: (_, r) => (
                   <Space>
                     {/* 2026-11-03：家长有订单时只锁"改资料/删家长"，不锁"加孩子"—— */}
@@ -825,7 +846,7 @@ export default function MemberManage() {
                 ),
               },
             ]}
-           scroll={{ x: "max-content" }}/>
+           scroll={{ x: "100%" }}/>
           <PaintHScrollbar auto />
           <PaintPagination current={parentPg.page} pageSize={parentPg.pageSize} total={parentTotal}
             onChange={(p, s) => { parentPg.onChange(p, s); updateUrl({ ppage: String(p) }); }} />

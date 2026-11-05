@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "gen:api": "node scripts/gen-api.mjs",
-    "gen:api:check": "node scripts/gen-api.mjs --check"
+    "gen:api:check": "node scripts/gen-api.mjs --check",
+    "test:gauge": "node --experimental-strip-types --test tests/gaugeRules.test.ts",
+    "test:ui": "node --experimental-strip-types --test tests/*.test.ts"
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.1",

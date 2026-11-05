@@ -122,35 +122,35 @@ export default function Reservations() {
         rowKey="id" loading={loading} dataSource={items.slice((page - 1) * pageSize, page * pageSize)} size="middle"
         pagination={false}
         columns={[
-          { title: "孩子", dataIndex: "child_name", width: 100 },
+          { title: "孩子", dataIndex: "child_name", width: 90 },
           {
-            title: "家长", key: "parent", width: 160, render: (_, r) => (
+            title: "家长", key: "parent", width: 140, render: (_, r) => (
               <div>
                 <div>{r.parent_name}</div>
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>{r.parent_phone}</Typography.Text>
               </div>
             ),
           },
-          { title: "书名", dataIndex: "book_title", width: 200 },
-          { title: "副本ID", dataIndex: "copy_id", width: 80 },
+          { title: "书名", dataIndex: "book_title", width: 170, ellipsis: true },
+          { title: "副本ID", dataIndex: "copy_id", width: 70 },
           {
-            title: "状态", key: "status", width: 110, render: (_, r) => (
+            title: "状态", key: "status", width: 104, render: (_, r) => (
               <Tag color={STATUS_COLOR[r.status]}>
                 {r.expired && r.status === "active" ? "已超时（待释放）" : STATUS_LABEL[r.status] ?? r.status}
               </Tag>
             ),
           },
-          { title: "预约时间", dataIndex: "created_at", width: 170, render: fmtDateTime },
-          { title: "锁定截止", dataIndex: "expires_at", width: 170, render: fmtDateTime },
+          { title: "预约时间", dataIndex: "created_at", width: 138, render: fmtDateTime },
+          { title: "锁定截止", dataIndex: "expires_at", width: 138, render: fmtDateTime },
           {
-            title: "操作", key: "op", width: 120, render: (_, r) => (
+            title: "操作", key: "op", width: 110, fixed: "right" as const, render: (_, r) => (
               r.status === "active" && !r.expired ? (
                 <Button type="link" size="small" onClick={() => onCheckout(r)}>核销借出</Button>
               ) : <span>—</span>
             ),
           },
         ]}
-       scroll={{ x: "max-content" }}/>
+       scroll={{ x: "100%" }}/>
           <PaintHScrollbar auto />
         <PaintPagination current={page} pageSize={pageSize} total={items.length} onChange={onPageChange} listLimit={listLimit} />
       </ListCard>

@@ -222,7 +222,7 @@ export default function CircleManage() {
       {
         title: "卡片",
         dataIndex: "id",
-        width: 110,
+        width: 100,
         render: (_: unknown, r: CirclePostItem) => (
           <PreviewImage
             src={circlePostImageUrl(r.id)}
@@ -235,7 +235,8 @@ export default function CircleManage() {
       {
         title: "双署名（家长 · 孩子）",
         key: "dual_name",
-        width: 200,
+        width: 150,
+        ellipsis: true,
         render: (_: unknown, r: CirclePostItem) => (
           <span>
             {dualName(r)}
@@ -245,31 +246,32 @@ export default function CircleManage() {
       {
         title: "类型",
         dataIndex: "card_type",
-        width: 110,
+        width: 90,
         render: (_: unknown, r: CirclePostItem) => (
           <Tag color={typeTagColor(r.card_type)}>{r.card_type_label}</Tag>
         ),
       },
-      { title: "点赞数", dataIndex: "like_count", width: 90 },
+      { title: "点赞数", dataIndex: "like_count", width: 72 },
       {
         title: "馆长赞",
         dataIndex: "admin_liked",
-        width: 90,
+        width: 82,
         render: (v: boolean) =>
           v ? <Tag color="gold">已赞</Tag> : <Tag bordered={false}>未赞</Tag>,
       },
       {
         title: "置顶",
         dataIndex: "is_pinned",
-        width: 80,
+        width: 70,
         render: (v: boolean) =>
           v ? <Tag color="red">置顶</Tag> : <span style={{ color: "var(--color-text-tertiary)" }}>—</span>,
       },
-      { title: "发布时间", dataIndex: "created_at", width: 150, render: fmtDateTime },
+      { title: "发布时间", dataIndex: "created_at", width: 138, render: fmtDateTime },
       {
         title: "操作",
         key: "action",
-        width: 250,
+        width: 240,
+        fixed: "right" as const,
         render: (_: unknown, r: CirclePostItem) => (
           <span style={{ display: "inline-flex", gap: 4 }}>
             <Button
@@ -366,7 +368,7 @@ export default function CircleManage() {
         locale={{ emptyText: listError ? null : <PaintEmpty message="还没有帖子——等家长来晒第一个成就" /> }}
         pagination={false}
         columns={columns}
-        scroll={{ x: "max-content" }}
+        scroll={{ x: "100%" }}
       />
       <div style={{ marginTop: 16, textAlign: "right" }}>
         <PaintPagination

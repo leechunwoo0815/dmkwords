@@ -1,18 +1,25 @@
-import { BookFilled, LockOutlined, UserOutlined } from "@ant-design/icons";
-import { Button, Card, Form, Input, Typography, App as AntdApp } from "antd";
+import { useEffect } from "react";
+import { BookFilled, BgColorsOutlined, DownOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
+import { Button, Card, Dropdown, Form, Input, Typography, App as AntdApp } from "antd";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth";
 import { BRAND } from "../branding";
+import { THEME_LIST, getTheme } from "../theme";
 import { useAdminTheme } from "../theme/ThemeProvider";
 
 export default function Login() {
   const { login } = useAuth();
-  const { themeId } = useAdminTheme();
+  const { themeId, setThemeId } = useAdminTheme();
   const isPaint = themeId === "paint";
   const navigate = useNavigate();
   const { message } = AntdApp.useApp();
   const [form] = Form.useForm();
+
+  // WCAG 2.4.2：/login 在 Layout 之外，路由级 document.title 不覆盖它
+  useEffect(() => {
+    document.title = `登录 · ${BRAND.documentSuffix}`;
+  }, []);
 
   const onFinish = async (values: { username: string; password: string }) => {
     try {
@@ -29,6 +36,7 @@ export default function Login() {
   return (
     <div
       style={{
+        position: "relative",
         minHeight: "100vh",
         display: "flex",
         alignItems: "center",
@@ -37,6 +45,27 @@ export default function Login() {
         padding: 16,
       }}
     >
+      {/* WCAG：登录页也要有语义化页面标题（Layout 的 sr-only h1 不覆盖 /login） */}
+      <h1 className="sr-only">登录 · {BRAND.documentSuffix}</h1>
+      {/* 未登录也能切主题：验收 S455 不必"登录→切换→退出"三步 */}
+      <div style={{ position: "absolute", top: 16, right: 16 }}>
+        <Dropdown
+          trigger={["click"]}
+          menu={{
+            selectable: true,
+            selectedKeys: [`theme:${themeId}`],
+            items: THEME_LIST.map((t) => ({ key: `theme:${t.id}`, label: t.name })),
+            onClick: ({ key }) => {
+              if (key.startsWith("theme:")) setThemeId(key.slice("theme:".length));
+            },
+          }}
+        >
+          <Button type="text" icon={<BgColorsOutlined />}>
+            {getTheme(themeId).name}
+            <DownOutlined style={{ fontSize: 10 }} />
+          </Button>
+        </Dropdown>
+      </div>
       <Card
         style={{ width: 360, boxShadow: "var(--shadow-lg)" }}
         styles={{ body: { padding: 32 } }}

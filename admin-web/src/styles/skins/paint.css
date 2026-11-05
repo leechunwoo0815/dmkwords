@@ -128,7 +128,7 @@
   display: block;
   font-family: var(--paint-display);
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--paint-primary);
   letter-spacing: 1px;
 }
@@ -147,7 +147,7 @@
   border-width: 2px;
   border-color: var(--paint-ink);
   border-radius: 999px;
-  font-weight: 700;
+  font-weight: 600;
 }
 [data-theme="paint"] .ant-btn:not(.ant-btn-link):not(.ant-btn-text) {
   box-shadow: var(--paint-shadow-sm);
@@ -215,7 +215,7 @@
 [data-theme="paint"] .ant-tag {
   border: 2px solid var(--paint-ink);
   border-radius: 999px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 2px 10px;
 }
 [data-theme="paint"] .ant-tag-green,
@@ -270,7 +270,7 @@
   border: 2px solid transparent;
   border-radius: 999px;
   padding: 6px 16px;
-  font-weight: 700;
+  font-weight: 600;
 }
 [data-theme="paint"] .ant-tabs-tab:hover {
   background: var(--paint-paper-dim);
@@ -299,7 +299,7 @@
 [data-theme="paint"] .ant-table-thead > tr > th {
   border: none;
   background: var(--paint-paper-dim);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--paint-ink);
   border-radius: 12px;
 }
@@ -342,7 +342,7 @@
   margin: 6px 16px 6px 12px;
   width: auto;
   padding-left: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--paint-ink);
 }
 [data-theme="paint"] .ant-menu-item:hover {
@@ -410,7 +410,7 @@
   background: var(--paint-paper);
 }
 [data-theme="paint"] .ant-form-item-label > label {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--paint-ink);
 }
 
@@ -435,7 +435,7 @@
 [data-theme="paint"] .page-title .ant-typography {
   font-family: var(--paint-display);
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 2px;
   color: var(--paint-ink);
 }

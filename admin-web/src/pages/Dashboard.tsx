@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -27,62 +27,17 @@ import {
 } from "../api/admin";
 import { hasPermission, useAuth } from "../auth";
 import { useTodoCounts } from "../hooks/useTodoCounts";
-import type { components } from "../api/schema";
 import DashboardCharts from "../components/DashboardCharts";
 import PageHead from "../components/PageHead";
+import { BUSINESS_CELLS, KPI_RATIO, cellValue, kpiTone, type Overview } from "../dashboardKpi";
 
-type Overview = components["schemas"]["DashboardOverviewResponse"];
-
-/** 经营看板格子（C21 点亮：只读统计；valueKey 对应 DashboardOverviewResponse 字段） */
-const BUSINESS_CELLS: { label: string; unit: string; valueKey: string }[] = [
-  { label: "总藏书量", unit: "本", valueKey: "copy_total" },
-  { label: "在馆 / 借出", unit: "本", valueKey: "copy_available_borrowed" },
-  { label: "维护 / 遗失", unit: "本", valueKey: "copy_maint_lost" },
-  { label: "今日借出", unit: "本", valueKey: "today_borrowed" },
-  { label: "今日归还", unit: "本", valueKey: "today_returned" },
-  { label: "当前逾期", unit: "本", valueKey: "overdue_active" },
-  { label: "会员总数", unit: "人", valueKey: "member_total" },
-  { label: "待评估", unit: "人", valueKey: "pending_evaluation_count" },
-  { label: "本周新增会员", unit: "人", valueKey: "member_new_week" },
-  { label: "续借率", unit: "%", valueKey: "renew_rate" },
-  { label: "退会率", unit: "%", valueKey: "withdrawal_rate" },
-  { label: "测验通过率", unit: "%", valueKey: "quiz_pass_rate" },
-  { label: "里程碑达成", unit: "人", valueKey: "milestone_count" },
-  { label: "近期活动报名", unit: "人次", valueKey: "activity_enroll_recent" },
-];
-
-const cellValue = (o: Overview | null, key: string): number | string | null => {
-  if (!o) return null;
-  if (key === "copy_available_borrowed") return `${o.copy_available} / ${o.copy_borrowed}`;
-  if (key === "copy_maint_lost") return `${o.copy_maintenance} / ${o.copy_lost}`;
-  const raw = (o as unknown as Record<string, number | null | undefined>)[key] ?? null;
-  return raw;
-};
-
-/** KPI 磁贴底部比例条：只用真实比例，取不到就不画（不编造同比/目标值）。 */
-const KPI_RATIO: Record<string, (o: Overview) => number | null> = {
-  copy_total: (o) => ((o.copy_total ?? 0) > 0 ? (o.copy_available ?? 0) / (o.copy_total ?? 1) : null),
-  copy_available_borrowed: (o) => {
-    const base = (o.copy_available ?? 0) + (o.copy_borrowed ?? 0);
-    return base > 0 ? (o.copy_available ?? 0) / base : null;
-  },
-  overdue_active: (o) =>
-    (o.copy_borrowed ?? 0) > 0 ? Math.min(1, (o.overdue_active ?? 0) / (o.copy_borrowed ?? 1)) : null,
-  pending_evaluation_count: (o) =>
-    (o.member_total ?? 0) > 0 ? Math.min(1, (o.pending_evaluation_count ?? 0) / (o.member_total ?? 1)) : null,
-  member_new_week: (o) =>
-    (o.member_total ?? 0) > 0 ? Math.min(1, (o.member_new_week ?? 0) / (o.member_total ?? 1)) : null,
-  renew_rate: (o) => ((o.renew_rate ?? 0) / 100),
-  withdrawal_rate: (o) => ((o.withdrawal_rate ?? 0) / 100),
-  quiz_pass_rate: (o) => ((o.quiz_pass_rate ?? 0) / 100),
-};
-
-/** 需要被看见的值：逾期 >0 标红、待评估 >0 标黄（其余中性）。 */
-const kpiTone = (key: string, o: Overview): "default" | "warning" | "danger" | "success" => {
-  if (key === "overdue_active" && (o.overdue_active ?? 0) > 0) return "danger";
-  if (key === "pending_evaluation_count" && (o.pending_evaluation_count ?? 0) > 0) return "warning";
-  return "default";
-};
+/** 数据新鲜度时刻（HH:mm:ss）；没有成功取数时显示 —（不编造"刚刚更新"）。 */
+const fmtTime = (at: Date | null): string =>
+  at
+    ? `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}:${String(
+        at.getSeconds(),
+      ).padStart(2, "0")}`
+    : "—";
 
 /** WM13 待办卡（提案 §6.3）：实时计数+跳转；失败禁假 0（U10）；零待办绿色态。
  *
@@ -219,6 +174,10 @@ export default function Dashboard() {
   const { message } = AntdApp.useApp(); // F-L4/T34：App context 化（禁静态 message）
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
+  // 168 批：overview 纳入 60s 轮询；updatedAt 是"最近一次成功取数"的真实时刻，
+  // 失败时保留旧数据并在横幅里标明上次成功时间，不把刷新失败伪装成空/0。
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const inFlight = useRef(false);
   // W6-D1（第十轮 P2，2026-10-24）：取数失败原先只有 ~3s toast，页面照旧渲染成
   // 「最近配置变更：暂无变更记录」+ 经营看板全「—」+ 图形区整块消失——与"确实没有数据"
   // 长得一模一样（超管首屏据此误判经营数据）。改为**页面级失败态**（横幅 + 重试），
@@ -228,22 +187,49 @@ export default function Dashboard() {
   const { permissions } = useAuth();
   const isSuper = hasPermission(permissions, "audit.view");
 
-  const load = () => {
-    setLoading(true);
-    apiDashboardOverview()
-      .then((d) => {
-        setOverview(d);
-        setOverviewError("");
-      })
-      // F-M8 族/T26：仪表盘 fetch 失败必须报错——静默 = 管理员对着空看板误判经营数据
-      .catch((e: Error) => {
-        setOverviewError(e.message || "概览加载失败");
-        message.error(e.message);
-      })
-      .finally(() => setLoading(false));
-  };
+  const load = useCallback(
+    (silent = false) => {
+      if (inFlight.current) return;
+      inFlight.current = true;
+      if (!silent) setLoading(true);
+      apiDashboardOverview()
+        .then((d) => {
+          setOverview(d);
+          setOverviewError("");
+          setUpdatedAt(new Date());
+        })
+        // F-M8 族/T26：仪表盘 fetch 失败必须报错——静默 = 管理员对着空看板误判经营数据。
+        // 自动轮询（silent）不弹 toast：每 60 秒骚扰一次没有意义，页内横幅已足够可见。
+        .catch((e: Error) => {
+          // 浏览器的网络层错误是英文 "Failed to fetch"，对馆员不可读，统一换成中文
+          const msg = e.message === "Failed to fetch" ? "网络请求失败" : e.message || "概览加载失败";
+          setOverviewError(msg);
+          if (!silent) message.error(msg);
+        })
+        .finally(() => {
+          inFlight.current = false;
+          if (!silent) setLoading(false);
+        });
+    },
+    [message],
+  );
 
-  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    load();
+    // 页签隐藏时暂停轮询（后台标签不必每 60 秒打一次接口）；回到前台立即补一次，
+    // 避免"切回来还是旧数据"。
+    const timer = setInterval(() => {
+      if (!document.hidden) load(true);
+    }, 60000);
+    const onVisible = () => {
+      if (!document.hidden) load(true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [load]);
 
   return (
     <>
@@ -270,7 +256,7 @@ export default function Dashboard() {
                 导出审计日志
               </Button>
             )}
-            <Button icon={<ReloadOutlined />} size="small" type="text" onClick={load}>
+            <Button icon={<ReloadOutlined />} size="small" type="text" onClick={() => load()}>
               刷新
             </Button>
           </>
@@ -279,8 +265,10 @@ export default function Dashboard() {
 
       {overviewError && (
         <Typography.Text type="warning" style={{ display: "block", marginBottom: 12 }}>
-          {overviewError} · 本次取数失败：下方数字与图形未加载（不代表经营数据为 0/无变更）——请重试
-          <Typography.Link onClick={load} style={{ marginLeft: 8 }}>
+          {overview
+            ? `${overviewError} · 本次刷新失败：下方显示的是上一次成功数据（${fmtTime(updatedAt)}），可能不是最新——请重试`
+            : `${overviewError} · 本次取数失败：下方数字与图形未加载（不代表经营数据为 0/无变更）——请重试`}
+          <Typography.Link onClick={() => load()} style={{ marginLeft: 8 }}>
             重试
           </Typography.Link>
         </Typography.Text>
@@ -289,8 +277,12 @@ export default function Dashboard() {
       {/* 关键指标磁贴：先给"数"再给"图"——第一屏应该能扫完经营概况。
           比例条只用真实比例（在馆/总量、逾期/在借、新增/会员总数），不编造同比或目标值。 */}
       {overview && (
-        <div className="kpi-grid">
-          {BUSINESS_CELLS.map((cell) => {
+        <>
+          <div className="dash-overview-updated">
+            数据更新于 {fmtTime(updatedAt)} · 每 60 秒自动刷新
+          </div>
+          <div className="kpi-grid">
+            {BUSINESS_CELLS.map((cell) => {
             const value = cellValue(overview, cell.valueKey);
             const unit = cell.unit;
             const iconName: IconName =
@@ -309,7 +301,8 @@ export default function Dashboard() {
               />
             );
           })}
-        </div>
+          </div>
+        </>
       )}
 
       {/* 图形区（2026-09-21 用户需求：仪表盘要有"很酷炫的图"，且要投到店外电视上）。

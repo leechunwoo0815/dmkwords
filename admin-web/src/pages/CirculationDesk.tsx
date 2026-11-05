@@ -525,7 +525,7 @@ export default function CirculationDesk() {
                   }}
                 >{r.status === "overdue" ? "人工续借" : "续借"}</Button>
               ) },
-              { title: "操作", key: "op", width: 100, render: (_, r) => (
+              { title: "操作", key: "op", width: 100, fixed: "right" as const, render: (_, r) => (
                 <Button type="primary" size="small" onClick={() => doReturn(r)}>还书</Button>
               ) },
             ]}

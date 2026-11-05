@@ -26,29 +26,12 @@ import { useTodoCounts } from "../hooks/useTodoCounts";
 import { BRAND } from "../branding";
 import TechIcon from "../components/TechIcon";
 import type { IconName } from "../components/TechIcon";
+import { PAGE_TITLES, pageTitleFor } from "../pageTitles";
 import { THEME_LIST, getTheme } from "../theme";
 import { useAdminTheme } from "../theme/ThemeProvider";
+import { paintIllustration as P } from "../theme/paint";
 
 const { Sider, Header, Content } = AntLayout;
-
-/** 路由 → 页面名（document.title / 面包屑 / 侧栏同口径）。 */
-const PAGE_TITLES: Record<string, string> = {
-  "/": "仪表盘",
-  "/books": "图书管理",
-  "/members": "会员管理",
-  "/deposits": "押金与赔偿",
-  "/circulation": "借阅操作台",
-  "/reservations": "预约管理",
-  "/growth": "成长与测验",
-  "/activities": "线下活动",
-  "/refund-center": "退款中心",
-  "/circle": "阅读圈",
-  "/notifications": "通知中心",
-  "/tasks": "任务看板",
-  "/staff": "员工管理",
-  "/configs": "系统配置",
-  "/audit-logs": "审计日志",
-};
 
 export default function Layout() {
   const { user, permissions, logout } = useAuth();
@@ -60,38 +43,38 @@ export default function Layout() {
   const isPaint = themeId === "paint";
   // 绘本风的彩色图标圆圈（旧版按路由给每个图标配底色/字色）；企业风不渲染这层
   const iconBgMap: Record<string, string> = {
-    "/": "#FCD34D",
-    "/books": "#FF6B35",
-    "/members": "#60A5FA",
-    "/deposits": "#A78BFA",
-    "/circulation": "#4ADE80",
-    "/reservations": "#F472B6",
-    "/growth": "#FCD34D",
-    "/activities": "#FF6B35",
-    "/refund-center": "#EF4444",
-    "/staff": "#60A5FA",
-    "/configs": "#6B5B5B",
-    "/audit-logs": "#A78BFA",
-    "/notifications": "#F472B6",
-    "/tasks": "#4ADE80",
-    "/circle": "#FCD34D",
+    "/": P.yellow,
+    "/books": P.orange,
+    "/members": P.blue,
+    "/deposits": P.purple,
+    "/circulation": P.green,
+    "/reservations": P.pink,
+    "/growth": P.yellow,
+    "/activities": P.orange,
+    "/refund-center": P.red,
+    "/staff": P.blue,
+    "/configs": P.textSecondary,
+    "/audit-logs": P.purple,
+    "/notifications": P.pink,
+    "/tasks": P.green,
+    "/circle": P.yellow,
   };
   const iconColorMap: Record<string, string> = {
-    "/": "#3B2F2F",
-    "/books": "#FFFFFF",
-    "/members": "#FFFFFF",
-    "/deposits": "#FFFFFF",
-    "/circulation": "#3B2F2F",
-    "/reservations": "#FFFFFF",
-    "/growth": "#3B2F2F",
-    "/activities": "#FFFFFF",
-    "/refund-center": "#FFFFFF",
-    "/staff": "#FFFFFF",
-    "/configs": "#FFFFFF",
-    "/audit-logs": "#FFFFFF",
-    "/notifications": "#FFFFFF",
-    "/tasks": "#3B2F2F",
-    "/circle": "#3B2F2F",
+    "/": P.ink,
+    "/books": P.white,
+    "/members": P.white,
+    "/deposits": P.white,
+    "/circulation": P.ink,
+    "/reservations": P.white,
+    "/growth": P.ink,
+    "/activities": P.white,
+    "/refund-center": P.white,
+    "/staff": P.white,
+    "/configs": P.white,
+    "/audit-logs": P.white,
+    "/notifications": P.white,
+    "/tasks": P.ink,
+    "/circle": P.ink,
   };
 
   // L3 双保险（Q10 裁定）：路由变化也触发待办刷新（审核完成主动 dispatch 之外的兜底）
@@ -102,8 +85,7 @@ export default function Layout() {
   // WCAG 2.4.2（页面有标题）：此前所有路由共用「DmkWords 管理后台」一个 document.title，
   // 读屏器/浏览器历史/收藏都无法区分页面（2026-10-24 无障碍轴实测）。
   useEffect(() => {
-    const detail = location.pathname.startsWith("/books/") ? "图书详情" : "";
-    const name = PAGE_TITLES[location.pathname] ?? detail;
+    const name = pageTitleFor(location.pathname);
     document.title = name ? `${name} · ${BRAND.documentSuffix}` : BRAND.documentSuffix;
   }, [location.pathname]);
 
@@ -204,9 +186,9 @@ export default function Layout() {
   // 菜单分组：15 项平铺像"毛坯"，分组后才有信息架构（Feishu/DingTalk 同款做法）
   const GROUPS: { key: string; label: string; keys: string[]; icon: IconName }[] = [
     { key: "overview", label: "概览", icon: "dashboard", keys: ["/"] },
-    { key: "library", label: "馆藏与借阅", icon: "book", keys: ["/books", "/circulation", "/reservations", "/deposits"] },
+    { key: "library", label: "馆藏与借阅", icon: "book", keys: ["/books", "/circulation", "/reservations"] },
     { key: "reader", label: "读者与运营", icon: "member", keys: ["/members", "/growth", "/activities", "/circle", "/notifications"] },
-    { key: "money", label: "资金与合规", icon: "refund", keys: ["/refund-center", "/audit-logs"] },
+    { key: "money", label: "资金与合规", icon: "refund", keys: ["/deposits", "/refund-center", "/audit-logs"] },
     { key: "system", label: "系统", icon: "config", keys: ["/tasks", "/staff", "/configs"] },
   ];
 
@@ -368,7 +350,7 @@ export default function Layout() {
         >
           {/* B8（2026-10-28）：无障碍——每页一个语义化 h1（视觉隐藏，不改变布局）。
               此前全仓管理端页面无 h1–h6，读屏软件无法定位页面主题。 */}
-          <h1 className="sr-only">{PAGE_TITLES[location.pathname] ?? BRAND.documentSuffix}</h1>
+          <h1 className="sr-only">{pageTitleFor(location.pathname) ?? BRAND.documentSuffix}</h1>
           {/* 内容面（surface）：页面内容装进一张白纸，而不是直接浮在灰底上——
               这是"成品感"与"毛坯感"最大的差别；卡片再画在这张白纸上。 */}
           <div className="page-surface">

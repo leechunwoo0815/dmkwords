@@ -125,7 +125,7 @@ export default function SystemConfigPage() {
           {
             title: "配置项",
             key: "name",
-            width: 240,
+            width: 220,
             render: (_, r) => (
               <div>
                 <div>{r.display_name || r.description || r.config_key}</div>
@@ -142,7 +142,7 @@ export default function SystemConfigPage() {
           {
             title: "类型",
             dataIndex: "value_type",
-            width: 70,
+            width: 64,
             render: (t: string) => (
               <Tag color={TYPE_COLOR[t] ?? "default"}>{TYPE_LABEL[t] ?? t}</Tag>
             ),
@@ -150,7 +150,8 @@ export default function SystemConfigPage() {
           {
             title: "当前值",
             dataIndex: "config_value",
-            width: 140,
+            width: 110,
+            ellipsis: true,
             render: (v: string, record) =>
               record.value_type === "bool" ? (
                 <Tag color={v === "true" ? "green" : "default"}>
@@ -163,7 +164,8 @@ export default function SystemConfigPage() {
           {
             title: "默认值",
             dataIndex: "default_value",
-            width: 120,
+            width: 96,
+            ellipsis: true,
             render: (v: string, record) =>
               record.value_type === "bool" ? (
                 <Typography.Text type="secondary">
@@ -173,12 +175,12 @@ export default function SystemConfigPage() {
                 <Typography.Text type="secondary">{v}</Typography.Text>
               ),
           },
-          { title: "说明", dataIndex: "description", ellipsis: true },
+          { title: "说明", dataIndex: "description", width: 240, ellipsis: true },
           {
             title: "操作",
             fixed: "right" as const,
             key: "action",
-            width: 80,
+            width: 72,
             render: (_, record) =>
               canEdit ? (
                 <Button type="link" size="small" onClick={() => openEdit(record)}>
@@ -187,7 +189,7 @@ export default function SystemConfigPage() {
               ) : null,
           },
         ]}
-       scroll={{ x: "max-content" }}/>
+       scroll={{ x: "100%" }}/>
           <PaintHScrollbar auto />
         <PaintPagination current={page} pageSize={pageSize} total={filtered.length} onChange={onPageChange} />
       </ListCard>

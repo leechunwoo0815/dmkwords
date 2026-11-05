@@ -260,6 +260,15 @@ body {
   margin-top: -1px !important;
 }
 
+/* 令牌接线（167 批）：表头/行高由主题密度控制，避免"注入但零消费"。
+   height 在表格里等价于最小行高；内容更高时仍按内容撑开。 */
+.page-surface .ant-table-thead > tr > th {
+  height: var(--table-header-height);
+}
+.page-surface .ant-table-tbody > tr > td {
+  height: var(--table-row-height);
+}
+
 /* ---------- 骨架：侧栏 / Header ---------- */
 .paint-sider {
   border-right: var(--border-width) solid var(--color-sider-border);
@@ -581,6 +590,12 @@ body {
   font-size: 11px;
   color: var(--color-text-quaternary);
 }
+/* 168 批：KPI 区自己的数据新鲜度时刻（与趋势卡的"图形数据"分开标注） */
+.dash-overview-updated {
+  margin: -4px 0 8px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
 .dash-card-title {
   display: inline-flex;
   align-items: center;
@@ -617,22 +632,39 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .dash-freshness-dot {
+  position: relative;
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--color-success);
-  box-shadow: 0 0 0 0 var(--color-success);
+}
+/* 170 批：脉冲环用主题成功色（原先写死 rgba(0,180,42)），三套主题都跟随 */
+.dash-freshness-dot::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 1px solid var(--color-success);
   animation: freshness-pulse 2s ease-out infinite;
 }
 @keyframes freshness-pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(0, 180, 42, 0.4);
+    transform: scale(1);
+    opacity: 0.5;
   }
   70% {
-    box-shadow: 0 0 0 6px rgba(0, 180, 42, 0);
+    transform: scale(2.4);
+    opacity: 0;
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(0, 180, 42, 0);
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-freshness-dot::after {
+    animation: none;
+    opacity: 0;
   }
 }
 

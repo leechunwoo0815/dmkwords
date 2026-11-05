@@ -200,6 +200,7 @@ export default function TaskBoard() {
             {
               title: "操作",
               width: 110,
+              fixed: "right" as const,
               render: (_: unknown, r) => (
                 // P2-21（2026-10-17 第六十九批·大审查）：无权触发的任务**禁按钮 + 说明**，
                 // 不再让专员点了才吃 403（判据来自后端 `manual_allowed`，与服务层强制点同源）

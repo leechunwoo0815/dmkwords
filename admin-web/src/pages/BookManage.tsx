@@ -38,6 +38,7 @@ import { AR_LEVEL_RULE } from "../constants/book";
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { cfgNum, useConfigs } from "../hooks/useConfigs";
 import PageHead from "../components/PageHead";
+import ListCard from "../components/ListCard";
 
 export default function BookManage() {
   // 第八轮 E 批剩余：测验口径读后端配置（原先文案写死"5 道/3 次"）
@@ -214,35 +215,29 @@ export default function BookManage() {
       />
 
       {/* 列表卡：工具条（标题 + 总数 + 批量操作）+ 搜索区 + 标签页 + 表格 + 分页 */}
-      <div className="list-card">
-        <div className="list-card-head">
-          <div className="list-card-title">
-            图书列表
-            <span className="list-card-count">共 {countsFailed ? "—" : total} 条</span>
-          </div>
-          <Space size="small">
-            {selectedRowKeys.length > 0 && (
-              <>
-                <Button size="small" icon={<ArrowUpOutlined />} onClick={() => handleBatchToggle(1)}>
-                  批量上架 ({selectedRowKeys.length})
-                </Button>
-                <Button size="small" icon={<ArrowDownOutlined />} onClick={() => handleBatchToggle(0)}>
-                  批量下架 ({selectedRowKeys.length})
-                </Button>
-                <Popconfirm
-                  title={`确认删除选中的 ${selectedRowKeys.length} 条书目？`}
-                  description="删除后不可恢复，已借出副本会阻止删除。"
-                  onConfirm={handleBatchDelete}
-                >
-                  <Button size="small" danger icon={<DeleteOutlined />}>
-                    批量删除 ({selectedRowKeys.length})
-                  </Button>
-                </Popconfirm>
-              </>
-            )}
-          </Space>
-        </div>
-        <div className="list-card-filter">
+      <ListCard
+        title="图书列表"
+        count={`共 ${countsFailed ? "—" : total} 条`}
+        extra={selectedRowKeys.length > 0 ? (
+          <>
+            <Button size="small" icon={<ArrowUpOutlined />} onClick={() => handleBatchToggle(1)}>
+              批量上架 ({selectedRowKeys.length})
+            </Button>
+            <Button size="small" icon={<ArrowDownOutlined />} onClick={() => handleBatchToggle(0)}>
+              批量下架 ({selectedRowKeys.length})
+            </Button>
+            <Popconfirm
+              title={`确认删除选中的 ${selectedRowKeys.length} 条书目？`}
+              description="删除后不可恢复，已借出副本会阻止删除。"
+              onConfirm={handleBatchDelete}
+            >
+              <Button size="small" danger icon={<DeleteOutlined />}>
+                批量删除 ({selectedRowKeys.length})
+              </Button>
+            </Popconfirm>
+          </>
+        ) : undefined}
+        filter={
           <Input.Search
             placeholder="书名 / 作者 / ISBN / 编号"
             allowClear
@@ -258,18 +253,8 @@ export default function BookManage() {
             onSearch={doSearch}
             onClear={() => doSearch("")}
           />
-        </div>
-        {batchErrors && (
-          <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--color-divider)" }}>
-            <Typography.Text type="danger">批量操作部分失败明细：</Typography.Text>
-            <div style={{ marginTop: 4, maxHeight: 200, overflow: "auto", background: "var(--color-bg-subtle)", border: "1px solid var(--color-border)", padding: 12, borderRadius: "var(--radius-base)" }}>
-              {batchErrors.map((e, i) => (
-                <div key={i} style={{ color: "var(--color-danger)", fontSize: 13 }}>{e}</div>
-              ))}
-            </div>
-          </div>
-        )}
-      <Tabs
+        }
+        tabs={<Tabs
         activeKey={tab}
         onChange={(k) => {
           setTab(k);
@@ -284,7 +269,18 @@ export default function BookManage() {
           { key: "no_audio", label: `未传音频（${countsFailed ? "—" : (tabCounts.no_audio ?? 0)}）` },
           { key: "quiz_incomplete", label: `测验未满 ${cfgNum(configs, "quiz_questions_per_book", 5)} 道（${countsFailed ? "—" : (tabCounts.quiz_incomplete ?? 0)}）` },
         ]}
-      />
+        />}
+      >
+        {batchErrors && (
+          <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--color-divider)" }}>
+            <Typography.Text type="danger">批量操作部分失败明细：</Typography.Text>
+            <div style={{ marginTop: 4, maxHeight: 200, overflow: "auto", background: "var(--color-bg-subtle)", border: "1px solid var(--color-border)", padding: 12, borderRadius: "var(--radius-base)" }}>
+              {batchErrors.map((e, i) => (
+                <div key={i} style={{ color: "var(--color-danger)", fontSize: 13 }}>{e}</div>
+              ))}
+            </div>
+          </div>
+        )}
         <div ref={tableWrapRef} style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
         {listError && (
           <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
@@ -298,7 +294,7 @@ export default function BookManage() {
           dataSource={books}
           size="middle"
           pagination={false}
-          scroll={{ x: "max-content" }}
+          scroll={{ x: "100%" }}
           onChange={(_pagination, _filters, sorter) => {
             const s = Array.isArray(sorter) ? sorter[0] : sorter;
             if (s && s.order && (s.field === "word_count" || s.field === "copy_count")) {
@@ -316,11 +312,11 @@ export default function BookManage() {
             preserveSelectedRowKeys: true,
           }}
           columns={[
-          { title: "书名", dataIndex: "title", width: 172, render: (t: string, r) => (
+          { title: "书名", dataIndex: "title", width: 160, ellipsis: true, render: (t: string, r) => (
             <a onClick={() => window.open(`/books/${r.id}`, "_self")}>{t}</a>
           ) },
-          { title: "作者", dataIndex: "author", width: 84, ellipsis: true },
-          { title: "ISBN / 编号", key: "code", width: 128, render: (_, r) => (
+          { title: "作者", dataIndex: "author", width: 130, ellipsis: true },
+          { title: "ISBN / 编号", key: "code", width: 120, render: (_, r) => (
             <Typography.Text code style={{ fontSize: 12 }}>{r.isbn ?? r.internal_code}</Typography.Text>
           ) },
           { title: "AR", dataIndex: "ar_level", width: 50, render: (v) => v ?? <Tag color="orange">待配置</Tag> },
@@ -336,7 +332,7 @@ export default function BookManage() {
             sortOrder: sortField === "copy_count" ? (sortOrder ?? null) : null,
           },
           {
-            title: "素材", key: "assets", width: 126,
+            title: "素材", key: "assets", width: 116,
             render: (_, r) => (
               <Space size={4}>
                 <Tooltip title={r.cover_path ? "封面已传" : "封面未传"}>
@@ -354,12 +350,12 @@ export default function BookManage() {
             ),
           },
           {
-            title: "状态", dataIndex: "status", width: 62,
+            title: "状态", dataIndex: "status", width: 80,
             render: (s: number) => (s === 1 ? <Tag color="green">上架</Tag> : <Tag>下架</Tag>),
           },
           {
             // 固定在右侧：表格列多时横向滚动，操作列永远可见（否则右边缘被裁一半）
-            title: "操作", key: "op", width: 170, fixed: "right" as const,
+            title: "操作", key: "op", width: 168, fixed: "right" as const,
             render: (_, r) => (
               <Space size="small">
                 <Button type="link" size="small" onClick={() => window.open(`/books/${r.id}`, "_self")}>编辑</Button>
@@ -399,7 +395,7 @@ export default function BookManage() {
           <PaintHScrollbar target={tableContent} />
         </div>
         <PaintPagination current={page} pageSize={pageSize} total={total} onChange={onPageChange} />
-      </div>
+      </ListCard>
 
       <Modal
         title="新书入库"

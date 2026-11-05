@@ -179,7 +179,7 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 
 | 级别 | 改动范围 | 本地提交前必须验证 | 是否可信任 CI 跑全量 | 备注 |
 | :--- | :--- | :--- | :--- | :--- |
-| **A 级** | 仅 `admin-web/**` 纯前端文件 | `cd admin-web && pnpm exec tsc --noEmit` | ✅ 可以 | push 后 CI 会跑全量 gate；本地 commit 前只需 tsc 绿 |
+| **A 级** | 仅 `admin-web/**` 纯前端文件 | `cd admin-web && pnpm exec tsc --noEmit && pnpm test:ui` | ✅ 可以 | push 后 CI 会跑全量 gate；本地 commit 前只需 tsc + 前端单测绿 |
 | **B 级** | 仅 `backend/**` 或 `tests/**` 单域 | 相关域 pytest 单文件 + `ruff check backend/ tests/` | ❌ 推荐再跑 `bash scripts/gate.sh full` 但非强制 | 例：`pytest tests/unit/test_wm2_catalog.py -q`（约 20-60s） |
 | **C 级** | `models/`、迁移、公共层、跨域调用 | `bash scripts/gate.sh full` | ❌ 必须本地绿 | 高传播面，本地全量 + CI 绿 |
 | **B′ 级（2026-09-21 补）** | 仅 `miniapp/**`（页面/组件/样式/文案） | `.venv/bin/python -m scripts.check_miniapp_style` + `check_miniapp_bindings` + `check_media_discipline`（**再加一次真机截图目视**，见 docs/15 §二十） | ❌ 不必本地全量 | 小程序**没有 pytest/tsc 可跑**——它的"测试"就是那三个检查器 + 截图；`gate.sh` 第 [5] 步与它们同源 |
@@ -198,14 +198,14 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 > ② 开全量之前先跑**四个秒级单点检查**兜住最常见的红：`ruff check/format`（2s）、`python -m scripts.verify_architecture`（1s）、
 >    `python -m scripts.check_docs_code_alignment`（2s）、`bash scripts/dev.sh status`（确认现场已停，防 BDD 抢库卡住）；
 > ③ 全量门禁红了，**只重跑失败的那一步**（`pytest <那个文件>` / 那个 checker），修完再跑一次全量，而不是每修一处就重跑 10 步；
-> ④ A 级只跑 tsc、B 级只跑该域 pytest + ruff、D 级不跑门禁也不单独推；最终兜底交给 CI 的全量 gate。
+> ④ A 级只跑 tsc + `pnpm test:ui`、B 级只跑该域 pytest + ruff、D 级不跑门禁也不单独推；最终兜底交给 CI 的全量 gate。
 
 > **`miniapp/**` 与 `scripts/**` 没有归级**，我（模型）于是习惯性对"改了 seed 一处书名 + 交接文档"也开全量门禁，白跑 15 分钟。**分级照改动面判定，验证成本与风险成正比**（本条与本节开头那句同源）。
 
 ### 不变纪律
 
 - **A/B/C 级如需跑 pytest，必须先 `bash scripts/dev.sh stop`**，因为 pytest 与 dev.sh 共库。
-- **禁止以"反正 CI 会跑"为由本地完全不验证**：A 级至少 tsc；B 级至少相关域单文件 + ruff；C 级必须本地全量 gate。
+- **禁止以"反正 CI 会跑"为由本地完全不验证**：A 级至少 tsc + `pnpm test:ui`；B 级至少相关域单文件 + ruff；C 级必须本地全量 gate。
 - **D 级不跑门禁、不为它推送或等 CI（2026-09-20 用户明令）**：纯文档刀没有可执行断言，跑 10 步全量门禁和一轮 CI 是 8~16 分钟的纯浪费——文档修补攒够、合并进下一次代码推送；
   **唯一例外**：在 `docs/` / `error_list/` / `外部专家意见/` 下**新增未跟踪文件**会被门禁第 [9] 步交付完整性拦，stage 时一并带上即可（不必为此单独开门禁）。
 - **完成 = 退出码 0 + 输出贴原文**（第六节 DoD 仍然成立，但"门禁命令"按本节分级选取）。
@@ -220,9 +220,9 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 | 2 | 单测 + 覆盖率 | `pytest tests/ -q --cov=backend --cov-fail-under=85`（**passed 数以 `gate-runs/` 最新一次输出为准**：2026-10-28 全量门禁（含 `--cov`，即 `gate.sh full` 步[2]）`pytest tests/` = **1280 passed / 0 failed / 0 skipped**（38m29s，覆盖率 **90.90%**；日志 `gate-runs/2026-10-28/gate-111804.log`；**数量下限 = `scripts/gate_baseline.json` 的 `min_passed`（当前 **1280**；**按收集数 = passed + skipped 比对**——CI 凌晨 `test_media_health` 走时钟 skip 不会误红），低于即判红**；**skip 收紧（B4/W8-D11）**：`pytest -rs` 的每个 SKIPPED 文件必须在 `scripts/gate_baseline.json` 的 `allowed_skips` 登记理由（`scripts/gate_skip_audit.py`），未登记即红；演进：1073（2026-10-22）→ 1138 → 1222 → 1255（第十一轮整改）→ 1260（合规口径改造）→ 1265（R11-e 门禁自证）→ 1266（端上取证补漏）→ 1267（CI 修复：收集数基线）→ 1271（产品口径四项）→ 1273（B5 索引判据）→ **1280**（B4 检查器判据）；覆盖率卡线 2026-10-28 由 25% 抬到 **85%**（实测 90.89%，B4/W8-D15；宪法目标 85/关键域 90）） |
 | 3 | BDD | `behave features/ --no-capture -q`（当前 **活动面 249 scenarios / 950 steps；全量 345 = 249 活跃 + 96 挂起展开**（2026-10-19 第八十九批：**rbac 域 2 场景解封**，+2 场景/+4 步，skipped 98→96；上一批 audit 域 +2/+4；38 个特性文件 = 27 个已解封 + 11 个整文件 `@draft`；剩余 `@draft` **65 场景条目 / 13 文件**，展开后 96 条 skipped）——**口径以 `gate-runs/` 最近一次全量日志为准**，下表数字仅作参考。历史基线演进：2026-10-13~16 第五十一~六十四轮解封押金/退会/转让、借阅/预约、词数/测验/积分/里程碑/榜单、**活动域 45 场景**、**音频收听域 14 场景**、**会员生命周期域 13 场景**、**预约域转维护 2 场景（G5）**、**图书资产管理域 11 场景（第六十一批，@draft 清零）**、**生词本与查词域 10 场景（第六十四批，@draft 清零）**、**收藏夹域 6 场景（第六十五批，@draft 清零）**，并补齐小程序自助续借（G6）、逾期书馆员人工续借（G7）、里程碑馆员通知（G9）、过期放行「续费跟进」（G11）、下架停播/禁测（G15/G16）、无 ISBN 禁走 Excel（G17）、生词本统计三口径收口服务端（第六十四批）、收藏入参类型化（第六十五批）；第七十/七十一批解封 account 6 场景 + admin_todo 7 场景；**基线原为 9/36/127**） |
 | 4 | 架构关 | **先自证再主流程**：`python -m scripts.verify_architecture --self-test` + `python -m scripts.verify_architecture`（Router 违规 0 / 单文件 ≤800 行 / 域四件套 / import 白名单 / 锁定读 `populate_existing` / 无 sqlite） |
-| 5 | 契约与反假绿（**含检查器自证**） | **清单驱动**：`CHECKER_CMDS` 数组里每个检查器**先 `--self-test` 再主流程**（第八轮审查 P1-10：原先只跑主流程，实测把 `?v=` 改坏 / 关掉 sqlite 禁令 / 让 R14 永远返回 `[]` / 把文档"文件存在性"改成 `if False and ...` —— gate 全部照样 PASS）。清单成员（当前仓库 **15 个检查器**；gate 实际调用 **14 个**（运行期 `check_demo_baseline` 除外）+ 非检查器 2 个（`export_openapi` + `gate_skip_audit`）；`-f` 守卫待启用 **0 个**（两个旧工具死分支已删，W8-D10），见 `check_gate_selftest` 实测）：`check_fake_assertions`（假绿断言 + **时间炸弹**：测试禁写死的近期未来绝对时间；**规则 C 源码文本断言登记制**） · `check_miniapp_bindings` · `check_miniapp_wiring`（W1 handler 存在 / W2 插值类名可解析 / W3 reader 入口传 id / W4 失败不吞成空（**资金/记录类 6 页的加载函数 catch 必须落到可见失败态**，第一百三十五批） / W5 远程图带 binderror / **W6 utils 符号先 require**——第一百三十四批 IDE 实测：`reader.js` 用了 `getConfigs` 却没 require，**reading 分包 5 页全挂**而七查全绿） · `check_docs_code_alignment`（文档↔代码：文件/接口/配置键/表/符号/任务/域，**扫描面含 `README.md`**） · `check_rbac_consistency` · `check_admin_todo_rows`（待办卡行覆盖 admin_total 全部求和项） · **`check_admin_failure_states`**<!-- docs-code-ignore: check_admin_failure_states -->（管理端「失败不许伪装成空/0」：A1 吞错 catch 未登记 / A2 列表页取数无失败态） · **`check_miniapp_style`**（R1–**R16** + S1–S3 自证；R14 = WXML 注释/标签结构；**R16 = 类名两端对账**） · **`check_media_discipline`**（M1 落盘单出口 / M2 破缓存单出口 / M3 清理脚本默认 dry-run） · **`check_copy_emoji`**（R13d：管理端与后端导出文案零 emoji） · **`check_bdd_baseline`**（`@draft` 挂起集合基线守卫） · **`check_gate_selftest`**（自证清单元检查：无自证 / 未接入 gate 即红，且**真执行**清单循环判别 gate 到底会跑什么）。**新增检查器必须进清单**（否则 `check_gate_selftest` 判红；确实不该进的写进它的 `NOT_IN_GATE` 并注明理由） |
+| 5 | 契约与反假绿（**含检查器自证**） | **清单驱动**：`CHECKER_CMDS` 数组里每个检查器**先 `--self-test` 再主流程**（第八轮审查 P1-10：原先只跑主流程，实测把 `?v=` 改坏 / 关掉 sqlite 禁令 / 让 R14 永远返回 `[]` / 把文档"文件存在性"改成 `if False and ...` —— gate 全部照样 PASS）。清单成员（当前仓库 **16 个检查器**；gate 实际调用 **15 个**（运行期 `check_demo_baseline` 除外）+ 非检查器 2 个（`export_openapi` + `gate_skip_audit`）；`-f` 守卫待启用 **0 个**（两个旧工具死分支已删，W8-D10），见 `check_gate_selftest` 实测）：`check_fake_assertions`（假绿断言 + **时间炸弹**：测试禁写死的近期未来绝对时间；**规则 C 源码文本断言登记制**） · `check_miniapp_bindings` · `check_miniapp_wiring`（W1 handler 存在 / W2 插值类名可解析 / W3 reader 入口传 id / W4 失败不吞成空（**资金/记录类 6 页的加载函数 catch 必须落到可见失败态**，第一百三十五批） / W5 远程图带 binderror / **W6 utils 符号先 require**——第一百三十四批 IDE 实测：`reader.js` 用了 `getConfigs` 却没 require，**reading 分包 5 页全挂**而七查全绿） · `check_docs_code_alignment`（文档↔代码：文件/接口/配置键/表/符号/任务/域，**扫描面含 `README.md`**） · `check_rbac_consistency` · `check_admin_todo_rows`（待办卡行覆盖 admin_total 全部求和项） · **`check_admin_failure_states`**<!-- docs-code-ignore: check_admin_failure_states -->（管理端「失败不许伪装成空/0」：A1 吞错 catch 未登记 / A2 列表页取数无失败态） · **`check_theme_tokens`**（主题令牌：`cssVars()` 定义集 ↔ CSS/TSX `var()` 使用集双向对账，零消费/未定义判红；`--chart-1..6` 作为色板契约放行） · **`check_miniapp_style`**（R1–**R16** + S1–S3 自证；R14 = WXML 注释/标签结构；**R16 = 类名两端对账**） · **`check_media_discipline`**（M1 落盘单出口 / M2 破缓存单出口 / M3 清理脚本默认 dry-run） · **`check_copy_emoji`**（R13d：管理端与后端导出文案零 emoji） · **`check_bdd_baseline`**（`@draft` 挂起集合基线守卫） · **`check_gate_selftest`**（自证清单元检查：无自证 / 未接入 gate 即红，且**真执行**清单循环判别 gate 到底会跑什么）。**新增检查器必须进清单**（否则 `check_gate_selftest` 判红；确实不该进的写进它的 `NOT_IN_GATE` 并注明理由） |
 | 6 | 数据库迁移一致性 | `alembic upgrade head` + `alembic check`（"No new upgrade operations detected"）；**迁移目录为空判红**（原静默 skip = 删掉迁移文件就能让这条红线无声消失，2026-10-20 第八轮 P1-10） |
-| 7 | 前端类型检查 | `pnpm exec tsc --noEmit`（admin-web） |
+| 7 | 前端类型检查与单测 | `pnpm exec tsc --noEmit` + `pnpm test:ui`（admin-web；Node 内置 test + 类型剥离，覆盖 Gauge 阈值与动态页面标题） |
 | 7b | 前端生产构建（R11-e S2） | `cd admin-web && pnpm build`（tsc -b + vite build）；产物 dist/ 已 gitignore。**CI 走同一个 gate.sh**，一处收口两处生效——原先门禁与 CI 都不构建，dist 落后 37 个源文件也全绿 |
 | 8 | 契约快照（T27） | `python scripts/export_openapi.py --check` + `cd admin-web && pnpm gen:api --check`（端点变更必须"改代码 + 重导快照"两步显形；**前端类型 `schema.d.ts` 自 2026-09-20 起同在此步守**——此前是职责空白，曾漂移 4 天没人发现） |
 | 9 | 交付完整性 | 全仓不得有 untracked（白名单仅 .zcodeignore）；**源码目录内不得有被 `.gitignore` 命中的文件**（W8-D17：`git status --porcelain --ignored` 过滤 backend/miniapp/admin-web/src/scripts/alembic/features/tests，工具产物与微信开发者工具私有配置除外） |
@@ -241,7 +241,7 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 | 数据库 | **MySQL 8.0 (utf8mb4) only**；alembic 管全部 schema（禁 create_all）；开发 OrbStack / CI service / 生产 Compose 同构 |
 | 缓存/锁 | **第一版不引入 Redis**（ADR-005：单机进程内锁 + JWT 无状态；预留演进） |
 | 定时任务 | 进程内 APScheduler（ADR-008；任务逻辑放域 service，调度器只做注册表） |
-| 前端 | 小程序原生（家长微信登录）+ React 18 + TS + Vite + AntD（`admin-web/src/theme/` 企业级令牌：飞书蓝 + 紧凑 32px） |
+| 前端 | 小程序原生（家长微信登录）+ React 18 + TS + Vite + AntD（`admin-web/src/theme/` **三套可切换主题**：企业·飞书蓝 / 绘本风 / 大屏深色；令牌驱动 CSS 变量 + antd token） |
 | 文件存储 | 本地磁盘 `uploads/`（ADR-004；音频上百 GB，预留存储抽象层） |
 | 支付 | 微信支付 V3（安卓线上）+ 企微人工确认（苹果）+ 线下收款登记（复用 design-reuse 集成资产） |
 | 测试 | pytest + behave（中文 Gherkin）；覆盖率门禁见第八节 |

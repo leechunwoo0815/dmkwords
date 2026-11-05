@@ -130,6 +130,8 @@ step 5 "契约与反假绿（**含检查器自证**）"
 # 第八轮审查 P2-69（2026-10-21）：**BDD 挂起基线守卫**——behave.ini 的 `~@draft` 让一行标签
 # 就能把场景摘出门禁；本检查器把"哪些文件/场景被挂起 + 为什么"钉成基线（features/bdd_baseline.json），
 # 挂起集合或活动面（features/scenarios/steps）与基线不一致即判红。
+# 167 批（P2-1）：**主题令牌对账**——cssVars() 定义集 ↔ CSS/TSX `var()` 使用集；
+# 零消费（图表色板契约除外）或使用未定义均判红，防止"注入了但没人用"。
 CHECKER_CMDS=(
   "python -m scripts.check_fake_assertions"
   "python -m scripts.check_bdd_baseline"
@@ -142,6 +144,7 @@ CHECKER_CMDS=(
   "python scripts/check_media_discipline.py"
   "python scripts/check_copy_emoji.py"
   "python scripts/check_admin_failure_states.py"
+  "python scripts/check_theme_tokens.py"
   "python -m scripts.check_gate_selftest"
 )
 for checker_cmd in "${CHECKER_CMDS[@]}"; do
@@ -159,9 +162,12 @@ else
   fail "alembic/versions 为空——迁移目录缺失或被清空（不许静默跳过）"
 fi
 
-step 7 "前端类型检查（tsc）"
+step 7 "前端类型检查与单测（tsc + node:test）"
 if [ -f "admin-web/node_modules/.bin/tsc" ]; then
   run bash -c "cd admin-web && pnpm exec tsc --noEmit"
+  # 170 批：前端纯函数判据（Gauge 阈值 / 动态页面标题）用 Node 内置 test + 类型剥离，
+  # 零新依赖；随 gate 与 CI 一起跑，避免"单测只在我机器上跑过"。
+  run bash -c "cd admin-web && pnpm test:ui"
 elif [ -n "${CI:-}" ]; then
   fail "CI 环境缺 admin-web 依赖（node_modules/.bin/tsc 不存在）——pnpm install 后重跑"
 else

@@ -21,6 +21,7 @@ import { dark } from "./dark";
 import { enterprise } from "./enterprise";
 import { paint } from "./paint";
 import type { ThemeTokens } from "./types";
+import { withAlpha } from "./color";
 
 export type { ThemeTokens } from "./types";
 
@@ -73,7 +74,6 @@ export function cssVars(t: ThemeTokens): Record<string, string> {
     // 品牌 / 语义色
     "--color-primary": c.primary,
     "--color-primary-hover": c.primaryHover,
-    "--color-primary-active": c.primaryActive,
     "--color-primary-soft": c.primarySoft,
     "--color-on-primary": c.onPrimary,
     "--color-success": c.success,
@@ -84,15 +84,12 @@ export function cssVars(t: ThemeTokens): Record<string, string> {
     "--color-danger-hover": c.dangerHover,
     "--color-danger-soft": c.dangerSoft,
     "--color-info": c.info,
-    "--color-info-soft": c.infoSoft,
-    "--color-link": c.link,
     // 中性色
     "--color-bg-layout": c.bgLayout,
     "--color-bg-container": c.bgContainer,
     "--color-bg-elevated": c.bgElevated,
     "--color-bg-subtle": c.bgSubtle,
     "--color-bg-hover": c.bgHover,
-    "--color-bg-selected": c.bgSelected,
     "--color-border": c.border,
     "--color-border-strong": c.borderStrong,
     "--color-divider": c.divider,
@@ -101,42 +98,30 @@ export function cssVars(t: ThemeTokens): Record<string, string> {
     "--color-text-tertiary": c.textTertiary,
     "--color-text-quaternary": c.textQuaternary,
     "--color-text-inverse": c.textInverse,
-    // 骨架（侧栏 / Header / 遮罩）
+    // 骨架（侧栏 / Header）
     "--color-sider-bg": c.siderBg,
     "--color-sider-border": c.siderBorder,
-    "--color-sider-text": c.siderText,
-    "--color-sider-text-active": c.siderTextActive,
-    "--color-header-bg": c.headerBg,
-    "--color-mask": c.mask,
     // 形状
     "--radius-sm": `${s.radiusSM}px`,
     "--radius-base": `${s.radius}px`,
     "--radius-lg": `${s.radiusLG}px`,
-    "--radius-xl": `${s.radiusXL}px`,
     "--border-width": `${s.borderWidth}px`,
     // 阴影
     "--shadow-sm": sh.sm,
     "--shadow-base": sh.base,
     "--shadow-lg": sh.lg,
-    "--shadow-modal": sh.modal,
     "--shadow-card": sh.card,
     // 密度
     "--control-height": `${d.controlHeight}px`,
-    "--control-height-sm": `${d.controlHeightSM}px`,
-    "--control-height-lg": `${d.controlHeightLG}px`,
     "--header-height": `${d.headerHeight}px`,
-    "--sider-width": `${d.siderWidth}px`,
-    "--content-padding": `${d.contentPadding}px`,
     "--card-padding": `${d.cardPadding}px`,
     "--table-header-height": `${d.tableHeaderHeight}px`,
     "--table-row-height": `${d.tableRowHeight}px`,
     // 字体
     "--font-body": f.body,
     "--font-heading": f.heading,
-    "--font-mono": f.mono,
     "--font-size": `${d.fontSize}px`,
     "--font-size-sm": `${d.fontSizeSM}px`,
-    "--font-size-lg": `${d.fontSizeLG}px`,
     "--font-weight-regular": String(f.weightRegular),
     "--font-weight-medium": String(f.weightMedium),
     "--font-weight-strong": String(f.weightStrong),
@@ -184,7 +169,9 @@ export function buildAntdTheme(t: ThemeTokens): ThemeConfig {
     algorithm: t.scheme === "dark" ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
     token: {
       colorPrimary: c.primary,
+      colorPrimaryActive: c.primaryActive,
       colorInfo: c.info,
+      colorInfoBg: c.infoSoft,
       colorSuccess: c.success,
       colorWarning: c.warning,
       colorError: c.danger,
@@ -192,6 +179,7 @@ export function buildAntdTheme(t: ThemeTokens): ThemeConfig {
       colorBgLayout: c.bgLayout,
       colorBgContainer: c.bgContainer,
       colorBgElevated: c.bgElevated,
+      colorBgMask: c.mask,
       colorText: c.text,
       colorTextHeading: c.text,
       colorTextSecondary: c.textSecondary,
@@ -220,7 +208,7 @@ export function buildAntdTheme(t: ThemeTokens): ThemeConfig {
       fontWeightStrong: d.fontWeightStrong,
       fontFamily: f.body,
       fontFamilyCode: f.mono,
-      controlOutline: "rgba(51, 112, 255, 0.12)",
+      controlOutline: withAlpha(c.primary, 0.12),
       controlOutlineWidth: 2,
       boxShadow: sh.base,
       boxShadowSecondary: sh.lg,
@@ -244,7 +232,7 @@ export function buildAntdTheme(t: ThemeTokens): ThemeConfig {
         itemHoverColor: c.text,
         itemHoverBg: c.bgHover,
         itemSelectedColor: c.siderTextActive,
-        itemSelectedBg: c.primarySoft,
+        itemSelectedBg: c.bgSelected,
         itemHeight: 36,
         itemMarginInline: 8,
         itemMarginBlock: 2,
@@ -281,8 +269,8 @@ export function buildAntdTheme(t: ThemeTokens): ThemeConfig {
         headerBorderRadius: 0,
         borderColor: c.border,
         rowHoverBg: c.bgHover,
-        rowSelectedBg: c.primarySoft,
-        rowSelectedHoverBg: c.primarySoft,
+        rowSelectedBg: c.bgSelected,
+        rowSelectedHoverBg: c.bgSelected,
         cellPaddingBlock: 10,
         cellPaddingInline: 12,
         cellPaddingBlockMD: 9,
@@ -306,7 +294,9 @@ export function buildAntdTheme(t: ThemeTokens): ThemeConfig {
         titleColor: c.text,
         titleFontSize: 16,
         footerBg: "transparent",
-        borderRadiusLG: s.radiusLG,
+        // 大浮层用 radiusXL / shadow.modal（antd Modal 样式读的是 borderRadiusLG / boxShadow）
+        borderRadiusLG: s.radiusXL,
+        boxShadow: sh.modal,
       },
       Drawer: {
         colorBgElevated: c.bgElevated,
@@ -333,13 +323,13 @@ export function buildAntdTheme(t: ThemeTokens): ThemeConfig {
       Input: {
         hoverBorderColor: c.borderStrong,
         activeBorderColor: c.primary,
-        activeShadow: "0 0 0 2px rgba(51, 112, 255, 0.12)",
+        activeShadow: `0 0 0 2px ${withAlpha(c.primary, 0.12)}`,
         paddingInline: 11,
       },
       InputNumber: {
         hoverBorderColor: c.borderStrong,
         activeBorderColor: c.primary,
-        activeShadow: "0 0 0 2px rgba(51, 112, 255, 0.12)",
+        activeShadow: `0 0 0 2px ${withAlpha(c.primary, 0.12)}`,
       },
       Select: {
         optionSelectedBg: c.primarySoft,
@@ -351,9 +341,9 @@ export function buildAntdTheme(t: ThemeTokens): ThemeConfig {
       DatePicker: {
         hoverBorderColor: c.borderStrong,
         activeBorderColor: c.primary,
-        activeShadow: "0 0 0 2px rgba(51, 112, 255, 0.12)",
+        activeShadow: `0 0 0 2px ${withAlpha(c.primary, 0.12)}`,
         cellHoverBg: c.bgHover,
-        cellActiveWithRangeBg: c.primarySoft,
+        cellActiveWithRangeBg: c.bgSelected,
       },
       Form: {
         labelColor: c.text,
@@ -379,6 +369,7 @@ export function buildAntdTheme(t: ThemeTokens): ThemeConfig {
         itemSelectedColor: c.text,
       },
       Tooltip: {
+        // 刻意保留反色深底：c.text 在深色主题会变浅，失去与浮层的对比（antd 默认深底）
         colorBgSpotlight: "rgba(31, 35, 41, 0.92)",
         borderRadius: s.radius,
       },

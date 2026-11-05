@@ -318,17 +318,17 @@ export default function ActivityManage() {
                   pagination={false}
                   columns={[
                     {
-                      title: "活动", dataIndex: "title", width: 150,
+                      title: "活动", dataIndex: "title", width: 140, ellipsis: true,
                       // 用户需求：点活动名称看只读详情（领导看封面/内容/人数），不弹编辑
                       render: (t: string, r) => (
                         <Typography.Link onClick={() => openDetail(r)}>{t}</Typography.Link>
                       ),
                     },
-                    { title: "类型", dataIndex: "activity_type", width: 84, render: (t) => TYPE_OPTIONS.find((o) => o.value === t)?.label ?? t },
-                    { title: "开始时间", dataIndex: "start_at", width: 126, render: (v) => <TimeText value={v} /> },
-                    { title: "结束时间", dataIndex: "end_at", width: 126, render: (v) => (v ? <TimeText value={v} /> : "—") },
-                    { title: "地点", dataIndex: "location", width: 126, ellipsis: true },
-                    { title: "费用", dataIndex: "fee_display", width: 82 },
+                    { title: "类型", dataIndex: "activity_type", width: 76, render: (t) => TYPE_OPTIONS.find((o) => o.value === t)?.label ?? t },
+                    { title: "开始时间", dataIndex: "start_at", width: 120, render: (v) => <TimeText value={v} /> },
+                    { title: "结束时间", dataIndex: "end_at", width: 120, render: (v) => (v ? <TimeText value={v} /> : "—") },
+                    { title: "地点", dataIndex: "location", width: 100, ellipsis: true },
+                    { title: "费用", dataIndex: "fee_display", width: 76 },
                     {
                       title: "名额", key: "quota", width: 74, render: (_, r) => (
                         <span>
@@ -345,7 +345,7 @@ export default function ActivityManage() {
                       ),
                     },
                     {
-                      title: "操作", key: "op", width: 180, fixed: "right" as const, render: (_, r) => (
+                      title: "操作", key: "op", width: 220, fixed: "right" as const, render: (_, r) => (
                         <Space>
                           <Button type="link" size="small" onClick={() => openEdit(r)}>编辑</Button>
                           <Button type="link" size="small" onClick={() => openEnrollments(r)}>报名名单</Button>
@@ -356,7 +356,7 @@ export default function ActivityManage() {
                       ),
                     },
                   ]}
-                 scroll={{ x: "max-content" }}/>
+                 scroll={{ x: "100%" }}/>
           <PaintHScrollbar auto />
                 <PaintPagination current={activityPg.page} pageSize={activityPg.pageSize} total={activities.length} onChange={activityPg.onChange} listLimit={listLimit} />
               </>

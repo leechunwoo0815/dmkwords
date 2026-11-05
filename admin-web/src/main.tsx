@@ -5,6 +5,7 @@ import { App as AntdApp, ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 
 import App from "./App";
+import { BRAND } from "./branding";
 import ErrorBoundary from "./components/ErrorBoundary";
 import PaintEmpty from "./components/PaintEmpty";
 import { applyTheme, buildAntdTheme } from "./theme";
@@ -20,6 +21,8 @@ import "./styles/skins/dark.css";
 // 开机注入主题变量：必须早于 render，否则首帧 antd 组件拿不到 CSS 变量（浅色闪烁）。
 // ConfigProvider 的 antd token 与这些变量同源（buildAntdTheme 从同一份令牌派生）。
 applyTheme();
+// index.html 不再写死品牌名；首帧标题也来自 branding.ts（路由页面随后会覆盖）
+document.title = BRAND.documentSuffix;
 
 /** ConfigProvider 放在 Provider 内层：切换主题时 antd token 与 CSS 变量一起换。 */
 function Root() {
