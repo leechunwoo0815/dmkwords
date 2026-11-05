@@ -442,9 +442,12 @@ class ChildService:
                 raise ValidationError("AR 值必须是数字（如 3.5）") from None
             if new_v < 0:
                 raise ValidationError("AR 值不能为负数")
-            if current is None or new_v > cur_v:
-                child.ar_level = f"{new_v:.1f}"
-                changed.append("ar_level")
+            if current is None or new_v >= cur_v:
+                # 「只升不降」= 不允许下降；相等表示"本次没有改 AR"（前端编辑其他字段时
+                # 会带上预填的当前值），必须放行，否则改年级/英文名也会被 422 拦住。
+                if current is None or new_v > cur_v:
+                    child.ar_level = f"{new_v:.1f}"
+                    changed.append("ar_level")
             else:
                 raise ValidationError(f"AR 值只升不降（当前 {current}，提交 {ar_level}）")
         if not changed:

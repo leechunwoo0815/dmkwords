@@ -206,6 +206,27 @@ def test_f7_child_with_orders_name_still_rejected(client: TestClient):
     assert "身份字段" in r.json()["detail"]
 
 
+def test_f7_child_ar_equal_is_noop_allows_other_fields(client: TestClient):
+    """「只升不降」允许相等：改年级时带上未变的 AR 不应 422（用户报障 2026-11-05）。"""
+    h = _h(client)
+    p = _parent(client, h, "13800003008")
+    c = _child(client, h, p["id"])
+    r = client.put(f"/api/admin/members/children/{c['id']}", json={"ar_level": "3.5"}, headers=h)
+    assert r.status_code == 200, r.text
+    r2 = client.put(
+        f"/api/admin/members/children/{c['id']}",
+        json={"grade": "二年级", "ar_level": "3.5"},
+        headers=h,
+    )
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["grade"] == "二年级"
+    assert r2.json()["ar_level"] == "3.5"
+    # 真正下降仍拒绝
+    r3 = client.put(f"/api/admin/members/children/{c['id']}", json={"ar_level": "3.4"}, headers=h)
+    assert r3.status_code == 422
+    assert "只升不降" in r3.json()["detail"]
+
+
 def test_f7_child_with_orders_english_and_ar_upgrade_ok(client: TestClient):
     """有订单孩子 PATCH english_name+ar_level（升级值）→ 200。"""
     h = _h(client)

@@ -1268,7 +1268,7 @@ export default function MemberManage() {
           <Form.Item
             name="ar_level"
             label="AR 值（老师评估，只升不降）"
-            extra="首次填写任意值；再次填写仅允许高于当前值（降级将被拒绝）"
+            extra="首次填写任意值；可保持不变或升高，降级将被拒绝（相等 = 未变更）"
           >
             <Input maxLength={10} placeholder="如 3.5" />
           </Form.Item>
