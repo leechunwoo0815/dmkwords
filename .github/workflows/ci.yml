@@ -59,7 +59,9 @@ jobs:
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          changed="$(git diff --name-only "$base" "${{ github.sha }}")"
+          # core.quotepath=false：否则中文路径会输出成 "docs/25-\344..."（带引号），
+          # 下面的 docs/* 匹配不上 → 纯文档推送被误判为代码（2026-11-06 实测踩到）。
+          changed="$(git -c core.quotepath=false diff --name-only "$base" "${{ github.sha }}")"
           echo "changed files:"; echo "$changed"
           docs_only=true
           while IFS= read -r f; do
