@@ -30,3 +30,6 @@ certs/
 # Trae 工作区记忆（工具产物不入库）
 .workbuddy/
 
+# 备份专用 MySQL 凭证（600，绝不入库）
+.backup.cnf
+
