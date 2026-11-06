@@ -221,24 +221,22 @@
 }
 .admin-liked .post-thumb { border-color: var(--gold); }
 
+/* 2026-11-06 产品口径：点赞头像**每行 8 个、不限行数**（原来单行叠压最多 8 个）。
+   用 grid 固定 8 列，头像居中；行数随点赞人数自然增长。 */
 .liker-wall {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8rpx;
   align-items: center;
-  gap: -10rpx;
+  justify-items: center;
+  margin-top: 12rpx;
 }
-/* fix34 R4：点赞头像墙改用 avatar-ring 组件（等级头像框）——负外边距做叠压 */
 .liker-slot {
-  margin-left: -10rpx;
   line-height: 0;
 }
-.liker-slot:first-child {
-  margin-left: 0;
-}
-/* fix34d：馆长条——单独站位（不与孩子叠压）+ 金色光晕 + 呼吸式微缩放（"闪闪"的 GM 感）
+/* fix34d：馆长条——金色光晕 + 呼吸式微缩放（"闪闪"的 GM 感）
    只动 transform（GPU 友好），不做高频 filter 动画（低端机代价高） */
 .liker-slot-gm {
-  margin-left: 0;
-  margin-right: 6rpx;
   filter: drop-shadow(0 0 8rpx rgba(var(--sun-rgb), 0.85));
   transform-origin: center 60%;
   animation: gmBreath 2.4s ease-in-out infinite;

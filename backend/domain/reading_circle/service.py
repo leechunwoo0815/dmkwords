@@ -289,13 +289,17 @@ class CircleService:
 
         return levels_map(self.db, child_ids)
 
-    def _likers_map(self, post_ids: list[int], limit: int = 8) -> dict[int, list]:
+    def _likers_map(self, post_ids: list[int], limit: int | None = None) -> dict[int, list]:
         """点赞头像墙（批查，禁 N+1）：按社交主体 child_id 关联（fix33 R2）。
-        每帖最多 limit 个，按点赞先后 id 升序；含等级（fix34 R4 头像框数据面）。
+        按点赞先后 id 升序；含等级（fix34 R4 头像框数据面）。
 
         fix34d：**馆长排第一**。馆长的赞只落在 `CirclePost.admin_liked`（不建 CircleLike 行），
         所以此处按 admin_liked 合成一个条目（is_admin=True）——前端据此换成
         「金光馆长头像 + 鎏金冠冕框」，孩子点赞墙不再"只见数字不见人"。
+
+        2026-11-06（产品口径）：信息流默认返回**全部**点赞（前端每行 8 个、自动换行）。
+        目标规模 ≤100 会员，单页 10 帖最多约千行，可接受；若用户量增长，调用方可传
+        `limit=` 恢复 SQL 层窗口限量（`limit=None` 才是全量）。
         """
         from backend.domain.growth.service import levels_map
         from backend.domain.reading_circle.models import CircleLike
@@ -311,51 +315,64 @@ class CircleService:
         ]
         for pid in admin_ids:
             out.setdefault(pid, []).append(dict(ADMIN_LIKER))
-        # P3 性能族（2026-10-22 第一百一十五批）：**SQL 层就按帖限条**——
-        # 原先把这一页所有帖的**全部点赞行**拉回来（热帖 1 万赞 = 1 万行/次信息流请求），
-        # 再在 Python 里 `if len(bucket) < limit` 截断。现在用窗口函数
-        # `ROW_NUMBER() OVER (PARTITION BY post_id ORDER BY id)` 只取每帖前 `limit` 条，
-        # 语义与原来一致（同样按点赞 id 升序、同样过滤软删的点赞与孩子）。
-        from sqlalchemy import func as _func
-        from sqlalchemy import select as _select
 
-        sub = (
-            _select(
-                CircleLike.post_id.label("post_id"),
-                Child.id.label("child_id"),
-                Child.english_name.label("english_name"),
-                Child.avatar.label("avatar"),
-                _func.row_number()
-                .over(partition_by=CircleLike.post_id, order_by=CircleLike.id.asc())
-                .label("rn"),
+        if limit is None:
+            rows = (
+                self.db.query(CircleLike.post_id, Child.id, Child.english_name, Child.avatar)
+                .join(Child, Child.id == CircleLike.child_id)
+                .filter(
+                    CircleLike.post_id.in_(post_ids),
+                    CircleLike.is_deleted == 0,
+                    Child.is_deleted == 0,
+                )
+                .order_by(CircleLike.post_id.asc(), CircleLike.id.asc())
+                .all()
             )
-            .join(Child, Child.id == CircleLike.child_id)
-            .where(
-                CircleLike.post_id.in_(post_ids),
-                CircleLike.is_deleted == 0,
-                Child.is_deleted == 0,
+        else:
+            # 限量分支（其它调用方显式传 limit 时）：SQL 层窗口函数只取每帖前 limit 条，
+            # 不把热帖的全部点赞行拉回 Python（P3 性能族 2026-10-22）。
+            from sqlalchemy import func as _func
+            from sqlalchemy import select as _select
+
+            sub = (
+                _select(
+                    CircleLike.post_id.label("post_id"),
+                    Child.id.label("child_id"),
+                    Child.english_name.label("english_name"),
+                    Child.avatar.label("avatar"),
+                    _func.row_number()
+                    .over(partition_by=CircleLike.post_id, order_by=CircleLike.id.asc())
+                    .label("rn"),
+                )
+                .join(Child, Child.id == CircleLike.child_id)
+                .where(
+                    CircleLike.post_id.in_(post_ids),
+                    CircleLike.is_deleted == 0,
+                    Child.is_deleted == 0,
+                )
+                .subquery()
             )
-            .subquery()
-        )
-        rows = (
-            self.db.query(sub.c.post_id, sub.c.child_id, sub.c.english_name, sub.c.avatar)
-            .filter(sub.c.rn <= limit)
-            .order_by(sub.c.post_id, sub.c.rn)
-            .all()
-        )
+            rows = (
+                self.db.query(sub.c.post_id, sub.c.child_id, sub.c.english_name, sub.c.avatar)
+                .filter(sub.c.rn <= limit)
+                .order_by(sub.c.post_id, sub.c.rn)
+                .all()
+            )
+
         lv = levels_map(self.db, [cid for _, cid, _, _ in rows])
         for pid, cid, en, av in rows:
             bucket = out.setdefault(pid, [])
-            if len(bucket) < limit:
-                bucket.append(
-                    {
-                        "child_id": cid,
-                        "name": en or f"小朋友{cid:03d}",
-                        "avatar": av,
-                        "level": lv.get(cid, "A"),
-                        "is_admin": False,  # 形状统一（馆长那条为 True，前端一处判断）
-                    }
-                )
+            if limit is not None and len(bucket) >= limit:
+                continue
+            bucket.append(
+                {
+                    "child_id": cid,
+                    "name": en or f"小朋友{cid:03d}",
+                    "avatar": av,
+                    "level": lv.get(cid, "A"),
+                    "is_admin": False,  # 形状统一（馆长那条为 True，前端一处判断）
+                }
+            )
         return out
 
     @staticmethod
