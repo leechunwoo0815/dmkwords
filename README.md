@@ -4,7 +4,7 @@
 
 ## 快速开始
 
-前置：macOS + [OrbStack](https://orbstack.dev) + uv + Node 20+（pnpm 由 `brew install pnpm` 安装）。
+前置：macOS + [OrbStack](https://orbstack.dev) + uv + **Node 22.6+**（`pnpm test:ui` 用 `--experimental-strip-types`；本机实测 v26）+ pnpm（`brew install pnpm` 安装）。
 
 ```bash
 bash scripts/dev.sh        # 一键启动：MySQL + 后端(:8002) + 管理后台(:5173)
@@ -20,7 +20,7 @@ bash scripts/dev.sh        # 一键启动：MySQL + 后端(:8002) + 管理后台
 ## 质量门禁（唯一完成判据）
 
 ```bash
-bash scripts/gate.sh full   # 退出码 0 = 通过（9 步：1 lint / 2 单测+覆盖率 / 3 BDD / 4 架构关 / 5 契约与反假绿（假绿断言+小程序断链+文档对齐+RBAC 对账+风格检查器 R1-R16+媒体纪律+管理端失败态）/ 6 迁移一致性 / 7 tsc / 8 契约快照（export_openapi --check + 前端类型 pnpm gen:api --check）/ 9 交付完整性）
+bash scripts/gate.sh full   # 退出码 0 = 通过（10 个阶段：1 lint / 2 单测+覆盖率 / 3 BDD / 4 架构关 / 5 契约与反假绿（16 个检查器清单驱动）/ 6 迁移一致性 / 7 tsc + pnpm test:ui / 7b vite build / 8 契约快照（export_openapi --check + pnpm gen:api --check）/ 9 交付完整性）
 ```
 
 ## 项目结构与文档索引
@@ -29,7 +29,7 @@ bash scripts/gate.sh full   # 退出码 0 = 通过（9 步：1 lint / 2 单测+�
 backend/            FastAPI + SQLAlchemy（9 域分层架构）
   domain/admin/       WM1 平台基座：账号/RBAC/配置中心/审计
   domain/{identity,catalog,circulation,billing,reading,growth,activity,reading_circle}/  后续模块域
-admin-web/          React 18 + TS + Vite + AntD（绘本风视觉系统，docs/15）
+admin-web/          React 18 + TS + Vite + AntD（三套可切换主题：企业·飞书蓝 / 绘本风 / 大屏深色；令牌体系见 docs/32）
 miniapp/            微信小程序（家长端，原生）
 features/           behave 中文 Gherkin（测试即规格；`@draft` = 挂起场景，不进 gate，
                     集合与理由唯一事实源 = features/bdd_baseline.json，改动须走
@@ -41,6 +41,7 @@ scripts/            gate.sh 门禁 / verify_architecture 架构关 / dev.sh
 | 文档 | 用途 |
 |---|---|
 | [CLAUDE.md](CLAUDE.md) | 项目宪法（最高法，每次会话必读） |
+| [docs/README.md](docs/README.md) | **文档索引与状态标签**（现行/历史/已取代，先看这里） |
 | [docs/01-顶层规划.md](docs/01-顶层规划.md) | 阶段目标与里程碑 |
 | [docs/02-架构蓝图.md](docs/02-架构蓝图.md) | 系统架构与 ADR |
 | [docs/03-Feature全量清单.md](docs/03-Feature全量清单.md) | 90 项 Feature 索引（状态按代码实测重算） |
