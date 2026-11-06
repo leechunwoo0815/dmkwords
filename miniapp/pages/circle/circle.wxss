@@ -188,14 +188,17 @@
 }
 
 /* 点赞 + 头像墙 */
+/* 2026-11-06：点赞按钮与「馆长亲赞」占第一行，头像墙**独占下一行**（8 列）。
+   原先三者同一行时，头像墙把「馆长亲赞」压成两行。 */
 .post-foot {
   margin-top: 18rpx;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
+  gap: 12rpx 16rpx;
 }
 .like-btn {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 8rpx;
@@ -224,6 +227,7 @@
 /* 2026-11-06 产品口径：点赞头像**每行 8 个、不限行数**（原来单行叠压最多 8 个）。
    用 grid 固定 8 列，头像居中；行数随点赞人数自然增长。 */
 .liker-wall {
+  flex: 1 0 100%;
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   gap: 8rpx;
@@ -246,6 +250,8 @@
   50% { transform: scale(1.08); }
 }
 .admin-like-label {
+  flex: none;
+  white-space: nowrap;
   margin-left: 12rpx;
   font-size: 24rpx;
   font-weight: 600;
