@@ -43,6 +43,16 @@ Page({
   onCodeInput(e) { this.setData({ code: e.detail.value }) },
   toggleAgreed() { this.setData({ agreed: !this.data.agreed }) },
 
+  // 本地隐私同意留痕（版本 + 时间）。后端 consent 表属 FEAT-006，尚未实现。
+  // 2026-11-06：隐私政策按实际收集范围修订，版本 v1 → v2；旧版本同意视为过期，重新记录。
+  _recordPrivacyConsent() {
+    if (!wx.getStorageSync('privacy_agreed') || wx.getStorageSync('privacy_agreed_version') !== 'v2') {
+      wx.setStorageSync('privacy_agreed', true)
+      wx.setStorageSync('privacy_agreed_version', 'v2')
+      wx.setStorageSync('privacy_agreed_at', Date.now())
+    }
+  },
+
   // 微信一键登录（主通道）
   async onWechatLogin() {
     if (this.data.submitting) return
@@ -50,12 +60,7 @@ Page({
     if (!this.data.agreed) {
       wx.showToast({ title: '请先同意隐私政策', icon: 'none' }); return
     }
-    // B8：登录勾选同样是"同意"的一个入口——本地留痕（版本/时间），只在首次记录
-    if (!wx.getStorageSync('privacy_agreed')) {
-      wx.setStorageSync('privacy_agreed', true)
-      wx.setStorageSync('privacy_agreed_version', 'v1')
-      wx.setStorageSync('privacy_agreed_at', Date.now())
-    }
+    this._recordPrivacyConsent()
     this.setData({ submitting: true })
     try {
       const wxCode = await this._wxLoginCode()
@@ -92,6 +97,7 @@ Page({
     if (!this.data.agreed) {
       wx.showToast({ title: '请先同意隐私政策', icon: 'none' }); return
     }
+    this._recordPrivacyConsent()
     this.setData({ submitting: true, loginError: '' })
     try {
       const res = await api.bindByWechatPhone(this.data.bindTicket, detail.code)
@@ -118,6 +124,7 @@ Page({
     if (!agreed) {
       wx.showToast({ title: '请先同意隐私政策', icon: 'none' }); return
     }
+    this._recordPrivacyConsent()
     this.setData({ submitting: true })
     try {
       const res = await api.bindByWechat(bindTicket, phone, code)
@@ -142,6 +149,7 @@ Page({
     if (!agreed) {
       wx.showToast({ title: '请先同意隐私政策', icon: 'none' }); return
     }
+    this._recordPrivacyConsent()
     this.setData({ submitting: true })
     try {
       const res = await api.login(phone, code)

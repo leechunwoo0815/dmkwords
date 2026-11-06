@@ -101,3 +101,23 @@ def test_backup_status_alarms_when_missing(tmp_path: Path) -> None:
     )
     assert proc.returncode == 2
     assert "无全量备份" in proc.stdout
+
+
+def test_log_alert_covers_deadlock_and_traceback() -> None:
+    text = _read("log_alert.sh")
+    for token in ("1213", "Deadlock found", "Traceback", "500 Internal Server Error"):
+        assert token in text, f"log_alert.sh 缺少 {token}"
+
+
+def test_log_alert_empty_window_passes() -> None:
+    env = os.environ.copy()
+    env["LOG_ALERT_SINCE"] = "1 second ago"
+    proc = subprocess.run(
+        ["bash", str(SCRIPTS / "log_alert.sh")],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr

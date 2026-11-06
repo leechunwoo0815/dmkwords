@@ -184,7 +184,7 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 | **C 级** | `models/`、迁移、公共层、跨域调用 | `bash scripts/gate.sh full` | ❌ 必须本地绿 | 高传播面，本地全量 + CI 绿 |
 | **B′ 级（2026-09-21 补）** | 仅 `miniapp/**`（页面/组件/样式/文案） | `.venv/bin/python -m scripts.check_miniapp_style` + `check_miniapp_bindings` + `check_media_discipline`（**再加一次真机截图目视**，见 docs/15 §二十） | ❌ 不必本地全量 | 小程序**没有 pytest/tsc 可跑**——它的"测试"就是那三个检查器 + 截图；`gate.sh` 第 [5] 步与它们同源 |
 | **B″ 级（2026-09-21 补）** | 仅 `scripts/**`（一次性生成器/运维脚本/检查器；**不含**改 schema 或业务逻辑） | `ruff check backend/ tests/ features/ scripts/` + `ruff format --check .` + **跑引用该脚本的测试**（`grep -rln "<脚本名>" tests/`） | ❌ 不必本地全量 | 数据性改动（如 seed 里改演示书名）**不触发全量门禁**；改了检查器本身则务必 check+format 两条都跑（红线 46） |
-| **D 级** | 仅文档/文字：`docs/**`、`*.md`、`error_list/**`、`外部专家意见/**`、代码注释文字 | **不跑门禁**（无代码语义变更） | ❌ **不单独推、不等 CI** | 攒批合并进下一次推送（红线 37）；判据：`git diff --name-only` 全落在上述路径 |
+| **D 级** | 仅文档/文字：`docs/**`、`*.md`、`error_list/**`、`外部专家意见/**`、代码注释文字 | **不跑门禁**（无代码语义变更） | ⚠️ **可单独推；CI 只跑 docs 轻量检查**（2026-11-06） | 纯文档 push 由 CI 的 `docs` job 跑 `check_docs_code_alignment` + 空白检查，**不再跑全量 gate**（`docs/api/openapi.json` 单独变更除外——它是契约快照，仍走全量）；判据：`git diff --name-only` 全落在上述路径 |
 
 > **2026-10-26 甲方指令（门禁频次放宽，立即生效）**：客户催进度，**全量门禁不再「每小轮一次」**——改为**批次簇**执行：
 > ① 每个小批次（含 C 级）只跑**定向判据**：新增/受影响域 `pytest` + `ruff check/format` + `python -m scripts.verify_architecture` + `python -m scripts.check_docs_code_alignment`（**动到 Router/Schema/Query 参数时加 `python scripts/export_openapi.py --check` + `cd admin-web && pnpm gen:api --check`（契约三件齐：代码/快照/生成类型）**——2026-10-26 实测：新增 `?fresh=1` 查询参数也会让快照不一致；前端加 `tsc` / 小程序四检查器）；
@@ -206,8 +206,8 @@ backend/domain/admin/        RBAC、SystemConfig、数据看板、操作日志�
 
 - **A/B/C 级如需跑 pytest，必须先 `bash scripts/dev.sh stop`**，因为 pytest 与 dev.sh 共库。
 - **禁止以"反正 CI 会跑"为由本地完全不验证**：A 级至少 tsc + `pnpm test:ui`；B 级至少相关域单文件 + ruff；C 级必须本地全量 gate。
-- **D 级不跑门禁、不为它推送或等 CI（2026-09-20 用户明令）**：纯文档刀没有可执行断言，跑 10 步全量门禁和一轮 CI 是 8~16 分钟的纯浪费——文档修补攒够、合并进下一次代码推送；
-  **唯一例外**：在 `docs/` / `error_list/` / `外部专家意见/` 下**新增未跟踪文件**会被门禁第 [9] 步交付完整性拦，stage 时一并带上即可（不必为此单独开门禁）。
+- **D 级不跑全量门禁（2026-09-20 用户明令；2026-11-06 起可单独推）**：纯文档刀没有可执行断言，跑 10 步全量门禁是 8~16 分钟的纯浪费；CI 对纯文档 push 只跑 `docs` job（`check_docs_code_alignment` + 空白检查），**不等全量 gate**；
+  **例外**：`docs/api/openapi.json` 单独变更（契约快照）仍走全量；在 `docs/` / `error_list/` / `外部专家意见/` 下**新增未跟踪文件**仍会被门禁第 [9] 步交付完整性拦（stage 时一并带上）。
 - **完成 = 退出码 0 + 输出贴原文**（第六节 DoD 仍然成立，但"门禁命令"按本节分级选取）。
 
 ### 全量门禁命令（C 级或 CI 使用）

@@ -106,15 +106,16 @@ App({
         const privacyPopup = () => {
           wx.showModal({
             title: '隐私保护指引',
-            content: '在您使用 DmkWords 之前，请仔细阅读并同意《隐私保护指引》。我们将收集您的昵称、头像信息用于账号识别，并收集孩子的年龄、年级信息用于推荐合适的阅读内容。',
+            content: '使用 DmkWords 前请阅读并同意《隐私政策》。我们仅收集：您的手机号（登录与到店核验）、孩子的姓名/昵称、内置头像选择、年龄与年级（阅读服务与适读内容）、阅读记录。不收集位置、通讯录、相册或微信昵称头像。全文见「我的 → 隐私政策」。',
             confirmText: '同意',
             cancelText: '拒绝',
             success: (res) => {
               if (res.confirm) {
                 // B8（2026-10-28）：本地同意留痕补**版本 + 时间戳**（后端 consent 表属 FEAT-006，
                 // 尚未实现）；至少让"同意的是哪一版、什么时候同意的"可追溯。
+                // 2026-11-06：隐私政策文案按实际收集范围修订（不再声明微信昵称/头像/相册），版本升 v2。
                 wx.setStorageSync('privacy_agreed', true)
-                wx.setStorageSync('privacy_agreed_version', 'v1')
+                wx.setStorageSync('privacy_agreed_version', 'v2')
                 wx.setStorageSync('privacy_agreed_at', Date.now())
                 resolve({ event: 'agree' })
               } else {

@@ -33,7 +33,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # 2026-11-06：纯文档推送不再跑 25 分钟全量门禁（用户明确"文档批不必每次全量"）。
+  # 判定：本次 push 的全部变更文件都落在 docs/、*.md、PRD/、error_list/ → docs_only=true。
+  # 例外：`docs/api/openapi.json` 是契约快照，单独变更仍必须跑全量 gate（export_openapi --check）。
+  # PR 一律跑全量（base 分支对比逻辑更复杂，且 PR 本来就是代码评审入口）。
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 2
+      - id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "push" ]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          base="${{ github.event.before }}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed="$(git diff --name-only "$base" "${{ github.sha }}")"
+          echo "changed files:"; echo "$changed"
+          docs_only=true
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              docs/api/openapi.json) docs_only=false ;;
+              docs/*|*.md|PRD/*|error_list/*) ;;
+              *) docs_only=false ;;
+            esac
+          done <<< "$changed"
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
+
   gate:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     services:
@@ -111,6 +152,8 @@ jobs:
   # 镜像当前定位为**非生产**（待甲方裁定，见 Dockerfile 头注释），因此本 job 失败不拦 CI；
   # 它的价值是"源码/依赖漂移 + 高危 CVE"的持续信号，裁定接入生产后再收紧退出码。
   image:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     continue-on-error: true
@@ -126,3 +169,17 @@ jobs:
           exit-code: "0"
           ignore-unfixed: true
           severity: "HIGH,CRITICAL"
+
+  # 纯文档推送的轻量检查（约 1 分钟）：文档→代码引用对账 + 提交空白错误。
+  # 不做全量门禁：docs-only 不改变可执行断言（宪法 §八 D 级）。
+  docs:
+    needs: changes
+    if: needs.changes.outputs.docs_only == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Docs reference check
+        run: python3 scripts/check_docs_code_alignment.py
+      - name: Whitespace check
+        run: git show --check --format= "$GITHUB_SHA"
