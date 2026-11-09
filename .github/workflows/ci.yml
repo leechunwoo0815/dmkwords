@@ -172,8 +172,10 @@ jobs:
           ignore-unfixed: true
           severity: "HIGH,CRITICAL"
 
-  # 纯文档推送的轻量检查（约 1 分钟）：文档→代码引用对账 + 提交空白错误。
-  # 不做全量门禁：docs-only 不改变可执行断言（宪法 §八 D 级）。
+  # 纯文档推送的轻量检查（约 2 分钟）：文档→代码引用对账 + 提交空白错误。
+  # 2026-11-06：必须装后端依赖——`check_docs_code_alignment` 要 import
+  # `backend.seeds.seed_configs` 才能拿到 60 个配置键；只跑系统 python3 会降级成正则（53 键），
+  # 把 `quiz_pass_bonus` 之类误报成悬空（首次 docs-only run 实测失败，已修）。
   docs:
     needs: changes
     if: needs.changes.outputs.docs_only == 'true'
@@ -181,7 +183,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - name: Install dependencies (uv)
+        run: uv sync --frozen
       - name: Docs reference check
-        run: python3 scripts/check_docs_code_alignment.py
+        run: uv run python scripts/check_docs_code_alignment.py
       - name: Whitespace check
         run: git show --check --format= "$GITHUB_SHA"
