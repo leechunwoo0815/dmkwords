@@ -183,6 +183,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # `git show --check` 需要父提交；浅克隆 depth=1 时该提交会被当成 root，
+          # 把整棵树都算成新增行 → 历史 LEDGER 的尾随空格全部误报（2026-11-10 实测）。
+          fetch-depth: 2
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           python-version: "3.13"
