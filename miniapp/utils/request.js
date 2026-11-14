@@ -131,6 +131,12 @@ function doRequest(app, method, url, data, options, showLoading, resolve, reject
     },
     fail(err) {
       if (showLoading) wx.hideLoading()
+      // 2026-11-12（审核驳回排查）：**把真实的 errMsg 打进 console**。
+      // 原先这里只弹「网络异常」，域名不在白名单 / 连接超时 / TLS 失败 / 打到内网 IP
+      // 全长得一模一样——审核驳回时无法从客户端日志区分（服务端一条请求都收不到）。
+      // 真机调试器与 vConsole 里现在能直接看到 request:fail 的原因。
+      const errMsg = (err && err.errMsg) || ''
+      console.error('[request] 网络层失败', method, url, errMsg || err)
       // MP-020: 网络异常区分
       if (showError) {
         wx.showToast({ title: '网络异常，请检查网络连接', icon: 'none', duration: 3000 })

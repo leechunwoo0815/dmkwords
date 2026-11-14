@@ -21,22 +21,49 @@ Page({
     // W7-16（2026-10-28）：默认改为 **false**（fail-closed）——原先初值 true 且请求失败空转，
     // 服务端关闭短信时若取数失败会露出假入口。微信主通道不受影响。
     smsEnabled: false,
+    // 只读演示体验（2026-11-12 微信审核整改）：由服务端 /login/options 的 demo_enabled 决定，
+    // 关掉服务端开关按钮就不显示——不给"能点但一定失败"的假入口。
+    demoEnabled: false,
+    // 页内失败态：网络层失败原先只有一条 3 秒就消失的 toast（审核员看到的画面正是它），
+    // 页面本身仍然"能用"，家属/审核员不知道自己在看一个连不上服务器的页面。
+    netError: '',
+    // 隐私弹窗被拒绝 / 手机号授权被取消：显示固定说明区 + 三个出口（重试/体验/退出）
+    privacyBlocked: false,
     loginError: '',  // P2-52：登录失败在页面内也留痕（toast 会消失，家长回来能看到原因）
     cfg: getConfigs(),  // 业务口径（后端下发；倒计时秒数 P2-73）
   },
 
   async onLoad() {
-    // 口径先落地（登录前就要用：验证码倒计时），再取登录通道开关
-    const { configs } = await loadConfigs()
+    this._load(false)
+  },
+
+  // 口径先落地（登录前就要用：验证码倒计时），再取登录通道开关。
+  // force=true：重试时**跳过 60 秒失败冷却**（utils/configs.js 的缓存口径），否则点重试等于没点。
+  async _load(force) {
+    const { configs, failed } = await loadConfigs(force)
     this.setData({ cfg: configs })
+    if (failed) this.setData({ netError: '网络异常，请检查网络连接后重试' })
     api.getLoginOptions().then((res) => {
       if (res && typeof res.sms_enabled === 'boolean') {
         this.setData({ smsEnabled: res.sms_enabled })
       }
-    }).catch(() => {
+      if (res && typeof res.demo_enabled === 'boolean') {
+        this.setData({ demoEnabled: res.demo_enabled })
+      }
+      this.setData({ netError: '' })
+    }).catch((e) => {
       // W7-16：取不到开关就保持隐藏（宁可少一个入口，也不给假入口）
-      this.setData({ smsEnabled: false })
+      // 2026-11-12：同时置页内失败态——审核驳回时页面只有一条「网络异常」toast，
+      // 看不出是"网络断了"还是"接口地址配错了"，家属也无从重试。
+      this.setData({ smsEnabled: false, netError: '网络异常，请检查网络连接后重试' })
+      console.error('[login] login/options 失败', (e && e.errMsg) || e)
     })
+  },
+
+  // 重试取数（页内失败态上的按钮）：强制刷新口径 + 重新取开关
+  retryNetwork() {
+    this.setData({ netError: '' })
+    this._load(true)
   },
 
   onPhoneInput(e) { this.setData({ phone: e.detail.value }) },
@@ -88,8 +115,22 @@ Page({
     if (this.data.submitting) return
     const detail = (e && e.detail) || {}
     if (!detail.code) {
-      const denied = (detail.errMsg || '').indexOf('deny') >= 0
-      const msg = denied ? '你取消了手机号授权，可重试或联系馆员' : '手机号验证未完成，请重试或联系馆员'
+      const errMsg = detail.errMsg || ''
+      // 2026-11-12（审核驳回「点击取消/返回选项无效」）：拒绝隐私 / 取消授权 / 未同意隐私指引
+      // 三种失败都要落到**页内固定说明区**（重试 / 体验一下 / 退出小程序），
+      // 不能只弹一条 toast 然后停在原地——那正是审核员看到的"点了没反应"。
+      const blocked =
+        errMsg.indexOf('deny') >= 0 ||
+        errMsg.indexOf('cancel') >= 0 ||
+        errMsg.indexOf('privacy') >= 0
+      if (blocked) {
+        this.setData({
+          privacyBlocked: true,
+          loginError: '未同意隐私授权，手机号验证无法继续',
+        })
+        return
+      }
+      const msg = '手机号验证未完成，请重试或联系馆员'
       wx.showToast({ title: msg, icon: 'none', duration: 2500 })
       this.setData({ loginError: msg })
       return
@@ -183,6 +224,42 @@ Page({
   switchToSms() { this.setData({ mode: 'sms', code: '' }) },
   switchToWechat() { this.setData({ mode: 'wechat', code: '' }) },
 
+  // 只读演示体验（2026-11-12 微信审核整改）：审核员/潜在客户没有本店账号也能看到核心页面。
+  // 服务端 `DEMO_LOGIN_PHONE` 关闭时端点 422，按钮本身也不会出现（demo_enabled）。
+  async onDemoLogin() {
+    if (this.data.submitting) return
+    this.setData({ submitting: true, loginError: '', privacyBlocked: false })
+    try {
+      const res = await api.loginDemo()
+      this._enterApp(res)
+    } catch (e) {
+      // 演示入口失败必须说清原因（未开启 / 演示账号未建档 / 网络）
+      const msg = (e && e.message) || '演示体验暂时不可用，请稍后重试'
+      wx.showToast({ title: msg, icon: 'none', duration: 2500 })
+      this.setData({ loginError: msg })
+    } finally {
+      this.setData({ submitting: false })
+    }
+  },
+
+  // 退出小程序：登录规范要求"拒绝授权后用户能正常离开"，不能把用户困在登录页
+  exitMiniProgram() {
+    if (wx.exitMiniProgram) {
+      wx.exitMiniProgram({
+        fail: () => wx.showToast({ title: '请点右上角关闭小程序', icon: 'none' }),
+      })
+      return
+    }
+    wx.showToast({ title: '请点右上角关闭小程序', icon: 'none' })
+  },
+
+  // 重新发起授权（隐私弹窗会再次出现，用户可点「同意」）
+  retryAuthorize() {
+    this.setData({ privacyBlocked: false, loginError: '' })
+    if (this.data.mode === 'bind') return // 绑定面板：用户直接再点「微信手机号快速验证」
+    this.onWechatLogin()
+  },
+
   // 进 app：写登录态（与既有口径一致）
   _enterApp(res) {
     const app = getApp()
@@ -196,8 +273,16 @@ Page({
       wx.removeStorageSync('currentChildId')
       wx.setStorageSync('currentChildId', res.children[0].id)
     }
-    wx.showToast({ title: '登录成功', icon: 'success' })
-    setTimeout(() => wx.reLaunch({ url: '/pages/index/index' }), 600)
+    // 只读演示（2026-11-12）：标记本地演示态 —— 退出登录不再打服务端撤销接口
+    // （演示家长是全店共用的一个账号，撤销会把别的审核会话一起踢掉），首页也会挂"演示模式"横幅。
+    if (res.demo) {
+      wx.setStorageSync('demo_mode', true)
+      wx.showToast({ title: '演示模式：仅可浏览', icon: 'none', duration: 2000 })
+    } else {
+      wx.removeStorageSync('demo_mode')
+      wx.showToast({ title: '登录成功', icon: 'success' })
+    }
+    setTimeout(() => wx.reLaunch({ url: '/pages/index/index' }), res.demo ? 900 : 600)
   },
 
   _wxLoginCode() {

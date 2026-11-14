@@ -7,12 +7,24 @@
   </view>
 
   <view class="login-form">
+    <!-- 页内失败态（2026-11-12 审核驳回整改）：网络/接口失败不再是"只弹一条 3 秒 toast"，
+         而是页面里留一条可见的说明 + 重试按钮（审核员看到的就是那条 toast 的页面）。 -->
+    <view class="net-error" wx:if="{{netError}}">
+      <text class="net-error-text">{{netError}}</text>
+      <text class="net-error-retry" bindtap="retryNetwork">重试</text>
+    </view>
+
     <!-- ① 微信一键登录（主通道） -->
     <block wx:if="{{mode === 'wechat'}}">
   <!-- P2-52：登录失败在页面内留痕（toast 会消失，家长回来能看到原因） -->
   <view class="login-error" wx:if="{{loginError}}">{{loginError}}</view>
       <button class="wechat-login-btn" bindtap="onWechatLogin" disabled="{{submitting}}">
         {{submitting ? '登录中…' : '微信一键登录'}}
+      </button>
+      <!-- 只读演示体验（2026-11-12）：审核员/潜在客户没有本店账号也能看到核心页面；
+           服务端 DEMO_LOGIN_PHONE 关闭时 demoEnabled=false，这里整块不渲染。 -->
+      <button class="demo-login-btn" wx:if="{{demoEnabled}}" bindtap="onDemoLogin" disabled="{{submitting}}">
+        体验一下（仅可浏览）
       </button>
       <view class="alt-row" wx:if="{{smsEnabled}}">
         <text class="alt-link" bindtap="switchToSms">用手机号验证码登录</text>
@@ -50,10 +62,25 @@
         </button>
       </block>
       <view class="mode-tip" wx:else>微信手机号验证失败时，请联系馆员在后台处理。</view>
+      <!-- 绑定面板也要能直接进演示（审核员手机号未建档时，不用先退回来再点） -->
+      <button class="demo-login-btn" wx:if="{{demoEnabled}}" bindtap="onDemoLogin" disabled="{{submitting}}">
+        没有本店账号？体验一下（仅可浏览）
+      </button>
       <view class="alt-row">
         <text class="alt-link" bindtap="switchToWechat">返回微信登录</text>
       </view>
     </block>
+
+    <!-- 拒绝隐私 / 取消授权后的固定出路（2026-11-12 审核驳回「点击取消/返回无效」）：
+         必须给用户可执行的三个选择，而不是停在原地反复弹同一个弹窗。 -->
+    <view class="privacy-blocked" wx:if="{{privacyBlocked}}">
+      <view class="privacy-blocked-text">需要同意《隐私政策》后才能继续手机号验证</view>
+      <view class="privacy-actions">
+        <button class="privacy-btn primary" bindtap="retryAuthorize">重新同意并继续</button>
+        <button class="privacy-btn" wx:if="{{demoEnabled}}" bindtap="onDemoLogin" disabled="{{submitting}}">体验一下（仅可浏览）</button>
+        <button class="privacy-btn ghost" bindtap="exitMiniProgram">退出小程序</button>
+      </view>
+    </view>
 
     <!-- ③ 短信兜底登录 -->
     <block wx:else>

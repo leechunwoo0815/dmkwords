@@ -33,6 +33,8 @@ Page({
     recommend: [],
     // T45（FEAT-082）：活动轮播位（有封面未开始 ≤5）
     carousel: [],
+    // 只读演示态（2026-11-12 微信审核整改）：横幅常驻说明"为什么点了不能提交"
+    demoMode: false,
   },
 
   /** 换孩子时必须清空的一整套"属于某个孩子"的状态。
@@ -55,6 +57,8 @@ Page({
 
   onShow() {
     if (!session.ensureLogin()) return
+    // 演示态标记（2026-11-12）：只在这里读一次，页面渲染成"仅可浏览"横幅
+    this.setData({ demoMode: !!wx.getStorageSync('demo_mode') })
     this.refresh()
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 0 })

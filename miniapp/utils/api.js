@@ -36,6 +36,11 @@ module.exports = {
   loginByWechat(wxCode) {
     return req.post('/api/miniapp/login/wechat', { code: wxCode }, { auth: false })
   },
+  // 只读演示体验（2026-11-12 微信审核整改）：审核员没有本店账号，一键进演示家长视角。
+  // 服务端按 DEMO_LOGIN_PHONE 开关签发 demo token；一切写操作会被 403「演示模式仅供浏览」。
+  loginDemo() {
+    return req.post('/api/miniapp/login/demo', {}, { auth: false, showError: false })
+  },
   // ①b 首次绑定（2026-10-29 短信退役后的主通道）：微信手机号快速验证。
   // phoneCode = <button open-type="getPhoneNumber"> 回调里的 e.detail.code
   bindByWechatPhone(bindTicket, phoneCode) {

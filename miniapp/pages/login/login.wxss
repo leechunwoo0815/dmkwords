@@ -234,3 +234,88 @@
   color: var(--danger, #cf1322);
   text-align: center;
 }
+
+/* 2026-11-12 审核驳回整改：页内失败态 / 演示入口 / 隐私拒绝后的固定出路 */
+
+/* 页内失败态：网络或接口失败时留在页面上（原先只有 3 秒 toast，审核员只看到"页面没内容"） */
+.net-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 20rpx 24rpx;
+  background: var(--error-soft);
+  border-radius: 12rpx;
+}
+.net-error-text {
+  flex: 1;
+  font-size: 26rpx;
+  color: var(--danger, #cf1322);
+  line-height: 1.5;
+}
+.net-error-retry {
+  flex: none;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 4rpx 12rpx;
+}
+
+/* 演示入口：次要按钮（描边），不与主登录按钮抢视觉 */
+.demo-login-btn {
+  width: 100%;
+  padding: 24rpx;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--accent);
+  font-size: 30rpx;
+  font-weight: 600;
+  border: 2rpx solid var(--accent);
+  line-height: 1.4;
+  min-height: auto;
+}
+.demo-login-btn::after {
+  border: none;
+}
+
+/* 隐私被拒绝：说明 + 三个出口（重试 / 体验 / 退出） */
+.privacy-blocked {
+  padding: 24rpx;
+  background: var(--error-soft);
+  border-radius: var(--radius);
+}
+.privacy-blocked-text {
+  font-size: 26rpx;
+  color: var(--danger, #cf1322);
+  text-align: center;
+  line-height: 1.6;
+  margin-bottom: 20rpx;
+}
+.privacy-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+.privacy-btn {
+  width: 100%;
+  padding: 20rpx;
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 28rpx;
+  border: 2rpx solid var(--border);
+  line-height: 1.4;
+  min-height: auto;
+}
+.privacy-btn::after {
+  border: none;
+}
+.privacy-btn.primary {
+  background: var(--accent); /* R6 口径：新代码用 --accent（--primary 是同一值的旧别名） */
+  color: var(--surface);
+  border-color: var(--accent);
+}
+.privacy-btn.ghost {
+  background: transparent;
+  color: var(--muted);
+}

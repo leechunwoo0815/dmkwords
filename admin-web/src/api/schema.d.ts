@@ -3220,6 +3220,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/miniapp/login/demo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login Demo
+         * @description 只读演示体验（2026-11-12 微信审核整改）：无需账号，直接进演示家长视角。
+         *
+         *     只读：`demo` token 的一切写请求在 `get_current_parent` 里被 403 拦下。
+         *     开关：`.env` 的 `DEMO_LOGIN_PHONE`（空 = 端点 422、登录页不显示按钮）。
+         */
+        post: operations["login_demo_api_miniapp_login_demo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/miniapp/login/options": {
         parameters: {
             query?: never;
@@ -3230,6 +3253,9 @@ export interface paths {
         /**
          * Login Options
          * @description 登录方式开关（公开端点，2026-10-12 拍板 P1）：小程序据此隐藏手机号入口。
+         *
+         *     2026-11-12：增 `demo_enabled` —— 演示入口也要服务端开关决定显示，
+         *     否则关掉 `DEMO_LOGIN_PHONE` 后小程序仍会露出一个点了报错的假入口。
          */
         get: operations["login_options_api_miniapp_login_options_get"];
         put?: never;
@@ -12168,6 +12194,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_demo_api_miniapp_login_demo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

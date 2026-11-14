@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     # 置空后 login 对任何 code 全拒（fail-closed），倒逼 WM12 接微信 code2session/SMS
     LOGIN_DEV_CODE: str = "1234"
     ENABLE_TEST_TOKEN: bool = False
+    # 只读「演示体验」入口（2026-11-12，微信审核：审核员没有本店账号也要能体验核心功能）。
+    # 填**演示家长手机号** = 开启；空 = 关闭（登录页不显示按钮，端点直接 422）。
+    # 签发的 token 带 `demo:true`，`get_current_parent` 对其一切写请求返回 403（见 identity/auth.py）。
+    DEMO_LOGIN_PHONE: str = ""
 
     # 数据库（MySQL 8.0 only，单一数据库铁律）
     DB_HOST: str = "127.0.0.1"

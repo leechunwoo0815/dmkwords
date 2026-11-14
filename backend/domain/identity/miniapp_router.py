@@ -386,12 +386,33 @@ def login_bind(body: WeChatBindRequest, db: Session = Depends(get_db)):
     return bind_wechat(db, body.bind_ticket, body.phone, body.code)
 
 
+@router.post("/login/demo", dependencies=[Depends(rate_limit(20, 60))])
+def login_demo(db: Session = Depends(get_db)):
+    """只读演示体验（2026-11-12 微信审核整改）：无需账号，直接进演示家长视角。
+
+    只读：`demo` token 的一切写请求在 `get_current_parent` 里被 403 拦下。
+    开关：`.env` 的 `DEMO_LOGIN_PHONE`（空 = 端点 422、登录页不显示按钮）。
+    """
+    from backend.domain.identity.auth import login_demo as _login_demo
+
+    return _login_demo(db)
+
+
 @router.get("/login/options")
 def login_options():
-    """登录方式开关（公开端点，2026-10-12 拍板 P1）：小程序据此隐藏手机号入口。"""
+    """登录方式开关（公开端点，2026-10-12 拍板 P1）：小程序据此隐藏手机号入口。
+
+    2026-11-12：增 `demo_enabled` —— 演示入口也要服务端开关决定显示，
+    否则关掉 `DEMO_LOGIN_PHONE` 后小程序仍会露出一个点了报错的假入口。
+    """
     from backend.config import get_settings
 
-    return {"sms_enabled": bool(get_settings().SMS_ENABLED), "wechat_enabled": True}
+    settings = get_settings()
+    return {
+        "sms_enabled": bool(settings.SMS_ENABLED),
+        "wechat_enabled": True,
+        "demo_enabled": bool((settings.DEMO_LOGIN_PHONE or "").strip()),
+    }
 
 
 class MiniappConfigsResponse(BaseSchema):

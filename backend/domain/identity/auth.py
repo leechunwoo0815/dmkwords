@@ -10,29 +10,40 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Request
 from sqlalchemy.exc import IntegrityError
 
-from backend.common.exceptions import UnauthorizedError, ValidationError
+from backend.common.exceptions import ForbiddenError, UnauthorizedError, ValidationError
 from backend.config import get_settings
 from backend.database import get_db
 from backend.domain.identity.models import Child, Parent
 
 
-def _parent_token(parent: Parent) -> str:
-    """签发家长 token（P1-11：带 `gen` 代数——撤销 = parents.token_generation +1）。"""
+def _parent_token(parent: Parent, demo: bool = False) -> str:
+    """签发家长 token（P1-11：带 `gen` 代数——撤销 = parents.token_generation +1）。
+
+    2026-11-12：`demo=True` 多带一个 `demo` 声明 = **只读演示体验**（微信审核用，审核员没有本店账号）。
+    有效期压到 2 天（正式 30 天）——演示态不该长期有效。
+    """
     import jwt as pyjwt
 
     payload = {
         "sub": str(parent.id),
         "type": "parent",
         "gen": int(parent.token_generation or 0),
-        "exp": datetime.now(UTC) + timedelta(days=30),
+        "exp": datetime.now(UTC) + timedelta(days=2 if demo else 30),
     }
+    if demo:
+        payload["demo"] = True
     return pyjwt.encode(payload, get_settings().SECRET_KEY, algorithm="HS256")
 
 
 def _parent_from_token(token: str, db) -> Parent:
+    return _parent_and_payload_from_token(token, db)[0]
+
+
+def _parent_and_payload_from_token(token: str, db) -> tuple[Parent, dict]:
+    """解析家长 token → (Parent, 原始 payload)；payload 可能含 `demo`（见 `_parent_token`）。"""
     import jwt as pyjwt
 
     try:
@@ -50,19 +61,31 @@ def _parent_from_token(token: str, db) -> Parent:
     # 老 token 无 `gen` 字段按 0 处理 → 未撤销的账号仍可用；撤销后（gen≥1）一律 401。
     if int(payload.get("gen", 0) or 0) != int(parent.token_generation or 0):
         raise UnauthorizedError("登录已失效，请重新登录")
-    return parent
+    return parent, payload
 
 
-def get_current_parent(authorization: str = Header(""), db=Depends(get_db)) -> tuple[Parent, Any]:
+def get_current_parent(
+    request: Request, authorization: str = Header(""), db=Depends(get_db)
+) -> tuple[Parent, Any]:
     """FastAPI 依赖：解析家长 token，返回 (Parent, Session)。
 
     P2-11（2026-10-09 审查）：缺头/空 token 一律 **401**——原先 `Header(...)` 缺头会被
     FastAPI 参数校验拦成 422，与"未登录"语义不一致（前端按 401 触发重新登录）。
+
+    2026-11-12（微信审核整改）：`demo` token 是**只读**的——除 `logout`（POST，退演示态）外，
+    一切非 GET/HEAD/OPTIONS 请求在这里统一 403。为什么放在鉴权口而不是逐个写端点：
+    写端点分散在 6 个 miniapp_router 里，漏一个就等于演示账号能下预约/借阅/点赞（数据污染 + 审核不认）。
     """
     token = (authorization or "").replace("Bearer ", "").strip()
     if not token:
         raise UnauthorizedError("请先登录")
-    return _parent_from_token(token, db), db
+    parent, payload = _parent_and_payload_from_token(token, db)
+    if payload.get("demo"):
+        if request.method not in ("GET", "HEAD", "OPTIONS") and not request.url.path.endswith(
+            "/logout"
+        ):
+            raise ForbiddenError("演示模式仅供浏览，未开通会员无法提交")
+    return parent, db
 
 
 def child_of_parent(db, parent_id: int, child_id: int) -> Child:
@@ -205,6 +228,27 @@ def login_by_wechat(db, code: str) -> dict:
     if parent:
         return _login_payload(db, parent)
     return {"need_bind": True, "bind_ticket": make_bind_ticket(openid)}
+
+
+def login_demo(db) -> dict:
+    """只读「演示体验」登录（2026-11-12，微信审核：审核员没有本店账号也要能体验核心功能）。
+
+    账号来源：`.env` 的 `DEMO_LOGIN_PHONE`（**手机号**，由馆员在后台正常建档的那个演示家长）。
+    空值 = 功能关闭（端点直接 422，登录页也不显示按钮）——不留"能点但用不了"的死入口。
+
+    安全边界：token 带 `demo:true`，`get_current_parent` 对它的写请求一律 403，2 天过期；
+    演示家长与正式会员共用同一张表，但**不新建账号、不写资料**，因此不会污染会员数据。
+    """
+    phone = (get_settings().DEMO_LOGIN_PHONE or "").strip()
+    if not phone:
+        raise ValidationError("演示模式未开启")
+    parent = db.query(Parent).filter(Parent.phone == phone, Parent.is_deleted == 0).first()
+    if not parent:
+        raise ValidationError("演示账号未建档，请联系馆员")
+    payload = _login_payload(db, parent)
+    payload["token"] = _parent_token(parent, demo=True)
+    payload["demo"] = True
+    return payload
 
 
 def _bind_openid_to_parent(db, openid: str, phone: str) -> dict:

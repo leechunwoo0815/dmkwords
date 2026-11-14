@@ -89,7 +89,10 @@ function ensureLogin() {
 }
 /** 本地清理（退出登录的第二步；见下面为什么不能在请求之前做）。 */
 function _clearLocalSession() {
-  ;['token', 'parent', 'children', 'currentChildId'].forEach((k) => wx.removeStorageSync(k))
+  // demo_mode（2026-11-12 只读演示）：退出演示态时一并清掉，避免下次真登录仍挂着"演示"横幅
+  ;['token', 'parent', 'children', 'currentChildId', 'demo_mode'].forEach((k) =>
+    wx.removeStorageSync(k)
+  )
   const app = getApp()
   app.globalData.token = ''
   app.globalData.userInfo = null
@@ -113,6 +116,12 @@ function logout() {
   const done = () => {
     if (wx.getStorageSync('token') !== tokenAtCall) return // 已换会话 → 本次回调不再动本地
     try { _clearLocalSession() } catch (e) { /* 清理失败不阻断退出 */ }
+  }
+  // 2026-11-12（只读演示）：演示家长是**全店共用**的一个账号，服务端退出会 +1 token 代数，
+  // 把其他审核/演示会话一起踢掉（也把正在体验的人踢回登录页）。演示态只清本地即可。
+  if (wx.getStorageSync('demo_mode')) {
+    done()
+    return
   }
   try {
     const api = require('./api')

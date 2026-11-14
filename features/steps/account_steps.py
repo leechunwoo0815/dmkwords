@@ -478,8 +478,9 @@ def step_only_parent_channels(context):
         decoded = _decode_parent_token(payload["token"])
         assert decoded["type"] == "parent", decoded
 
-    # 登录面收敛：小程序的登录端点就是这五个（微信手机号快速验证是首登绑定的子路径，
-    # 不是第五条登录通道；2026-10-29 短信退役后它取代短信成为首绑主通道）
+    # 登录面收敛：小程序的登录端点就是这六个（微信手机号快速验证是首登绑定的子路径，
+    # 不是第五条登录通道；2026-10-29 短信退役后它取代短信成为首绑主通道；
+    # 2026-11-12 增 `/login/demo`——只读演示，非公开注册通道，见下面的开关探针）。
     # 取 OpenAPI 契约面而不是 `app.routes`——本版 FastAPI 的 included router 在
     # `app.routes` 里是 `_IncludedRouter` 包装（无 path 属性），契约面才是可枚举的接口全集。
     paths = set(context.client.app.openapi()["paths"])
@@ -490,7 +491,16 @@ def step_only_parent_channels(context):
         "/api/miniapp/login/wechat/phone",
         "/api/miniapp/login/bind",
         "/api/miniapp/login/options",
+        # 2026-11-12（微信审核驳回整改）：只读演示入口。它**不是第六条登录通道**——
+        # 只在 `.env` 的 `DEMO_LOGIN_PHONE` 配了演示家长时才可用，且签发 demo token
+        # （写操作 403，见 backend/domain/identity/auth.py）。下面用探针把这两条钉住，
+        # 防止它悄悄变成"任何人可登入"的后门。
+        "/api/miniapp/login/demo",
     }, login_paths
+    # 开关关闭（BDD 环境未配 DEMO_LOGIN_PHONE）→ 422，不留可用入口
+    demo = context.client.post("/api/miniapp/login/demo", json={})
+    assert demo.status_code == 422, demo.text
+    assert "演示模式未开启" in demo.json()["detail"], demo.json()
 
 
 @then("不存在孩子账号密码登录方式")

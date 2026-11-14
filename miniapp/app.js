@@ -1,21 +1,23 @@
 // frontend/app.js
-// 生产环境通过 project.config.json 的编译环境注入 baseURL
+// 接口地址（2026-11-12 微信审核驳回整改，见 docs/34 §九）：**真机一律生产域名**。
+//
+// 改前的坑：`envVersion === 'develop'` 时用内网 `https://192.168.18.162:8443`。
+// 提审版本还没发布，审核环境被判成 develop → 审核员手机上**所有**请求打向一个内网 IP，
+// 100% 连接失败 → `utils/request.js` 的 fail() 统一弹「网络异常，请检查网络连接」，
+// 微信据此判「页面无法加载/无法体验核心功能」。服务端一条请求都收不到（日志可证）。
+//
+// 现在的判定只看**平台**，不再看版本环境：
+//   - 模拟器（platform=devtools）：本地后端 http://127.0.0.1:8002（image 组件不信任自签 https）
+//   - 真机：默认生产 https://saisenyoo.cn
+//   - 真机要连本地后端：控制台执行 wx.setStorageSync('dev_base_url', 'https://<IP>:8443')
+//     显式覆盖（P2-9 口径保留；证书 certs/server.crt，手机需安装并完全信任 ca.crt）
 const PROD_BASE_URL = 'https://saisenyoo.cn'
-// 开发版连本地后端。
-// - 模拟器（platform=devtools）：http 127.0.0.1 即可（image 组件不信任自签 https）
-// - 真机（ios/android）：媒体栈拦 http，必须走本地 https :8443
-//   （证书 certs/server.crt，手机需安装并完全信任 ca.crt；本机 IP 变更需改 SAN 重新生成）
-const _envVersion = (wx.getAccountInfoSync().miniProgram.envVersion || 'develop')
-// P2-9（2026-10-09 审查）：本机 IP 变了不必改代码——控制台执行
-//   wx.setStorageSync('dev_base_url', 'https://<新IP>:8443')
-// 即可覆盖（模拟器与真机各一套默认值；改网络环境不再需要发版/改源码）。
+const LOCAL_BASE_URL = 'http://127.0.0.1:8002'
 const _devOverride = wx.getStorageSync('dev_base_url') || ''
-const DEV_BASE_URL =
-  _devOverride ||
-  (wx.getSystemInfoSync().platform === 'devtools'
-    ? 'http://127.0.0.1:8002'
-    : 'https://192.168.18.162:8443')
-const BASE_URL = _envVersion === 'develop' ? DEV_BASE_URL : PROD_BASE_URL
+const _isDevtools = (wx.getSystemInfoSync() || {}).platform === 'devtools'
+const BASE_URL = _devOverride || (_isDevtools ? LOCAL_BASE_URL : PROD_BASE_URL)
+// 排查用（2026-11-12）：真机调试器/vConsole 里一眼能看到这次到底打的哪个地址
+console.log('[app] baseURL =', BASE_URL)
 
 const session = require('./utils/session')
 
@@ -25,6 +27,8 @@ App({
     token: '',
     userInfo: null,
     currentChild: null,
+    // 隐私弹窗最近一次是否被拒绝（登录页据此显示说明区与出口，见 login.js）
+    privacyRefused: false,
   },
 
   onShow() {
@@ -117,8 +121,13 @@ App({
                 wx.setStorageSync('privacy_agreed', true)
                 wx.setStorageSync('privacy_agreed_version', 'v2')
                 wx.setStorageSync('privacy_agreed_at', Date.now())
+                getApp().globalData.privacyRefused = false
                 resolve({ event: 'agree' })
               } else {
+                // 2026-11-12（审核驳回「点击取消/返回无效」）：拒绝后**记录下来**，
+                // 登录页据此显示固定的说明区 + 三个出口（重试/体验一下/退出），
+                // 而不是让按钮反复弹同一个弹窗、页面上无处可去。
+                getApp().globalData.privacyRefused = true
                 resolve({ event: 'disagree' })
               }
             }

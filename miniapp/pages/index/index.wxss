@@ -352,3 +352,15 @@
   font-size: 24rpx;
   color: var(--warn, #b26a00);
 }
+
+/* 演示模式横幅（2026-11-12 微信审核整改）：只读演示态常驻，解释不可提交的原因 */
+.demo-banner {
+  margin: 16rpx 24rpx 0;
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+  background: var(--accent-soft, rgba(255, 173, 51, 0.16));
+  color: var(--accent-dark, #b26a00);
+  font-size: 24rpx;
+  line-height: 1.5;
+  text-align: center;
+}

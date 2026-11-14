@@ -1,4 +1,9 @@
 <scroll-view class="page-root" scroll-y enhanced show-scrollbar="{{false}}">
+  <!-- 演示模式横幅（2026-11-12 微信审核整改）：只读演示进入后常驻，
+       解释"为什么点了不能提交"（服务端对 demo token 的写操作统一 403）。 -->
+  <view class="demo-banner" wx:if="{{demoMode}}">
+    演示模式：仅可浏览，借阅/预约/点赞等操作需到店建档入会
+  </view>
   <!-- 问候卡：孩子 + 会员态 + 打卡 -->
   <view class="hero-card" wx:if="{{currentChild}}">
     <view class="hero-left">
