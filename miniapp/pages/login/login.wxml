@@ -71,17 +71,6 @@
       </view>
     </block>
 
-    <!-- 拒绝隐私 / 取消授权后的固定出路（2026-11-12 审核驳回「点击取消/返回无效」）：
-         必须给用户可执行的三个选择，而不是停在原地反复弹同一个弹窗。 -->
-    <view class="privacy-blocked" wx:if="{{privacyBlocked}}">
-      <view class="privacy-blocked-text">需要同意《隐私政策》后才能继续手机号验证</view>
-      <view class="privacy-actions">
-        <button class="privacy-btn primary" bindtap="retryAuthorize">重新同意并继续</button>
-        <button class="privacy-btn" wx:if="{{demoEnabled}}" bindtap="onDemoLogin" disabled="{{submitting}}">体验一下（仅可浏览）</button>
-        <button class="privacy-btn ghost" bindtap="exitMiniProgram">退出小程序</button>
-      </view>
-    </view>
-
     <!-- ③ 短信兜底登录 -->
     <block wx:else>
       <view class="input-row">
@@ -106,6 +95,20 @@
         <text class="alt-link" bindtap="switchToWechat">用微信一键登录</text>
       </view>
     </block>
+
+    <!-- 拒绝隐私 / 取消授权后的固定出路（2026-11-12 审核驳回「点击取消/返回无效」）：
+         必须给用户可执行的三个选择，而不是停在原地反复弹同一个弹窗。
+         注意：位置固定在 if/elif/else 链**之后**：WXML 的 `wx:else` 只能紧跟 `wx:elif`，
+         中间插任何节点都会让 else 分支脱离条件判断（短信表单会在微信模式下一起渲染，
+         2026-11-14 开发者工具截图实测到；检查器不查结构，只能靠这条约定）。 -->
+    <view class="privacy-blocked" wx:if="{{privacyBlocked}}">
+      <view class="privacy-blocked-text">需要同意《隐私政策》后才能继续手机号验证</view>
+      <view class="privacy-actions">
+        <button class="privacy-btn primary" bindtap="retryAuthorize">重新同意并继续</button>
+        <button class="privacy-btn" wx:if="{{demoEnabled}}" bindtap="onDemoLogin" disabled="{{submitting}}">体验一下（仅可浏览）</button>
+        <button class="privacy-btn ghost" bindtap="exitMiniProgram">退出小程序</button>
+      </view>
+    </view>
 
     <view class="agreement-row">
       登录即代表同意
