@@ -59,6 +59,19 @@ jobs:
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # 2026-11-14 实测踩到：fetch-depth=2 只覆盖"本次推送的最后两个提交"，
+          # 一次推 3 个提交（e73ae05..9be74dc）时 base 不在浅克隆里 →
+          # `git diff` 直接 `fatal: bad object`、changes job 7 秒红（run 43563420736）。
+          # 两条兜底：① 单独按 SHA 拉一次 base；② 仍拿不到就**保守按代码变更**处理
+          # （宁可多跑一次 25 分钟全量，也不让门禁被误跳过）。
+          if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "$base" >/dev/null 2>&1 || true
+          fi
+          if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            echo "取不到 base 提交 $base（浅克隆）——按代码变更保守处理"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # core.quotepath=false：否则中文路径会输出成 "docs/25-\344..."（带引号），
           # 下面的 docs/* 匹配不上 → 纯文档推送被误判为代码（2026-11-06 实测踩到）。
           changed="$(git -c core.quotepath=false diff --name-only "$base" "${{ github.sha }}")"
