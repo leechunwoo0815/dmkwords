@@ -264,7 +264,8 @@
 /* 演示入口：次要按钮（描边），不与主登录按钮抢视觉 */
 .demo-login-btn {
   width: 100%;
-  padding: 24rpx;
+  box-sizing: border-box;
+  padding: 28rpx; /* 与「微信一键登录」同高（28rpx），两个按钮视觉成对 */
   border-radius: var(--radius);
   background: transparent;
   color: var(--accent);
@@ -273,6 +274,13 @@
   border: 2rpx solid var(--accent);
   line-height: 1.4;
   min-height: auto;
+  /* 单行：字号 30rpx 的 8 个字在 327px 内容宽里放得下，但仍显式禁止折行——
+     2026-11-14 用户真机/模拟器截图里「体验一下（仅可浏览）」被折成两行 */
+  white-space: nowrap;
+  word-break: keep-all;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .demo-login-btn::after {
   border: none;
@@ -298,6 +306,7 @@
 }
 .privacy-btn {
   width: 100%;
+  box-sizing: border-box;
   padding: 20rpx;
   border-radius: var(--radius);
   background: var(--bg);
@@ -309,6 +318,10 @@
 }
 .privacy-btn::after {
   border: none;
+}
+.privacy-btn {
+  white-space: nowrap;
+  word-break: keep-all;
 }
 .privacy-btn.primary {
   background: var(--accent); /* R6 口径：新代码用 --accent（--primary 是同一值的旧别名） */

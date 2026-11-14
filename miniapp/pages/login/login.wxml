@@ -24,7 +24,7 @@
       <!-- 只读演示体验（2026-11-12）：审核员/潜在客户没有本店账号也能看到核心页面；
            服务端 DEMO_LOGIN_PHONE 关闭时 demoEnabled=false，这里整块不渲染。 -->
       <button class="demo-login-btn" wx:if="{{demoEnabled}}" bindtap="onDemoLogin" disabled="{{submitting}}">
-        体验一下（仅可浏览）
+        体验一下（只读）
       </button>
       <view class="alt-row" wx:if="{{smsEnabled}}">
         <text class="alt-link" bindtap="switchToSms">用手机号验证码登录</text>
@@ -64,7 +64,7 @@
       <view class="mode-tip" wx:else>微信手机号验证失败时，请联系馆员在后台处理。</view>
       <!-- 绑定面板也要能直接进演示（审核员手机号未建档时，不用先退回来再点） -->
       <button class="demo-login-btn" wx:if="{{demoEnabled}}" bindtap="onDemoLogin" disabled="{{submitting}}">
-        没有本店账号？体验一下（仅可浏览）
+        没有本店账号？体验一下（只读）
       </button>
       <view class="alt-row">
         <text class="alt-link" bindtap="switchToWechat">返回微信登录</text>
@@ -105,7 +105,7 @@
       <view class="privacy-blocked-text">需要同意《隐私政策》后才能继续手机号验证</view>
       <view class="privacy-actions">
         <button class="privacy-btn primary" bindtap="retryAuthorize">重新同意并继续</button>
-        <button class="privacy-btn" wx:if="{{demoEnabled}}" bindtap="onDemoLogin" disabled="{{submitting}}">体验一下（仅可浏览）</button>
+        <button class="privacy-btn" wx:if="{{demoEnabled}}" bindtap="onDemoLogin" disabled="{{submitting}}">体验一下（只读）</button>
         <button class="privacy-btn ghost" bindtap="exitMiniProgram">退出小程序</button>
       </view>
     </view>
