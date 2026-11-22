@@ -1,6 +1,6 @@
 <view class="page-bg">
   <view class="content">
-    <view class="draft-banner">本文本为待法务审阅的占位文本，仅概述当前服务与规则的实际执行方式；最终版本以馆方公示为准。</view>
+    <view class="draft-banner">本小程序仅面向本馆线下会员开放，不提供公众注册。本协议说明本店会员服务的服务内容、费用缴纳与办理方式；如有调整以馆内最新公示为准。</view>
 
     <view class="agreement-title">服务内容</view>
     <view class="agreement-text">
