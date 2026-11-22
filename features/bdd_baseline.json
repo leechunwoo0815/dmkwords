@@ -8,7 +8,7 @@
   "active_steps": {
     "features/account.feature::一个账号添加多个孩子": "2cfe736c4ac19981",
     "features/account.feature::切换当前操作的孩子": "0f259cfb24754933",
-    "features/account.feature::同一手机号不可重复注册": "7e89975d42228729",
+    "features/account.feature::同一手机号不可重复注册": "04d06450cfe5ed3e",
     "features/account.feature::孩子没有独立登录入口": "055a9e40338e8f06",
     "features/account.feature::微信登录新设备": "30e1f9d1fbfd71d6",
     "features/account.feature::添加第一个孩子": "a778ac3a33eb953b",

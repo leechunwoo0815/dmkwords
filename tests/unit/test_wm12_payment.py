@@ -180,7 +180,7 @@ def test_prepay_requires_openid(client):
     order = _online_order(client, mh, child["id"])
     r = client.post(f"/api/miniapp/orders/{order['id']}/pay", headers=mh)
     assert r.status_code == 422
-    assert "微信" in r.json()["detail"]
+    assert "手机号快捷登录" in r.json()["detail"]
 
 
 def test_prepay_mock_instant_settles_membership(client, db):

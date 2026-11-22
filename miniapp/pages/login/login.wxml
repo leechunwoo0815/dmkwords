@@ -14,12 +14,12 @@
       <text class="net-error-retry" bindtap="retryNetwork">重试</text>
     </view>
 
-    <!-- ① 微信一键登录（主通道） -->
+    <!-- ① 手机号快捷登录（主通道；2026-11-22 去「微信」字样，审核要求不得混淆官方元素） -->
     <block wx:if="{{mode === 'wechat'}}">
   <!-- P2-52：登录失败在页面内留痕（toast 会消失，家长回来能看到原因） -->
   <view class="login-error" wx:if="{{loginError}}">{{loginError}}</view>
       <button class="wechat-login-btn" bindtap="onWechatLogin" disabled="{{submitting}}">
-        {{submitting ? '登录中…' : '微信一键登录'}}
+        {{submitting ? '登录中…' : '手机号快捷登录'}}
       </button>
       <!-- 只读演示体验（2026-11-12）：审核员/潜在客户没有本店账号也能看到核心页面；
            服务端 DEMO_LOGIN_PHONE 关闭时 demoEnabled=false，这里整块不渲染。 -->
@@ -31,12 +31,12 @@
       </view>
     </block>
 
-    <!-- ② 首次绑定手机号（微信已取到；2026-10-29 起短信退役，手机号用微信快速验证） -->
+    <!-- ② 首次绑定手机号（已取到登录标识；2026-10-29 起短信退役，手机号用快捷验证组件） -->
     <block wx:elif="{{mode === 'bind'}}">
       <view class="mode-tip">首次登录，请验证手机号完成绑定</view>
       <button class="wechat-login-btn" open-type="getPhoneNumber"
         bindgetphonenumber="onGetPhoneNumber" disabled="{{submitting}}">
-        {{submitting ? '绑定中…' : '微信手机号快速验证'}}
+        {{submitting ? '绑定中…' : '手机号快捷验证'}}
       </button>
       <view class="login-error" wx:if="{{loginError}}">{{loginError}}</view>
       <!-- 短信仍启用时才显示兼容绑定面板；SMS_ENABLED=false 时整块隐藏，不给假入口 -->
@@ -61,13 +61,13 @@
           {{submitting ? '绑定中…' : '绑定并登录'}}
         </button>
       </block>
-      <view class="mode-tip" wx:else>微信手机号验证失败时，请联系馆员在后台处理。</view>
+      <view class="mode-tip" wx:else>手机号验证失败时，请联系馆员在后台处理。</view>
       <!-- 绑定面板也要能直接进演示（审核员手机号未建档时，不用先退回来再点） -->
       <button class="demo-login-btn" wx:if="{{demoEnabled}}" bindtap="onDemoLogin" disabled="{{submitting}}">
-        没有本店账号？体验一下（只读）
+        体验一下（只读）
       </button>
       <view class="alt-row">
-        <text class="alt-link" bindtap="switchToWechat">返回微信登录</text>
+        <text class="alt-link" bindtap="switchToWechat">返回快捷登录</text>
       </view>
     </block>
 
@@ -92,7 +92,7 @@
         {{submitting ? '登录中…' : '登录'}}
       </button>
       <view class="alt-row">
-        <text class="alt-link" bindtap="switchToWechat">用微信一键登录</text>
+        <text class="alt-link" bindtap="switchToWechat">用快捷登录</text>
       </view>
     </block>
 
@@ -110,11 +110,18 @@
       </view>
     </view>
 
-    <view class="agreement-row">
-      登录即代表同意
-      <text class="agreement-link" bindtap="goServiceAgreement">《用户服务协议》</text>
-      与
-      <text class="agreement-link" bindtap="goPrivacy">《隐私政策》</text>
+    <!-- 隐私同意（2026-11-22 审核驳回「默认强制同意」）：改为**用户主动勾选**的复选框。
+         旧文案「登录即代表同意…」本身就是被驳回的表述，已删除；
+         复选框默认不勾选（login.js 的 agreed 初值 false），未勾选时登录入口只提示、不发请求。
+         协议链接用 catchtap：点链接只跳转，不改变勾选状态。 -->
+    <view class="agreement-row" bindtap="toggleAgreed">
+      <view class="agree-check {{agreed ? 'agree-check-on' : ''}}">{{agreed ? '✓' : ''}}</view>
+      <view class="agree-text">
+        我已阅读并同意
+        <text class="agreement-link" catchtap="goServiceAgreement">《用户服务协议》</text>
+        与
+        <text class="agreement-link" catchtap="goPrivacy">《隐私政策》</text>
+      </view>
     </view>
   </view>
 </view>

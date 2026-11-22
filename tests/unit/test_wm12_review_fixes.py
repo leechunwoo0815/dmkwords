@@ -440,7 +440,7 @@ def test_prepay_without_openid_returns_422_with_guidance(client, db):
     created = _online_order(client, mh, child["id"])
     r = client.post(f"/api/miniapp/orders/{created['id']}/pay", headers=mh)
     assert r.status_code == 422, r.text
-    assert "微信一键登录" in r.json()["detail"]
+    assert "手机号快捷登录" in r.json()["detail"]
 
 
 # ---------- P0-4 短信原子校验 ----------

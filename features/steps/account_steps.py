@@ -441,12 +441,12 @@ def step_other_wechat_binds(context):
     )
 
 
-@then("系统拒绝并提示该手机号已绑定其他微信")
+@then("系统拒绝并提示该手机号已绑定其他账号")
 def step_phone_rebind_rejected(context):
     resp = context.bind_resp
     assert resp.status_code == 422, resp.text
     detail = resp.json()["detail"]
-    assert "已绑定其他微信" in detail, detail
+    assert "已绑定其他账号" in detail, detail
     # 拒绝是**真拒绝**：没发登录态，原绑定也没被顶号
     assert "token" not in resp.json(), resp.json()
     assert _openid_in_db(context) == WECHAT_OPENID, _openid_in_db(context)

@@ -1,4 +1,5 @@
-// pages/login/login.js — 微信一键登录（主）+ 微信手机号快速验证（首次绑定）
+// pages/login/login.js — 手机号快捷登录（主）+ 手机号快捷验证（首次绑定）
+// 2026-11-22 审核驳回「混淆腾讯官方元素」：用户可见文案一律不用「微信」字样（注释保留原文描述）。
 // 2026-10-08 接线（审查 P0-1）：生产环境固定验证码关闭后，这里是唯一的入口。
 //   ① 主通道：wx.login → /login/wechat → 已绑 → 直接进首页；
 //      未绑 → 绑定面板 → getPhoneNumber → /login/wechat/phone（2026-10-29 短信退役）
@@ -8,12 +9,14 @@ const { loadConfigs, getConfigs } = require('../../utils/configs')
 
 Page({
   data: {
-    mode: 'wechat', // wechat=微信一键登录 | bind=首次绑定 | sms=手机号验证码登录
+    mode: 'wechat', // wechat=快捷登录 | bind=首次绑定 | sms=手机号验证码登录
     phone: '',
     code: '',
     bindTicket: '',
     submitting: false,
-    agreed: true,
+    // 2026-11-22 审核驳回「默认强制同意」：初值必须是 **false**（用户主动勾选），
+    // 旧版默认 true + 「登录即代表同意」被判定为强制同意隐私政策。
+    agreed: false,
     sending: false,
     countdown: 0,
     // 2026-10-12 拍板（P1）：短信通道开关由服务端下发——关闭时**隐藏手机号入口**
@@ -85,7 +88,7 @@ Page({
     if (this.data.submitting) return
     this.setData({ loginError: '' })
     if (!this.data.agreed) {
-      wx.showToast({ title: '请先同意隐私政策', icon: 'none' }); return
+      wx.showToast({ title: '请先勾选同意《隐私政策》', icon: 'none' }); return
     }
     this._recordPrivacyConsent()
     this.setData({ submitting: true })
@@ -102,7 +105,7 @@ Page({
     } catch (e) {
       // P2-52（第八轮）：**取 code 失败原先完全静默**（"点了没反应"型入口故障）。
       // request.js 只覆盖 HTTP 失败；wx.login 自身失败/无 code 在这里必须自己讲清楚。
-      const msg = (e && e.message) || '微信登录失败，请重试'
+      const msg = (e && e.message) || '登录失败，请重试'
       wx.showToast({ title: msg, icon: 'none', duration: 2500 })
       this.setData({ loginError: msg })
     } finally {
@@ -136,7 +139,7 @@ Page({
       return
     }
     if (!this.data.agreed) {
-      wx.showToast({ title: '请先同意隐私政策', icon: 'none' }); return
+      wx.showToast({ title: '请先勾选同意《隐私政策》', icon: 'none' }); return
     }
     this._recordPrivacyConsent()
     this.setData({ submitting: true, loginError: '' })
@@ -163,7 +166,7 @@ Page({
       wx.showToast({ title: '请输入验证码', icon: 'none' }); return
     }
     if (!agreed) {
-      wx.showToast({ title: '请先同意隐私政策', icon: 'none' }); return
+      wx.showToast({ title: '请先勾选同意《隐私政策》', icon: 'none' }); return
     }
     this._recordPrivacyConsent()
     this.setData({ submitting: true })
@@ -188,7 +191,7 @@ Page({
       wx.showToast({ title: '请输入验证码', icon: 'none' }); return
     }
     if (!agreed) {
-      wx.showToast({ title: '请先同意隐私政策', icon: 'none' }); return
+      wx.showToast({ title: '请先勾选同意《隐私政策》', icon: 'none' }); return
     }
     this._recordPrivacyConsent()
     this.setData({ submitting: true })
@@ -256,7 +259,7 @@ Page({
   // 重新发起授权（隐私弹窗会再次出现，用户可点「同意」）
   retryAuthorize() {
     this.setData({ privacyBlocked: false, loginError: '' })
-    if (this.data.mode === 'bind') return // 绑定面板：用户直接再点「微信手机号快速验证」
+    if (this.data.mode === 'bind') return // 绑定面板：用户直接再点「手机号快捷验证」
     this.onWechatLogin()
   },
 
@@ -288,8 +291,8 @@ Page({
   _wxLoginCode() {
     return new Promise((resolve, reject) => {
       wx.login({
-        success: (r) => (r && r.code ? resolve(r.code) : reject(new Error('微信登录失败'))),
-        fail: () => reject(new Error('微信登录失败，请重试')),
+        success: (r) => (r && r.code ? resolve(r.code) : reject(new Error('登录失败'))),
+        fail: () => reject(new Error('登录失败，请重试')),
       })
     })
   },

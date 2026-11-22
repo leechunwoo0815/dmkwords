@@ -191,7 +191,7 @@ def _wechat_openid(code: str) -> str:
     data = asyncio.run(WeChatAuth.code_to_session(code))
     openid = data.get("openid")
     if not openid:
-        raise ValidationError("微信登录失败：未取到 openid")
+        raise ValidationError("登录失败：未取到用户标识")
     return openid
 
 
@@ -263,15 +263,15 @@ def _bind_openid_to_parent(db, openid: str, phone: str) -> dict:
     if not parent:
         raise ValidationError("该手机号未注册（请到店建档）")
     if parent.wechat_openid and parent.wechat_openid != openid:
-        raise ValidationError("该手机号已绑定其他微信，请联系馆员处理")
+        raise ValidationError("该手机号已绑定其他账号，请联系馆员处理")
     occupied = parent_by_openid(db, openid)
     if occupied and occupied.id != parent.id:
-        raise ValidationError("该微信已绑定其他手机号，请联系馆员处理")
+        raise ValidationError("当前登录账号已绑定其他手机号，请联系馆员处理")
     # P2-6（2026-10-17 第六十九批·大审查）：软删家长仍占着 `wechat_openid` 全局唯一索引；
     # 直接绑定会撞索引、被下面兜底成"刚刚已被绑定"（误导）。这里先如实拦截并给可执行指引。
     stale = db.query(Parent).filter(Parent.wechat_openid == openid, Parent.is_deleted != 0).first()
     if stale is not None:
-        raise ValidationError("该微信曾绑定一个已删除的家长档案，请联系馆员在后台处理后重试")
+        raise ValidationError("当前登录账号曾绑定一个已删除的家长档案，请联系馆员在后台处理后重试")
     parent.wechat_openid = openid
     try:
         db.commit()
@@ -279,7 +279,7 @@ def _bind_openid_to_parent(db, openid: str, phone: str) -> dict:
         # WM12-C（审查 P2-13）：`parents.wechat_openid` 是唯一索引，两个请求同时绑同一微信时
         # 后到者原先会以 500 收场（堆栈暴露）；这里是业务冲突，回滚并转 422。
         db.rollback()
-        raise ValidationError("该微信刚刚已被绑定，请重新登录或联系馆员处理") from exc
+        raise ValidationError("当前登录账号刚刚已被绑定，请重新登录或联系馆员处理") from exc
     return _login_payload(db, parent)
 
 
@@ -310,5 +310,5 @@ def bind_wechat_by_phone_code(db, bind_ticket: str, phone_code: str) -> dict:
     openid = parse_bind_ticket(bind_ticket)
     phone = asyncio.run(WeChatAuth.get_phone_number(phone_code))
     if not phone:
-        raise ValidationError("微信手机号获取失败，请重试或联系馆员")
+        raise ValidationError("手机号获取失败，请重试或联系馆员")
     return _bind_openid_to_parent(db, openid, phone)

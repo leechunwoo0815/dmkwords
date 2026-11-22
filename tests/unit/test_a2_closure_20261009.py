@@ -78,7 +78,9 @@ def test_service_agreement_matches_reality():
         encoding="utf-8"
     )
     assert "不提供在线支付" not in wxml, "文案不得再写死'不提供在线支付'（已接微信支付）"
-    assert "微信一键登录" in wxml, "登录方式必须包含微信一键登录（主通道）"
+    assert "手机号快捷登录" in wxml, (
+        "登录方式必须包含手机号快捷登录（主通道；2026-11-22 去「微信」字样）"
+    )
 
 
 # ---------- ④ 动态类名 ----------

@@ -64,7 +64,7 @@ class SmsCodeService:
         # 2026-10-29 甲方裁定：短信退役。关闭时**必须 fail-closed**——不能走 mock 网关
         # 回"已发送"（家长永远收不到码的假成功）。
         if not get_settings().SMS_ENABLED:
-            raise ConflictError("短信通道未启用，请使用微信一键登录")
+            raise ConflictError("短信通道未启用，请使用手机号快捷登录")
         phone = (phone or "").strip()
         if not phone or len(phone) < 11 or not phone.isdigit():
             raise ValidationError("请输入 11 位手机号")
@@ -139,7 +139,7 @@ class SmsCodeService:
             if ip_today >= ip_daily_limit:
                 raise ConflictError(
                     f"当前网络今日发送验证码已达上限（{ip_daily_limit} 条）——"
-                    "请改用微信一键登录，或明天再试"
+                    "请改用手机号快捷登录，或明天再试"
                 )
 
         # 网关生成并发送；它把 code 回传给我方（真实厂商路径同样回传——用于本地落哈希）
@@ -198,7 +198,7 @@ class SmsCodeService:
         """
         # 2026-10-29 甲方裁定：短信退役。关闭时任何校验入口都 fail-closed。
         if not get_settings().SMS_ENABLED:
-            raise ValidationError("短信通道未启用，请使用微信一键登录")
+            raise ValidationError("短信通道未启用，请使用手机号快捷登录")
         phone = (phone or "").strip()
         code = (code or "").strip()
         if not code:

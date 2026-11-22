@@ -120,15 +120,6 @@
   opacity: 0.5;
 }
 
-.agreement-link {
-  color: var(--accent);
-  text-decoration: underline;
-}
-
-.agreement-link:active {
-  opacity: 0.7;
-}
-
 
 /* ============================================
    绘本风精修（v3 2026-08-30）— 覆盖块，勿删
@@ -150,7 +141,8 @@
   color: var(--muted);
 }
 
-/* 合规入口（2026-09-13）：登录即同意协议（仅入口，不做勾选门禁——F3 同意流待拍板） */
+/* 合规入口（2026-11-22）：隐私同意改为**主动勾选**——审核驳回「默认强制同意」，
+   默认不勾选、不勾选不执行登录；协议链接用 catchtap 只跳转不切换勾选。 */
 .agreement-row {
   margin-top: 32rpx;
   text-align: center;
@@ -158,6 +150,38 @@
   color: var(--muted);
   line-height: 1.8;
 }
+.agreement-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+
+/* 2026-11-22：隐私同意改为用户主动勾选（审核驳回「默认强制同意」） */
+.agree-check {
+  flex: none;
+  width: 32rpx;
+  height: 32rpx;
+  margin-top: 4rpx;
+  border: 2rpx solid var(--border);
+  border-radius: 8rpx;
+  background: var(--surface);
+  color: var(--surface);
+  font-size: 22rpx;
+  line-height: 32rpx;
+  text-align: center;
+}
+.agree-check-on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.agree-text {
+  flex: 1;
+  font-size: 24rpx;
+  color: var(--muted);
+  line-height: 1.6;
+  text-align: left;
+}
+
 .agreement-link {
   color: var(--accent);
   text-decoration: underline;

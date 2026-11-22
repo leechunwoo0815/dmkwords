@@ -324,7 +324,7 @@ class PaymentService(PaymentNotifyMixin):
             # 口径 docs/09 WM12-C §二.4（用户裁定）：线上支付只允许微信一键登录的家长。
             # 小程序已按 `can_pay_online` 隐藏入口，这里是服务端兜底（老版本前端/直连 API）。
             raise ValidationError(
-                "线上支付需微信一键登录：请用微信一键登录后再试（短信登录仅供查询订单）"
+                "线上支付需手机号快捷登录：请用手机号快捷登录后再试（短信登录仅供查询订单）"
             )
         if order.order_type == Order.TYPE_FIRST_ACTIVITY:
             self._assert_first_activity_payable(order)
