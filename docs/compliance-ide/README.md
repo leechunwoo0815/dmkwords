@@ -44,3 +44,8 @@ wechatide -c zcode automation_evaluate --project /Users/litianyu/cc-projects/dmk
 > 说明：本机 `simulator_open_page --query` 对页面 `options` 的传参不稳定（quiz/book-detail 已改用应用内
 > `wx.navigateTo` 复核）。截图只证明**渲染层文案**；提审前仍须按 `docs/22 §七` 用真机走购买页/订单列表/
 > 微信账单三处核对。
+
+## 2026-11-23 追加：0.1.15 审核通过截图
+
+- `20261123-0.1.15-审核通过待发布.png`（甲方提供）：微信公众平台「审核版本」卡片——版本 **0.1.15**、开发者 **Bokoblin**、提交审核时间 **2026-11-23 16:27:18**、审核说明「**审核通过待发布**」、按钮「提交发布」。
+- 用途：提审链最终状态的仓库内留痕；发布动作与备案由甲方控制台完成。
