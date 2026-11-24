@@ -360,6 +360,8 @@ class SystemHistoryPoint(BaseSchema):
     at: str
     cpu_percent: float
     load1: float
+    load5: float
+    load15: float
     mem_used_mb: int
     mem_total_mb: int
     mem_cached_mb: int

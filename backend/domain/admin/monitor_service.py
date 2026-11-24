@@ -18,6 +18,7 @@ from __future__ import annotations
 import os
 import platform
 import socket
+import sys
 import threading
 import time
 from datetime import datetime, timedelta
@@ -31,6 +32,10 @@ from backend.metrics import app_metrics
 _LIVE_CACHE_TTL = 3.0
 _HISTORY_CACHE_TTL = 60.0
 _DISK_PATH = os.getenv("SYSTEM_MONITOR_DISK_PATH", "/")
+# 历史聚合粒度候选（秒）。采样本身 60 秒一行，故最小 60：
+#   1h → 60 秒（60 点）、6h → 120 秒（180 点）、12h/24h → 300 秒（144/288 点）。
+_HISTORY_STEPS = (60, 120, 300)
+_HISTORY_MAX_POINTS = 300
 
 _cache_lock = threading.Lock()
 _live_cache: tuple[float, dict] | None = None
@@ -67,6 +72,15 @@ def _kb_rate(current: int, previous: int, elapsed: float) -> float:
     return max(0.0, (current - previous) / elapsed / 1024.0)
 
 
+def _auto_step(hours: int) -> int:
+    """按回看时长选聚合粒度：在 60/120/300 秒里取“点数不超上限”的最小值。"""
+    total = max(60, int(hours) * 3600)
+    for step in _HISTORY_STEPS:
+        if total / step <= _HISTORY_MAX_POINTS:
+            return step
+    return _HISTORY_STEPS[-1]
+
+
 def _os_name() -> str:
     try:
         with open("/etc/os-release", encoding="utf-8") as fh:
@@ -88,11 +102,17 @@ def collect_host_metrics() -> dict:
 
     vm = psutil.virtual_memory()
     swap = psutil.swap_memory()
-    # 与 `free -m` 对齐：used = total - free - buffers - cached（psutil 的 vm.used），
-    # cached 展示为 buffers + cached（即 free 的 buff/cache）。不用 total-available——
-    # 后者会把可回收缓存算进 used，生产 2G 机上会显示 59% 而 free 实际是 50%。
-    cached_bytes = int(getattr(vm, "cached", 0)) + int(getattr(vm, "buffers", 0))
-    used_bytes = int(getattr(vm, "used", vm.total - vm.available))
+    # 平台口径（与用户看到的系统工具对齐）：
+    #   macOS：Activity Monitor / psutil.vm.percent 是 total - available（含压缩/不可回收部分）；
+    #          开发机若用 vm.used 会显示 44%，与系统实际 70%+ 不符。
+    #   Linux：free -m 的 used = total - free - buffers - cached（psutil.vm.used）；
+    #          cached 展示为 buffers + cached（即 free 的 buff/cache）。
+    if sys.platform == "darwin":
+        used_bytes = max(0, int(vm.total) - int(vm.available))
+        cached_bytes = 0
+    else:
+        cached_bytes = int(getattr(vm, "cached", 0)) + int(getattr(vm, "buffers", 0))
+        used_bytes = int(getattr(vm, "used", vm.total - vm.available))
     disk = psutil.disk_usage(_DISK_PATH)
     try:
         statvfs = os.statvfs(_DISK_PATH)
@@ -322,7 +342,9 @@ class SystemMonitorService:
         return data
 
     def history(self, hours: int = 24) -> dict:
+        """回看 hours 小时历史；聚合粒度按时长自适应（1h=60s、6h=120s、12h/24h=300s）。"""
         hours = max(1, min(24, int(hours)))
+        step = _auto_step(hours)
         now = time.monotonic()
         with _cache_lock:
             cached = _history_cache.get(hours)
@@ -334,7 +356,7 @@ class SystemMonitorService:
         try:
             rows = self.db.execute(
                 text(
-                    "SELECT collected_at, cpu_percent, load1, mem_used_mb, mem_total_mb, "
+                    "SELECT collected_at, cpu_percent, load1, load5, load15, mem_used_mb, mem_total_mb, "
                     "mem_cached_mb, disk_percent, net_rx_kbps, net_tx_kbps, "
                     "disk_read_kbps, disk_write_kbps, app_requests, app_4xx, app_5xx, app_p95_ms "
                     "FROM system_metrics WHERE collected_at >= :since ORDER BY collected_at"
@@ -343,7 +365,7 @@ class SystemMonitorService:
             ).all()
             buckets: dict[int, list] = {}
             for row in rows:
-                key = int(row[0].timestamp() // 300)
+                key = int(row[0].timestamp() // step)
                 buckets.setdefault(key, []).append(row)
             for key in sorted(buckets):
                 group = buckets[key]
@@ -354,21 +376,23 @@ class SystemMonitorService:
 
                 points.append(
                     {
-                        "at": datetime.fromtimestamp(key * 300).isoformat(timespec="seconds"),
+                        "at": datetime.fromtimestamp(key * step).isoformat(timespec="seconds"),
                         "cpu_percent": avg(1),
                         "load1": avg(2),
-                        "mem_used_mb": int(avg(3)),
-                        "mem_total_mb": int(avg(4)),
-                        "mem_cached_mb": int(avg(5)),
-                        "disk_percent": avg(6),
-                        "net_rx_kbps": avg(7),
-                        "net_tx_kbps": avg(8),
-                        "disk_read_kbps": avg(9),
-                        "disk_write_kbps": avg(10),
-                        "app_requests": sum(int(r[11] or 0) for r in group),
-                        "app_4xx": sum(int(r[12] or 0) for r in group),
-                        "app_5xx": sum(int(r[13] or 0) for r in group),
-                        "app_p95_ms": max(int(r[14] or 0) for r in group),
+                        "load5": avg(3),
+                        "load15": avg(4),
+                        "mem_used_mb": int(avg(5)),
+                        "mem_total_mb": int(avg(6)),
+                        "mem_cached_mb": int(avg(7)),
+                        "disk_percent": avg(8),
+                        "net_rx_kbps": avg(9),
+                        "net_tx_kbps": avg(10),
+                        "disk_read_kbps": avg(11),
+                        "disk_write_kbps": avg(12),
+                        "app_requests": sum(int(r[13] or 0) for r in group),
+                        "app_4xx": sum(int(r[14] or 0) for r in group),
+                        "app_5xx": sum(int(r[15] or 0) for r in group),
+                        "app_p95_ms": max(int(r[16] or 0) for r in group),
                     }
                 )
         except Exception:  # noqa: BLE001 — 迁移未跑/DB 不可达时返回空曲线，不白屏
@@ -378,7 +402,7 @@ class SystemMonitorService:
                 pass
             points = []
 
-        data = {"hours": hours, "step_seconds": 300, "points": points}
+        data = {"hours": hours, "step_seconds": step, "points": points}
         with _cache_lock:
             _history_cache[hours] = (now, data)
         return data

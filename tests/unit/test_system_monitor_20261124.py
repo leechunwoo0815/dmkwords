@@ -159,3 +159,18 @@ def test_history_hours_clamped():
         assert service.history(0)["hours"] == 1
     finally:
         session.close()
+
+
+def test_history_step_adapts_to_range():
+    """回看越长聚合越粗：1h=60s、6h=120s、24h=300s（页面 30m/1h/6h/12h/24h 共用此端点）。"""
+    session = SessionLocal()
+    try:
+        service = SystemMonitorService(session)
+        assert service.history(1)["step_seconds"] == 60
+        assert service.history(6)["step_seconds"] == 120
+        assert service.history(12)["step_seconds"] == 300
+        assert service.history(24)["step_seconds"] == 300
+        # 点数上限 300：24h 仍是 300 秒粒度，不会退化成 60 秒 1440 点
+        assert 24 * 3600 / service.history(24)["step_seconds"] <= 300
+    finally:
+        session.close()
