@@ -193,7 +193,7 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
 | 方法 | 路径 | 参数 | 说明 |
 |---|---|---|---|
 | GET | `/api/admin/system/live` | 无 | 实时快照；服务端缓存 3 秒 |
-| GET | `/api/admin/system/history` | `hours`（默认 24，1–24） | 24h 历史；5 分钟聚合；缓存 60 秒 |
+| GET | `/api/admin/system/history` | `hours`（默认 24，1–24） | 回看历史；聚合粒度按时长自适应（见下）；缓存 60 秒 |
 
 `/live` 响应形状（字段名 snake_case，数值单位写在字段名里）：
 
@@ -213,10 +213,17 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
 }
 ```
 
-`/history` 响应：`{"hours": 24, "step_seconds": 300, "points": [{"at": "...", "cpu_percent": 2.1, "mem_used_mb": 886, "mem_total_mb": 1756, "mem_cached_mb": 768, "disk_percent": 38.0, "load1": 0.01, "net_rx_kbps": 2.6, "net_tx_kbps": 44.7, "disk_read_kbps": 0.4, "disk_write_kbps": 26.0, "app_requests": 12, "app_4xx": 0, "app_5xx": 0, "app_p95_ms": 45}]}`。
+`/history` 响应：`{"hours": 24, "step_seconds": 300, "points": [{"at": "...", "cpu_percent": 2.1, "load1": 0.01, "load5": 0.02, "load15": 0.05, "mem_used_mb": 886, "mem_total_mb": 1756, "mem_cached_mb": 768, "disk_percent": 38.0, "net_rx_kbps": 2.6, "net_tx_kbps": 44.7, "disk_read_kbps": 0.4, "disk_write_kbps": 26.0, "app_requests": 12, "app_4xx": 0, "app_5xx": 0, "app_p95_ms": 45}]}`。
 
+- **聚合粒度自适应**（2026-11-25 起，页面 30 分钟–24 小时区间共用本端点）：
+  采样本身 60 秒一行，`step_seconds` 取 `60 / 120 / 300` 中「点数不超过 300」的最小值——
+  `hours=1 → 60`（60 点）、`hours=6 → 120`（180 点）、`hours=12/24 → 300`（144/288 点）。
+  `points[].at` 为桶起点（按 `step_seconds` 对齐）。`app_requests/app_4xx/app_5xx` 是桶内求和，
+  页面按 `step_seconds/60` 折算成「次/分」；`app_p95_ms` 取桶内最大值。
 - **排除面**：应用指标中间件只统计 `/api/` 路径，排除 `/health` 与 `/api/admin/system/*`（监控页自身 10 秒轮询不计入）。
-- **采样**：服务端每 60 秒写一行 `system_metrics`，保留 24h；页面刷新不影响采样。
+- **采样**：服务端每 60 秒写一行 `system_metrics`，保留 24h（上限 1440 行/天）；页面刷新不影响采样。
+- **页面数据源**：10 分钟视图用 `/live` 的**浏览器内实时滚动窗口**（每 10 秒追加一个点）；
+  30 分钟/1 小时/6 小时/12 小时/24 小时视图用 `/history`（页面每 60 秒续一次，切回 10 分钟即停）。
 
 ## 五、契约工作流（改接口三步链，缺一步 gate 红或前端断）
 
