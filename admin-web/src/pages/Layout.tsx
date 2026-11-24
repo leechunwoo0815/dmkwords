@@ -9,6 +9,7 @@ import {
   CalendarOutlined,
   SafetyCertificateOutlined,
   DashboardOutlined,
+  CloudServerOutlined,
   SettingOutlined,
   UserOutlined,
   NotificationOutlined,
@@ -54,6 +55,7 @@ export default function Layout() {
     "/refund-center": P.red,
     "/staff": P.blue,
     "/configs": P.textSecondary,
+    "/system-monitor": P.green,
     "/audit-logs": P.purple,
     "/notifications": P.pink,
     "/tasks": P.green,
@@ -71,6 +73,7 @@ export default function Layout() {
     "/refund-center": P.white,
     "/staff": P.white,
     "/configs": P.white,
+    "/system-monitor": P.ink,
     "/audit-logs": P.white,
     "/notifications": P.white,
     "/tasks": P.ink,
@@ -180,6 +183,7 @@ export default function Layout() {
     // 换既有超管专属码 audit.view（STAFF_PERMISSIONS 无此码=staff 永远隐藏，语义不变）
     { key: "/staff", icon: <UserOutlined />, label: "员工管理", perm: "audit.view" },
     { key: "/configs", icon: <SettingOutlined />, label: "系统配置", perm: "config.view" },
+    { key: "/system-monitor", icon: <CloudServerOutlined />, label: "服务器监控", perm: "config.view" },
     { key: "/audit-logs", icon: <AuditOutlined />, label: "审计日志", perm: "audit.view" },
   ];
 
@@ -189,7 +193,7 @@ export default function Layout() {
     { key: "library", label: "馆藏与借阅", icon: "book", keys: ["/books", "/circulation", "/reservations"] },
     { key: "reader", label: "读者与运营", icon: "member", keys: ["/members", "/growth", "/activities", "/circle", "/notifications"] },
     { key: "money", label: "资金与合规", icon: "refund", keys: ["/deposits", "/refund-center", "/audit-logs"] },
-    { key: "system", label: "系统", icon: "config", keys: ["/tasks", "/staff", "/configs"] },
+    { key: "system", label: "系统", icon: "config", keys: ["/tasks", "/staff", "/configs", "/system-monitor"] },
   ];
 
   const allowed = rawItems

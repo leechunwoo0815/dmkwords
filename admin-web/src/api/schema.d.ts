@@ -2205,6 +2205,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/system/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * System History
+         * @description 24h 历史（5 分钟聚合）；服务端缓存 60 秒。
+         */
+        get: operations["system_history_api_admin_system_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/system/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * System Live
+         * @description 实时快照（服务端缓存 3 秒）；页面 10 秒轮询。
+         */
+        get: operations["system_live_api_admin_system_live_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/tasks": {
         parameters: {
             query?: never;
@@ -5238,6 +5278,138 @@ export interface components {
              */
             transfer_review_timeout_hours: number;
         };
+        /** MonitorApp */
+        MonitorApp: {
+            /** Errors 4Xx 1M */
+            errors_4xx_1m: number;
+            /** Errors 5Xx 1M */
+            errors_5xx_1m: number;
+            /** Errors Today */
+            errors_today: number;
+            /** P95 Ms 1M */
+            p95_ms_1m: number;
+            /** Requests 1M */
+            requests_1m: number;
+            /** Requests Today */
+            requests_today: number;
+        };
+        /** MonitorCpu */
+        MonitorCpu: {
+            /** Load1 */
+            load1: number;
+            /** Load15 */
+            load15: number;
+            /** Load5 */
+            load5: number;
+            /** Per Core */
+            per_core?: number[];
+            /** Percent */
+            percent: number;
+        };
+        /** MonitorDisk */
+        MonitorDisk: {
+            /** Free Gb */
+            free_gb: number;
+            /** Inode Percent */
+            inode_percent: number;
+            /** Percent */
+            percent: number;
+            /** Read Kbps */
+            read_kbps: number;
+            /** Total Gb */
+            total_gb: number;
+            /** Used Gb */
+            used_gb: number;
+            /** Write Kbps */
+            write_kbps: number;
+        };
+        /** MonitorHost */
+        MonitorHost: {
+            /** Cpu Count */
+            cpu_count: number;
+            /** Hostname */
+            hostname: string;
+            /** Kernel */
+            kernel: string;
+            /** Os */
+            os: string;
+            /** Uptime Seconds */
+            uptime_seconds: number;
+        };
+        /** MonitorMemory */
+        MonitorMemory: {
+            /** Available Mb */
+            available_mb: number;
+            /** Cached Mb */
+            cached_mb: number;
+            /** Swap Total Mb */
+            swap_total_mb: number;
+            /** Swap Used Mb */
+            swap_used_mb: number;
+            /** Total Mb */
+            total_mb: number;
+            /** Used Mb */
+            used_mb: number;
+        };
+        /** MonitorMysql */
+        MonitorMysql: {
+            /** Connections */
+            connections: number;
+            /** Qps */
+            qps: number;
+            /** Running */
+            running: number;
+            /** Slow Queries */
+            slow_queries: number;
+            /** Status */
+            status: string;
+        };
+        /** MonitorNetwork */
+        MonitorNetwork: {
+            /** Rx Kbps */
+            rx_kbps: number;
+            /** Tx Kbps */
+            tx_kbps: number;
+        };
+        /** MonitorProcess */
+        MonitorProcess: {
+            /** Cpu Percent */
+            cpu_percent: number;
+            /** Name */
+            name: string;
+            /** Pid */
+            pid: number;
+            /** Rss Mb */
+            rss_mb: number;
+        };
+        /** MonitorProcesses */
+        MonitorProcesses: {
+            /** Top Cpu */
+            top_cpu?: components["schemas"]["MonitorProcess"][];
+            /** Top Memory */
+            top_memory?: components["schemas"]["MonitorProcess"][];
+        };
+        /** MonitorScheduler */
+        MonitorScheduler: {
+            /** Enabled */
+            enabled: boolean;
+            /** Has Lock Conn */
+            has_lock_conn: boolean;
+            /** Running */
+            running: boolean;
+            /** Watchdog */
+            watchdog: boolean;
+        };
+        /** MonitorServices */
+        MonitorServices: {
+            /** Backend */
+            backend: string;
+            /** Mysql */
+            mysql: string;
+            /** Nginx */
+            nginx: string;
+            scheduler: components["schemas"]["MonitorScheduler"];
+        };
         /** NotificationReadStatusRequest */
         NotificationReadStatusRequest: {
             /**
@@ -6204,6 +6376,68 @@ export interface components {
              * @description 新值（字符串，服务端按类型解析）
              */
             value: string;
+        };
+        /** SystemHistoryPoint */
+        SystemHistoryPoint: {
+            /** App 4Xx */
+            app_4xx: number;
+            /** App 5Xx */
+            app_5xx: number;
+            /** App P95 Ms */
+            app_p95_ms: number;
+            /** App Requests */
+            app_requests: number;
+            /** At */
+            at: string;
+            /** Cpu Percent */
+            cpu_percent: number;
+            /** Disk Percent */
+            disk_percent: number;
+            /** Disk Read Kbps */
+            disk_read_kbps: number;
+            /** Disk Write Kbps */
+            disk_write_kbps: number;
+            /** Load1 */
+            load1: number;
+            /** Load15 */
+            load15: number;
+            /** Load5 */
+            load5: number;
+            /** Mem Cached Mb */
+            mem_cached_mb: number;
+            /** Mem Total Mb */
+            mem_total_mb: number;
+            /** Mem Used Mb */
+            mem_used_mb: number;
+            /** Net Rx Kbps */
+            net_rx_kbps: number;
+            /** Net Tx Kbps */
+            net_tx_kbps: number;
+        };
+        /** SystemHistoryResponse */
+        SystemHistoryResponse: {
+            /** Hours */
+            hours: number;
+            /** Points */
+            points?: components["schemas"]["SystemHistoryPoint"][];
+            /** Step Seconds */
+            step_seconds: number;
+        };
+        /** SystemLiveResponse */
+        SystemLiveResponse: {
+            app: components["schemas"]["MonitorApp"];
+            cpu: components["schemas"]["MonitorCpu"];
+            disk: components["schemas"]["MonitorDisk"];
+            host: components["schemas"]["MonitorHost"];
+            memory: components["schemas"]["MonitorMemory"];
+            mysql: components["schemas"]["MonitorMysql"];
+            network: components["schemas"]["MonitorNetwork"];
+            /** Process Count */
+            process_count: number;
+            processes: components["schemas"]["MonitorProcesses"];
+            /** Server Time */
+            server_time: string;
+            services: components["schemas"]["MonitorServices"];
         };
         /** TransferApplyRequest */
         TransferApplyRequest: {
@@ -10434,6 +10668,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    system_history_api_admin_system_history_get: {
+        parameters: {
+            query?: {
+                /** @description 回看小时数，最大 24 */
+                hours?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemHistoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    system_live_api_admin_system_live_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemLiveResponse"];
                 };
             };
         };

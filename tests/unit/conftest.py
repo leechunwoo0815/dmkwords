@@ -71,6 +71,8 @@ ADMIN_TABLES = [
     "audit_logs",
     "system_configs",
     "admin_users",
+    # FEAT-091 服务器指标：每测试清空，避免历史曲线/今日汇总跨用例串台
+    "system_metrics",
 ]
 
 
@@ -123,6 +125,12 @@ def clean_db():
     from backend.middleware.rate_limit import _limiter as _rate_limiter
 
     _rate_limiter._requests.clear()
+    # FEAT-091：应用指标与监控缓存都是进程内状态，跨测试必须清空
+    from backend.domain.admin.monitor_service import reset_caches
+    from backend.metrics import app_metrics
+
+    app_metrics.reset()
+    reset_caches()
     # 第八轮审查 P1-3：支付异常留痕的分钟预算同样是进程内状态，跨测试累积会误伤
     from backend.domain.identity.payment_notify import reset_anomaly_budget
 

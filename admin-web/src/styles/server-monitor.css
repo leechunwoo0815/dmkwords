@@ -1,0 +1,303 @@
+/* admin-web/src/styles/server-monitor.css — FEAT-091 服务器监控页
+   全部走主题令牌（--color-* / --chart-*），三套主题自动跟随；不写死颜色。 */
+
+.sm-page {
+  min-width: 0;
+}
+
+.sm-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--card-padding);
+  margin-bottom: var(--card-padding);
+}
+.sm-kpi-grid .kpi-tile-value {
+  font-size: 22px;
+}
+.sm-kpi-grid .kpi-tile-hint {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.45;
+}
+.sm-kpi-grid .kpi-tile svg {
+  margin-top: 4px;
+}
+
+/* 与单页看板一致：结论横幅 + 两列大图 */
+.sm-conclusion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 0 0 var(--card-padding);
+  padding: 12px 16px;
+  background: var(--color-bg-container);
+  border: var(--border-width) solid var(--color-border);
+  border-left: 4px solid var(--color-success);
+  border-radius: var(--radius-base);
+  box-shadow: var(--shadow-card);
+}
+.sm-conclusion--warn {
+  border-left-color: var(--color-warning);
+}
+.sm-conclusion--down {
+  border-left-color: var(--color-danger);
+}
+.sm-conclusion-main {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.sm-conclusion-main strong {
+  font-size: 14px;
+  color: var(--color-text);
+}
+.sm-conclusion-main span {
+  font-size: 12.5px;
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.sm-conclusion-attention {
+  font-size: 12px;
+  color: var(--color-warning);
+  font-weight: var(--font-weight-strong);
+}
+.sm-conclusion--down .sm-conclusion-attention {
+  color: var(--color-danger);
+}
+
+.sm-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--card-padding);
+  margin-bottom: var(--card-padding);
+}
+.ant-card-extra .sm-legend {
+  margin-top: 0;
+  gap: 10px;
+  font-size: 11.5px;
+}
+
+.sm-cell .ant-card-head {
+  border-bottom-color: var(--color-divider);
+  min-height: 42px;
+}
+.sm-cell .ant-card-body {
+  min-height: 0;
+  justify-content: flex-start;
+}
+
+.sm-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+.sm-legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+.sm-chart-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+.sm-history-note {
+  margin: -4px 0 10px;
+}
+
+.sm-bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--card-padding);
+  margin-bottom: var(--card-padding);
+}
+
+.sm-status {
+  display: flex;
+  flex-direction: column;
+}
+.sm-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-divider);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.sm-status-row:last-child {
+  border-bottom: none;
+}
+.sm-status-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: var(--font-weight-strong);
+}
+.sm-status-value--ok {
+  color: var(--color-success);
+}
+.sm-status-value--warn {
+  color: var(--color-warning);
+}
+.sm-status-value--down {
+  color: var(--color-danger);
+}
+.sm-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.sm-status-dot--ok {
+  background: var(--color-success);
+}
+.sm-status-dot--warn {
+  background: var(--color-warning);
+}
+.sm-status-dot--down {
+  background: var(--color-danger);
+}
+.sm-status-detail {
+  margin-left: 4px;
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-tertiary);
+}
+
+.sm-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.sm-metric {
+  min-width: 0;
+  padding: 9px 11px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-base);
+  background: var(--color-bg-container);
+}
+.sm-metric-label {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+.sm-metric-value {
+  margin-top: 3px;
+  font-size: 19px;
+  font-weight: var(--font-weight-strong);
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.sm-metric-unit {
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-tertiary);
+}
+
+.sm-process-card {
+  margin-bottom: var(--card-padding);
+}
+.sm-proc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.sm-proc-title {
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+.sm-proc-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) 92px;
+  align-items: center;
+  gap: 8px;
+  margin: 7px 0;
+  font-size: 12px;
+}
+.sm-proc-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-text-secondary);
+}
+.sm-proc-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--color-bg-subtle);
+}
+.sm-proc-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--chart-1);
+  transition: width 0.6s var(--motion-easing);
+}
+.sm-proc-val {
+  text-align: right;
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.sm-updated {
+  margin-right: 8px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.sm-alert {
+  margin-bottom: var(--card-padding);
+}
+.sm-footer {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--color-text-tertiary);
+}
+.sm-footer code {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--color-bg-subtle);
+  font-size: 11px;
+}
+
+@media (max-width: 1000px) {
+  .sm-chart-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 1300px) {
+  .sm-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .sm-bottom-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 820px) {
+  .sm-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sm-bottom-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sm-proc-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sm-proc-row {
+    grid-template-columns: 100px minmax(0, 1fr) 80px;
+  }
+}

@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from backend.common.exceptions import BusinessException, business_exception_handler
 from backend.config import get_settings, is_production_env
+from backend.middleware.app_metrics import AppMetricsMiddleware
 from backend.middleware.body_limit import BodySizeLimitMiddleware
 from backend.middleware.media_cache import MediaCacheMiddleware
 from backend.middleware.rate_limit import WriteRateLimitMiddleware
@@ -111,6 +112,9 @@ app.add_middleware(SecurityHeadersMiddleware)
 # 请求体上限（第八轮审查 P2-19）：**在限流内侧、CORS 外侧**——先挡超大包再谈业务。
 # 回环直连（无 nginx）与无凭证回调（/api/pay/**，必须 await request.body()）都靠它兜底。
 app.add_middleware(BodySizeLimitMiddleware)
+# FEAT-091：应用指标（请求量/4xx/5xx/P95）——**最后加 = 最外层**，最终状态码（含异常 500）都能记录；
+# 只统计 `/api/*`，排除 `/health` 与 `/api/admin/system/*`（监控页自身轮询）。
+app.add_middleware(AppMetricsMiddleware)
 app.add_exception_handler(BusinessException, business_exception_handler)
 
 

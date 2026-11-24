@@ -254,3 +254,127 @@ class MediaEmptyTrashResponse(BaseSchema):
     purged_bytes: int
     restored: int
     census: MediaCensusResponse
+
+
+# ---------- FEAT-091 服务器资源监控 ----------
+
+
+class MonitorHost(BaseSchema):
+    hostname: str
+    os: str
+    kernel: str
+    uptime_seconds: int
+    cpu_count: int
+
+
+class MonitorCpu(BaseSchema):
+    percent: float
+    per_core: list[float] = Field(default_factory=list)
+    load1: float
+    load5: float
+    load15: float
+
+
+class MonitorMemory(BaseSchema):
+    total_mb: int
+    used_mb: int
+    available_mb: int
+    cached_mb: int
+    swap_total_mb: int
+    swap_used_mb: int
+
+
+class MonitorDisk(BaseSchema):
+    total_gb: float
+    used_gb: float
+    free_gb: float
+    percent: float
+    inode_percent: float
+    read_kbps: float
+    write_kbps: float
+
+
+class MonitorNetwork(BaseSchema):
+    rx_kbps: float
+    tx_kbps: float
+
+
+class MonitorProcess(BaseSchema):
+    pid: int
+    name: str
+    cpu_percent: float
+    rss_mb: float
+
+
+class MonitorProcesses(BaseSchema):
+    top_cpu: list[MonitorProcess] = Field(default_factory=list)
+    top_memory: list[MonitorProcess] = Field(default_factory=list)
+
+
+class MonitorMysql(BaseSchema):
+    status: str
+    connections: int
+    running: int
+    qps: float
+    slow_queries: int
+
+
+class MonitorScheduler(BaseSchema):
+    enabled: bool
+    running: bool
+    has_lock_conn: bool
+    watchdog: bool
+
+
+class MonitorServices(BaseSchema):
+    backend: str
+    mysql: str
+    nginx: str
+    scheduler: MonitorScheduler
+
+
+class MonitorApp(BaseSchema):
+    requests_1m: int
+    errors_4xx_1m: int
+    errors_5xx_1m: int
+    p95_ms_1m: int
+    requests_today: int
+    errors_today: int
+
+
+class SystemLiveResponse(BaseSchema):
+    server_time: str
+    host: MonitorHost
+    cpu: MonitorCpu
+    memory: MonitorMemory
+    disk: MonitorDisk
+    network: MonitorNetwork
+    process_count: int
+    processes: MonitorProcesses
+    mysql: MonitorMysql
+    services: MonitorServices
+    app: MonitorApp
+
+
+class SystemHistoryPoint(BaseSchema):
+    at: str
+    cpu_percent: float
+    load1: float
+    mem_used_mb: int
+    mem_total_mb: int
+    mem_cached_mb: int
+    disk_percent: float
+    net_rx_kbps: float
+    net_tx_kbps: float
+    disk_read_kbps: float
+    disk_write_kbps: float
+    app_requests: int
+    app_4xx: int
+    app_5xx: int
+    app_p95_ms: int
+
+
+class SystemHistoryResponse(BaseSchema):
+    hours: int
+    step_seconds: int
+    points: list[SystemHistoryPoint] = Field(default_factory=list)

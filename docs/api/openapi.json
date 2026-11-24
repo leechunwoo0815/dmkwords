@@ -2881,6 +2881,358 @@
         "title": "MiniappConfigsResponse",
         "type": "object"
       },
+      "MonitorApp": {
+        "additionalProperties": false,
+        "properties": {
+          "errors_4xx_1m": {
+            "title": "Errors 4Xx 1M",
+            "type": "integer"
+          },
+          "errors_5xx_1m": {
+            "title": "Errors 5Xx 1M",
+            "type": "integer"
+          },
+          "errors_today": {
+            "title": "Errors Today",
+            "type": "integer"
+          },
+          "p95_ms_1m": {
+            "title": "P95 Ms 1M",
+            "type": "integer"
+          },
+          "requests_1m": {
+            "title": "Requests 1M",
+            "type": "integer"
+          },
+          "requests_today": {
+            "title": "Requests Today",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "requests_1m",
+          "errors_4xx_1m",
+          "errors_5xx_1m",
+          "p95_ms_1m",
+          "requests_today",
+          "errors_today"
+        ],
+        "title": "MonitorApp",
+        "type": "object"
+      },
+      "MonitorCpu": {
+        "additionalProperties": false,
+        "properties": {
+          "load1": {
+            "title": "Load1",
+            "type": "number"
+          },
+          "load15": {
+            "title": "Load15",
+            "type": "number"
+          },
+          "load5": {
+            "title": "Load5",
+            "type": "number"
+          },
+          "per_core": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Per Core",
+            "type": "array"
+          },
+          "percent": {
+            "title": "Percent",
+            "type": "number"
+          }
+        },
+        "required": [
+          "percent",
+          "load1",
+          "load5",
+          "load15"
+        ],
+        "title": "MonitorCpu",
+        "type": "object"
+      },
+      "MonitorDisk": {
+        "additionalProperties": false,
+        "properties": {
+          "free_gb": {
+            "title": "Free Gb",
+            "type": "number"
+          },
+          "inode_percent": {
+            "title": "Inode Percent",
+            "type": "number"
+          },
+          "percent": {
+            "title": "Percent",
+            "type": "number"
+          },
+          "read_kbps": {
+            "title": "Read Kbps",
+            "type": "number"
+          },
+          "total_gb": {
+            "title": "Total Gb",
+            "type": "number"
+          },
+          "used_gb": {
+            "title": "Used Gb",
+            "type": "number"
+          },
+          "write_kbps": {
+            "title": "Write Kbps",
+            "type": "number"
+          }
+        },
+        "required": [
+          "total_gb",
+          "used_gb",
+          "free_gb",
+          "percent",
+          "inode_percent",
+          "read_kbps",
+          "write_kbps"
+        ],
+        "title": "MonitorDisk",
+        "type": "object"
+      },
+      "MonitorHost": {
+        "additionalProperties": false,
+        "properties": {
+          "cpu_count": {
+            "title": "Cpu Count",
+            "type": "integer"
+          },
+          "hostname": {
+            "title": "Hostname",
+            "type": "string"
+          },
+          "kernel": {
+            "title": "Kernel",
+            "type": "string"
+          },
+          "os": {
+            "title": "Os",
+            "type": "string"
+          },
+          "uptime_seconds": {
+            "title": "Uptime Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hostname",
+          "os",
+          "kernel",
+          "uptime_seconds",
+          "cpu_count"
+        ],
+        "title": "MonitorHost",
+        "type": "object"
+      },
+      "MonitorMemory": {
+        "additionalProperties": false,
+        "properties": {
+          "available_mb": {
+            "title": "Available Mb",
+            "type": "integer"
+          },
+          "cached_mb": {
+            "title": "Cached Mb",
+            "type": "integer"
+          },
+          "swap_total_mb": {
+            "title": "Swap Total Mb",
+            "type": "integer"
+          },
+          "swap_used_mb": {
+            "title": "Swap Used Mb",
+            "type": "integer"
+          },
+          "total_mb": {
+            "title": "Total Mb",
+            "type": "integer"
+          },
+          "used_mb": {
+            "title": "Used Mb",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_mb",
+          "used_mb",
+          "available_mb",
+          "cached_mb",
+          "swap_total_mb",
+          "swap_used_mb"
+        ],
+        "title": "MonitorMemory",
+        "type": "object"
+      },
+      "MonitorMysql": {
+        "additionalProperties": false,
+        "properties": {
+          "connections": {
+            "title": "Connections",
+            "type": "integer"
+          },
+          "qps": {
+            "title": "Qps",
+            "type": "number"
+          },
+          "running": {
+            "title": "Running",
+            "type": "integer"
+          },
+          "slow_queries": {
+            "title": "Slow Queries",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "connections",
+          "running",
+          "qps",
+          "slow_queries"
+        ],
+        "title": "MonitorMysql",
+        "type": "object"
+      },
+      "MonitorNetwork": {
+        "additionalProperties": false,
+        "properties": {
+          "rx_kbps": {
+            "title": "Rx Kbps",
+            "type": "number"
+          },
+          "tx_kbps": {
+            "title": "Tx Kbps",
+            "type": "number"
+          }
+        },
+        "required": [
+          "rx_kbps",
+          "tx_kbps"
+        ],
+        "title": "MonitorNetwork",
+        "type": "object"
+      },
+      "MonitorProcess": {
+        "additionalProperties": false,
+        "properties": {
+          "cpu_percent": {
+            "title": "Cpu Percent",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pid": {
+            "title": "Pid",
+            "type": "integer"
+          },
+          "rss_mb": {
+            "title": "Rss Mb",
+            "type": "number"
+          }
+        },
+        "required": [
+          "pid",
+          "name",
+          "cpu_percent",
+          "rss_mb"
+        ],
+        "title": "MonitorProcess",
+        "type": "object"
+      },
+      "MonitorProcesses": {
+        "additionalProperties": false,
+        "properties": {
+          "top_cpu": {
+            "items": {
+              "$ref": "#/components/schemas/MonitorProcess"
+            },
+            "title": "Top Cpu",
+            "type": "array"
+          },
+          "top_memory": {
+            "items": {
+              "$ref": "#/components/schemas/MonitorProcess"
+            },
+            "title": "Top Memory",
+            "type": "array"
+          }
+        },
+        "title": "MonitorProcesses",
+        "type": "object"
+      },
+      "MonitorScheduler": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "has_lock_conn": {
+            "title": "Has Lock Conn",
+            "type": "boolean"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "watchdog": {
+            "title": "Watchdog",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "running",
+          "has_lock_conn",
+          "watchdog"
+        ],
+        "title": "MonitorScheduler",
+        "type": "object"
+      },
+      "MonitorServices": {
+        "additionalProperties": false,
+        "properties": {
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "mysql": {
+            "title": "Mysql",
+            "type": "string"
+          },
+          "nginx": {
+            "title": "Nginx",
+            "type": "string"
+          },
+          "scheduler": {
+            "$ref": "#/components/schemas/MonitorScheduler"
+          }
+        },
+        "required": [
+          "backend",
+          "mysql",
+          "nginx",
+          "scheduler"
+        ],
+        "title": "MonitorServices",
+        "type": "object"
+      },
       "NotificationReadStatusRequest": {
         "additionalProperties": false,
         "properties": {
@@ -4819,6 +5171,181 @@
           "reason"
         ],
         "title": "SystemConfigUpdateRequest",
+        "type": "object"
+      },
+      "SystemHistoryPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "app_4xx": {
+            "title": "App 4Xx",
+            "type": "integer"
+          },
+          "app_5xx": {
+            "title": "App 5Xx",
+            "type": "integer"
+          },
+          "app_p95_ms": {
+            "title": "App P95 Ms",
+            "type": "integer"
+          },
+          "app_requests": {
+            "title": "App Requests",
+            "type": "integer"
+          },
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "cpu_percent": {
+            "title": "Cpu Percent",
+            "type": "number"
+          },
+          "disk_percent": {
+            "title": "Disk Percent",
+            "type": "number"
+          },
+          "disk_read_kbps": {
+            "title": "Disk Read Kbps",
+            "type": "number"
+          },
+          "disk_write_kbps": {
+            "title": "Disk Write Kbps",
+            "type": "number"
+          },
+          "load1": {
+            "title": "Load1",
+            "type": "number"
+          },
+          "load15": {
+            "title": "Load15",
+            "type": "number"
+          },
+          "load5": {
+            "title": "Load5",
+            "type": "number"
+          },
+          "mem_cached_mb": {
+            "title": "Mem Cached Mb",
+            "type": "integer"
+          },
+          "mem_total_mb": {
+            "title": "Mem Total Mb",
+            "type": "integer"
+          },
+          "mem_used_mb": {
+            "title": "Mem Used Mb",
+            "type": "integer"
+          },
+          "net_rx_kbps": {
+            "title": "Net Rx Kbps",
+            "type": "number"
+          },
+          "net_tx_kbps": {
+            "title": "Net Tx Kbps",
+            "type": "number"
+          }
+        },
+        "required": [
+          "at",
+          "cpu_percent",
+          "load1",
+          "load5",
+          "load15",
+          "mem_used_mb",
+          "mem_total_mb",
+          "mem_cached_mb",
+          "disk_percent",
+          "net_rx_kbps",
+          "net_tx_kbps",
+          "disk_read_kbps",
+          "disk_write_kbps",
+          "app_requests",
+          "app_4xx",
+          "app_5xx",
+          "app_p95_ms"
+        ],
+        "title": "SystemHistoryPoint",
+        "type": "object"
+      },
+      "SystemHistoryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "hours": {
+            "title": "Hours",
+            "type": "integer"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/SystemHistoryPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "step_seconds": {
+            "title": "Step Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hours",
+          "step_seconds"
+        ],
+        "title": "SystemHistoryResponse",
+        "type": "object"
+      },
+      "SystemLiveResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "app": {
+            "$ref": "#/components/schemas/MonitorApp"
+          },
+          "cpu": {
+            "$ref": "#/components/schemas/MonitorCpu"
+          },
+          "disk": {
+            "$ref": "#/components/schemas/MonitorDisk"
+          },
+          "host": {
+            "$ref": "#/components/schemas/MonitorHost"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MonitorMemory"
+          },
+          "mysql": {
+            "$ref": "#/components/schemas/MonitorMysql"
+          },
+          "network": {
+            "$ref": "#/components/schemas/MonitorNetwork"
+          },
+          "process_count": {
+            "title": "Process Count",
+            "type": "integer"
+          },
+          "processes": {
+            "$ref": "#/components/schemas/MonitorProcesses"
+          },
+          "server_time": {
+            "title": "Server Time",
+            "type": "string"
+          },
+          "services": {
+            "$ref": "#/components/schemas/MonitorServices"
+          }
+        },
+        "required": [
+          "server_time",
+          "host",
+          "cpu",
+          "memory",
+          "disk",
+          "network",
+          "process_count",
+          "processes",
+          "mysql",
+          "services",
+          "app"
+        ],
+        "title": "SystemLiveResponse",
         "type": "object"
       },
       "TransferApplyRequest": {
@@ -12100,6 +12627,86 @@
           }
         ],
         "summary": "Staff Status",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/system/history": {
+      "get": {
+        "description": "24h 历史（5 分钟聚合）；服务端缓存 60 秒。",
+        "operationId": "system_history_api_admin_system_history_get",
+        "parameters": [
+          {
+            "description": "回看小时数，最大 24",
+            "in": "query",
+            "name": "hours",
+            "required": false,
+            "schema": {
+              "default": 24,
+              "description": "回看小时数，最大 24",
+              "maximum": 24,
+              "minimum": 1,
+              "title": "Hours",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemHistoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "System History",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/system/live": {
+      "get": {
+        "description": "实时快照（服务端缓存 3 秒）；页面 10 秒轮询。",
+        "operationId": "system_live_api_admin_system_live_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemLiveResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "System Live",
         "tags": [
           "admin"
         ]

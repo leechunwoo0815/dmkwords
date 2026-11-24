@@ -6,6 +6,7 @@ from backend.common.base_schema import PaginatedResponse
 from backend.database import get_db
 from backend.domain.admin.dead_letter_service import DeadLetterService
 from backend.domain.admin.models import AdminUser
+from backend.domain.admin.monitor_service import SystemMonitorService
 from backend.domain.admin.schemas import (
     AdminNotificationHandleRequest,
     AdminUserResponse,
@@ -28,6 +29,8 @@ from backend.domain.admin.schemas import (
     StaffUpdateRequest,
     SystemConfigResponse,
     SystemConfigUpdateRequest,
+    SystemHistoryResponse,
+    SystemLiveResponse,
 )
 from backend.domain.admin.service import (
     AuditExportService,
@@ -82,6 +85,28 @@ def update_config(
 ):
     config = ConfigService(db).update_config(admin, key, body.value, body.reason)
     return SystemConfigResponse.model_validate(config)
+
+
+# ---------- FEAT-091 服务器资源监控（只读；权限复用 config.view） ----------
+
+
+@router.get("/system/live", response_model=SystemLiveResponse)
+def system_live(
+    admin: AdminUser = Depends(require_perm("config.view")),
+    db: Session = Depends(get_db),
+):
+    """实时快照（服务端缓存 3 秒）；页面 10 秒轮询。"""
+    return SystemLiveResponse.model_validate(SystemMonitorService(db).live())
+
+
+@router.get("/system/history", response_model=SystemHistoryResponse)
+def system_history(
+    hours: int = Query(24, ge=1, le=24, description="回看小时数，最大 24"),
+    admin: AdminUser = Depends(require_perm("config.view")),
+    db: Session = Depends(get_db),
+):
+    """24h 历史（5 分钟聚合）；服务端缓存 60 秒。"""
+    return SystemHistoryResponse.model_validate(SystemMonitorService(db).history(hours))
 
 
 @router.get("/audit-logs", response_model=PaginatedResponse[AuditLogResponse])

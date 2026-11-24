@@ -18,6 +18,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/tasks": "任务看板",
   "/staff": "员工管理",
   "/configs": "系统配置",
+  "/system-monitor": "服务器监控",
   "/audit-logs": "审计日志",
 };
 

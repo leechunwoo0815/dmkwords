@@ -20,6 +20,7 @@ import Login from "./pages/Login";
 import Notifications from "./pages/Notifications";
 import Staff from "./pages/Staff";
 import SystemConfig from "./pages/SystemConfig";
+import ServerMonitor from "./pages/ServerMonitor";
 import TaskBoard from "./pages/TaskBoard";
 
 /**
@@ -72,6 +73,14 @@ export default function App() {
             element={
               <RequirePerm code="config.view">
                 <SystemConfig />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="system-monitor"
+            element={
+              <RequirePerm code="config.view">
+                <ServerMonitor />
               </RequirePerm>
             }
           />

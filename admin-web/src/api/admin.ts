@@ -28,6 +28,19 @@ export function apiUpdateConfig(
   return request(`/api/admin/configs/${key}`, { method: "PUT", body: JSON.stringify(body) });
 }
 
+// ---------- FEAT-091 服务器资源监控 ----------
+
+export type SystemLive = components["schemas"]["SystemLiveResponse"];
+export type SystemHistory = components["schemas"]["SystemHistoryResponse"];
+
+export function apiSystemLive(): Promise<SystemLive> {
+  return request("/api/admin/system/live");
+}
+
+export function apiSystemHistory(hours = 24): Promise<SystemHistory> {
+  return request(`/api/admin/system/history?hours=${hours}`);
+}
+
 type StaffCreateRequest = components["schemas"]["StaffCreateRequest"];
 type StaffStatusRequest = components["schemas"]["StaffStatusRequest"];
 type StaffResetPasswordRequest = components["schemas"]["StaffResetPasswordRequest"];

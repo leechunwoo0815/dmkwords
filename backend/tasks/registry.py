@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from backend.common.notification_models import TaskRunLog
+from backend.domain.admin.monitor_sampler import register_metrics_job
 from backend.tasks.run_log import finalize_failed_run
 from backend.tasks.task_guard import run_with_task_lock, schedule_retry
 
@@ -227,11 +228,7 @@ def _payment_reconcile(db: Session) -> int:
     return int(result["diff_total"])
 
 
-# 21 项定时任务（第五十九批 +deposit_settle_remind）（WM13-4 新增 transfer_expiring_warn 后 12→13；WM14-B 新增
-# circle_rank_snapshot / circle_image_cleanup 后 13→15；2026-09-23 新增 media_census 后 15→16；
-# 2026-10-08 WM12-A 新增 wechat_cert_refresh 后 16→17；同日 WM12-B 新增 payment_reconcile 后 17→18；
-# 2026-10-17 第六十九批（大审查 P2-28）新增 refund_review_timeout_warn / withdrawal_review_timeout_warn 后 19→21；
-# 周月报定时生成不在本批）
+# 21 项定时任务（演进：12→13→15→16→17→18→19→21；周月报定时生成不在本批）
 TASKS: dict[str, TaskSpec] = {
     "member_expire_check": TaskSpec(
         "member_expire_check", "会员过期落库", "会员", 300, _member_expire_check
@@ -575,6 +572,7 @@ def _start_jobs_now() -> None:
 
     scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
     _register_all_jobs(scheduler)
+    register_metrics_job(scheduler)  # FEAT-091：60s 采样，不进任务看板
     scheduler.start()
     _scheduler = scheduler
     _schedule_cron_catchup(scheduler)

@@ -21,6 +21,7 @@ const ICON_BY_PATH: Record<string, IconName> = {
   "/tasks": "task",
   "/staff": "staff",
   "/configs": "config",
+  "/system-monitor": "config",
   "/audit-logs": "audit",
 };
 

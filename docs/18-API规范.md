@@ -185,6 +185,39 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
   后台改了孩子头像后两处不一致（用户报障「点赞的头像跟我的页面的头像不匹配」）。
   **纪律：这份载荷只有 `children_payload` 一个出口**，新增字段必须两处同时可见（防字段漂移）。
 
+### 4.9 2026-11-24 增补：管理端服务器资源监控（FEAT-091）
+
+> 权限统一 `config.view`；只读，不写业务数据；响应只含聚合指标与进程名，**不含命令行/env/密钥/公网 IP**。
+> 采集与页面口径见 `docs/任务包-20261124-服务器资源监控页.md`。
+
+| 方法 | 路径 | 参数 | 说明 |
+|---|---|---|---|
+| GET | `/api/admin/system/live` | 无 | 实时快照；服务端缓存 3 秒 |
+| GET | `/api/admin/system/history` | `hours`（默认 24，1–24） | 24h 历史；5 分钟聚合；缓存 60 秒 |
+
+`/live` 响应形状（字段名 snake_case，数值单位写在字段名里）：
+
+```json
+{
+  "server_time": "2026-11-24T10:00:00",
+  "host": {"hostname": "...", "os": "...", "kernel": "...", "uptime_seconds": 0, "cpu_count": 2},
+  "cpu": {"percent": 2.1, "per_core": [2.0, 2.2], "load1": 0.01, "load5": 0.02, "load15": 0.05},
+  "memory": {"total_mb": 1756, "used_mb": 886, "available_mb": 717, "cached_mb": 768, "swap_total_mb": 1024, "swap_used_mb": 0},
+  "disk": {"total_gb": 40.0, "used_gb": 15.0, "free_gb": 24.0, "percent": 38.0, "inode_percent": 5.0, "read_kbps": 0.4, "write_kbps": 26.0},
+  "network": {"rx_kbps": 2.6, "tx_kbps": 44.7},
+  "process_count": 314,
+  "processes": {"top_cpu": [{"pid": 1, "name": "systemd", "cpu_percent": 0.1, "rss_mb": 12.0}], "top_memory": []},
+  "mysql": {"status": "ok", "connections": 12, "running": 2, "qps": 0.4, "slow_queries": 0},
+  "services": {"backend": "ok", "mysql": "ok", "nginx": "ok", "scheduler": {"enabled": true, "running": true, "has_lock_conn": true, "watchdog": false}},
+  "app": {"requests_1m": 3, "errors_4xx_1m": 0, "errors_5xx_1m": 0, "p95_ms_1m": 45, "requests_today": 120, "errors_today": 2}
+}
+```
+
+`/history` 响应：`{"hours": 24, "step_seconds": 300, "points": [{"at": "...", "cpu_percent": 2.1, "mem_used_mb": 886, "mem_total_mb": 1756, "mem_cached_mb": 768, "disk_percent": 38.0, "load1": 0.01, "net_rx_kbps": 2.6, "net_tx_kbps": 44.7, "disk_read_kbps": 0.4, "disk_write_kbps": 26.0, "app_requests": 12, "app_4xx": 0, "app_5xx": 0, "app_p95_ms": 45}]}`。
+
+- **排除面**：应用指标中间件只统计 `/api/` 路径，排除 `/health` 与 `/api/admin/system/*`（监控页自身 10 秒轮询不计入）。
+- **采样**：服务端每 60 秒写一行 `system_metrics`，保留 24h；页面刷新不影响采样。
+
 ## 五、契约工作流（改接口三步链，缺一步 gate 红或前端断）
 
 1. **改后端**（schema/端点/响应模型）；
