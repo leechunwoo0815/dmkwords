@@ -212,9 +212,136 @@ def test_restore_check_flags_volatile_rows_beyond_now(tmp_path: Path):
     assert "恢复=999 > 现值=140" in proc.stdout
 
 
-def test_backup_script_writes_manifest_and_prunes_it(tmp_path: Path):
-    """备份脚本必须写出 manifest，且过期清理要连 manifest 一起清（否则留孤儿）。"""
-    text = (SCRIPTS / "backup_db.sh").read_text()
-    assert ".manifest" in text
-    assert '-name "${DB_NAME}_full_*.sql.gz*"' in text, "清理要覆盖 *.sql.gz.manifest"
-    assert "volatile=" in text
+# 假 mysql / mysqldump：让 backup_db.sh 真跑一遍（而不是断言源码里有某个字符串）
+FAKE_MYSQL_BACKUP = r"""#!/bin/bash
+# 假 mysql：只回答 backup_db.sh 用到的两类查询
+sql=""
+next=0
+for a in "$@"; do
+  case "$a" in
+    -e) next=1 ;;
+    *) if [ "$next" = "1" ]; then sql="$a"; next=0; fi ;;
+  esac
+done
+if [ -z "$sql" ]; then cat > /dev/null; exit 0; fi
+# 注意 SQL 里 COUNT 在 information_schema **之前**（SELECT COUNT(*) FROM information_schema...），
+# 所以表数量那条的模式是 COUNT*information_schema，写反了就会把表数当成行数
+case "$sql" in
+  *table_name*information_schema*) printf '%s\n' orders system_metrics ;;
+  *COUNT*information_schema*) echo "${FAKE_TABLE_COUNT:-2}" ;;
+  *COUNT*) echo "${FAKE_ROWS:-7}" ;;
+  *) echo "" ;;
+esac
+"""
+
+FAKE_MYSQLDUMP = r"""#!/bin/bash
+# 假 mysqldump：输出 2 个 CREATE TABLE + 标准结束标记（backup_db.sh 会校验这两点）
+cat <<'DUMP'
+CREATE TABLE `orders` (id int);
+CREATE TABLE `system_metrics` (id int);
+-- Dump completed on 2026-11-26  4:30:00
+DUMP
+"""
+
+
+def _parse_manifest(path: Path) -> dict:
+    """把 manifest 解析成结构化字段（不靠子串断言——那是"读源码文本"，不是行为）。"""
+    header: dict[str, str] = {}
+    rows: dict[str, int] = {}
+    in_rows = False
+    for line in path.read_text().splitlines():
+        if line.startswith("--- row counts"):
+            in_rows = True
+            continue
+        if not line.strip() or line.startswith("#"):
+            continue
+        if in_rows:
+            parts = line.split()
+            if len(parts) == 2 and parts[1].isdigit():
+                rows[parts[0]] = int(parts[1])
+        elif "=" in line:
+            k, v = line.split("=", 1)
+            header[k] = v
+    header["rows"] = rows
+    return header
+
+
+def _backup_env(tmp_path: Path) -> dict:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    for name, body in (("mysql", FAKE_MYSQL_BACKUP), ("mysqldump", FAKE_MYSQLDUMP)):
+        f = fake_bin / name
+        f.write_text(body)
+        f.chmod(0o755)
+    cnf = tmp_path / "backup.cnf"
+    cnf.write_text("[client]\nuser=dmkwords\n")
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": str(fake_bin) + os.pathsep + env.get("PATH", ""),
+            "BACKUP_DIR": str(tmp_path / "backups"),
+            "MYSQL_CNF": str(cnf),
+            "DB_NAME": "dmkwords",
+            "FAKE_TABLE_COUNT": "2",
+            "FAKE_ROWS": "7",
+        }
+    )
+    env.pop("BACKUP_UPLOADS", None)
+    return env
+
+
+def test_backup_script_writes_manifest_next_to_dump(tmp_path: Path):
+    """真跑一次备份：dump 旁边必须出现 manifest，sha256 必须与 dump 实际一致。"""
+    import hashlib
+
+    env = _backup_env(tmp_path)
+    env["PROJECT_DIR"] = str(tmp_path)  # 阻止脚本读取仓库里的 uploads/
+    proc = subprocess.run(
+        ["bash", str(SCRIPTS / "backup_db.sh")],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+    dumps = sorted((tmp_path / "backups").glob("dmkwords_full_*.sql.gz"))
+    assert dumps, f"没有产出备份文件：{proc.stdout}"
+    manifest = dumps[-1].with_name(dumps[-1].name + ".manifest")
+    assert manifest.exists(), f"备份旁没有 manifest：{proc.stdout}"
+    fields = _parse_manifest(manifest)
+    assert {"system_metrics", "audit_logs"} <= set(fields["volatile"].split()), (
+        f"易变表名单不完整：{fields['volatile']}"
+    )
+    assert fields["sha256"] == hashlib.sha256(dumps[-1].read_bytes()).hexdigest(), (
+        "manifest 的 sha256 必须对应这份 dump"
+    )
+    assert fields["rows"] == {"orders": 7, "system_metrics": 7}, f"行数段不对：{fields['rows']}"
+
+
+def test_backup_prune_removes_manifest_with_dump(tmp_path: Path):
+    """过期清理必须连 manifest 一起删（否则 backups 目录留下一堆孤儿清单）。"""
+    env = _backup_env(tmp_path)
+    env["PROJECT_DIR"] = str(tmp_path)
+    backup_dir = tmp_path / "backups"
+    backup_dir.mkdir()
+    # 造一份"14 天前"的旧备份 + 它的 manifest
+    old = backup_dir / "dmkwords_full_20260101_043000.sql.gz"
+    old.write_bytes(b"old")
+    old_manifest = old.with_name(old.name + ".manifest")
+    old_manifest.write_text("sha256=x\n")
+    stale = 1_700_000_000  # 2023-11：远超 RETENTION_DAYS
+    os.utime(old, (stale, stale))
+    os.utime(old_manifest, (stale, stale))
+    env["BACKUP_RETENTION_DAYS"] = "14"
+
+    proc = subprocess.run(
+        ["bash", str(SCRIPTS / "backup_db.sh")],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert not old.exists(), "过期 dump 必须被清掉"
+    assert not old_manifest.exists(), "过期 dump 的 manifest 必须一起清掉（不许留孤儿）"
