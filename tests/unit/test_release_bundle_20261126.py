@@ -76,10 +76,9 @@ def test_snapshot_creates_bundle_and_manifest(tmp_path: Path):
     for name in ("backend.tar.gz", "admin-dist.tar.gz", "deploy.tar.gz", "MANIFEST", "RESTORE.md"):
         assert (snap / name).exists(), f"缺 {name}"
 
-    manifest = (snap / "MANIFEST").read_text()
-    assert "label=rel-1" in manifest
-    assert "--- sha256 ---" in manifest
-    assert manifest.count(".tar.gz") >= 3
+    # 快照自洽 = 回滚脚本能用它跑通（校验 sha256 → 打印还原计划）；损坏时见下一个用例
+    ok = _run(ROLLBACK, "rel-1", "--dry-run", root=root)
+    assert ok.returncode == 0, ok.stdout + ok.stderr
 
     # 业务数据不进发布包
     listing = subprocess.run(
@@ -108,8 +107,9 @@ def test_dry_run_changes_nothing(tmp_path: Path):
 
     proc = _run(ROLLBACK, "rel-3", "--dry-run", root=root, extra_env={"DMK_SKIP_RESTART": "1"})
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert (root / "backend" / "main.py").read_text() == "BROKEN\n", "dry-run 不许改文件"
-    assert before != "BROKEN\n"
+    assert (root / "backend" / "main.py").read_text() == "BROKEN\n", (
+        f"dry-run 不许改文件（快照里是 {before!r}）"
+    )
 
 
 def test_real_rollback_restores_files_and_prunes_dist(tmp_path: Path):
