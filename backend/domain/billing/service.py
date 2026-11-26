@@ -34,7 +34,14 @@ class DepositService:
         return dep
 
     def _ledger(
-        self, dep: Deposit, entry_type: str, amount: Decimal, reason: str, admin=None, copy_id=None
+        self,
+        dep: Deposit,
+        entry_type: str,
+        amount: Decimal,
+        reason: str,
+        admin=None,
+        copy_id=None,
+        client_request_id: str | None = None,
     ) -> None:
         self.db.add(
             DepositLedger(
@@ -45,6 +52,7 @@ class DepositService:
                 reason=reason,
                 related_copy_id=copy_id,
                 operator_id=admin.id if admin else None,
+                client_request_id=client_request_id,
             )
         )
 
@@ -331,10 +339,35 @@ class DepositService:
 
     # ---------- 赔偿扣除（WM5 还书标记遗失时调用） ----------
     def deduct_for_compensation(
-        self, admin, child_id: int, amount: Decimal, reason: str, copy_id: int | None = None
+        self,
+        admin,
+        child_id: int,
+        amount: Decimal,
+        reason: str,
+        copy_id: int | None = None,
+        client_request_id: str | None = None,
     ) -> Deposit:
         if amount <= 0:  # P0-F4 防御层：负数会反向增加可用余额（多退真钱）
             raise ValidationError("赔偿金额必须大于 0")
+        # B1-5（2026-11-26 双审查）：**幂等**。押金行锁只挡并发，挡不住同一请求重放
+        # （双击提交 / 超时重试 / 前端重发）——那会实打实扣两次钱。带 key 的重放直接返回当前押金，
+        # 并发同 key 由 `deposit_ledger.client_request_id` 的唯一索引兜底（见下面的 IntegrityError）。
+        if client_request_id:
+            replayed = (
+                self.db.query(DepositLedger.id)
+                .filter(DepositLedger.client_request_id == client_request_id)
+                .first()
+            )
+            if replayed is not None:
+                dep = (
+                    self.db.query(Deposit)
+                    .filter(Deposit.child_id == child_id, Deposit.is_deleted == 0)
+                    .populate_existing()
+                    .first()
+                )
+                if dep is None:
+                    raise ValidationError("重复请求：该幂等键已使用，但押金账户不存在")
+                return dep
         # P1-F3：锁定读——扣款基于当前真实余额计算，双管理员并发扣款串行化
         # （无锁时 B 读旧快照覆盖写 → 账实永久漂移）
         dep = (
@@ -376,7 +409,35 @@ class DepositService:
         ledger_reason = reason
         if over > 0:
             ledger_reason = f"{reason}（索赔 {amount}，实扣 {deduct}，转待结清 {over}）"
-        self._ledger(dep, DepositLedger.ENTRY_DEDUCT, deduct, ledger_reason, admin, copy_id)
+        from sqlalchemy.exc import IntegrityError
+
+        self._ledger(
+            dep,
+            DepositLedger.ENTRY_DEDUCT,
+            deduct,
+            ledger_reason,
+            admin,
+            copy_id,
+            client_request_id=client_request_id,
+        )
+        if client_request_id:
+            # 并发同 key：两个请求都过了上面的前置检查，落库时唯一索引只放行一个。
+            # 后到者不该 500，也不该再扣一次——事务回滚到写台账之前，按"重放"返回。
+            try:
+                self.db.flush()
+            except IntegrityError:
+                self.db.rollback()
+                dep = (
+                    self.db.query(Deposit)
+                    .filter(Deposit.child_id == child_id, Deposit.is_deleted == 0)
+                    .populate_existing()
+                    .first()
+                )
+                if dep is None:
+                    raise ValidationError("重复请求：该幂等键已使用") from None
+                return dep
+            self.db.flush()
+            return dep
         publish_audit(
             self.db,
             admin=admin,
@@ -536,9 +597,17 @@ class DepositService:
         return dep, (child.name if child else "")
 
     def deduct(
-        self, admin, child_id: int, amount: Decimal, reason: str, copy_id: int | None = None
+        self,
+        admin,
+        child_id: int,
+        amount: Decimal,
+        reason: str,
+        copy_id: int | None = None,
+        client_request_id: str | None = None,
     ):
-        dep = self.deduct_for_compensation(admin, child_id, amount, reason, copy_id)
+        dep = self.deduct_for_compensation(
+            admin, child_id, amount, reason, copy_id, client_request_id
+        )
         child = self.db.query(Child).filter(Child.id == child_id).first()
         self.db.commit()
         return dep, (child.name if child else "")

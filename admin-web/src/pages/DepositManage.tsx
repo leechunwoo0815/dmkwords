@@ -68,6 +68,8 @@ export default function DepositManage() {
   // 不做 promise→loading（那是 ConfirmDialog 专属），异步 onOk 期间可再点 → 双击双扣
   // （后端无幂等键）。守卫在首个 await 前置位才关得住双击窗口。
   const deductInFlight = useRef(false);
+  // B1-5 幂等键：一次提交意图一个 key，成功后清空
+  const deductRequestId = useRef<string>("");
   const [deductForm] = Form.useForm();
 
   const load = useCallback(
@@ -239,10 +241,23 @@ export default function DepositManage() {
         onOk={async () => {
           if (!deductChild || deductInFlight.current) return;
           deductInFlight.current = true;
+          // 同一次提交意图固定一个幂等键：重试沿用，成功后清空（下次登记是新的意图）
+          if (!deductRequestId.current) {
+            deductRequestId.current =
+              typeof crypto !== "undefined" && "randomUUID" in crypto
+                ? crypto.randomUUID()
+                : `deduct-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+          }
           try {
             const v = await deductForm.validateFields();
             try {
-              const dep = await apiDeductDeposit(deductChild.child_id, { amount: String(v.amount), reason: v.reason });
+              // B1-5：带幂等键——双击/超时重试不会扣两次钱（键在"这一次提交意图"内固定）
+              const dep = await apiDeductDeposit(deductChild.child_id, {
+                amount: String(v.amount),
+                reason: v.reason,
+                client_request_id: deductRequestId.current,
+              });
+              deductRequestId.current = "";
               message.success(`已扣除 ￥${v.amount.toLocaleString()}${Number(dep.unpaid_balance) > 0 ? `，待结清 ￥${Number(dep.unpaid_balance).toLocaleString()}` : ""}`);
               setDeductChild(null);
               load(page);

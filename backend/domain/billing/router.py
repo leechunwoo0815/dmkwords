@@ -52,6 +52,11 @@ class DeductRequest(BaseSchema):
     )
     reason: str = Field(..., min_length=1, max_length=200, description="事由（关联图书等，留痕）")
     copy_id: int | None = Field(None, description="关联副本ID")
+    client_request_id: str | None = Field(
+        None,
+        max_length=64,
+        description="幂等键（客户端生成；同一键重试不重复扣款，B1-5）",
+    )
 
 
 @router.get("/deposits", response_model=PaginatedResponse[DepositResponse])
@@ -171,7 +176,7 @@ def deduct_deposit(
 ):
 
     dep, child_name = DepositService(db).deduct(
-        admin, child_id, body.amount, body.reason, body.copy_id
+        admin, child_id, body.amount, body.reason, body.copy_id, body.client_request_id
     )
     return DepositResponse(
         id=dep.id,

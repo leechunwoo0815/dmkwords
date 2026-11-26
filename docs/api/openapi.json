@@ -2026,6 +2026,19 @@
             "description": "赔偿金额（元，正数）",
             "title": "Amount"
           },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "幂等键（客户端生成；同一键重试不重复扣款，B1-5）",
+            "title": "Client Request Id"
+          },
           "copy_id": {
             "anyOf": [
               {

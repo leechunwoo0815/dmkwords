@@ -100,4 +100,13 @@ class DepositLedger(BaseModel):
     reason = Column(String(200), nullable=False, default="", comment="事由（赔偿关联图书等）")
     related_copy_id = Column(Integer, nullable=True, comment="关联副本（赔偿时）")
     operator_id = Column(Integer, nullable=True, comment="操作管理员")
+    # B1-5（2026-11-26 双审查）：赔偿登记的**幂等键**。押金扣款是"读余额→扣减→写台账"，
+    # 现在靠押金行锁防并发，但防不住**同一请求重放**（双击、超时重试、网关重发）——
+    # 那会实打实扣两次钱。客户端带同一 key 重试时按本列去重，唯一索引兜底并发。
+    client_request_id = Column(
+        String(64),
+        nullable=True,
+        unique=True,
+        comment="幂等键（赔偿登记等资金动作；客户端生成，重试同键不重复扣款）",
+    )
     created_at = Column(DateTime, nullable=False, default=datetime.now)

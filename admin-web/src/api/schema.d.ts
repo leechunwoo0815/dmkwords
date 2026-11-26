@@ -4921,6 +4921,11 @@ export interface components {
              */
             amount: number | string;
             /**
+             * Client Request Id
+             * @description 幂等键（客户端生成；同一键重试不重复扣款，B1-5）
+             */
+            client_request_id?: string | null;
+            /**
              * Copy Id
              * @description 关联副本ID
              */

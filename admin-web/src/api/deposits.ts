@@ -29,6 +29,9 @@ export function apiCreateSupplementOrder(childId: number): Promise<{ order_id: n
   return request(`/api/admin/deposits/children/${childId}/supplement-orders`, { method: "POST" });
 }
 
-export function apiDeductDeposit(childId: number, body: { amount: string; reason: string; copy_id?: number }): Promise<Deposit> {
+export function apiDeductDeposit(
+  childId: number,
+  body: { amount: string; reason: string; copy_id?: number; client_request_id?: string },
+): Promise<Deposit> {
   return request(`/api/admin/deposits/children/${childId}/deduct`, { method: "POST", body: JSON.stringify(body) });
 }
