@@ -87,20 +87,20 @@ function Tooltip({
   title: string;
   rows: TipRow[];
 }) {
-  const height = 22 + rows.length * 15;
+  const height = 30 + rows.length * 22;
   return (
     <g pointerEvents="none">
       <rect x={x} y={y} width={width} height={height} rx={6} fill="#23262b" opacity={0.94} />
-      <text x={x + 9} y={y + 15} fill="#ffffff" opacity={0.82} fontSize={11} fontWeight={600}>
+      <text x={x + 9} y={y + 20} fill="#ffffff" opacity={0.85} fontSize={16} fontWeight={600}>
         {title}
       </text>
       {rows.map((row, i) => (
         <g key={row.name}>
-          <rect x={x + 9} y={y + 25 + i * 15} width={6} height={6} rx={1.5} fill={row.color} />
-          <text x={x + 20} y={y + 31 + i * 15} fill="#d9d9d9" fontSize={11}>
+          <rect x={x + 9} y={y + 33 + i * 22} width={8} height={8} rx={1.5} fill={row.color} />
+          <text x={x + 20} y={y + 40 + i * 22} fill="#e6e6e6" fontSize={16}>
             {row.name}
           </text>
-          <text x={x + width - 9} y={y + 31 + i * 15} fill="#ffffff" fontSize={11} textAnchor="end" fontWeight={600}>
+          <text x={x + width - 9} y={y + 40 + i * 22} fill="#ffffff" fontSize={16} textAnchor="end" fontWeight={600}>
             {row.value}
           </text>
         </g>
@@ -138,11 +138,11 @@ export function LineChart({
   const count = single ? 2 : n;
   const at = (s: LineSeries, i: number) => s.values[single ? 0 : i] ?? 0;
 
-  const W = 640;
-  const PAD_L = 46;
-  const PAD_R = 16;
-  const PAD_T = 16;
-  const PAD_B = 26;
+  const W = 560;
+  const PAD_L = 64;
+  const PAD_R = 18;
+  const PAD_T = 20;
+  const PAD_B = 38;
   const top = yMax ?? niceMax(Math.max(1, ...series.flatMap((s) => s.values.slice(0, n))) * 1.2);
   const stepX = (W - PAD_L - PAD_R) / Math.max(1, count - 1);
   const x = (i: number) => PAD_L + i * stepX;
@@ -165,7 +165,7 @@ export function LineChart({
   const singleSeries = series.length === 1;
 
   const hoverLabel = hover === null ? "" : (labels[single ? 0 : hover] ?? "");
-  const tipWidth = 150;
+  const tipWidth = 230;
   const tipX =
     hover === null
       ? 0
@@ -215,27 +215,36 @@ export function LineChart({
             return <path key={`area-${s.name}`} d={area} fill={`url(#${uid}-fill-${si})`} stroke="none" />;
           })}
 
-        {/* 峰值/最新竖向标注（顶部时间 + 数值） */}
-        {!single && peakIdx >= 0 && peakValue > 0 && (
-          <g>
-            <line
-              x1={x(peakIdx)}
-              y1={PAD_T}
-              x2={x(peakIdx)}
-              y2={baseY}
-              stroke="#b9a98d"
-              strokeWidth={1}
-              strokeDasharray="4 4"
-            />
-            <text
-              x={x(peakIdx) + (peakIdx > count * 0.72 ? -6 : 6)}
-              y={PAD_T + 11}
-              textAnchor={peakIdx > count * 0.72 ? "end" : "start"}
-              className="chart-axis-text"
-            >
-              峰值 {valueText(peakValue, series[0]?.digits, series[0]?.unit)} · {labels[peakIdx]}
-            </text>
-          </g>
+        {/* 峰值/最新竖向标注（顶部时间 + 数值）；悬停时让位给读数框，避免叠字 */}
+        {!single && hover === null && peakIdx >= 0 && peakIdx < count - 1 && peakValue > 0 && (
+          (() => {
+            const peakLabel = `峰值 ${valueText(peakValue, series[0]?.digits, series[0]?.unit)} · ${labels[peakIdx]}`;
+            const peakTextWidth = peakLabel.length * 9.2; // 16px 字号的经验宽度（中英混排）
+            const overflowRight = x(peakIdx) + 6 + peakTextWidth > W - PAD_R;
+            const overflowLeft = x(peakIdx) - 6 - peakTextWidth < PAD_L;
+            const flip = overflowRight && !overflowLeft;
+            return (
+              <g>
+                <line
+                  x1={x(peakIdx)}
+                  y1={PAD_T}
+                  x2={x(peakIdx)}
+                  y2={baseY}
+                  stroke="#b9a98d"
+                  strokeWidth={1}
+                  strokeDasharray="4 4"
+                />
+                <text
+                  x={x(peakIdx) + (flip ? -6 : 6)}
+                  y={PAD_T + 14}
+                  textAnchor={flip ? "end" : "start"}
+                  className="chart-axis-text"
+                >
+                  {peakLabel}
+                </text>
+              </g>
+            );
+          })()
         )}
         {single && (
           <g>
@@ -261,15 +270,26 @@ export function LineChart({
             <g key={s.name}>
               <path d={smoothPath(pts)} fill="none" stroke={s.color} strokeWidth={2} strokeLinecap="round" />
               <circle cx={last.x} cy={last.y} r={3.5} fill={s.color} />
-              <text
-                x={W - PAD_R - 2}
-                y={Math.max(tipY + 40, last.y - 6 - si * 12)}
-                textAnchor="end"
-                className="chart-peak-text"
-                fill={s.color}
-              >
-                {valueText(at(s, count - 1), s.digits, s.unit)}
-              </text>
+              {/* 末值标签：多线时按 24 单位阶梯排列并整体夹在绘图区内；悬停时让位读数框 */}
+              {hover === null &&
+                (() => {
+                  const step = 24;
+                  const topLimit = PAD_T + 18;
+                  const bottomLimit = baseY - 8 - step * Math.max(0, series.length - 1);
+                  const startY = Math.min(Math.max(last.y - 12, topLimit), Math.max(topLimit, bottomLimit));
+                  return (
+                    <text
+                      x={W - PAD_R - 2}
+                      y={startY + si * step}
+                      textAnchor="end"
+                      className="chart-peak-text"
+                      fill={s.color}
+                      style={{ paintOrder: "stroke", stroke: "var(--color-bg-container)", strokeWidth: 3.5 }}
+                    >
+                      {valueText(at(s, count - 1), s.digits, s.unit)}
+                    </text>
+                  );
+                })()}
             </g>
           );
         })}
@@ -353,11 +373,11 @@ export function StackedAreaChart({
   const count = single ? 2 : n;
   const at = (layer: AreaLayer, i: number) => layer.values[single ? 0 : i] ?? 0;
 
-  const W = 640;
-  const PAD_L = 46;
-  const PAD_R = 16;
-  const PAD_T = 16;
-  const PAD_B = 26;
+  const W = 560;
+  const PAD_L = 64;
+  const PAD_R = 18;
+  const PAD_T = 20;
+  const PAD_B = 38;
   const stepX = (W - PAD_L - PAD_R) / Math.max(1, count - 1);
   const x = (i: number) => PAD_L + i * stepX;
   const y = (v: number) => height - PAD_B - (v / 100) * (height - PAD_T - PAD_B);
@@ -375,7 +395,7 @@ export function StackedAreaChart({
       );
   const cumulative = new Array<number>(count).fill(0);
 
-  const tipWidth = 150;
+  const tipWidth = 230;
   const tipX =
     hover === null
       ? 0
