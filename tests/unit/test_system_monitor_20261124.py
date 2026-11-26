@@ -44,9 +44,12 @@ def test_live_shape_and_no_sensitive_fields(client, admin_headers):
         "errors_4xx_1m",
         "errors_5xx_1m",
         "p95_ms_1m",
+        "window_seconds",
         "requests_today",
         "errors_today",
     }
+    # 窗口长度必须落在 0–60 秒（轮转后立刻取会很小），前端据此折算「次/分」
+    assert 0 <= body["app"]["window_seconds"] <= 60
 
     # 进程只允许 4 个字段；命令行/env 绝不能出现在响应里
     for proc in body["processes"]["top_cpu"] + body["processes"]["top_memory"]:
@@ -86,7 +89,11 @@ def test_app_metrics_middleware_excludes_monitor_endpoints(client, admin_headers
     assert app_metrics.snapshot()["requests"] >= 1
 
 
-def test_sampler_writes_and_purges_24h():
+def test_sampler_writes_and_purges_24h(monkeypatch):
+    # 单测不跑调度器：把"逐次复核单实例锁"打桩为已持锁（锁丢失的路径见下一个用例）
+    import backend.tasks.registry as registry_module
+
+    monkeypatch.setattr(registry_module, "ensure_scheduler_lock", lambda: True)
     assert sample_system_metrics() == 1
 
     session = SessionLocal()
@@ -107,6 +114,26 @@ def test_sampler_writes_and_purges_24h():
     session = SessionLocal()
     try:
         assert session.get(SystemMetric, old_id) is None, "25 小时前的行必须被清理"
+    finally:
+        session.close()
+
+
+def test_sampler_skips_when_scheduler_lock_lost(monkeypatch):
+    """锁丢失时采样必须直接返回 0，否则两个副本会双写 system_metrics。"""
+    import backend.tasks.registry as registry_module
+
+    session = SessionLocal()
+    try:
+        before = session.query(SystemMetric).count()
+    finally:
+        session.close()
+
+    monkeypatch.setattr(registry_module, "ensure_scheduler_lock", lambda: False)
+    assert sample_system_metrics() == 0
+
+    session = SessionLocal()
+    try:
+        assert session.query(SystemMetric).count() == before, "锁丢失时不允许写入采样"
     finally:
         session.close()
 
@@ -159,6 +186,27 @@ def test_history_hours_clamped():
         assert service.history(0)["hours"] == 1
     finally:
         session.close()
+
+
+def test_rate_pair_guards_time_regression_and_counter_reset():
+    """B1 回归：并发交错导致的时间回退 / 计数器重置不得产出假尖峰。"""
+    from backend.domain.admin.monitor_service import _rate_pair
+
+    # 正常：1 秒内 1024/2048 字节 → 1.0 / 2.0 kB/s
+    r1, r2, base = _rate_pair(10.0, (9.0, 0, 0), 1024, 2048)
+    assert round(r1, 2) == 1.0
+    assert round(r2, 2) == 2.0
+    assert base == (10.0, 1024, 2048)
+
+    # 时间回退（后到的线程拿着更早的 now）：速率 0，基线保留时间更新的那一份
+    r1, r2, base2 = _rate_pair(9.5, (10.0, 1024, 2048), 2048, 4096)
+    assert (r1, r2) == (0.0, 0.0)
+    assert base2 == (10.0, 1024, 2048)
+
+    # 计数器重置（重启/网卡重建）：速率 0，基线换成新计数器
+    r1, r2, base3 = _rate_pair(11.0, (10.0, 1024, 2048), 10, 20)
+    assert (r1, r2) == (0.0, 0.0)
+    assert base3 == (11.0, 10, 20)
 
 
 def test_host_memory_breakdown_within_total():

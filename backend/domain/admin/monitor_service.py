@@ -72,6 +72,28 @@ def _kb_rate(current: int, previous: int, elapsed: float) -> float:
     return max(0.0, (current - previous) / elapsed / 1024.0)
 
 
+def _rate_pair(
+    now: float, previous: tuple[float, int, int] | None, cur1: int, cur2: int
+) -> tuple[float, float, tuple[float, int, int]]:
+    """双计数器速率（kB/s）+ 新基线。
+
+    并发守卫（FEAT-091 深审 B1）：采集器与 live 请求线程共用基线，
+    交错时可能出现「时间戳回退」或「计数器重置」。两种情况都返回 0 速率，
+    并且**只接受时间前进的基线**，避免 elapsed 被钳到 1e-6 而产生假尖峰。
+    """
+    if previous is None:
+        return 0.0, 0.0, (now, cur1, cur2)
+    prev_at, prev1, prev2 = previous
+    if now > prev_at and cur1 >= prev1 and cur2 >= prev2:
+        elapsed = now - prev_at
+        return (
+            _round(_kb_rate(cur1, prev1, elapsed)),
+            _round(_kb_rate(cur2, prev2, elapsed)),
+            (now, cur1, cur2),
+        )
+    return 0.0, 0.0, ((now, cur1, cur2) if now > prev_at else previous)
+
+
 def _auto_step(hours: int) -> int:
     """按回看时长选聚合粒度：在 60/120/300 秒里取“点数不超上限”的最小值。"""
     total = max(60, int(hours) * 3600)
@@ -123,32 +145,23 @@ def collect_host_metrics() -> dict:
     except OSError:
         inode_percent = 0.0
 
-    now = time.monotonic()
-    disk_io = psutil.disk_io_counters()
-    net_io = psutil.net_io_counters()
-    disk_read = disk_io.read_bytes if disk_io else 0
-    disk_write = disk_io.write_bytes if disk_io else 0
-    net_rx = net_io.bytes_recv if net_io else 0
-    net_tx = net_io.bytes_sent if net_io else 0
-
+    # 采集器（60s 采样线程）与 live 端点（请求线程池）**共用同一组速率基线**：
+    #   · 计数器读取、差值计算、基线写入必须在同一把锁内完成，否则两个线程交错时
+    #     后读计数器的线程先写基线、先读的后写 → 基线时间戳回退；
+    #   · 时间回退 / 计数器重置（重启、网卡重建）时不输出速率，且只接受更新的基线，
+    #     避免 `elapsed` 被钳到 1e-6 而产生假尖峰或假 0。
     with _rate_lock:
-        if _last_disk is None:
-            disk_read_kbps = disk_write_kbps = 0.0
-        else:
-            prev_at, prev_read, prev_write = _last_disk
-            elapsed = max(now - prev_at, 1e-6)
-            disk_read_kbps = _round(_kb_rate(disk_read, prev_read, elapsed))
-            disk_write_kbps = _round(_kb_rate(disk_write, prev_write, elapsed))
-        _last_disk = (now, disk_read, disk_write)
-
-        if _last_net is None:
-            net_rx_kbps = net_tx_kbps = 0.0
-        else:
-            prev_at, prev_rx, prev_tx = _last_net
-            elapsed = max(now - prev_at, 1e-6)
-            net_rx_kbps = _round(_kb_rate(net_rx, prev_rx, elapsed))
-            net_tx_kbps = _round(_kb_rate(net_tx, prev_tx, elapsed))
-        _last_net = (now, net_rx, net_tx)
+        now = time.monotonic()
+        disk_io = psutil.disk_io_counters()
+        net_io = psutil.net_io_counters()
+        disk_read = disk_io.read_bytes if disk_io else 0
+        disk_write = disk_io.write_bytes if disk_io else 0
+        net_rx = net_io.bytes_recv if net_io else 0
+        net_tx = net_io.bytes_sent if net_io else 0
+        disk_read_kbps, disk_write_kbps, _last_disk = _rate_pair(
+            now, _last_disk, disk_read, disk_write
+        )
+        net_rx_kbps, net_tx_kbps, _last_net = _rate_pair(now, _last_net, net_rx, net_tx)
 
     return {
         "server_time": datetime.now().isoformat(timespec="seconds"),
@@ -222,7 +235,12 @@ def collect_processes() -> dict:
             continue
 
     with _rate_lock:
-        _proc_cpu = current
+        # 合并而非整表替换：采集器与 live 并发时，各自只更新自己看到的进程，
+        # 整表替换会丢掉对方刚建立的基线 → 进程 CPU% 随机归零。
+        _proc_cpu.update(current)
+        stale = [pid for pid, (_, seen_at) in _proc_cpu.items() if now - seen_at > 300]
+        for pid in stale:
+            _proc_cpu.pop(pid, None)
 
     return {
         "top_cpu": sorted(rows, key=lambda r: r["cpu_percent"], reverse=True)[:5],
@@ -248,10 +266,11 @@ def collect_mysql(db: Session) -> dict:
             qps = 0.0
             if _last_mysql is not None:
                 prev_at, prev_questions = _last_mysql
-                elapsed = max(now - prev_at, 1e-6)
-                if questions >= prev_questions:
-                    qps = _round((questions - prev_questions) / elapsed, 2)
-            _last_mysql = (now, questions)
+                # 与磁盘/网络同款守卫：并发交错时时间戳可能回退，此时不输出速率也不回写旧基线
+                if now > prev_at and questions >= prev_questions:
+                    qps = _round((questions - prev_questions) / (now - prev_at), 2)
+            if _last_mysql is None or now > _last_mysql[0] or questions < _last_mysql[1]:
+                _last_mysql = (now, questions)
         return {
             "status": "ok",
             "connections": int(stats.get("Threads_connected", 0)),
@@ -336,6 +355,8 @@ class SystemMonitorService:
                 "errors_4xx_1m": app_window["errors_4xx"],
                 "errors_5xx_1m": app_window["errors_5xx"],
                 "p95_ms_1m": app_window["p95_ms"],
+                # 计数窗口起点由采样任务轮转决定：窗口 0–60 秒锯齿，前端按窗口长度折算「次/分」
+                "window_seconds": _round(app_window.get("window_seconds", 60.0), 1),
                 "requests_today": today["requests_today"],
                 "errors_today": today["errors_today"],
             },

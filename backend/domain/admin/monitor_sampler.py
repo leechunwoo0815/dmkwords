@@ -40,6 +40,17 @@ def register_metrics_job(scheduler) -> None:
 
 def sample_system_metrics() -> int:
     """写一行采样并清理过期行；返回 1=成功 0=失败（调度器不关心返回值）。"""
+    # 逐次复核单实例锁（与 21 项任务的 guarded_run 对齐）：注册时持锁 ≠ 执行时还持锁。
+    # 持锁副本的 `wait_timeout` 掐断空闲连接会让锁静默消失，另一个副本接管后若旧副本
+    # 的采样 job 仍在跑，就会双写 system_metrics、历史曲线密度凭空翻倍。
+    from backend.tasks.registry import (
+        ensure_scheduler_lock,
+    )  # 延迟导入：避免 registry↔sampler 模块级环
+
+    if not ensure_scheduler_lock():
+        logger.warning("system metrics sample skipped: scheduler lock not held")
+        return 0
+
     session = get_session()
     try:
         host = collect_host_metrics()

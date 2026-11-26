@@ -338,6 +338,8 @@ class MonitorApp(BaseSchema):
     errors_4xx_1m: int
     errors_5xx_1m: int
     p95_ms_1m: int
+    #: 计数窗口已过去的秒数（0–60）；前端用它把原始计数折算成「次/分」
+    window_seconds: float
     requests_today: int
     errors_today: int
 

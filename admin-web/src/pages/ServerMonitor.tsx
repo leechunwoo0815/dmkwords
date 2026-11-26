@@ -124,6 +124,16 @@ function secondsClockLabel(ts: number): string {
   });
 }
 
+/**
+ * 把「距上次轮转以来的原始计数」折算成每分钟速率。
+ * 采样任务每 60 秒轮转一次窗口，所以原始计数是 0–60 秒锯齿：
+ * 轮转刚过只有几秒的量，直接标「次/分」会低估（甚至显示 0 次/分但有流量）。
+ */
+function perMinute(count: number, windowSeconds: number): number {
+  const win = Math.max(1, windowSeconds || 60);
+  return Math.round((count / win) * 60 * 10) / 10;
+}
+
 function liveToPoint(data: SystemLive): ChartPoint {
   const ts = new Date(data.server_time).getTime();
   const total = data.memory.total_mb;
@@ -143,8 +153,8 @@ function liveToPoint(data: SystemLive): ChartPoint {
     tx: data.network.tx_kbps,
     diskRead: data.disk.read_kbps,
     diskWrite: data.disk.write_kbps,
-    requests: data.app.requests_1m,
-    errors: data.app.errors_4xx_1m + data.app.errors_5xx_1m,
+    requests: perMinute(data.app.requests_1m, data.app.window_seconds),
+    errors: perMinute(data.app.errors_4xx_1m + data.app.errors_5xx_1m, data.app.window_seconds),
     p95: data.app.p95_ms_1m,
   };
 }
@@ -477,6 +487,11 @@ export default function ServerMonitor() {
       : 0;
   const requestedMinutes = isLiveRange ? 10 : rangeConfig.trimMinutes || rangeConfig.hours * 60;
   const coverageShort = points.length > 1 && spanMinutes < requestedMinutes * 0.8;
+  // 数据新鲜度：采样任务停了曲线不会报错、只会停止生长，页面必须能分辨"刚部署"与"采样死了"
+  const lastSampleAgeMin = points.length
+    ? (Date.now() - (points[points.length - 1]?.ts ?? 0)) / 60_000
+    : 0;
+  const sampleStale = points.length > 0 && lastSampleAgeMin > 3;
   const stepLabel = isLiveRange
     ? "10 秒"
     : historyStep >= 300
@@ -662,11 +677,15 @@ export default function ServerMonitor() {
             应用请求
           </div>
           <div className="kpi-tile-value">
-            {live ? live.app.requests_1m : "—"}
+            {live ? Math.round(perMinute(live.app.requests_1m, live.app.window_seconds)) : "—"}
             <span className="kpi-tile-unit">次/分</span>
           </div>
           <div className="kpi-tile-hint">
-            {live ? `错误 ${appErrors} · P95 ${live.app.p95_ms_1m} ms` : "—"}
+            {live
+              ? `错误 ${Math.round(perMinute(appErrors, live.app.window_seconds))} 次/分 · P95 ${
+                  live.app.p95_ms_1m
+                } ms（本窗口 ${live.app.window_seconds.toFixed(0)}s：${live.app.requests_1m} 次）`
+              : "—"}
           </div>
         </div>
       </div>
@@ -699,6 +718,7 @@ export default function ServerMonitor() {
                   coverageShort ? ` · 当前仅覆盖 ${spanMinutes} 分钟` : ""
                 }`}
           {usingFallback ? " · 历史为空，暂显示本次页面数据" : ""}
+          {sampleStale ? ` · ⚠ 最近采样 ${lastSampleAgeMin.toFixed(0)} 分钟前，采样可能已停止` : ""}
         </div>
       </div>
 
@@ -860,7 +880,7 @@ export default function ServerMonitor() {
             ariaLabel="应用 P95 延迟趋势"
           />
           <div className="sm-chart-note">
-            最近 1 分钟 P95 {live?.app.p95_ms_1m ?? "—"} ms（监控页自身请求不计入）
+            本窗口 P95 {live?.app.p95_ms_1m ?? "—"} ms（窗口 {live?.app.window_seconds.toFixed(0) ?? "—"}s，监控页自身请求不计入）
           </div>
         </Card>
       </div>
@@ -900,7 +920,11 @@ export default function ServerMonitor() {
           <div className="sm-metrics">
             <Metric label="请求" value={live?.app.requests_today ?? "—"} unit="次" />
             <Metric label="错误" value={live?.app.errors_today ?? "—"} unit="次" />
-            <Metric label="近 1 分钟" value={live?.app.requests_1m ?? "—"} unit="次" />
+            <Metric
+              label={live ? `本窗口(${live.app.window_seconds.toFixed(0)}s)` : "本窗口"}
+              value={live?.app.requests_1m ?? "—"}
+              unit="次"
+            />
             <Metric label="P95" value={live?.app.p95_ms_1m ?? "—"} unit="ms" />
           </div>
         </Card>
