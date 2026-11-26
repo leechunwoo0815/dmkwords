@@ -38,6 +38,8 @@ _HISTORY_STEPS = (60, 120, 300)
 _HISTORY_MAX_POINTS = 300
 
 _cache_lock = threading.Lock()
+#: 缓存过期瞬间可能有多名管理员同时请求：只让一个线程真正采集，其余等它出结果
+_live_build_lock = threading.Lock()
 _live_cache: tuple[float, dict] | None = None
 _history_cache: dict[int, tuple[float, dict]] = {}
 
@@ -334,36 +336,48 @@ class SystemMonitorService:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def live(self) -> dict:
-        global _live_cache
-
+    def _fresh_cache(self) -> dict | None:
         with _cache_lock:
             if _live_cache is not None and time.monotonic() - _live_cache[0] < _LIVE_CACHE_TTL:
                 return _live_cache[1]
+        return None
 
-        mysql = collect_mysql(self.db)
-        host = collect_host_metrics()
-        app_window = app_metrics.snapshot()
-        today = _today_totals(self.db)
-        data = {
-            **host,
-            "processes": collect_processes(),
-            "mysql": mysql,
-            "services": collect_services(self.db, mysql),
-            "app": {
-                "requests_1m": app_window["requests"],
-                "errors_4xx_1m": app_window["errors_4xx"],
-                "errors_5xx_1m": app_window["errors_5xx"],
-                "p95_ms_1m": app_window["p95_ms"],
-                # 计数窗口起点由采样任务轮转决定：窗口 0–60 秒锯齿，前端按窗口长度折算「次/分」
-                "window_seconds": _round(app_window.get("window_seconds", 60.0), 1),
-                "requests_today": today["requests_today"],
-                "errors_today": today["errors_today"],
-            },
-        }
-        with _cache_lock:
-            _live_cache = (time.monotonic(), data)
-        return data
+    def live(self) -> dict:
+        global _live_cache
+
+        cached = self._fresh_cache()
+        if cached is not None:
+            return cached
+
+        # 双检 + 采集锁：缓存刚过期时并发请求只采集一次（多管理员/多标签页）
+        with _live_build_lock:
+            cached = self._fresh_cache()
+            if cached is not None:
+                return cached
+
+            mysql = collect_mysql(self.db)
+            host = collect_host_metrics()
+            app_window = app_metrics.snapshot()
+            today = _today_totals(self.db)
+            data = {
+                **host,
+                "processes": collect_processes(),
+                "mysql": mysql,
+                "services": collect_services(self.db, mysql),
+                "app": {
+                    "requests_1m": app_window["requests"],
+                    "errors_4xx_1m": app_window["errors_4xx"],
+                    "errors_5xx_1m": app_window["errors_5xx"],
+                    "p95_ms_1m": app_window["p95_ms"],
+                    # 计数窗口起点由采样任务轮转决定：窗口 0–60 秒锯齿，前端按窗口长度折算「次/分」
+                    "window_seconds": _round(app_window.get("window_seconds", 60.0), 1),
+                    "requests_today": today["requests_today"],
+                    "errors_today": today["errors_today"],
+                },
+            }
+            with _cache_lock:
+                _live_cache = (time.monotonic(), data)
+            return data
 
     def history(self, hours: int = 24) -> dict:
         """回看 hours 小时历史；聚合粒度按时长自适应（1h=60s、6h=120s、12h/24h=300s）。"""

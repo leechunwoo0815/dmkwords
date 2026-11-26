@@ -35,7 +35,10 @@ class AppMetricsMiddleware:
             return
 
         started = time.perf_counter()
-        status_code = 500
+        # None = 响应头还没发出（客户端提前断开/取消）。这种"没答完"不是服务端 5xx，
+        # 记 5xx 会让错误率虚增；handler 真抛异常时 FastAPI 仍会以 500 起响应，
+        # 异常在 start 之前抛出 → 由异常处理器的响应补上真实状态码。
+        status_code: int | None = None
 
         async def send_wrapper(message) -> None:
             nonlocal status_code
@@ -45,5 +48,10 @@ class AppMetricsMiddleware:
 
         try:
             await self.app(scope, receive, send_wrapper)
+        except Exception:
+            # 没有响应头就抛异常 → 按 500 计（服务端错误），再原样抛出
+            status_code = 500
+            raise
         finally:
-            app_metrics.record(status_code, (time.perf_counter() - started) * 1000)
+            if status_code is not None:
+                app_metrics.record(status_code, (time.perf_counter() - started) * 1000)

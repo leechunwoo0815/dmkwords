@@ -105,7 +105,7 @@ def system_history(
     admin: AdminUser = Depends(require_perm("config.view")),
     db: Session = Depends(get_db),
 ):
-    """24h 历史（5 分钟聚合）；服务端缓存 60 秒。"""
+    """回看历史（粒度按时长自适应 60/120/300 秒）；服务端缓存 60 秒。"""
     return SystemHistoryResponse.model_validate(SystemMonitorService(db).history(hours))
 
 

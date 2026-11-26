@@ -933,7 +933,7 @@ export default function ServerMonitor() {
       <Card size="small" className="dash-cell sm-cell sm-process-card" title="进程 Top（实时）">
         <div className="sm-proc-grid">
           <ProcessList
-            title="CPU Top 5"
+            title="CPU Top 5（单核 100% 计，可 >100%）"
             rows={live?.processes.top_cpu ?? []}
             unit="%"
             value={(row) => row.cpu_percent}
