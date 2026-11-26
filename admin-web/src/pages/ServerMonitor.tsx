@@ -114,6 +114,16 @@ function dateClockLabel(ts: number): string {
   return `${md} ${clockLabel(ts)}`;
 }
 
+/** 10 分钟视图：历史回填点与实时点共用「时:分:秒」刻度。 */
+function secondsClockLabel(ts: number): string {
+  return new Date(ts).toLocaleTimeString("zh-CN", {
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
 function liveToPoint(data: SystemLive): ChartPoint {
   const ts = new Date(data.server_time).getTime();
   const total = data.memory.total_mb;
@@ -295,8 +305,33 @@ export default function ServerMonitor() {
     }
   }, []);
 
+  /**
+   * 10 分钟视图回填：进页面先用服务端最近 1 小时采样裁出最近 10 分钟，
+   * 让首屏就是「已经发生的曲线」，而不是从打开页面才开始计时（服务端 60 秒一行）。
+   * 之后实时点每 10 秒追加到同一数组，滚动窗口仍是最近 10 分钟。
+   */
+  const seedLiveWindow = useCallback(async () => {
+    try {
+      const data = await apiSystemHistory(1);
+      const cut = Date.now() - 10 * 60_000;
+      const seeded = (data.points ?? [])
+        .map((p) => historyToPoint(p as HistoryPoint, data.step_seconds))
+        .filter((p) => p.ts >= cut);
+      if (seeded.length === 0) return;
+      setLivePoints((prev) => {
+        const byTs = new Map<number, ChartPoint>();
+        for (const p of seeded) byTs.set(p.ts, { ...p, label: secondsClockLabel(p.ts) });
+        for (const p of prev) byTs.set(p.ts, p);
+        return [...byTs.values()].sort((a, b) => a.ts - b.ts).slice(-MAX_POINTS);
+      });
+    } catch {
+      // 历史不可用（迁移未跑/DB 不可达）时退化为「只显示本次页面实时点」
+    }
+  }, []);
+
   useEffect(() => {
     void loadLive();
+    void seedLiveWindow();
     const liveTimer = window.setInterval(() => {
       if (!document.hidden) void loadLive();
     }, LIVE_INTERVAL_MS);
@@ -308,7 +343,7 @@ export default function ServerMonitor() {
       window.clearInterval(liveTimer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [loadLive]);
+  }, [loadLive, seedLiveWindow]);
 
   const rangeConfig = useMemo(
     () => RANGES.find((r) => r.key === range) ?? RANGES[0]!,
@@ -319,6 +354,8 @@ export default function ServerMonitor() {
   useEffect(() => {
     if (rangeConfig.hours === 0) {
       setHistoryError("");
+      // 从长区间切回 10 分钟：补回离开期间的采样，曲线不留缺口
+      void seedLiveWindow();
       return;
     }
     let cancelled = false;
@@ -357,7 +394,7 @@ export default function ServerMonitor() {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [rangeConfig, historyTick]);
+  }, [rangeConfig, historyTick, seedLiveWindow]);
 
   const refreshAll = async () => {
     setRefreshing(true);
@@ -655,7 +692,7 @@ export default function ServerMonitor() {
         />
         <div className="sm-range-meta">
           {isLiveRange
-            ? "实时曲线 · 每 10 秒追加一个点（最近 10 分钟）"
+            ? "已回填最近 10 分钟（服务端 60 秒采样）· 之后每 10 秒追加实时点"
             : historyLoading && historyPoints.length === 0
               ? "正在读取历史采样…"
               : `服务端 60 秒采样 · ${stepLabel}粒度 · 共 ${points.length} 个点${
@@ -889,8 +926,8 @@ export default function ServerMonitor() {
       <div className="sm-footer">
         采样式只读监控：主机数据来自 psutil，MySQL 来自只读状态查询，应用指标来自进程内中间件（排除
         <code>/health</code> 与 <code>/api/admin/system/*</code>）。KPI 每 10 秒刷新；图表可选 10
-        分钟（实时）/30 分钟/1 小时/6 小时/12 小时/24 小时，长区间由服务端 60 秒采样聚合（1
-        小时=1 分钟粒度、6 小时=2 分钟、12/24 小时=5 分钟），鼠标悬停可读取该时刻全部指标。数据保留 24 小时。
+        分钟/30 分钟/1 小时/6 小时/12 小时/24 小时，进入页面即用服务端 60 秒采样回填所选区间
+        （10 分钟视图同样先回填、之后每 10 秒追加实时点；长区间粒度 1/2/5 分钟），鼠标悬停可读取该时刻全部指标。数据保留 24 小时。
       </div>
     </div>
   );
