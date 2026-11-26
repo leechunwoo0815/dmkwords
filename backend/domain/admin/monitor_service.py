@@ -104,15 +104,18 @@ def collect_host_metrics() -> dict:
     swap = psutil.swap_memory()
     # 平台口径（与用户看到的系统工具对齐）：
     #   macOS：Activity Monitor / psutil.vm.percent 是 total - available（含压缩/不可回收部分）；
-    #          开发机若用 vm.used 会显示 44%，与系统实际 70%+ 不符。
-    #   Linux：free -m 的 used = total - free - buffers - cached（psutil.vm.used）；
-    #          cached 展示为 buffers + cached（即 free 的 buff/cache）。
+    #          开发机若用 vm.used 会显示 44%，与系统实际 70%+ 不符。cached 记 0（mac 无此口径）。
+    #   Linux：与 `free -m` 完全对齐——used = total - free - buff/cache，
+    #          cached 展示 buff/cache（psutil.cached 已含 SReclaimable，再加 Buffers）。
+    #          注意不能用 psutil.vm.used：新版 psutil 的 used = total - available，
+    #          它本身已包含可回收缓存，与 cached 相加会超过总量（页面堆叠图会顶到 100%+，
+    #          生产 2G 机实测 61% + 45% = 106%，空闲被挤成 0）。
     if sys.platform == "darwin":
         used_bytes = max(0, int(vm.total) - int(vm.available))
         cached_bytes = 0
     else:
         cached_bytes = int(getattr(vm, "cached", 0)) + int(getattr(vm, "buffers", 0))
-        used_bytes = int(getattr(vm, "used", vm.total - vm.available))
+        used_bytes = max(0, int(vm.total) - int(getattr(vm, "free", 0)) - cached_bytes)
     disk = psutil.disk_usage(_DISK_PATH)
     try:
         statvfs = os.statvfs(_DISK_PATH)

@@ -215,6 +215,7 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
 
 `/history` 响应：`{"hours": 24, "step_seconds": 300, "points": [{"at": "...", "cpu_percent": 2.1, "load1": 0.01, "load5": 0.02, "load15": 0.05, "mem_used_mb": 886, "mem_total_mb": 1756, "mem_cached_mb": 768, "disk_percent": 38.0, "net_rx_kbps": 2.6, "net_tx_kbps": 44.7, "disk_read_kbps": 0.4, "disk_write_kbps": 26.0, "app_requests": 12, "app_4xx": 0, "app_5xx": 0, "app_p95_ms": 45}]}`。
 
+- **内存口径（2026-11-26 订正）**：`memory.total_mb` 是**内核可见总量**（`MemTotal`），不是云厂商标称值——2 GB 实例实测 **1756 MiB**（`crashkernel=auto` 预留 161 MiB + 内核/硬件保留约 130 MiB），属正常。Linux `used_mb` = `free` 的 used（total − free − buff/cache），`cached_mb` = buff/cache；macOS `used_mb` = total − available、`cached_mb` = 0。三者（used + cached + free）合计 100%，堆叠图不会溢出。
 - **聚合粒度自适应**（2026-11-25 起，页面 30 分钟–24 小时区间共用本端点）：
   采样本身 60 秒一行，`step_seconds` 取 `60 / 120 / 300` 中「点数不超过 300」的最小值——
   `hours=1 → 60`（60 点）、`hours=6 → 120`（180 点）、`hours=12/24 → 300`（144/288 点）。

@@ -574,7 +574,7 @@ export default function ServerMonitor() {
           <div className="kpi-tile-hint">
             {live ? (
               <>
-                {live.memory.used_mb.toLocaleString()} / {live.memory.total_mb.toLocaleString()} MiB
+                已用 {live.memory.used_mb.toLocaleString()} / 可见 {live.memory.total_mb.toLocaleString()} MiB
                 <br />
                 可用 {live.memory.available_mb.toLocaleString()} MiB
                 {live.memory.swap_used_mb > 0 && (

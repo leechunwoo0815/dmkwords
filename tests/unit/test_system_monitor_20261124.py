@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from backend.database import SessionLocal
 from backend.domain.admin.models import SystemMetric
 from backend.domain.admin.monitor_sampler import sample_system_metrics
-from backend.domain.admin.monitor_service import SystemMonitorService
+from backend.domain.admin.monitor_service import SystemMonitorService, collect_host_metrics
 from backend.metrics import AppMetricsRegistry, app_metrics
 
 
@@ -159,6 +159,21 @@ def test_history_hours_clamped():
         assert service.history(0)["hours"] == 1
     finally:
         session.close()
+
+
+def test_host_memory_breakdown_within_total():
+    """used + cached 不得超过总量。
+
+    Linux 上曾把 psutil.vm.used（= total - available，已含可回收缓存）再与
+    buffers+cached 相加，生产 2G 机得到 61% + 45% = 106%，页面堆叠图把「空闲」挤成 0。
+    这里锁死组成口径：used + cached <= total，且三者能铺满 100%。
+    """
+    mem = collect_host_metrics()["memory"]
+    assert mem["total_mb"] > 0
+    assert mem["used_mb"] >= 0
+    assert mem["cached_mb"] >= 0
+    assert mem["used_mb"] + mem["cached_mb"] <= mem["total_mb"], mem
+    assert mem["available_mb"] <= mem["total_mb"]
 
 
 def test_history_step_adapts_to_range():
