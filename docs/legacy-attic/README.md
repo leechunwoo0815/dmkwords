@@ -6,7 +6,7 @@
 ## 规则
 
 1. **任何文件都不能作为「当前实现 / 当前口径 / 当前待办」的依据。**
-   现行入口只有：`docs/项目交接-20260824.md`（v180）、`docs/LEDGER.md`、`CLAUDE.md`。
+   现行入口只有：`docs/项目交接-20260824.md`（v181）、`docs/LEDGER.md`、`CLAUDE.md`。
 2. `legacy-code-2026-08/` 下是**旧版本代码副本**，与现役 `backend/` 同名文件已经分叉
    （例：`config_service.py` 156 行 vs 现役 128 行；`seed_admin.py` 58 行 vs 现役 68 行）。
    **只用于考古**：要改代码请改 `backend/` 现役文件，不要复制这里的实现。
