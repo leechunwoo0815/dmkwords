@@ -215,6 +215,31 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
 
 `/history` 响应：`{"hours": 24, "step_seconds": 300, "points": [{"at": "...", "cpu_percent": 2.1, "load1": 0.01, "load5": 0.02, "load15": 0.05, "mem_used_mb": 886, "mem_total_mb": 1756, "mem_cached_mb": 768, "disk_percent": 38.0, "net_rx_kbps": 2.6, "net_tx_kbps": 44.7, "disk_read_kbps": 0.4, "disk_write_kbps": 26.0, "app_requests": 12, "app_4xx": 0, "app_5xx": 0, "app_p95_ms": 45}]}`。
 
+### 4.10 2026-11-26 增补：运维探针 `/ready`（B2-1 双审查整改）
+
+> 无权限要求（仅供本机/监控平台内网调用，不返回任何业务数据）；**不计入应用指标**（与 `/health` 同口径）。
+> 语义分工：`/health` = 进程活着（**恒 200**，不查依赖）；`/ready` = **能不能受理业务**（任一判据不过 → 503）。
+
+| 方法 | 路径 | 参数 | 说明 |
+|---|---|---|---|
+| GET | `/ready` | 无 | 就绪探针：`db`（`SELECT 1`）+ `scheduler`（在跑且握锁，`SCHEDULER_ENABLED=false` 时不判）+ `sampler`（`system_metrics` 最近一行 ≤ 300 秒） |
+
+响应形状（200 = ready / 503 = not_ready，`checks` 里写明哪项不过、为什么）：
+
+```json
+{
+  "status": "ready",
+  "checks": {
+    "db": {"ok": true},
+    "scheduler": {"ok": true, "enabled": true, "running": true, "has_lock_conn": true, "watchdog": true},
+    "sampler": {"ok": true, "age_seconds": 42.0}
+  }
+}
+```
+
+失败示例（调度器没起来）：`{"status": "not_ready", "checks": {"db": {"ok": true}, "scheduler": {"ok": false, "error": "调度器未运行或未持有锁连接（定时任务不会执行）"}, "sampler": {...}}}`。
+外部探针（UptimeRobot 等）应改测 `/ready` 并断言 `status == "ready"`——只测 `/health` 会漏掉"进程活着、库连不上、定时任务全停"的半死状态（`docs/任务书-20261126-双审查合并整改.md` B2-1）。
+
 - **应用计数窗口（2026-11-26 订正）**：`requests_1m/errors_*_1m` 是「距上次采样轮转以来的原始计数」，窗口长度由 `window_seconds`（0–60）给出；页面按 `count / window_seconds * 60` 折算成「次/分」再展示，**不要直接把原始计数当次/分**（轮转刚过会低估甚至显示 0）。`p95_ms_1m` 同属本窗口。
 - **内存口径（2026-11-26 订正）**：`memory.total_mb` 是**内核可见总量**（`MemTotal`），不是云厂商标称值——2 GB 实例实测 **1756 MiB**（`crashkernel=auto` 预留 161 MiB + 内核/硬件保留约 130 MiB），属正常。Linux `used_mb` = `free` 的 used（total − free − buff/cache），`cached_mb` = buff/cache；macOS `used_mb` = total − available、`cached_mb` = 0。三者（used + cached + free）合计 100%，堆叠图不会溢出。
 - **聚合粒度自适应**（2026-11-25 起，页面 30 分钟–24 小时区间共用本端点）：
