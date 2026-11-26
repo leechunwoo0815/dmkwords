@@ -13,6 +13,7 @@ import {
   DatabaseOutlined,
   HddOutlined,
   ReloadOutlined,
+  WarningOutlined,
   WifiOutlined,
 } from "@ant-design/icons";
 import { Alert, Button, Card, Segmented } from "antd";
@@ -718,7 +719,11 @@ export default function ServerMonitor() {
                   coverageShort ? ` · 当前仅覆盖 ${spanMinutes} 分钟` : ""
                 }`}
           {usingFallback ? " · 历史为空，暂显示本次页面数据" : ""}
-          {sampleStale ? ` · ⚠ 最近采样 ${lastSampleAgeMin.toFixed(0)} 分钟前，采样可能已停止` : ""}
+          {sampleStale && (
+            <span className="sm-range-stale">
+              <WarningOutlined /> 最近采样 {lastSampleAgeMin.toFixed(0)} 分钟前，采样可能已停止
+            </span>
+          )}
         </div>
       </div>
 

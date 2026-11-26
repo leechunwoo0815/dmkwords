@@ -166,6 +166,20 @@
   color: var(--color-text-tertiary);
   font-variant-numeric: tabular-nums;
 }
+/* 采样停滞提示：与前文用中点分隔，警示色 + 图标（文案 emoji 门禁 R13d 不允许裸 emoji） */
+.sm-page .sm-range-stale {
+  margin-left: 4px;
+  color: var(--sm-orange);
+  font-weight: 600;
+}
+.sm-page .sm-range-stale::before {
+  content: " · ";
+  color: var(--color-text-tertiary);
+  font-weight: 400;
+}
+.sm-page .sm-range-stale .anticon {
+  margin-right: 3px;
+}
 .sm-page .sm-range-stats {
   display: flex;
   flex-wrap: wrap;
