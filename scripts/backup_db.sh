@@ -124,7 +124,7 @@ if ! gzip -t "$TMP_SQL" 2>/dev/null; then
 fi
 
 # 校验 2+3：结束标记 + 表数量（一次解压同时统计）
-STATS="$(zcat "$TMP_SQL" | awk '/^CREATE TABLE/{n++} {last=$0} END{printf "%d\t%s", n, last}')"
+STATS="$(gzip -dc "$TMP_SQL" | awk '/^CREATE TABLE/{n++} {last=$0} END{printf "%d\t%s", n, last}')"
 TABLE_COUNT="${STATS%%$'\t'*}"
 LAST_LINE="${STATS#*$'\t'}"
 if [ "$TABLE_COUNT" != "$EXPECTED_TABLES" ]; then
@@ -141,6 +141,33 @@ mv "$TMP_SQL" "$BACKUP_FILE"
 chmod 600 "$BACKUP_FILE"
 BACKUP_SIZE="$(du -h "$BACKUP_FILE" | awk '{print $1}')"
 log "✅ 全量备份完成: $BACKUP_FILE ($BACKUP_SIZE, $TABLE_COUNT 表)"
+
+# ── 备份清单（B2-3，2026-11-26 双审查）──
+# 为什么必须有：`restore_check.sh` 原先拿"恢复出来的临时库"跟**此刻的生产库**对拍行数。
+# 生产库每秒都在写（system_metrics 每 60 秒一行），备份是几小时/几天前的快照——两边数字
+# 天然不同，于是演练要么永远报假差异、要么被当成噪音忽略，等于没有校验。
+# 现在把"备份那一刻的行数"钉在清单里，恢复后对清单（而不是对现在）。
+# 易变表（append-only 的采样/审计/任务日志/短信码/通知）只要求"恢复库 ≤ 生产现在"，
+# 不做等值比较——否则备份之后新增的行会把它判红。
+BACKUP_MANIFEST="$BACKUP_FILE.manifest"
+VOLATILE_TABLES="system_metrics audit_logs task_run_logs sms_codes notifications admin_notifications"
+{
+  echo "# DmkWords backup manifest（restore_check.sh 的一致性事实源；勿手改）"
+  echo "created_at=$(date '+%Y-%m-%d %H:%M:%S %z')"
+  echo "db=$DB_NAME"
+  echo "file=$(basename "$BACKUP_FILE")"
+  echo "tables=$TABLE_COUNT"
+  echo "volatile=$VOLATILE_TABLES"
+  echo "sha256=$(sha256sum "$BACKUP_FILE" 2>/dev/null | cut -d' ' -f1 || shasum -a 256 "$BACKUP_FILE" | cut -d' ' -f1)"
+  echo "--- row counts at dump time ---"
+  for t in $(run_mysql -N -e "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB_NAME' AND table_type='BASE TABLE' ORDER BY table_name"); do
+    n="$(run_mysql -N -e "SELECT COUNT(*) FROM \`$DB_NAME\`.\`$t\`" 2>/dev/null || echo NA)"
+    echo "$t $n"
+  done
+} > "$BACKUP_MANIFEST"
+chmod 600 "$BACKUP_MANIFEST"
+manifest_rows="$(grep -cE '^[A-Za-z0-9_]+ [0-9]+$' "$BACKUP_MANIFEST" || true)"
+log "✅ 备份清单: ${BACKUP_MANIFEST}（${manifest_rows} 张表行数已钉住）"
 
 # 周日额外留周备（日备只留 RETENTION_DAYS 天，周备覆盖更久）
 if [ "$(date +%u)" = "7" ]; then
@@ -162,8 +189,8 @@ if [ "$BACKUP_UPLOADS" = "1" ] && [ -d "$PROJECT_DIR/uploads" ]; then
 fi
 
 # ── 清理过期 ──
-DELETED_DB="$(find "$BACKUP_DIR" -maxdepth 1 -name "${DB_NAME}_full_*.sql.gz" -mtime +"$RETENTION_DAYS" -print -delete 2>/dev/null | wc -l)"
-DELETED_WEEKLY="$(find "$BACKUP_DIR/weekly" -name "${DB_NAME}_full_*.sql.gz" -mtime +"$WEEKLY_RETENTION_DAYS" -print -delete 2>/dev/null | wc -l)"
+DELETED_DB="$(find "$BACKUP_DIR" -maxdepth 1 -name "${DB_NAME}_full_*.sql.gz*" -mtime +"$RETENTION_DAYS" -print -delete 2>/dev/null | wc -l)"
+DELETED_WEEKLY="$(find "$BACKUP_DIR/weekly" -name "${DB_NAME}_full_*.sql.gz*" -mtime +"$WEEKLY_RETENTION_DAYS" -print -delete 2>/dev/null | wc -l)"
 DELETED_UPLOADS="$(find "$BACKUP_DIR" -maxdepth 1 -name "uploads_*.tar.gz" -mtime +"$RETENTION_DAYS" -print -delete 2>/dev/null | wc -l)"
 log "清理过期备份: 日备 ${DELETED_DB} / 周备 ${DELETED_WEEKLY} / 文件 ${DELETED_UPLOADS}"
 
