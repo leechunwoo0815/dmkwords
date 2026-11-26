@@ -18033,6 +18033,23 @@
         },
         "summary": "Health"
       }
+    },
+    "/ready": {
+      "get": {
+        "description": "就绪探针（B2-1，2026-11-26 双审查）：**能不能受理业务**，与 `/health`（进程活着）分开。\n\n为什么必须分开：`/health` 恒 200 的语义是对的（进程活着），但它挡不住\"进程活着、库连不上、\n定时任务全停\"这种**半死**状态——外部探针只看 `/health` 会一直绿灯，直到用户报错。\n判据三项，任一不过 → **503**，响应体写明哪项不过（探针抓 JSON 就能看到原因）：\n\n1. `db`：`SELECT 1`；\n2. `scheduler`：调度器在跑且握着锁连接（`SCHEDULER_ENABLED=false` 时不作判据，仅回显）；\n3. `sampler`：`system_metrics` 最近一行不超过 5 分钟（同样仅在调度器启用时判）。",
+        "operationId": "ready_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ready"
+      }
     }
   }
 }

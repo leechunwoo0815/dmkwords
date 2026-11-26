@@ -4050,6 +4050,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ready
+         * @description 就绪探针（B2-1，2026-11-26 双审查）：**能不能受理业务**，与 `/health`（进程活着）分开。
+         *
+         *     为什么必须分开：`/health` 恒 200 的语义是对的（进程活着），但它挡不住"进程活着、库连不上、
+         *     定时任务全停"这种**半死**状态——外部探针只看 `/health` 会一直绿灯，直到用户报错。
+         *     判据三项，任一不过 → **503**，响应体写明哪项不过（探针抓 JSON 就能看到原因）：
+         *
+         *     1. `db`：`SELECT 1`；
+         *     2. `scheduler`：调度器在跑且握着锁连接（`SCHEDULER_ENABLED=false` 时不作判据，仅回显）；
+         *     3. `sampler`：`system_metrics` 最近一行不超过 5 分钟（同样仅在调度器启用时判）。
+         */
+        get: operations["ready_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -13946,6 +13974,26 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    ready_ready_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };
