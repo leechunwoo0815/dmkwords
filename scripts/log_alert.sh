@@ -72,7 +72,10 @@ fi
 if mtime="$(sudo -n stat -c %Y "$MYSQL_LOG" 2>/dev/null)"; then
   age_days=$(( ( $(date +%s) - mtime ) / 86400 ))
   if [ "$MYSQL_LOG_MAX_AGE_DAYS" -gt 0 ] && [ "$age_days" -gt "$MYSQL_LOG_MAX_AGE_DAYS" ]; then
-    log "⚠ MySQL 错误日志 ${age_days} 天未更新（阈值 ${MYSQL_LOG_MAX_AGE_DAYS} 天）：死锁探测置信度下降（安静库属正常；可用 LOG_ALERT_MYSQL_LOG_MAX_AGE_DAYS=0 关闭提示）"
+    # 复审（2026-11-26）更正：原先这里写"安静库属正常"，但当时生产 `innodb_print_all_deadlocks=OFF`，
+    # 死锁**根本不写** error log —— "日志不动"是致盲不是安静。现在该开关已在生产打开并持久化
+    # （见 docs/25 §三十三 同夜补充），所以"没有新行"确实可能只是没有错误。
+    log "⚠ MySQL 错误日志 ${age_days} 天未更新（阈值 ${MYSQL_LOG_MAX_AGE_DAYS} 天）：已开 innodb_print_all_deadlocks，无错误时本就不会写；持续不更新时请核对 error_log 路径（可用 LOG_ALERT_MYSQL_LOG_MAX_AGE_DAYS=0 关闭提示）"
   fi
 fi
 

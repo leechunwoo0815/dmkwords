@@ -82,7 +82,10 @@ if [ -f "$DMK_ROOT/alembic.ini" ]; then
     alembic_rev="$(printf '%s' "$out" | tail -1)"
     [ -n "$alembic_rev" ] || alembic_rev="(empty)"
   else
-    alembic_rev="(alembic 读取失败)"
+    # 失败要能查：stderr 之前被丢进 /dev/null，只剩一句"读取失败"，无法判断是权限、迁移文件还是
+    # 瞬时数据库问题（2026-11-26 实测撞到一次，复跑又正常）。这里保留首行原因。
+    alembic_err="$(cd "$DMK_ROOT" && timeout 20 "${DMK_PYTHON:-.venv/bin/python}" -m alembic current 2>&1 >/dev/null | tail -1 || true)"
+    alembic_rev="(alembic 读取失败: ${alembic_err:-无输出})"
   fi
 fi
 
