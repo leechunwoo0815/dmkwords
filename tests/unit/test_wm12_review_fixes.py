@@ -203,13 +203,18 @@ def test_query_gateway_confirms_not_accepted_then_retry_ok(client, db, monkeypat
 
 
 def test_query_gateway_success_settles_refund(client, db, monkeypatch):
-    """查单结论 SUCCESS（回调没到）→ 直接落已退款。"""
-    _fail_gateway(monkeypatch, fail_times=1, query_found=True, query_state="SUCCESS")
+    """查单结论 SUCCESS 且金额相符（回调没到）→ 直接落已退款。
+
+    注意（复审 2026-11-26）：**缺金额现在不落终态**（与回调侧 P1-14 同口径），
+    所以桩必须给金额，否则走的是下面那条 `test_query_gateway_missing_amount_keeps_unknown`。
+    """
+    stub = _fail_gateway(monkeypatch, fail_times=1, query_found=True, query_state="SUCCESS")
     _parent, child, mh, order = _online_paid_order(client, db, phone="13800009965")
     applied = _apply_refund(client, mh, order, child["id"])
     h = _h(client)
     _approve(client, h, applied["id"])
     _execute(client, h, applied["id"], remark="原路退")
+    stub.query_refund_amount = Decimal(str(_refund_row(db, applied["id"]).amount))
 
     q = client.post(f"/api/admin/refund-requests/{applied['id']}/query-gateway", headers=h)
     assert q.status_code == 200, q.text
@@ -218,6 +223,46 @@ def test_query_gateway_success_settles_refund(client, db, monkeypatch):
     assert req.status == RefundRequest.STATUS_REFUNDED
     db.refresh(order)
     assert order.status == Order.STATUS_REFUNDED
+
+
+def test_query_gateway_missing_amount_keeps_unknown(client, db, monkeypatch):
+    """复审（2026-11-26）：查单 SUCCESS 但**没带金额** → 不落终态、未知态保持、留审计。
+
+    原先只 `logger.warning` 然后照落已退款——与回调侧 P1-14「缺金额即拒」同险不同判。
+    微信字段改名/部分退款时，本地会把整笔记成已退而账实不符，且对账按单号对号还双双通过。
+    """
+    from backend.domain.admin.models import AuditLog
+
+    _fail_gateway(monkeypatch, fail_times=1, query_found=True, query_state="SUCCESS")
+    _parent, child, mh, order = _online_paid_order(client, db, phone="13800009973")
+    applied = _apply_refund(client, mh, order, child["id"])
+    h = _h(client)
+    _approve(client, h, applied["id"])
+    _execute(client, h, applied["id"], remark="原路退")
+
+    q = client.post(f"/api/admin/refund-requests/{applied['id']}/query-gateway", headers=h)
+    assert q.status_code == 200, q.text
+    body = q.json()
+    assert body["resolved"] is False, "缺金额不许当已解决"
+    assert "未携带实退金额" in body["note"]
+
+    db.expire_all()
+    req = _refund_row(db, applied["id"])
+    assert req.status == RefundRequest.STATUS_PROCESSING, "缺金额不许落终态"
+    assert req.gateway_unknown_at is not None, "未知态保持（禁止换单号重提）"
+    db.refresh(order)
+    assert order.status != Order.STATUS_REFUNDED
+
+    row = (
+        db.query(AuditLog)
+        .filter(
+            AuditLog.action == "refund.query_amount_missing",
+            AuditLog.target_id == str(req.id),
+        )
+        .order_by(AuditLog.id.desc())
+        .first()
+    )
+    assert row is not None, "缺金额必须留审计"
 
 
 def test_query_gateway_amount_mismatch_keeps_unknown(client, db, monkeypatch):

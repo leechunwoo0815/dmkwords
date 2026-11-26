@@ -33,6 +33,14 @@ SNAPSHOT = SCRIPTS / "release_snapshot.sh"
 ROLLBACK = SCRIPTS / "release_rollback.sh"
 
 
+def _manifest_field(path: Path, key: str) -> str | None:
+    """读 MANIFEST 的某个 `key=value`（返回解析后的值，不做子串断言）。"""
+    for line in path.read_text().splitlines():
+        if line.startswith(key + "="):
+            return line.split("=", 1)[1]
+    return None
+
+
 def _fake_root(tmp_path: Path) -> Path:
     """造一个最小可用的"生产目录"：backend / admin-web/dist（含 avatars）/ deploy。"""
     root = tmp_path / "prod"
@@ -152,3 +160,68 @@ def test_help_does_not_crash(tmp_path: Path):
         proc = _run(script, "--help", root=root)
         assert proc.returncode == 0
         assert "B0-2" in proc.stdout
+
+
+# ---------- 复审 N2/N3（2026-11-26）：迁移要成对回退；自定义锚点不许被自动清 ----------
+
+
+def _fake_root_with_alembic(tmp_path: Path) -> Path:
+    root = _fake_root(tmp_path)
+    versions = root / "alembic" / "versions"
+    versions.mkdir(parents=True)
+    (versions / "0001_init.py").write_text("# migration\n")
+    (root / "alembic.ini").write_text("[alembic]\nscript_location = alembic\n")
+    return root
+
+
+def test_snapshot_includes_migrations(tmp_path: Path):
+    """N2：迁移目录必须进快照，否则回滚只能回代码、回不了迁移。"""
+    root = _fake_root_with_alembic(tmp_path)
+    proc = _run(SNAPSHOT, "rel-m", root=root)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    snap = root / "backups" / "releases" / "rel-m"
+    assert (snap / "alembic.tar.gz").exists(), "快照缺 alembic 包"
+    assert _manifest_field(snap / "MANIFEST", "alembic_versions") == "1"
+
+
+def test_rollback_never_deletes_migrations_it_cannot_roll_back(tmp_path: Path):
+    """N2 的安全阀：快照版本与 DB 版本对不上（或读不出）时**不许覆盖/删除** versions/。
+
+    否则 DB 已应用的新迁移文件被旧快照覆盖 → `alembic current` 报 Can't locate revision，
+    历史断裂且没有台阶可下。这里断言文件仍在、且输出提示人工 downgrade。
+    """
+    root = _fake_root_with_alembic(tmp_path)
+    assert _run(SNAPSHOT, "rel-m2", root=root).returncode == 0
+
+    # 本版之后新增了一个迁移（模拟"部署后又加了一版"）
+    new_migration = root / "alembic" / "versions" / "0002_later.py"
+    new_migration.write_text("# later migration\n")
+    (root / "backend" / "main.py").write_text("BROKEN\n")
+
+    proc = _run(ROLLBACK, "rel-m2", root=root, extra_env={"DMK_SKIP_RESTART": "1"})
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert new_migration.exists(), "DB 可能已应用的新迁移文件绝不能被回滚删掉"
+    assert "迁移目录**未回退**" in proc.stdout, proc.stdout
+    assert "alembic downgrade" in proc.stdout, "必须给出人工回退命令"
+
+
+def test_named_anchor_survives_pruning(tmp_path: Path):
+    """N3：自定义名字（如 pre-180-batch）是锚点，不能被"只留 5 份"清掉。"""
+    root = _fake_root(tmp_path)
+    # 先造一个人指定的锚点 + 5 个自动时间戳快照
+    for label in (
+        "pre-180-batch",
+        "20260101-010101",
+        "20260102-010101",
+        "20260103-010101",
+        "20260104-010101",
+        "20260105-010101",
+    ):
+        assert _run(SNAPSHOT, label, root=root).returncode == 0
+
+    # 再打一份（数量超过"留 5 份"）
+    assert _run(SNAPSHOT, "20260106-010101", root=root).returncode == 0
+
+    labels = {p.name for p in (root / "backups" / "releases").iterdir() if p.is_dir()}
+    assert "pre-180-batch" in labels, f"自定义锚点被清掉了：{sorted(labels)}"
+    assert "20260101-010101" not in labels, f"最老的时间戳快照该被清：{sorted(labels)}"

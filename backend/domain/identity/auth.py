@@ -64,17 +64,14 @@ def _parent_and_payload_from_token(token: str, db) -> tuple[Parent, dict]:
     return parent, payload
 
 
-def get_current_parent(
+def get_current_parent_ctx(
     request: Request, authorization: str = Header(""), db=Depends(get_db)
-) -> tuple[Parent, Any]:
-    """FastAPI 依赖：解析家长 token，返回 (Parent, Session)。
+) -> tuple[Parent, Any, dict]:
+    """FastAPI 依赖：解析家长 token，返回 (Parent, Session, payload)。
 
-    P2-11（2026-10-09 审查）：缺头/空 token 一律 **401**——原先 `Header(...)` 缺头会被
-    FastAPI 参数校验拦成 422，与"未登录"语义不一致（前端按 401 触发重新登录）。
-
-    2026-11-12（微信审核整改）：`demo` token 是**只读**的——除 `logout`（POST，退演示态）外，
-    一切非 GET/HEAD/OPTIONS 请求在这里统一 403。为什么放在鉴权口而不是逐个写端点：
-    写端点分散在 6 个 miniapp_router 里，漏一个就等于演示账号能下预约/借阅/点赞（数据污染 + 审核不认）。
+    需要判断"这是不是演示 token"的端点用这个（`payload["demo"]`）；其余端点仍用
+    `get_current_parent`（少一个返回值，调用方不用改）。B0-6 复审 P1：演示脱敏必须覆盖
+    `GET /api/miniapp/children` 这类**独立刷新路径**，而它原先拿不到 payload 就脱不了敏。
     """
     token = (authorization or "").replace("Bearer ", "").strip()
     if not token:
@@ -85,7 +82,25 @@ def get_current_parent(
             "/logout"
         ):
             raise ForbiddenError("演示模式仅供浏览，未开通会员无法提交")
-    return parent, db
+    return parent, db, payload
+
+
+def get_current_parent(
+    request: Request, authorization: str = Header(""), db=Depends(get_db)
+) -> tuple[Parent, Any]:
+    """FastAPI 依赖：解析家长 token，返回 (Parent, Session)。
+
+    P2-11（2026-10-09 审查）：缺头/空 token 一律 **401**——原先 `Header(...)` 缺头会被
+    FastAPI 参数校验拦成 422，与"未登录"语义不一致（前端按 401 触发重新登录）。
+
+    2026-11-12（微信审核整改）：`demo` token 是**只读**的——除 `logout`（POST，退演示态）外，
+    一切非 GET/HEAD/OPTIONS 请求统一 403。写端点分散在 6 个 miniapp_router 里，漏一个
+    就等于演示账号能下预约/借阅/点赞，所以放在鉴权口而不是逐个端点。
+
+    鉴权逻辑只有 `get_current_parent_ctx` 一份，这里只负责裁掉 payload。
+    """
+    parent, session, _payload = get_current_parent_ctx(request, authorization, db)
+    return parent, session
 
 
 def child_of_parent(db, parent_id: int, child_id: int) -> Child:
@@ -100,13 +115,18 @@ def child_of_parent(db, parent_id: int, child_id: int) -> Child:
     return child
 
 
-def children_payload(db, parent_id: int) -> list[dict]:
+def children_payload(db, parent_id: int, *, demo: bool = False) -> list[dict]:
     """家长名下孩子的**唯一序列化入口**（登录与 `GET /api/miniapp/children` 共用）。
 
     为什么必须单源：小程序把这份列表缓存在本地，两个消费方（登录快照 / 刷新接口）
     若各写一份，字段迟早漂移。2026-09-16 用户报「点赞的头像跟我的页面的头像不匹配」——
     根因就是本地快照只此一份、且**缺 member_expire**（我的页"到期时间"行永远是空的，
     后台改了头像也不会同步）。改这里 = 两个消费方一起改。
+
+    **演示态脱敏必须走这里**（B0-6 复审 P1，2026-11-26）：原先只脱了登录载荷，
+    而小程序「会员码」页会主动拉 `GET /api/miniapp/children` 刷新（`member-code.js`），
+    那条路返回的是**真实姓名/头像/完整会员码**——审核员截图即可拿到能在借阅台冒用的码。
+    既然本函数自称"唯一序列化入口"，脱敏就只能在它内部按 `demo` 分流（调用方别再各脱一遍）。
 
     字段约定（前端消费点）：
       - id / name / english_name / avatar / level → 我的页头像、切换孩子、阅读圈头像框
@@ -122,38 +142,47 @@ def children_payload(db, parent_id: int) -> list[dict]:
     from backend.domain.growth.service import levels_map
 
     lv = levels_map(db, [c.id for c in children])
-    return [
-        {
-            "id": c.id,
-            "name": c.name,
-            "english_name": c.english_name,
-            "member_status": c.member_status,
-            "member_start": str(c.member_start) if c.member_start else None,
-            "member_expire": str(c.member_expire) if c.member_expire else None,
-            "avatar": c.avatar,
-            # fix34 R4：带等级（前端按等级映射头像框档位；批查一次，禁逐条）
-            "level": lv.get(c.id, "A"),
-            # 会员码（2026-09-21 任务包 A 批）：小程序「会员码」页出示给借阅台扫码。
-            # 历史行为空时前端走"联系馆员"兜底文案，不要把 None 当码显示。
-            "member_code": c.member_code,
-        }
-        for c in children
-    ]
+    rows: list[dict] = []
+    for c in children:
+        rows.append(
+            {
+                "id": c.id,  # id 保留真值：演示 token 要靠它读 GET 数据（详情/进度）
+                "name": _mask_name(c.name) if demo else c.name,
+                "english_name": (_mask_name(c.english_name or "") or None)
+                if demo
+                else c.english_name,
+                "member_status": c.member_status,
+                "member_start": str(c.member_start) if c.member_start else None,
+                "member_expire": str(c.member_expire) if c.member_expire else None,
+                "avatar": None if demo else c.avatar,
+                # fix34 R4：带等级（前端按等级映射头像框档位；批查一次，禁逐条）
+                "level": lv.get(c.id, "A"),
+                # 会员码（2026-09-21 任务包 A 批）：小程序「会员码」页出示给借阅台扫码。
+                # 历史行为空时前端走"联系馆员"兜底文案，不要把 None 当码显示。
+                # 演示态打码：真码能在借阅台冒用，绝不能给审核员。
+                "member_code": _mask_member_code(c.member_code) if demo else c.member_code,
+            }
+        )
+    return rows
 
 
-def _login_payload(db, parent: Parent) -> dict:
-    """登录成功的统一载荷（三条通道共用：开发固定码 / 短信 / 微信）。"""
+def _login_payload(db, parent: Parent, *, demo: bool = False) -> dict:
+    """登录成功的统一载荷（三条通道共用：开发固定码 / 短信 / 微信）。
+
+    `demo=True` 时家长与孩子的展示字段一并脱敏（B0-6；脱敏只在**这一层**做，
+    孩子的脱敏再下沉到 `children_payload`，避免"登录脱了、刷新没脱"的漏口）。
+    """
     return {
-        "token": _parent_token(parent),
+        "token": _parent_token(parent, demo=demo),
         "parent": {
             "id": parent.id,
-            "name": parent.name,
-            "phone": parent.phone,
+            "name": _mask_name(parent.name) if demo else parent.name,
+            "phone": _mask_phone(parent.phone) if demo else parent.phone,
             # WM12-C（审查 P0-3，用户裁定"线上支付只允许微信一键登录"）：
             # 前端据此隐藏支付入口——短信/固定码登录拿不到 openid，点了必然 422。
             "wechat_bound": bool((parent.wechat_openid or "").strip()),
         },
-        "children": children_payload(db, parent.id),
+        "children": children_payload(db, parent.id, demo=demo),
     }
 
 
@@ -255,31 +284,15 @@ def _mask_member_code(code) -> str | None:
 
 
 def _demo_payload(db, parent: Parent) -> dict:
-    """演示登录载荷：**统一脱敏**后再下发（B0-6，2026-11-26 双审查）。
+    """演示登录载荷（B0-6）：脱敏已下沉到 `_login_payload(demo=True)` 与 `children_payload`。
 
-    原先演示通道直接复用 `_login_payload`，等于把一个真实会员家庭的家长姓名、手机号、
-    孩子姓名/头像、**会员码**原样交给审核员（截图/录屏即外泄，会员码还能在借阅台冒用）。
-    演示只需要"看起来是真的"，不需要真实值——所以展示字段一律打码，`id` 保持真值
-    （演示 token 要靠它读 GET 数据）。
+    这里只负责"演示专属"的三件事：token 带 `demo` 声明（写请求在鉴权口被 403）、
+    载荷标 `demo=True`（前端据此显示演示横幅）、有效期压到 2 天。
+    2026-11-26 复审 P1 教训：脱敏写在调用点会漏——小程序「会员码」页另有一条
+    `GET /api/miniapp/children` 刷新路径，那条路当时返回的是真实姓名/头像/会员码。
     """
-    payload = _login_payload(db, parent)
-    payload["token"] = _parent_token(parent, demo=True)
+    payload = _login_payload(db, parent, demo=True)
     payload["demo"] = True
-    payload["parent"] = {
-        **payload["parent"],
-        "name": _mask_name(payload["parent"].get("name") or ""),
-        "phone": _mask_phone(payload["parent"].get("phone") or ""),
-    }
-    payload["children"] = [
-        {
-            **child,
-            "name": _mask_name(child.get("name") or ""),
-            "english_name": _mask_name(child.get("english_name") or "") or None,
-            "avatar": None,  # 真实孩子头像不外流；前端走首字母兜底
-            "member_code": _mask_member_code(child.get("member_code")),
-        }
-        for child in payload["children"]
-    ]
     return payload
 
 

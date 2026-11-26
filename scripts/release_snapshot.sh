@@ -67,6 +67,11 @@ run "mkdir -p '$DEST'"
 
 # 只打"跑起来需要的东西"：dist 排除上传目录（uploads/avatars 是业务数据，不进发布包）
 run "tar -czf '$DEST/backend.tar.gz' -C '$DMK_ROOT' backend"
+# 迁移目录也要进快照（复审 N2，2026-11-26）：回滚只覆盖 backend/ 时，alembic/versions 会留在
+# 新版本上——老代码配新迁移，alembic 历史当场断裂（Can't locate revision）。有快照才能成对回退。
+if [ -d "$DMK_ROOT/alembic" ]; then
+  run "tar -czf '$DEST/alembic.tar.gz' -C '$DMK_ROOT' alembic"
+fi
 run "tar -czf '$DEST/admin-dist.tar.gz' -C '$DMK_ROOT/admin-web/dist' --exclude=avatars --exclude=uploads --exclude=.DS_Store ."
 run "tar -czf '$DEST/deploy.tar.gz' -C '$DMK_ROOT' deploy"
 
@@ -101,6 +106,7 @@ if [ "$DRY_RUN" -eq 0 ]; then
     echo "health_at_snapshot=$health"
     echo "ready_at_snapshot=$ready"
     echo "backend_files=$(find "$SRC_BACKEND" -type f -name '*.py' | wc -l | tr -d ' ')"
+    echo "alembic_versions=$(find "$DMK_ROOT/alembic/versions" -maxdepth 1 -name '*.py' 2>/dev/null | wc -l | tr -d ' ')"
     echo "dist_entries=$(find "$SRC_DIST" -maxdepth 1 -mindepth 1 | wc -l | tr -d ' ')"
     echo "--- sha256 ---"
     (cd "$DEST" && (_sha256_files ./*.tar.gz))
@@ -121,8 +127,14 @@ fi
 
 # ---- 3. 清理旧快照（只留最近 N 份）----
 # 不用 mapfile：macOS 自带 bash 3.2 没有它（本脚本要能在开发机和 CentOS 7 上跑同一份）
+# 清理**只针对自动命名的快照**（时间戳 `YYYYMMDD-HHMMSS` 与 `pre-rollback-*`）。
+# 复审 N3（2026-11-26）：自定义名字（如 `pre-180-batch`）是**人指定的锚点**，会被"只留 5 份"
+# 静默清掉——而那正是最需要它的时候。锚点只能人工删。
 if [ "$DRY_RUN" -eq 0 ] && [ "$DMK_KEEP_RELEASES" -gt 0 ]; then
-  ls -1dt "$DMK_ROOT/backups/releases"/*/ 2>/dev/null | tail -n "+$((DMK_KEEP_RELEASES + 1))"     | while IFS= read -r old; do
+  ls -1dt "$DMK_ROOT/backups/releases"/*/ 2>/dev/null \
+    | awk -F/ '$(NF-1) ~ /^[0-9]{8}-[0-9]{6}$/ || $(NF-1) ~ /^pre-rollback-/' \
+    | tail -n "+$((DMK_KEEP_RELEASES + 1))" \
+    | while IFS= read -r old; do
         [ -n "$old" ] || continue
         log "清理旧快照：$(basename "$old")"
         rm -rf "$old"

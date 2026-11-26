@@ -86,12 +86,36 @@ trap 'rm -rf "$tmpdir"' EXIT
 run "tar -xzf '$SNAP/backend.tar.gz' -C '$tmpdir'"
 run "mkdir -p '$tmpdir/dist' && tar -xzf '$SNAP/admin-dist.tar.gz' -C '$tmpdir/dist'"
 run "mkdir -p '$tmpdir/deploy-root' && tar -xzf '$SNAP/deploy.tar.gz' -C '$tmpdir/deploy-root'"
+alembic_pkg=0
+[ -f "$SNAP/alembic.tar.gz" ] && alembic_pkg=1
 
 # backend/：不用 --delete（uploads/data 等运行期写入不能被打包内容以外的东西抹掉）
 run "rsync -a '$tmpdir/backend/' '$DMK_ROOT/backend/'"
 # dist：**必须 --delete**，否则旧 chunk 残留 → index.html 引用旧 hash（S2 产物漂移同族）
 run "rsync -a --delete '$tmpdir/dist/' '$DMK_ROOT/admin-web/dist/'"
 run "rsync -a '$tmpdir/deploy-root/deploy/' '$DMK_ROOT/deploy/'"
+
+# 迁移目录（复审 N2，2026-11-26）：**绝不能盲目覆盖/删除**。
+# 场景：本版之后跑过新迁移 → DB 的 head 在 versions/ 里只存在于"新"文件。
+# 若拿旧快照把 versions/ 覆盖回去，`alembic current` 立刻报 Can't locate revision，历史断裂。
+# 规则：只有"快照记录的迁移版本 == DB 当前版本"时才允许还原 versions/（成对回退），
+# 否则保留现有迁移文件，并把需要人工执行的降级命令打出来。
+db_rev="$(cd "$DMK_ROOT" && "${DMK_PYTHON:-.venv/bin/python}" -m alembic current 2>/dev/null | tail -1 || true)"
+if [ "$alembic_pkg" = "1" ]; then
+  if [ -n "$alembic_at_snapshot" ] && [ "$alembic_at_snapshot" != "(unknown)" ] \
+     && [ "$(printf '%s' "$db_rev" | awk '{print $1}')" = "$(printf '%s' "$alembic_at_snapshot" | awk '{print $1}')" ]; then
+    run "tar -xzf '$SNAP/alembic.tar.gz' -C '$tmpdir'"
+    run "rsync -a '$tmpdir/alembic/' '$DMK_ROOT/alembic/'"
+    log "迁移目录已与代码成对回退（快照版本 = DB 版本：${alembic_at_snapshot}）"
+  else
+    log "⚠ 迁移目录**未回退**：快照版本 ${alembic_at_snapshot:-未知} ≠ DB 当前 ${db_rev:-未知}"
+    log "  原因：DB 已应用本版之后的新迁移，删/覆盖 versions/ 会让 alembic 历史断裂（Can't locate revision）"
+    log "  如确需连库回退，人工执行（先备份）："
+    log "    cd $DMK_ROOT && .venv/bin/python -m alembic downgrade ${alembic_at_snapshot:-<rev>}"
+  fi
+else
+  log "⚠ 该快照没有 alembic 包（旧格式），迁移目录保持现状不动"
+fi
 
 # ---- 4. 重启 + 自检 ----
 if [ "$DRY_RUN" -eq 1 ]; then

@@ -15,6 +15,11 @@ FRONTEND_PID_FILE="$LOG_DIR/frontend.pid"
 BACKEND_URL="http://localhost:8002/health"
 FRONTEND_URL="http://localhost:5173"
 
+# 停进程的"等待语义"（复审 N1）：SIGTERM 后必须**等它真退**，否则 restart 会打到旧进程上
+# 或者撞"端口被占用"。实现与等待时长见 scripts/lib/process_stop.sh。
+# shellcheck source=scripts/lib/process_stop.sh
+. "$(cd "$(dirname "$0")" && pwd)/lib/process_stop.sh"
+
 is_running() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
 
 # R11-e S1（2026-10-26）：就绪探测统一带重试。原先后端/前端在"已在运行"分支只有**单次**
@@ -74,7 +79,8 @@ start() {
     echo "⚠ 后端已在运行（pid $(cat "$BACKEND_PID_FILE")）——运行的是启动时的代码，不会自动加载新提交"
     echo "  拉取/修改过代码后请执行: bash scripts/dev.sh restart"
   else
-    nohup .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8002 > "$LOG_DIR/backend.log" 2>&1 < /dev/null &
+    nohup .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8002 \
+      --timeout-graceful-shutdown 5 > "$LOG_DIR/backend.log" 2>&1 < /dev/null &
     echo $! > "$BACKEND_PID_FILE"
     for _ in $(seq 1 20); do
       # --noproxy：本机探测绕过系统代理（http_proxy 会把 localhost 探测打到 7890 代理上，返回 502 假崩）
@@ -88,7 +94,7 @@ start() {
       else
         # P1-F10：8443 是 8002 的媒体镜像进程——双进程各自跑 APScheduler 会任务双执行
         # （TaskRunLog 同任务同秒双条），禁掉镜像进程的调度器
-        SCHEDULER_ENABLED=false nohup .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8443 \
+        SCHEDULER_ENABLED=false nohup .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8443 --timeout-graceful-shutdown 5 \
           --ssl-certfile certs/server.crt --ssl-keyfile certs/server.key \
           > "$LOG_DIR/backend-https.log" 2>&1 < /dev/null &
         echo $! > "${BACKEND_PID_FILE}.https"
@@ -124,16 +130,32 @@ start() {
 }
 
 stop() {
+  local pids=() ports=()
   for pid_file in "$BACKEND_PID_FILE" "$BACKEND_PID_FILE.https" "$FRONTEND_PID_FILE"; do
     if is_running "$pid_file"; then
       pid=$(cat "$pid_file")
-      # 杀进程组（vite 会 spawn 子进程）
+      # 先杀子进程（vite 会 spawn），再对本进程走"等它真退"的流程
       pkill -P "$pid" 2>/dev/null || true
-      kill "$pid" 2>/dev/null || true
-      echo "已停止 pid ${pid}（${pid_file}）"
+      echo "停止 pid ${pid}（${pid_file}）..."
+      stop_pid_gracefully "$pid" "${DEV_STOP_TIMEOUT:-10}" || {
+        echo "  ✗ pid ${pid} 仍未退出，请手动 kill -9 ${pid}"
+      }
+      pids+=("$pid")
     fi
     rm -f "$pid_file"
   done
+
+  # 复审 N1：**必须等端口释放**再返回——否则 restart 的 start() 会看到旧进程还占着 8002，
+  # 要么报"端口被占用"，要么健康检查打到旧进程上假装 OK（check_demo_baseline 确定性假红）。
+  for port in 8002 8443 5173; do
+    if ! wait_port_free "$port" "${DEV_STOP_TIMEOUT:-10}"; then
+      echo "  ⚠ 端口 ${port} 在 ${DEV_STOP_TIMEOUT:-10}s 内仍被占用：$(lsof -ti tcp:${port} -sTCP:LISTEN | tr '\n' ' ')"
+    fi
+  done
+
+  if [ "${#pids[@]}" -gt 0 ]; then
+    echo "已停止 ${#pids[@]} 个进程，端口已释放"
+  fi
   echo "（MySQL 容器保持运行；如需停止: docker compose stop mysql）"
 }
 

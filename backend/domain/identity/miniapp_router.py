@@ -11,7 +11,11 @@ from backend.common.base_schema import BaseSchema
 from backend.common.list_meta import stamp_list_meta
 from backend.database import get_db
 from backend.domain.identity import refund_queries
-from backend.domain.identity.auth import child_of_parent, get_current_parent
+from backend.domain.identity.auth import (
+    child_of_parent,
+    get_current_parent,
+    get_current_parent_ctx,
+)
 from backend.domain.identity.observation_service import ObservationReportService
 from backend.domain.identity.transfer_service import TransferService
 from backend.domain.identity.wm10_service import RefundService, WithdrawalService
@@ -61,17 +65,21 @@ def parent_logout(auth: Any = Depends(get_current_parent)):
 
 
 @router.get("/children")
-def my_children(auth: Any = Depends(get_current_parent)):
+def my_children(auth: Any = Depends(get_current_parent_ctx)):
     """家长名下孩子列表（**与登录载荷同源**：`identity.auth.children_payload`）。
 
     为什么需要它：小程序把登录返回的孩子列表缓存在本地，而阅读圈点赞墙/排行榜走服务端
     实时数据。**后台改了孩子头像（或会员到期）后本地快照永远不同步** → 用户看到
     「点赞的头像跟我的页面的头像不匹配」。本端点供小程序刷新本地缓存（app 前台时拉一次）。
+
+    **演示态必须脱敏**（B0-6 复审 P1）：小程序「会员码」页会先打这个端点再展示，
+    原先演示 token 从这里拿到的是真实姓名/头像/完整会员码——截图即可在借阅台冒用。
+    所以这里用 `get_current_parent_ctx` 拿 payload，把 `demo` 透传给单源序列化函数。
     """
     from backend.domain.identity.auth import children_payload
 
-    parent, db = auth
-    return {"children": children_payload(db, parent.id)}
+    parent, db, payload = auth
+    return {"children": children_payload(db, parent.id, demo=bool(payload.get("demo")))}
 
 
 # ---------- 孩子头像（WM15-R3：系统内置头像库，家长自助选择） ----------

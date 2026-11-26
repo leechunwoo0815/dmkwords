@@ -217,3 +217,45 @@ def test_demo_masking_does_not_touch_stored_data(client, admin_headers, demo_pho
     )
     assert listed.status_code == 200
     assert phone in listed.text
+
+
+def test_demo_children_endpoint_is_masked(client, admin_headers, demo_phone):
+    """复审 P1（2026-11-26）：演示 token 走 `GET /api/miniapp/children` 也必须脱敏。
+
+    小程序「会员码」页会先打这个端点刷新再展示（`member-code.js`），所以只脱登录载荷不够——
+    审核员一点会员码页就能拿到**真实姓名 + 完整会员码**（能在借阅台冒用）。
+    修法是把脱敏下沉到 `children_payload` 单源，并由 `get_current_parent_ctx` 把 `demo` 透传。
+    """
+    phone = "13900006661"
+    parent, child = _parent_with_child(
+        client, admin_headers, phone, name="张伟", child_name="张小宝"
+    )
+    real_code = client.get(
+        f"/api/admin/members/parents/{parent['id']}/children", headers=admin_headers
+    ).json()[0]["member_code"]
+    demo_phone(phone)
+
+    _clear_rate_limit()
+    tok = client.post("/api/miniapp/login/demo", json={}).json()["token"]
+    r = client.get("/api/miniapp/children", headers={"Authorization": f"Bearer {tok}"})
+    assert r.status_code == 200, r.text
+    kid = r.json()["children"][0]
+    assert kid["id"] == child["id"], "id 必须保留真值（演示靠它读详情）"
+    assert kid["name"] == "张**", kid
+    assert kid["avatar"] is None, "真实孩子头像不得下发"
+    assert kid["member_code"] != real_code, "完整会员码可在借阅台冒用，演示态必须打码"
+    assert re.fullmatch(r"..\*{4,}", kid["member_code"] or ""), kid["member_code"]
+
+
+def test_real_login_children_endpoint_still_returns_real_values(client, admin_headers):
+    """对照组：正式登录照旧拿真值（别把脱敏做成"一刀切"）。"""
+    phone = "13900006662"
+    parent, child = _parent_with_child(
+        client, admin_headers, phone, name="李雷", child_name="李小雷"
+    )
+    mini = _mini_token(client, phone)
+    r = client.get("/api/miniapp/children", headers=mini)
+    assert r.status_code == 200, r.text
+    kid = r.json()["children"][0]
+    assert kid["name"] == "李小雷", kid
+    assert kid["member_code"] and "*" not in kid["member_code"], kid["member_code"]

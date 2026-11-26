@@ -53,6 +53,34 @@ settings = get_settings()
 settings.validate_production()
 
 
+def _multi_process_sources(argv: list[str], env: dict[str, str]) -> list[str]:
+    """找出所有"要求多进程"的入参（B2-7；复审 2026-11-26 补 `--workers=2` 等号形）。
+
+    只认三种写法是不够的：`--workers 2`（分开）之外还有 `--workers=2`、`-w2`（粘连）、
+    以及 gunicorn 风格的 `-w 2`。漏一种就等于守卫可以被一行参数绕过——复审实锤。
+    返回空列表 = 单进程（或没提 worker）。
+    """
+    import re
+
+    offenders: list[str] = []
+    workers_env = (env.get("WEB_CONCURRENCY") or "").strip()
+    if workers_env.isdigit() and int(workers_env) > 1:
+        offenders.append(f"WEB_CONCURRENCY={workers_env}")
+
+    glued = re.compile(r"^(?:--workers=|-w)(\d+)$")
+    for i, arg in enumerate(argv):
+        matched = glued.match(arg)
+        if matched:
+            if int(matched.group(1)) > 1:
+                offenders.append(arg)
+            continue
+        if arg in ("--workers", "-w") and i + 1 < len(argv):
+            value = argv[i + 1]
+            if value.isdigit() and int(value) > 1:
+                offenders.append(f"{arg} {value}")
+    return offenders
+
+
 def _assert_single_process() -> None:
     """B2-7（2026-11-26 双审查）：**多 worker 拒启**。
 
@@ -61,21 +89,13 @@ def _assert_single_process() -> None:
     把 APScheduler 起两份（采样重复写）。这些退化是静默的（页面照常显示），所以必须在启动口
     硬拦，而不是写在文档里靠人记得。
 
-    检测面：`WEB_CONCURRENCY`（uvicorn/gunicorn 通用）与命令行 `--workers N`（uvicorn 直接跑）。
+    检测面：`WEB_CONCURRENCY`、`--workers N`、`--workers=N`、`-w N`、`-wN`（见
+    `_multi_process_sources`，独立成函数是为了能直接用用例覆盖各种拼法）。
     """
     import os
     import sys
 
-    offenders: list[str] = []
-    workers_env = (os.getenv("WEB_CONCURRENCY") or "").strip()
-    if workers_env.isdigit() and int(workers_env) > 1:
-        offenders.append(f"WEB_CONCURRENCY={workers_env}")
-    argv = sys.argv
-    for i, arg in enumerate(argv):
-        if arg in ("--workers", "-w") and i + 1 < len(argv):
-            value = argv[i + 1]
-            if value.isdigit() and int(value) > 1:
-                offenders.append(f"{arg} {value}")
+    offenders = _multi_process_sources(sys.argv, dict(os.environ))
     if offenders:
         raise RuntimeError(
             "本服务只允许单进程运行（限流/指标/live 缓存/调度器锁均为进程内状态）："

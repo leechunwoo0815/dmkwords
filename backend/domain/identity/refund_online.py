@@ -416,9 +416,29 @@ def resolve_unknown(
                 ),
             }
         if actual is None:
-            logger.warning(
-                "退款查单未返回金额，无法逐分核对 req=%s out_refund_no=%s", req.id, out_refund_no
+            # 复审（2026-11-26）：**缺金额必须 fail-closed**。原先只 warn 然后照落终态——
+            # 与回调侧 P1-14「缺金额即拒」同险不同判：微信字段改名/部分退款场景下，
+            # 本地会把整笔记成已退而账实不符。未知态保持 = 禁止换单号重提，交人工核对。
+            publish_audit(
+                db,
+                admin=admin,
+                action="refund.query_amount_missing",
+                target_type="refund_request",
+                target_id=str(req.id),
+                detail={"out_refund_no": out_refund_no, "expected_amount": str(expected)},
+                reason="退款查单未返回实退金额，无法逐分核对，拒绝落终态（需人工核对）",
             )
+            db.commit()
+            return {
+                "id": req.id,
+                "status": req.status,
+                "gateway_state": state,
+                "resolved": False,
+                "note": (
+                    "微信查单未携带实退金额：无法逐分核对，未落终态。"
+                    "请人工核对微信商户平台后处理（禁止直接重提，防二次出款）"
+                ),
+            }
         req.gateway_unknown_at = None
         finalize(
             admin,

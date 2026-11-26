@@ -374,7 +374,12 @@ class WeChatPayV3(PaymentGateway):
                 None if refund_cents is None else Decimal(str(refund_cents)) / Decimal("100")
             )
         except (TypeError, ValueError, ArithmeticError):
+            # 解析失败不能静默：业务层会把 None 当"网关没给金额"而拒绝落终态，
+            # 但**为什么**没给必须留痕（字段改名是真实风险，本轮复审点名的就是这个）
+            logger.warning("退款查单 amount.refund 解析失败: %r", refund_cents)
             refund_amount = None
+        if refund_amount is None:
+            logger.warning("退款查单未返回 amount.refund（字段缺失或为空）: %s", out_refund_no)
         return PaymentRefundQuery(
             found=True,
             state=str(data.get("status", "") or ""),
