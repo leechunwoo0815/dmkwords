@@ -209,12 +209,13 @@ page: int = Query(1, ge=1); page_size: int = Query(20, ge=1, le=100)
   "processes": {"top_cpu": [{"pid": 1, "name": "systemd", "cpu_percent": 0.1, "rss_mb": 12.0}], "top_memory": []},
   "mysql": {"status": "ok", "connections": 12, "running": 2, "qps": 0.4, "slow_queries": 0},
   "services": {"backend": "ok", "mysql": "ok", "nginx": "ok", "scheduler": {"enabled": true, "running": true, "has_lock_conn": true, "watchdog": false}},
-  "app": {"requests_1m": 3, "errors_4xx_1m": 0, "errors_5xx_1m": 0, "p95_ms_1m": 45, "requests_today": 120, "errors_today": 2}
+  "app": {"requests_1m": 3, "errors_4xx_1m": 0, "errors_5xx_1m": 0, "p95_ms_1m": 45, "window_seconds": 42.1, "requests_today": 120, "errors_today": 2}
 }
 ```
 
 `/history` 响应：`{"hours": 24, "step_seconds": 300, "points": [{"at": "...", "cpu_percent": 2.1, "load1": 0.01, "load5": 0.02, "load15": 0.05, "mem_used_mb": 886, "mem_total_mb": 1756, "mem_cached_mb": 768, "disk_percent": 38.0, "net_rx_kbps": 2.6, "net_tx_kbps": 44.7, "disk_read_kbps": 0.4, "disk_write_kbps": 26.0, "app_requests": 12, "app_4xx": 0, "app_5xx": 0, "app_p95_ms": 45}]}`。
 
+- **应用计数窗口（2026-11-26 订正）**：`requests_1m/errors_*_1m` 是「距上次采样轮转以来的原始计数」，窗口长度由 `window_seconds`（0–60）给出；页面按 `count / window_seconds * 60` 折算成「次/分」再展示，**不要直接把原始计数当次/分**（轮转刚过会低估甚至显示 0）。`p95_ms_1m` 同属本窗口。
 - **内存口径（2026-11-26 订正）**：`memory.total_mb` 是**内核可见总量**（`MemTotal`），不是云厂商标称值——2 GB 实例实测 **1756 MiB**（`crashkernel=auto` 预留 161 MiB + 内核/硬件保留约 130 MiB），属正常。Linux `used_mb` = `free` 的 used（total − free − buff/cache），`cached_mb` = buff/cache；macOS `used_mb` = total − available、`cached_mb` = 0。三者（used + cached + free）合计 100%，堆叠图不会溢出。
 - **聚合粒度自适应**（2026-11-25 起，页面 30 分钟–24 小时区间共用本端点）：
   采样本身 60 秒一行，`step_seconds` 取 `60 / 120 / 300` 中「点数不超过 300」的最小值——
