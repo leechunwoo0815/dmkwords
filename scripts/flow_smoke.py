@@ -36,6 +36,11 @@
 
 两道安全闸（`guard_target`，与 `scripts/load_test.py` 同款）：`DB_NAME` 必须含
 flowsmoke/loadtest/drill 之一；`--base-url` 端口不得是 dev.sh 的 8002/8443/5173。
+
+家长身份说明（诚实留痕）：业务操作全走真实 HTTP；但 `/api/miniapp/login` 自带
+`rate_limit(3, 60)`（按 IP），四条链有 5 个家庭身份，全走登录会被自家防刷闸挡成 429。
+故**每次运行只有第一个身份走真实登录**（证明登录链可用），其余按 `scripts/load_test.py`
+先例用同一个签发函数在进程内签 token——归属/会员态/冻结校验一条不绕。
 """
 
 from __future__ import annotations
@@ -45,6 +50,7 @@ import io
 import os
 import sys
 import time
+import unicodedata
 import urllib.parse
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -190,33 +196,59 @@ def login_admin(base: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {r.json()['token']}"}
 
 
-def parent_headers(run: ChainRun, phone: str) -> dict[str, str]:
-    """家长 token：优先走**真实登录**；被 3 次/分钟限流挡下时退回进程内签发。
+_token_cache: dict[str, dict[str, str]] = {}
+_login_done = False
 
-    为什么要有退路：`/api/miniapp/login` 带 `rate_limit(3, 60)`（按 IP），四条链 4 个家长身份
-    必然在第二轮跑时撞 429。进程内签发用**与登录同一个签发函数**（同 SECRET_KEY），
-    等价于"家长已登录"，业务校验（归属/会员态）一条不绕——`scripts/load_test.py` 同款先例。
+
+def _mint_parent_token(run: ChainRun, phone: str) -> dict[str, str]:
+    """进程内签家长 token（与 `/api/miniapp/login` **同一个签发函数**、同一 SECRET_KEY）。
+
+    等价于"家长已登录"，业务校验（归属/会员态/冻结）一条不绕——`scripts/load_test.py` 同款先例。
     """
+    from backend.domain.identity.auth import _parent_token
+    from backend.domain.identity.models import Parent
+
+    db = _scratch_db()
+    try:
+        parent = db.query(Parent).filter(Parent.phone == phone).first()
+        if parent is None:
+            raise StepFailed(f"家长 {phone} 不存在，无法签发 token")
+        token = _parent_token(parent)
+    finally:
+        db.close()
+    run.check(f"家长 token 就绪 {phone}（进程内签发）", bool(token))
+    return {"Authorization": f"Bearer {token}"}
+
+
+def parent_headers(run: ChainRun, phone: str) -> dict[str, str]:
+    """家长 token：**每次运行第一个身份走真实登录**，其余进程内签发。
+
+    为什么不是每个身份都走登录：`/api/miniapp/login` 带 `rate_limit(3, 60)`（按 IP），
+    四条链要 5 个家庭身份，全走登录必被自家防刷闸挡成 429（load_test 首轮实测同款）。
+    所以保留**一次真实登录**证明登录链可用，其余按 load_test 先例签同款 token；
+    真登录被限流时同样退回签发（重跑场景）。
+    """
+    global _login_done
+    if phone in _token_cache:
+        return _token_cache[phone]
+    if _login_done:
+        headers = _mint_parent_token(run, phone)
+        _token_cache[phone] = headers
+        return headers
+    _login_done = True
     r = httpx.post(
         f"{run.base}/api/miniapp/login", json={"phone": phone, "code": DEV_CODE}, timeout=30
     )
     if r.status_code == 200:
-        run.check(f"家长登录 {phone}", True)
-        return {"Authorization": f"Bearer {r.json()['token']}"}
+        run.check(f"家长真实登录 {phone}", True)
+        headers = {"Authorization": f"Bearer {r.json()['token']}"}
+        _token_cache[phone] = headers
+        return headers
     if r.status_code == 429:
         print("       · 家长登录被 3 次/分钟限流挡下 → 进程内签发同款 token（load_test 同先例）")
-        run.check(f"家长登录 {phone}（限流退路）", True)
-        from backend.domain.identity.auth import _parent_token
-        from backend.domain.identity.models import Parent
-
-        db = _scratch_db()
-        try:
-            parent = db.query(Parent).filter(Parent.phone == phone).first()
-            if parent is None:
-                raise StepFailed(f"家长 {phone} 不存在，无法签发 token")
-            return {"Authorization": f"Bearer {_parent_token(parent)}"}
-        finally:
-            db.close()
+        headers = _mint_parent_token(run, phone)
+        _token_cache[phone] = headers
+        return headers
     raise StepFailed(f"家长登录 {phone} 失败 {r.status_code}: {r.text[:200]}")
 
 
@@ -227,7 +259,8 @@ def make_family(run: ChainRun, child_name: str) -> tuple[int, int, str]:
     """建家长 + 孩子（手机号带运行 tag，保证可重跑）。返回 (parent_id, child_id, phone)。"""
     global _seq
     _seq += 1
-    phone = f"139{RUN_TAG[-8:]}{_seq:02d}"
+    # 手机号必须 11 位（接口侧 `^\d{11}$`）：139 + 「分秒秒+两位运行随机」+ 两位序号
+    phone = f"139{RUN_TAG[-6:]}{_seq:02d}"
     p = run.call(
         "POST",
         "/api/admin/members/parents",
@@ -311,8 +344,10 @@ def chain_money(run: ChainRun) -> None:
     ).json()
     oid = int(order["id"])
     run.check(
-        "订单待支付且金额 > 0",
-        order["status"] == Order.STATUS_PENDING_PAYMENT and Decimal(str(order["amount"])) > 0,
+        "订单待收款且金额 > 0",
+        # 管理端建单落在「待人工确认收款」（线上单才是 pending_payment）——两者都是未收款
+        order["status"] in (Order.STATUS_PENDING_MANUAL, Order.STATUS_PENDING_PAYMENT)
+        and Decimal(str(order["amount"])) > 0,
         order,
     )
 
@@ -605,7 +640,10 @@ def chain_quiz(run: ChainRun) -> None:
         headers=mini,
     )
     prog = _first(ReadingProgress, ReadingProgress.child_id == cid, ReadingProgress.book_id == bid)
-    run.fact("reading_progress", f"finished={prog.finished} coverage={prog.coverage}")
+    run.fact(
+        "reading_progress",
+        f"finished={prog.finished} coverage_seconds={prog.coverage_seconds}/{prog.total_seconds}",
+    )
     run.check("完播（finished=1 → 测验解锁前置）", prog.finished == 1, prog.finished)
 
     run.step("加 3 道题（答案全 A）")
@@ -852,6 +890,13 @@ CHAINS: list[tuple[str, str, Any]] = [
 ]
 
 
+def _pad(text: str, width: int, *, align: str = "left") -> str:
+    """按**显示宽度**补空格（中文占两列，`str.ljust` 会让汇总表错位）。"""
+    shown = sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in text)
+    fill = " " * max(0, width - shown)
+    return (text + fill) if align == "left" else (fill + text)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="四条主链冒烟（一次性库/实例）")
     ap.add_argument("--base-url", default="http://127.0.0.1:8003")
@@ -886,12 +931,23 @@ def main() -> int:
         results.append((title, run))
 
     print("\n══ 汇总")
-    print(f"{'链':<34}{'结果':<6}{'步骤':>4}{'断言':>6}{'通过':>6}{'耗时':>9}")
+    print(
+        _pad("链", 40)
+        + _pad("结果", 6)
+        + _pad("步骤", 6, align="right")
+        + _pad("断言", 6, align="right")
+        + _pad("通过", 6, align="right")
+        + _pad("耗时", 10, align="right")
+    )
     for title, run in results:
         passed = sum(1 for _, ok, _ in run.checks if ok)
         print(
-            f"{title:<34}{'✓' if run.passed else '✗':<6}{run.steps:>4}"
-            f"{len(run.checks):>6}{passed:>6}{run.seconds:>8.2f}s"
+            _pad(title, 40)
+            + _pad("✓" if run.passed else "✗", 6)
+            + _pad(str(run.steps), 6, align="right")
+            + _pad(str(len(run.checks)), 6, align="right")
+            + _pad(str(passed), 6, align="right")
+            + _pad(f"{run.seconds:.2f}s", 10, align="right")
         )
     failed = [title for title, run in results if not run.passed]
     print(f"\n[flow] {len(results) - len(failed)}/{len(results)} 条链通过")
