@@ -2214,7 +2214,7 @@ export interface paths {
         };
         /**
          * System History
-         * @description 24h 历史（5 分钟聚合）；服务端缓存 60 秒。
+         * @description 回看历史（粒度按时长自适应 60/120/300 秒）；服务端缓存 60 秒。
          */
         get: operations["system_history_api_admin_system_history_get"];
         put?: never;
