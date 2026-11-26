@@ -378,9 +378,48 @@ def resolve_unknown(
             "note": "微信侧查无此单（未受理）→ 已置失败，可重新执行（会生成新的商户退款单号）",
         }
     if state == "SUCCESS":
-        req.gateway_unknown_at = None
         if result.refund_id:
             req.gateway_refund_id = result.refund_id
+        # B1-4（2026-11-26 双审查）：查单同样要**逐分比对实退金额**。回调节点早就有这条判据
+        # （payment_notify P1-7/P1-14），查单却没有——"微信只退了 10 元、本地记整单已退"在
+        # 未知态收口这条路上照样能发生，而这条路的结论是直接落终态的。
+        # 不符 → **不落终态、未知态保持**（禁止重提防止二次出款）+ 审计 + 让人工核对。
+        expected = Decimal(str(req.amount)).quantize(Decimal("0.01"))
+        actual = (
+            None
+            if result.refund_amount is None
+            else Decimal(str(result.refund_amount)).quantize(Decimal("0.01"))
+        )
+        if actual is not None and actual != expected:
+            publish_audit(
+                db,
+                admin=admin,
+                action="refund.query_amount_mismatch",
+                target_type="refund_request",
+                target_id=str(req.id),
+                detail={
+                    "out_refund_no": out_refund_no,
+                    "gateway_refund_amount": str(actual),
+                    "expected_amount": str(expected),
+                },
+                reason="退款查单金额与申请金额不符，拒绝落终态（需人工核对）",
+            )
+            db.commit()
+            return {
+                "id": req.id,
+                "status": req.status,
+                "gateway_state": state,
+                "resolved": False,
+                "note": (
+                    f"微信查单实退 ￥{actual} ≠ 申请 ￥{expected}"
+                    "：未落终态，请人工核对后处理（禁止直接重提，防二次出款）"
+                ),
+            }
+        if actual is None:
+            logger.warning(
+                "退款查单未返回金额，无法逐分核对 req=%s out_refund_no=%s", req.id, out_refund_no
+            )
+        req.gateway_unknown_at = None
         finalize(
             admin,
             req,

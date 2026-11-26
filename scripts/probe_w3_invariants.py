@@ -103,11 +103,10 @@ INVARIANTS: list[tuple[str, str, str]] = [
         """,
     ),
     (
-        "QUO-1 在借+活跃预约不超上限",
-        "可借数 = 30 − 在借(含逾期) − 预约占用（PRD §5.4）；超限说明某条链漏退额",
+        "QUO-1 在借不超上限（预约不占额度）",
+        "可借数 = 30 − 在借(含逾期)；预约不占可借额度（PRD §5.5 + 2026-11-03 甲方口径修订）",
         """
-        SELECT x.child_id, x.in_hand, x.reserved,
-               (x.in_hand + x.reserved) AS used
+        SELECT x.child_id, x.in_hand, x.reserved, x.in_hand AS used
           FROM (
                 SELECT ch.id AS child_id,
                        (SELECT COUNT(*) FROM borrow_records b
@@ -118,7 +117,7 @@ INVARIANTS: list[tuple[str, str, str]] = [
                            AND r.status = 'active') AS reserved
                   FROM children ch
                  WHERE ch.is_deleted = 0) x
-         WHERE x.in_hand + x.reserved > 30
+         WHERE x.in_hand > 30
         """,
     ),
     (

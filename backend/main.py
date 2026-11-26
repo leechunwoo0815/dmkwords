@@ -53,6 +53,40 @@ settings = get_settings()
 settings.validate_production()
 
 
+def _assert_single_process() -> None:
+    """B2-7（2026-11-26 双审查）：**多 worker 拒启**。
+
+    限流计数（`middleware/rate_limit`）、应用指标（`metrics`）、live 采集缓存与调度器锁
+    都是**进程内状态**：起 2 个 worker 等于把写接口限流阈值翻倍、把请求量/5xx 看板拆成两半、
+    把 APScheduler 起两份（采样重复写）。这些退化是静默的（页面照常显示），所以必须在启动口
+    硬拦，而不是写在文档里靠人记得。
+
+    检测面：`WEB_CONCURRENCY`（uvicorn/gunicorn 通用）与命令行 `--workers N`（uvicorn 直接跑）。
+    """
+    import os
+    import sys
+
+    offenders: list[str] = []
+    workers_env = (os.getenv("WEB_CONCURRENCY") or "").strip()
+    if workers_env.isdigit() and int(workers_env) > 1:
+        offenders.append(f"WEB_CONCURRENCY={workers_env}")
+    argv = sys.argv
+    for i, arg in enumerate(argv):
+        if arg in ("--workers", "-w") and i + 1 < len(argv):
+            value = argv[i + 1]
+            if value.isdigit() and int(value) > 1:
+                offenders.append(f"{arg} {value}")
+    if offenders:
+        raise RuntimeError(
+            "本服务只允许单进程运行（限流/指标/live 缓存/调度器锁均为进程内状态）："
+            f"检测到 {' / '.join(offenders)}。请去掉 --workers 与 WEB_CONCURRENCY>1 后重启；"
+            "确需多进程须先改造成共享存储（Redis），见 docs/任务书-20261126-双审查合并整改.md B2-7。"
+        )
+
+
+_assert_single_process()
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     """启动：定时任务调度器（ADR-008 进程内 APScheduler；SCHEDULER_ENABLED=false 可关，F5）。
@@ -149,6 +183,112 @@ def health() -> dict:
         "version": settings.APP_VERSION,
         "scheduler": scheduler_state(),
     }
+
+
+#: 就绪判据：采样数据超过这个时长没更新 = 采样停摆（60 秒一采，5 分钟 = 连丢 5 次）
+READY_SAMPLER_MAX_AGE_SECONDS = 300
+
+
+def _ready_db_check() -> tuple[bool, str]:
+    """`SELECT 1`（唯一能证明"库连得上"的最小代价探针）。"""
+    from sqlalchemy import text
+
+    from backend.database import SessionLocal
+
+    try:
+        db = SessionLocal()
+        try:
+            db.execute(text("SELECT 1"))
+        finally:
+            db.close()
+    except Exception as exc:  # noqa: BLE001 - 探针必须把任何失败翻成"未就绪"，不能抛
+        return False, f"{type(exc).__name__}: {str(exc)[:120]}"
+    return True, ""
+
+
+def _ready_sampler_check() -> tuple[bool, str, float | None]:
+    """采样新鲜度：`system_metrics` 最近一行的年龄（B2-1 的"关键任务新鲜度"）。"""
+    from datetime import datetime
+
+    from sqlalchemy import text
+
+    from backend.database import SessionLocal
+
+    try:
+        db = SessionLocal()
+        try:
+            latest = db.execute(text("SELECT MAX(collected_at) FROM system_metrics")).scalar()
+        finally:
+            db.close()
+    except Exception as exc:  # noqa: BLE001
+        return False, f"{type(exc).__name__}: {str(exc)[:120]}", None
+    if latest is None:
+        return False, "system_metrics 无数据（采样从未成功）", None
+    if isinstance(latest, str):  # 驱动返回字符串时兜底解析
+        try:
+            from datetime import datetime as _dt
+
+            latest = _dt.fromisoformat(latest)
+        except ValueError:
+            return False, f"collected_at 解析失败: {latest!r}", None
+    age = (datetime.now() - latest).total_seconds()
+    if age > READY_SAMPLER_MAX_AGE_SECONDS:
+        return (
+            False,
+            f"最近一次采样 {int(age)} 秒前（阈值 {READY_SAMPLER_MAX_AGE_SECONDS} 秒）",
+            age,
+        )
+    return True, "", age
+
+
+@app.get("/ready")
+def ready() -> JSONResponse:
+    """就绪探针（B2-1，2026-11-26 双审查）：**能不能受理业务**，与 `/health`（进程活着）分开。
+
+    为什么必须分开：`/health` 恒 200 的语义是对的（进程活着），但它挡不住"进程活着、库连不上、
+    定时任务全停"这种**半死**状态——外部探针只看 `/health` 会一直绿灯，直到用户报错。
+    判据三项，任一不过 → **503**，响应体写明哪项不过（探针抓 JSON 就能看到原因）：
+
+    1. `db`：`SELECT 1`；
+    2. `scheduler`：调度器在跑且握着锁连接（`SCHEDULER_ENABLED=false` 时不作判据，仅回显）；
+    3. `sampler`：`system_metrics` 最近一行不超过 5 分钟（同样仅在调度器启用时判）。
+    """
+    from backend.tasks.registry import scheduler_state
+
+    checks: dict[str, dict] = {}
+    ok = True
+
+    db_ok, db_error = _ready_db_check()
+    checks["db"] = {"ok": db_ok, **({"error": db_error} if db_error else {})}
+    ok = ok and db_ok
+
+    sched = scheduler_state()
+    checks["scheduler"] = {"ok": True, **sched}
+    if sched.get("enabled"):
+        sched_ok = bool(sched.get("running")) and bool(sched.get("has_lock_conn"))
+        checks["scheduler"]["ok"] = sched_ok
+        if not sched_ok:
+            checks["scheduler"]["error"] = "调度器未运行或未持有锁连接（定时任务不会执行）"
+            ok = False
+
+        if db_ok:  # 库连不上时再去查 MAX() 只会重复报错
+            fresh_ok, fresh_error, age = _ready_sampler_check()
+            checks["sampler"] = {
+                "ok": fresh_ok,
+                **({"age_seconds": round(age, 1)} if age is not None else {}),
+                **({"error": fresh_error} if fresh_error else {}),
+            }
+            ok = ok and fresh_ok
+        else:
+            checks["sampler"] = {"ok": False, "error": "数据库不可用，无法判定采样新鲜度"}
+            ok = False
+    else:
+        checks["sampler"] = {"ok": True, "skipped": "SCHEDULER_ENABLED=false（本进程不采样）"}
+
+    return JSONResponse(
+        status_code=200 if ok else 503,
+        content={"status": "ready" if ok else "not_ready", "checks": checks},
+    )
 
 
 from backend.domain.activity.miniapp_router import router as activity_miniapp_router  # noqa: E402

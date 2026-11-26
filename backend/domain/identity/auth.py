@@ -230,6 +230,59 @@ def login_by_wechat(db, code: str) -> dict:
     return {"need_bind": True, "bind_ticket": make_bind_ticket(openid)}
 
 
+def _mask_phone(phone: str) -> str:
+    """手机号脱敏：`13900001111` → `139****1111`（留前 3 后 4，中间定长星号）。"""
+    value = (phone or "").strip()
+    if len(value) <= 7:
+        return "*" * len(value)
+    return f"{value[:3]}****{value[-4:]}"
+
+
+def _mask_name(name: str) -> str:
+    """姓名脱敏：留首字，其余按长度补星号（`李小明` → `李**`；空值保持空）。"""
+    value = (name or "").strip()
+    if not value:
+        return ""
+    return value[0] + "*" * max(1, len(value) - 1)
+
+
+def _mask_member_code(code) -> str | None:
+    """会员码打码：留前 2 位。演示态是只读的，真实会员码不该出现在审核员屏幕上。"""
+    value = (code or "").strip()
+    if not value:
+        return None
+    return f"{value[:2]}{'*' * max(4, len(value) - 2)}"
+
+
+def _demo_payload(db, parent: Parent) -> dict:
+    """演示登录载荷：**统一脱敏**后再下发（B0-6，2026-11-26 双审查）。
+
+    原先演示通道直接复用 `_login_payload`，等于把一个真实会员家庭的家长姓名、手机号、
+    孩子姓名/头像、**会员码**原样交给审核员（截图/录屏即外泄，会员码还能在借阅台冒用）。
+    演示只需要"看起来是真的"，不需要真实值——所以展示字段一律打码，`id` 保持真值
+    （演示 token 要靠它读 GET 数据）。
+    """
+    payload = _login_payload(db, parent)
+    payload["token"] = _parent_token(parent, demo=True)
+    payload["demo"] = True
+    payload["parent"] = {
+        **payload["parent"],
+        "name": _mask_name(payload["parent"].get("name") or ""),
+        "phone": _mask_phone(payload["parent"].get("phone") or ""),
+    }
+    payload["children"] = [
+        {
+            **child,
+            "name": _mask_name(child.get("name") or ""),
+            "english_name": _mask_name(child.get("english_name") or "") or None,
+            "avatar": None,  # 真实孩子头像不外流；前端走首字母兜底
+            "member_code": _mask_member_code(child.get("member_code")),
+        }
+        for child in payload["children"]
+    ]
+    return payload
+
+
 def login_demo(db) -> dict:
     """只读「演示体验」登录（2026-11-12，微信审核：审核员没有本店账号也要能体验核心功能）。
 
@@ -238,6 +291,7 @@ def login_demo(db) -> dict:
 
     安全边界：token 带 `demo:true`，`get_current_parent` 对它的写请求一律 403，2 天过期；
     演示家长与正式会员共用同一张表，但**不新建账号、不写资料**，因此不会污染会员数据。
+    载荷经 `_demo_payload` 脱敏（B0-6）；待 0.1.15 发布后把 `DEMO_LOGIN_PHONE` 置空关停入口。
     """
     phone = (get_settings().DEMO_LOGIN_PHONE or "").strip()
     if not phone:
@@ -245,10 +299,7 @@ def login_demo(db) -> dict:
     parent = db.query(Parent).filter(Parent.phone == phone, Parent.is_deleted == 0).first()
     if not parent:
         raise ValidationError("演示账号未建档，请联系馆员")
-    payload = _login_payload(db, parent)
-    payload["token"] = _parent_token(parent, demo=True)
-    payload["demo"] = True
-    return payload
+    return _demo_payload(db, parent)
 
 
 def _bind_openid_to_parent(db, openid: str, phone: str) -> dict:

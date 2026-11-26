@@ -48,11 +48,18 @@ from tests.unit.test_wm12_refund_reconcile import (
 
 
 def _fail_gateway(
-    monkeypatch, *, fail_times=1, query_found=None, query_state="", refund_state="SUCCESS"
+    monkeypatch,
+    *,
+    fail_times=1,
+    query_found=None,
+    query_state="",
+    query_refund_amount=None,
+    refund_state="SUCCESS",
 ):
     """退款网关桩：`refund` 抛超时（可只抛前 N 次），`query_refund` 按参数回结果。
 
     下单/回调仍走 mock（否则"线上支付成功"那步造不出来）。
+    `query_refund_amount`（B1-4）：查单返回的**实退金额（元）**；None = 网关没给（桩的默认行为）。
     """
     from backend.common.gateways.payment.mock import MockPaymentGateway
     from backend.common.gateways.payment.types import PaymentRefundQuery, PaymentRefundResponse
@@ -63,6 +70,8 @@ def _fail_gateway(
             self._mock = MockPaymentGateway()
             self.refund_calls = 0
             self.query_calls = 0
+            # B1-4：可变属性（用例拿到退款单后可按真实申请金额回填，不必重建桩）
+            self.query_refund_amount = query_refund_amount
 
         @property
         def supports_instant_payment(self):
@@ -87,7 +96,12 @@ def _fail_gateway(
             self.query_calls += 1
             if query_found is None:
                 raise NotImplementedError("未提供查单能力（模拟网关不支持）")
-            return PaymentRefundQuery(found=query_found, state=query_state, refund_id="wx_q")
+            return PaymentRefundQuery(
+                found=query_found,
+                state=query_state,
+                refund_id="wx_q",
+                refund_amount=self.query_refund_amount,
+            )
 
     stub = _Stub()
     monkeypatch.setattr(payment_pkg, "get_payment_gateway", lambda: stub)
@@ -204,6 +218,74 @@ def test_query_gateway_success_settles_refund(client, db, monkeypatch):
     assert req.status == RefundRequest.STATUS_REFUNDED
     db.refresh(order)
     assert order.status == Order.STATUS_REFUNDED
+
+
+def test_query_gateway_amount_mismatch_keeps_unknown(client, db, monkeypatch):
+    """B1-4（2026-11-26 双审查）：查单 SUCCESS 但实退金额 ≠ 申请金额 → **不落终态**。
+
+    原先查单只看 `status`，于是"微信只退了 10 元、本地把整单记已退"在这条收口路径上照样发生，
+    且对账按 out_refund_no 逐号对号也双双通过。现在逐分比对，不符即保持未知态（禁止换单号重提
+    → 防二次出款）+ 审计，交人工核对。
+    """
+    from backend.domain.admin.models import AuditLog
+
+    stub = _fail_gateway(monkeypatch, fail_times=1, query_found=True, query_state="SUCCESS")
+    _parent, child, mh, order = _online_paid_order(client, db, phone="13800009971")
+    applied = _apply_refund(client, mh, order, child["id"])
+    h = _h(client)
+    _approve(client, h, applied["id"])
+    _execute(client, h, applied["id"], remark="原路退")
+
+    req = _refund_row(db, applied["id"])
+    assert str(req.amount) == "500.00"
+    stub.query_refund_amount = Decimal("10.00")  # 微信侧只退了 10 元
+
+    q = client.post(f"/api/admin/refund-requests/{applied['id']}/query-gateway", headers=h)
+    assert q.status_code == 200, q.text
+    body = q.json()
+    assert body["gateway_state"] == "SUCCESS"
+    assert body["resolved"] is False, "金额不符不许当「已解决」"
+    assert "人工核对" in body["note"]
+
+    db.expire_all()
+    req = _refund_row(db, applied["id"])
+    assert req.status == RefundRequest.STATUS_PROCESSING, "金额不符不许落终态"
+    assert req.gateway_unknown_at is not None, "未知态必须保持（否则会被换单号重提 → 二次出款）"
+    db.refresh(order)
+    assert order.status != Order.STATUS_REFUNDED
+
+    row = (
+        db.query(AuditLog)
+        .filter(
+            AuditLog.action == "refund.query_amount_mismatch",
+            AuditLog.target_id == str(req.id),
+        )
+        .order_by(AuditLog.id.desc())
+        .first()
+    )
+    assert row is not None, "金额不符必须留审计（对账之外的第二道痕迹）"
+    assert "10.00" in (row.detail or "") and "500.00" in (row.detail or "")
+
+
+def test_query_gateway_amount_match_settles_refund(client, db, monkeypatch):
+    """对照组：金额逐分相符 → 照常落已退款（别把正常路径也拦死）。"""
+    stub = _fail_gateway(monkeypatch, fail_times=1, query_found=True, query_state="SUCCESS")
+    _parent, child, mh, order = _online_paid_order(client, db, phone="13800009972")
+    applied = _apply_refund(client, mh, order, child["id"])
+    h = _h(client)
+    _approve(client, h, applied["id"])
+    _execute(client, h, applied["id"], remark="原路退")
+
+    req = _refund_row(db, applied["id"])
+    stub.query_refund_amount = Decimal(str(req.amount))
+
+    q = client.post(f"/api/admin/refund-requests/{applied['id']}/query-gateway", headers=h)
+    assert q.status_code == 200, q.text
+    assert q.json()["resolved"] is True
+    db.expire_all()
+    req = _refund_row(db, applied["id"])
+    assert req.status == RefundRequest.STATUS_REFUNDED
+    assert req.gateway_unknown_at is None
 
 
 def test_query_gateway_unavailable_keeps_unknown(client, db, monkeypatch):

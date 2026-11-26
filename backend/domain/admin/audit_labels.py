@@ -83,6 +83,7 @@ AUDIT_ACTION_LABEL = {
     "refund.gateway_submitted": "退款提交网关",
     "refund.gateway_unknown": "退款网关结果未知",
     "refund.notify_state_skipped": "退款通知跳过",
+    "refund.query_amount_mismatch": "退款查单金额不符",
     "refund.review": "退款审核",
     "reservation.copy_switched": "预约改锁副本",
     "reservation.copy_unavailable_exception": "预约转异常",

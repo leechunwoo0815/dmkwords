@@ -365,10 +365,21 @@ class WeChatPayV3(PaymentGateway):
                 error_msg = f"HTTP {resp.status_code}: {resp.text[:200]}"
             raise PaymentError(f"微信退款查单失败: {error_msg}")
         data = resp.json()
+        # B1-4（2026-11-26 双审查）：查单要带**实退金额**（元）。微信 `amount.refund` 单位是分，
+        # 原样当元用会差 100 倍（F1/F2 元分混淆同族）——这里显式除 100。
+        amount_obj = data.get("amount") or {}
+        refund_cents = amount_obj.get("refund")
+        try:
+            refund_amount = (
+                None if refund_cents is None else Decimal(str(refund_cents)) / Decimal("100")
+            )
+        except (TypeError, ValueError, ArithmeticError):
+            refund_amount = None
         return PaymentRefundQuery(
             found=True,
             state=str(data.get("status", "") or ""),
             refund_id=str(data.get("refund_id", "") or ""),
+            refund_amount=refund_amount,
         )
 
     async def download_bill(self, bill_date: str, bill_type: str = "ALL") -> str:

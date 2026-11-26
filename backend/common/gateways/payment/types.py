@@ -81,9 +81,14 @@ class PaymentRefundQuery:
 
     `found=False` 是**确定没受理**（微信 404 RESOURCE_NOT_EXISTS）——只有这种情况允许清掉
     未知态并重试；`state` 走 SUCCESS/PROCESSING/CLOSED/ABNORMAL 语义（与 `refund()` 一致）。
+
+    `refund_amount`（B1-4，2026-11-26 双审查）：微信侧**实际退款金额（元）**。
+    原先查单只看 `status`，于是"微信退了 10 元、本地记整单已退"这种不一致无人发现——
+    对账按单号对号也双双通过。`None` = 网关没给（mock/旧通道），此时不做金额判据。
     """
 
     found: bool
     state: str = ""
     refund_id: str = ""
     error_message: str = ""
+    refund_amount: Decimal | None = None

@@ -95,6 +95,13 @@ class ParentService:
             revived.is_deleted = 0
             revived.name = req.name
             revived.remark = req.remark
+            # B0-5（2026-11-26 双审查）：复活是**同号新档案**。删档前签发的 token 若不换代数，
+            # 复活那一刻会跟着 is_deleted=0 一起"复活"（同一 parents 行、同 gen）——实测能在
+            # 家长重新登录前继续看这个家庭的孩子/会员码/订单。删档与复活各 +1，旧 token 永久 401。
+            revived.token_generation = int(revived.token_generation or 0) + 1
+            # 微信绑定也不继承：openid 是"谁在用什么手机"的凭证，删档即视为解绑，
+            # 复活后由家长重新走一次绑定（防旧 openid 持有人直接接手档案）。
+            revived.wechat_openid = None
             parent = revived
         else:
             # 2026-10-30 大审查 P2-3：上面"活跃查重"是普通读，并发建档会在唯一索引上撞 1062 → 500。
@@ -282,6 +289,12 @@ class ParentService:
             raise ConflictError("该家长名下已创建订单，禁止删除")
         parent = self.get(parent_id)
         parent.is_deleted = 1
+        # B0-5（2026-11-26 双审查）：删档即撤销登录态——否则删档前签发的 token 会随"同号复活"
+        # 一起活过来（见 `create` 里的复活分支）。+1 是永久的：即便反复删除/复活也不会回到旧代数。
+        parent.token_generation = int(parent.token_generation or 0) + 1
+        # openid 是全局唯一索引：留在已删档案上会让该微信再也绑不了新账号
+        # （`_bind_openid_to_parent` 实测拦成"请联系馆员处理"），删档即释放。
+        parent.wechat_openid = None
         # 名下未删孩子一并软删（孤儿档案必须清；守卫已确保这些孩子无订单）
         self.db.query(Child).filter(Child.parent_id == parent_id, Child.is_deleted == 0).update(
             {"is_deleted": 1}
