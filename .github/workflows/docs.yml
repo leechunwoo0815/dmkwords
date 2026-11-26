@@ -1,0 +1,60 @@
+name: Docs
+
+# B2-4（2026-11-26 双审查）：纯文档推送的**独立工作流**。
+#
+# 为什么单开一个文件而不是留在 ci.yml 里：
+#   GitHub 的 `concurrency` 是按**工作流 run** 生效的。原先 docs-only 推送也会创建一条
+#   `ci-<ref>` 的 run，`cancel-in-progress: true` 就把**正在跑的全量门禁**整条取消
+#   （2026-11 已踩 4 次，每次白烧 20–45 分钟额度）。把文档检查拆到独立工作流后，
+#   两条工作流各有各的 group，文档推送再也不会掐断门禁；而全量门禁之间仍照旧互相取消。
+#
+# 触发面与 ci.yml 的排除面**必须互补**（改一边就要改另一边）：
+#   ci.yml  push 排除 docs/**（但保留 docs/api/**）、**/*.md、PRD/**、error_list/**
+#   本文件 push 只收这几类。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "**/*.md"
+      - "PRD/**"
+      - "error_list/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "**/*.md"
+      - "PRD/**"
+      - "error_list/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # `git show --check` 需要父提交；浅克隆 depth=1 时该提交会被当成 root，
+          # 把整棵树都算成新增行 → 历史 LEDGER 的尾随空格全部误报（2026-11-10 实测）。
+          fetch-depth: 2
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      # 必须装后端依赖：`check_docs_code_alignment` 要 import `backend.seeds.seed_configs`
+      # 才能拿到 60 个配置键；只跑系统 python3 会降级成正则（53 键），把
+      # `quiz_pass_bonus` 之类误报成悬空（首次 docs-only run 实测失败，已修）。
+      - name: Install dependencies (uv)
+        run: uv sync --frozen
+      - name: Docs reference check
+        run: uv run python scripts/check_docs_code_alignment.py
+      - name: Whitespace check
+        run: git show --check --format= "$GITHUB_SHA"
