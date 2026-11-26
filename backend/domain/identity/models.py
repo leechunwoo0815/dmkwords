@@ -228,6 +228,15 @@ class Order(BaseModel):
         String(255), nullable=True, comment="收款凭证图路径（WM3-B2，voucher/ 目录）"
     )
     paid_at = Column(DateTime, nullable=True, comment="收款确认时间")
+    # B1-3（2026-11-26 双审查）：会员期限**下单时冻结**。退款分母原先读"此刻配置"
+    # （`refund_rules.period_days` 直接查 ConfigService）——把 `observation_period_days`
+    # 从 30 改成 60，历史上所有观察期订单的退款比例会跟着变，账就再也对不上"当时谈好的口径"。
+    # 只对会员类订单（观察期/年费）写值；其它类型为 NULL（退款不看它）。
+    period_days = Column(
+        Integer,
+        nullable=True,
+        comment="会员期限天数快照（下单时冻结；退款分母读它而不是当前配置）",
+    )
     paid_by = Column(Integer, nullable=True, comment="确认收款的管理员ID")
     remark = Column(String(200), nullable=False, default="", comment="备注/凭证说明")
 

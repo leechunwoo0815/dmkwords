@@ -33,6 +33,26 @@ def period_days(db: Session, order_type: str) -> int:
     return int(ConfigService(db).get_value("formal_period_days", "365"))
 
 
+def snapshot_period_days(db: Session, order_type: str) -> int | None:
+    """下单时冻结的会员期限（B1-3）：只有会员类订单有值，其它类型为 None。
+
+    为什么不把这段判断留在 `order_service`：口径（"哪些类型有期限、期限取哪份配置"）必须与
+    `refundable_amount` 同源，否则开通与退款会在两个文件里各写一份、迟早漂。
+    """
+    if order_type in (Order.TYPE_OBSERVATION, Order.TYPE_FORMAL):
+        return period_days(db, order_type)
+    return None
+
+
+def membership_period_days(order: Order, db: Session) -> int:
+    """开通会员时用的期限：优先**订单快照**，历史单（快照列之前创建）回退当前配置。
+
+    B1-3 的第二半：`confirm-payment` 原先读当前配置算 `member_expire`，与退款分母（订单快照）
+    可能不是同一个数——"下单 30 天 → 改配置 60 天 → 收款"会开出 60 天、退款却按 30 天算。
+    """
+    return int(order.period_days or period_days(db, order.order_type))
+
+
 def days_used(order: Order) -> int:
     """已使用天数（按付款时刻起算；未付款为 0）。"""
     if not order.paid_at:
@@ -43,7 +63,10 @@ def days_used(order: Order) -> int:
 def refundable_amount(db: Session, order: Order) -> Decimal:
     """可退金额（服务端唯一权威）。"""
     if order.order_type in (Order.TYPE_OBSERVATION, Order.TYPE_FORMAL):
-        period = period_days(db, order.order_type)
+        # B1-3：分母优先读**下单时冻结的快照**。历史订单（快照列上线前创建）没有值，
+        # 退回读当前配置——这是已知局限：那些单一旦改过配置就无法还原"当时口径"，
+        # 迁移里的回填只能按迁移时刻的配置尽力补齐（见该迁移文件注释）。
+        period = int(order.period_days or period_days(db, order.order_type))
         remaining = max(0, period - days_used(order))
         # B8（2026-10-28）：金额舍入统一 **ROUND_HALF_UP**（四舍五入）——原默认
         # ROUND_HALF_EVEN（银行家舍入）会与支付网关的分换算口径不一致（网关已用 HALF_UP），

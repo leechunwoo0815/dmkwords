@@ -33,11 +33,6 @@ class OrderService(OrderGuardMixin):
     def __init__(self, db: Session):
         self.db = db
 
-    def _config_int(self, key: str, default: int) -> int:
-        from backend.common.config_service import ConfigService
-
-        return int(ConfigService(self.db).get_value(key, str(default)))
-
     MY_ORDERS_LIMIT = 50  # 家长端订单列表硬上限（P2-44：上限经响应头告知）
 
     def my_orders(self, child_id: int, parent_id: int) -> list[dict]:
@@ -171,6 +166,8 @@ class OrderService(OrderGuardMixin):
             amount=amount,
             status=Order.STATUS_PENDING_MANUAL,
             remark=req.remark,
+            # B1-3：把下单时的期限口径冻在单子上（口径判断见 refund_rules.snapshot_period_days）
+            period_days=refund_rules.snapshot_period_days(self.db, req.order_type),
         )
         self.db.add(order)
         self.db.flush()
@@ -439,7 +436,8 @@ class OrderService(OrderGuardMixin):
             child = self._open_membership(
                 locked_child,
                 Child.MEMBER_OBSERVATION,
-                self._config_int("observation_period_days", 30),
+                # B1-3：开通时长与退款分母同一口径（快照优先，见 refund_rules.membership_period_days）
+                refund_rules.membership_period_days(order, self.db),
                 actor=actor,
             )
         elif order.order_type == Order.TYPE_FORMAL:
@@ -457,7 +455,9 @@ class OrderService(OrderGuardMixin):
             self._transition_member(child, Child.MEMBER_FORMAL, actor=actor)
             child.member_start = child.member_start or date.today()
             # 年费时长进配置（审查 P2-3）：改口径只改配置，不发版
-            child.member_expire = base + timedelta(days=self._config_int("formal_period_days", 365))
+            child.member_expire = base + timedelta(
+                days=refund_rules.membership_period_days(order, self.db)
+            )
         elif order.order_type == Order.TYPE_FIRST_ACTIVITY:
             child = None  # 99 元不开会员（获客单）
         else:
