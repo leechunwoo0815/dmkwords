@@ -5292,6 +5292,8 @@ export interface components {
             requests_1m: number;
             /** Requests Today */
             requests_today: number;
+            /** Window Seconds */
+            window_seconds: number;
         };
         /** MonitorCpu */
         MonitorCpu: {

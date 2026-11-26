@@ -2907,6 +2907,10 @@
           "requests_today": {
             "title": "Requests Today",
             "type": "integer"
+          },
+          "window_seconds": {
+            "title": "Window Seconds",
+            "type": "number"
           }
         },
         "required": [
@@ -2914,6 +2918,7 @@
           "errors_4xx_1m",
           "errors_5xx_1m",
           "p95_ms_1m",
+          "window_seconds",
           "requests_today",
           "errors_today"
         ],
