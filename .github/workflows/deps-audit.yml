@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 20
     steps:
       # action 一律钉 commit SHA（与 ci.yml 同一条纪律：major tag 可被上游移动）
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           python-version: "3.13"
