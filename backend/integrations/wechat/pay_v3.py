@@ -263,6 +263,9 @@ class WeChatPayV3(PaymentGateway):
             refund_status=data.get("refund_status", ""),
             amount=amount,
             refund_amount=refund_amount,
+            # B1-7（2026-11-27）：解密明文自带 mchid（退款通知没有 appid），交给业务层核对归属
+            mchid=str(data.get("mchid") or ""),
+            appid=str(data.get("appid") or ""),
             raw_body=plaintext.decode(),
         )
 

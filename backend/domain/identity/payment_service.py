@@ -503,6 +503,11 @@ class PaymentService(PaymentNotifyMixin):
             )
             return 400, {"code": "FAIL", "message": "回调数据无法解密"}
 
+        # B1-7（2026-11-27 双审查 P2）：商户号 / AppID 归属校验（口径见 `_merchant_guard`）
+        rejected = self._merchant_guard(data, scene="支付回调")
+        if rejected is not None:
+            return rejected
+
         if data.trade_state != "SUCCESS":
             # trade_state 消费：非 SUCCESS 不标记已支付
             self._audit_anomaly(

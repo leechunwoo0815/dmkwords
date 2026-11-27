@@ -76,6 +76,10 @@ class PaymentNotifyMixin:
                 "退款回调解密失败", target_id=DECRYPT_FAILED_REF, reason="decrypt_failed"
             )
             return 400, {"code": "FAIL", "message": "回调数据无法解密"}
+        # B1-7（2026-11-27 双审查 P2）：**先确认这条回调属于本系统**，再谈单号/金额/状态
+        rejected = self._merchant_guard(data, scene="退款回调")
+        if rejected is not None:
+            return rejected
         out_refund_no = (data.out_refund_no or "").strip()
         if not out_refund_no:
             self._audit_anomaly(
@@ -201,6 +205,45 @@ class PaymentNotifyMixin:
         except (TypeError, ValueError):
             return None
         return envelope if isinstance(envelope, dict) else None
+
+    def _merchant_guard(self, data, *, scene: str) -> tuple[int, dict] | None:
+        """B1-7（2026-11-27 双审查 P2）：解密后校验 **mchid / appid 属于本系统**。
+
+        为什么必须校验：v3 回调的签名只证明"报文由微信签的"，**不证明这笔钱是我们的**——
+        别人的商户回调打到本地址（配置串了 / 换商户号后旧商户回调还在路上）时，只要
+        `out_trade_no` 与金额碰巧对得上，就会照常入账或把退款项落终态。
+
+        口径（三条，都不许"猜"）：
+        · 配置有值 且 回调有值 → 必须**逐字相等**，不等即拒（400 + 资金异常待办）；
+        · 任一侧为空 → **跳过该项**（退款通知的明文本来就没有 `appid`；mock 通道与 dev 环境
+          也没配商户号）。生产 `validate_production` 已强制这两个键非空，所以"跳过"只可能
+          发生在非生产环境或"该通知本就不带这个字段"上；
+        · 拒绝用 **400 FAIL**（与"金额不符"同口径）：返回 200 会让微信停止重试，而
+          "商户号配错 / 换了商户号"这类问题要我们自己去修——重试噪音换来待办里一条能定位的
+          异常；静默 200 的代价是钱进了账、系统不知道。
+
+        本方法只做归属判断，**不写业务库**（唯一副作用是 anomaly 待办）。
+        """
+        from backend.config import get_settings
+
+        settings = get_settings()
+        problems: list[str] = []
+        expected_mch = (getattr(settings, "WECHAT_MCH_ID", "") or "").strip()
+        got_mch = (getattr(data, "mchid", "") or "").strip()
+        if expected_mch and got_mch and got_mch != expected_mch:
+            problems.append(f"mchid 回调={got_mch} 期望={expected_mch}")
+        expected_app = (getattr(settings, "WECHAT_APP_ID", "") or "").strip()
+        got_app = (getattr(data, "appid", "") or "").strip()
+        if expected_app and got_app and got_app != expected_app:
+            problems.append(f"appid 回调={got_app} 期望={expected_app}")
+        if not problems:
+            return None
+        self._audit_anomaly(
+            f"{scene}的商户信息与本系统不符，拒绝处理（不入账、不落终态）",
+            target_id=(getattr(data, "out_trade_no", "") or "") or UNVERIFIED_BODY_REF,
+            reason="; ".join(problems),
+        )
+        return 400, {"code": "FAIL", "message": "商户信息不符"}
 
     @staticmethod
     def _decrypt(gateway, envelope: dict):

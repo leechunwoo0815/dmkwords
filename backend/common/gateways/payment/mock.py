@@ -141,6 +141,9 @@ class MockPaymentGateway(PaymentGateway):
                 # WM12-C（审查 P1-7）：与微信 `amount.refund` 同语义（分 → 元）；缺省=None 表示
                 # 报文没带钱数（老报文/演练）——此时不做金额比对，但会记审计
                 refund_amount=refund_amount,
+                # B1-7（2026-11-27）：明文里带 mchid/appid 时要能被业务层核对（测试端到端驱动）
+                mchid=str(data.get("mchid") or ""),
+                appid=str(data.get("appid") or ""),
                 raw_body=ciphertext,
             )
         except json.JSONDecodeError as e:
