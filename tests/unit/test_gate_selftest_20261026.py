@@ -108,3 +108,56 @@ def test_ci_pins_actions_and_declares_permissions():
         "镜像尚未接入生产（待甲方裁定）——构建/扫描 job 不应拦门禁"
     )
     assert any("trivy" in spec for spec in uses), "CI 缺少镜像漏洞扫描"
+
+
+# ---------------------------------------------------------------- B5-1（2026-11-27）
+
+
+def test_gate_auto_writes_unit_count_baseline():
+    """B5-1：gate PASS 时自动回写基线，且 CI 校验"基线 == 本次收集数"（严格相等）。
+
+    修前实测：基线 1337，实际收集 1455——**118 个空档**，删 118 个测试照样绿。
+    自动回写 + CI 严格相等，把这个空档压到 0；同时保持"只升不降"
+    （自动下调会把删测洗成绿色）。
+    """
+    gate = GATE.read_text(encoding="utf-8")
+    assert "scripts/gate_baseline_update.py" in gate, "gate 未自动回写单测数量基线（B5-1）"
+
+    data = yaml.safe_load(CI.read_text(encoding="utf-8"))
+    steps = data["jobs"]["gate"]["steps"]
+    drift = [s for s in steps if s.get("name") == "Gate baseline drift check (B5-1)"]
+    assert drift, "CI 缺少基线漂移校验（B5-1 后半句：CI 校验两者相等）"
+    run_src = drift[0]["run"]
+    assert "git diff --quiet -- scripts/gate_baseline.json" in run_src
+    assert "exit 1" in run_src, "基线漂移必须判红，不许只打印"
+
+
+def test_baseline_update_only_raises_and_is_idempotent(tmp_path):
+    """回写脚本的三条规则：只升不降 / 相等不落盘 / 高于则写入并留痕。"""
+    from scripts.gate_baseline_update import update
+
+    f = tmp_path / "gate_baseline.json"
+    f.write_text(
+        json.dumps({"min_passed": 100, "updated_at": "2026-01-01", "allowed_skips": {}}),
+        encoding="utf-8",
+    )
+
+    before_bytes, before_mtime = f.read_bytes(), f.stat().st_mtime_ns
+    assert update(100, path=f) is False, "相等也必须不落盘（否则 CI 每轮 diff 必红）"
+    # 行为断言（比"内容相等"更强）：字节与 mtime 都没动 = 真的没写盘
+    assert f.read_bytes() == before_bytes and f.stat().st_mtime_ns == before_mtime
+
+    assert update(90, path=f) is False, "低于基线绝不下调（自动下调=把删测洗成绿）"
+    assert json.loads(f.read_text(encoding="utf-8"))["min_passed"] == 100
+
+    assert update(120, path=f, today="2026-11-27") is True
+    data = json.loads(f.read_text(encoding="utf-8"))
+    assert data["min_passed"] == 120
+    assert data["last_collected"] == 120
+    assert data["updated_at"] == "2026-11-27"
+    assert data["allowed_skips"] == {}, "回写不得丢掉 allowed_skips 等既有键"
+
+    # 二次同值调用（门禁每天跑）必须稳定：不再产生 diff
+    snapshot_bytes, snapshot_mtime = f.read_bytes(), f.stat().st_mtime_ns
+    assert update(120, path=f, today="2026-12-01") is False
+    assert f.read_bytes() == snapshot_bytes and f.stat().st_mtime_ns == snapshot_mtime

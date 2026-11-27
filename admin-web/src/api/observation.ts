@@ -1,6 +1,8 @@
 // observation API（WM10：评估报告上传 + 管理端查看）
 import { getToken, request } from "./client";
 
+// B5-8（2026-11-27）：手写类型**保留**——评估报告列表端点响应在 OpenAPI 里是 `unknown`，契约无等价 schema。
+
 export interface ObservationReportRow {
   id: number;
   child_id: number;

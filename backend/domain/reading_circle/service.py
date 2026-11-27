@@ -27,6 +27,7 @@ from backend.common.ttl_cache import TtlCache
 from backend.domain.identity.models import Child, Parent
 from backend.domain.reading_circle import card_engine
 from backend.domain.reading_circle.models import CircleLike, CirclePost
+from backend.domain.reading_circle.repository import CirclePostRepository
 
 #: 社区横幅（本周全馆共读词数 / 在坚持的孩子数）的缓存 TTL（P2-40，2026-10-20 第八轮）。
 #:
@@ -75,11 +76,7 @@ class CircleService:
     def my_cards(self, child: Child) -> dict:
         """孩子全部可晒成就（已达成未晒 + 已晒分组）。"""
         achievements = card_engine.enumerate_cards(self.db, child)
-        shared_rows = (
-            self.db.query(CirclePost)
-            .filter(CirclePost.child_id == child.id, CirclePost.is_deleted == 0)
-            .all()
-        )
+        shared_rows = CirclePostRepository(self.db).list_by_child(child.id)
         shared_keys = {(r.card_type, r.ref_id) for r in shared_rows}
         available, shared = [], []
         for c in achievements:

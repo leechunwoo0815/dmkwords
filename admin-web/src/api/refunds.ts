@@ -1,6 +1,9 @@
 // refunds API（WM10：退款/退会/转让审核 + 评估报告）
 import { ListResult, request, requestList } from "./client";
 
+// B5-8（2026-11-27）：手写类型**保留**——退款/退会/转让台账端点响应在 OpenAPI 里是 `unknown`
+// （后端返 dict），契约无等价 schema。
+
 export interface RefundRequestItem {
   id: number;
   kind: string;

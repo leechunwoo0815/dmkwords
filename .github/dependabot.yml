@@ -1,0 +1,54 @@
+# .github/dependabot.yml — 依赖公告与升级 PR（B5-7，2026-11-27）
+# 三件事各管一层，缺一层就有盲区：
+#   1. `uv` 生态（Python）：读 uv.lock，与 scripts/audit_deps.sh 的 pip-audit **互补**——
+#      pip-audit 只看"已知漏洞"，Dependabot 还会推小版本更新（漏洞之前的安全修复）。
+#   2. `npm` 生态（admin-web）：本机 pnpm 走 npmmirror 镜像，该镜像**没有 audit 端点**
+#      （实测 ERR_PNPM_AUDIT_ENDPOINT_NOT_EXISTS），所以 npm 侧的公告只能靠 Dependabot。
+#   3. `github-actions`：workflow 里 action 钉的是 commit SHA，没有 Dependabot 就永远不升级
+#      （钉 SHA 的代价就是必须有人推更新）。
+#
+# 分组策略：minor/patch 合成一个 PR（少噪音、一次 CI 验完）；major 单独一个 PR（必须人看）。
+# 注：Dependabot PR 是独立 ref，CI 的 `concurrency: cancel-in-progress` 按 ref 生效，
+# 不会掐断 main 上的全量门禁（B2-4 踩过 4 次的坑）。
+version: 2
+updates:
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    groups:
+      python-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: "npm"
+    directory: "/admin-web"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    groups:
+      admin-web-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(ci)"

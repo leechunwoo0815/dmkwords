@@ -29,6 +29,7 @@ from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, Order, Parent
 
 from .models import Activity, ActivityEnrollment
+from .repository import ActivityEnrollmentRepository, ActivityRepository
 
 
 def _ticket_code(activity_id: int, child_id: int) -> str:
@@ -121,23 +122,11 @@ class ActivityService(ActivityCancelMixin):
         # 记录不占报名入口位（前端 wx:if={{!my_enrollment}} 才显示"立即报名"）；
         # 历史全量在"我的活动"列表仍可见（my_enrollments 不动）；
         # enroll 判定本就正确（refunded 不在 ACTIVE_STATUSES=允许重报）
-        rows = (
-            self.db.query(ActivityEnrollment)
-            .filter(
-                ActivityEnrollment.child_id == child_id,
-                ActivityEnrollment.status.in_(ActivityEnrollment.ACTIVE_STATUSES),
-                ActivityEnrollment.is_deleted == 0,
-            )
-            .all()
-        )
+        rows = ActivityEnrollmentRepository(self.db).list_active_by_child(child_id)
         return {r.activity_id: self._enrollment_view(r) for r in rows}
 
     def _get(self, activity_id: int) -> Activity:
-        a = (
-            self.db.query(Activity)
-            .filter(Activity.id == activity_id, Activity.is_deleted == 0)
-            .first()
-        )
+        a = ActivityRepository(self.db).get_active(activity_id)
         if not a:
             raise NotFoundError("活动不存在")
         return a

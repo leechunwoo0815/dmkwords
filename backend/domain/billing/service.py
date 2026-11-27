@@ -13,6 +13,7 @@ from backend.common.config_service import ConfigService
 from backend.common.exceptions import NotFoundError, ValidationError
 from backend.common.sql_utils import escape_like
 from backend.domain.billing.models import Deposit, DepositLedger
+from backend.domain.billing.repository import DepositLedgerRepository, DepositRepository
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, Order
 
@@ -456,19 +457,10 @@ class DepositService:
 
     # ---------- 查询 ----------
     def get_by_child(self, child_id: int) -> tuple[Deposit | None, list[DepositLedger]]:
-        dep = (
-            self.db.query(Deposit)
-            .filter(Deposit.child_id == child_id, Deposit.is_deleted == 0)
-            .first()
-        )
+        dep = DepositRepository(self.db).get_by_child(child_id)
         ledgers = []
         if dep:
-            ledgers = (
-                self.db.query(DepositLedger)
-                .filter(DepositLedger.deposit_id == dep.id, DepositLedger.is_deleted == 0)
-                .order_by(DepositLedger.id.desc())
-                .all()
-            )
+            ledgers = DepositLedgerRepository(self.db).list_by_deposit(dep.id)
         return dep, ledgers
 
     def my_deposit_view(self, child_id: int) -> dict:

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { getToken } from "./api/client";
 import { AuthProvider, hasPermission, useAuth } from "./auth";
+import { routePerm } from "./permissions";
 import AuditLog from "./pages/AuditLog";
 import BookDetail from "./pages/BookDetail";
 import BookManage from "./pages/BookManage";
@@ -24,15 +25,20 @@ import ServerMonitor from "./pages/ServerMonitor";
 import TaskBoard from "./pages/TaskBoard";
 
 /**
- * 路由级权限门（P2-58，2026-10-20 第八轮）。
+ * 路由级权限门（P2-58，2026-10-20 第八轮；B5-8，2026-11-27 收敛为查表）。
  *
  * 侧边栏按权限隐藏菜单，但**直输 URL 仍可达**——`/staff`、`/audit-logs` 这类页面进去就是
  * 一片 403 报错（"能点不能用"回归族）。这里与菜单**同一个判据**（`hasPermission`），
  * 无权限直接渲染说明页（不跳转，避免和"登录过期跳转"打架）。
+ *
+ * 权限码**只从 `permissions.ts` 的 ROUTE_META 查**（B5-8）——路由侧不再出现内联字面量，
+ * 避免"路由/菜单/按钮三处各写一份码"漂移。未登记的路由 = 不做路由级拦截（保持现状可见）；
+ * 登记完整性由 tests/unit/test_b5_8_frontend_perms_20261127.py 机械执法。
  */
-function RequirePerm({ code, children }: { code: string; children: React.ReactNode }) {
+function RequirePerm({ path, children }: { path: string; children: React.ReactNode }) {
   const { permissions } = useAuth();
-  if (!hasPermission(permissions, code)) {
+  const code = routePerm(path);
+  if (code !== undefined && !hasPermission(permissions, code)) {
     return (
       <Card>
         <Typography.Title level={5} style={{ fontFamily: "var(--font-heading)" }}>
@@ -45,6 +51,11 @@ function RequirePerm({ code, children }: { code: string; children: React.ReactNo
     );
   }
   return <>{children}</>;
+}
+
+/** 路由元素别名：`element={gate("/books", <BookManage />)}`——码在表里，调用处只写路径。 */
+function gate(path: string, element: React.ReactNode) {
+  return <RequirePerm path={path}>{element}</RequirePerm>;
 }
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -67,51 +78,23 @@ export default function App() {
             </Protected>
           }
         >
-          <Route index element={<Dashboard />} />
-          <Route
-            path="configs"
-            element={
-              <RequirePerm code="config.view">
-                <SystemConfig />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="system-monitor"
-            element={
-              <RequirePerm code="config.view">
-                <ServerMonitor />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="audit-logs"
-            element={
-              <RequirePerm code="audit.view">
-                <AuditLog />
-              </RequirePerm>
-            }
-          />
-          <Route path="books" element={<BookManage />} />
-          <Route path="circulation" element={<CirculationDesk />} />
-          <Route path="books/:id" element={<BookDetail />} />
-          <Route path="members" element={<MemberManage />} />
-          <Route path="deposits" element={<DepositManage />} />
-          <Route path="reservations" element={<Reservations />} />
-          <Route path="growth" element={<GrowthManage />} />
-          <Route path="activities" element={<ActivityManage />} />
-          <Route path="circle" element={<CircleManage />} />
-          <Route path="refund-center" element={<RefundCenter />} />
-          <Route path="notifications" element={<Notifications />} />
-          <Route path="tasks" element={<TaskBoard />} />
-          <Route
-            path="staff"
-            element={
-              <RequirePerm code="audit.view">
-                <Staff />
-              </RequirePerm>
-            }
-          />
+          <Route index element={gate("/", <Dashboard />)} />
+          <Route path="configs" element={gate("/configs", <SystemConfig />)} />
+          <Route path="system-monitor" element={gate("/system-monitor", <ServerMonitor />)} />
+          <Route path="audit-logs" element={gate("/audit-logs", <AuditLog />)} />
+          <Route path="books" element={gate("/books", <BookManage />)} />
+          <Route path="circulation" element={gate("/circulation", <CirculationDesk />)} />
+          <Route path="books/:id" element={gate("/books/:id", <BookDetail />)} />
+          <Route path="members" element={gate("/members", <MemberManage />)} />
+          <Route path="deposits" element={gate("/deposits", <DepositManage />)} />
+          <Route path="reservations" element={gate("/reservations", <Reservations />)} />
+          <Route path="growth" element={gate("/growth", <GrowthManage />)} />
+          <Route path="activities" element={gate("/activities", <ActivityManage />)} />
+          <Route path="circle" element={gate("/circle", <CircleManage />)} />
+          <Route path="refund-center" element={gate("/refund-center", <RefundCenter />)} />
+          <Route path="notifications" element={gate("/notifications", <Notifications />)} />
+          <Route path="tasks" element={gate("/tasks", <TaskBoard />)} />
+          <Route path="staff" element={gate("/staff", <Staff />)} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

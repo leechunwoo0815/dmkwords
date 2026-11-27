@@ -65,7 +65,10 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
   return (await res.json()) as T;
 }
 
-/** 列表类响应：数据 + **硬上限元信息**（P2-44）。 */
+/** 列表类响应：数据 + **硬上限元信息**（P2-44）。
+ *
+ * B5-8（2026-11-27）：**保留**为前端派生类型——三个元信息来自响应头
+ * （X-List-Limit / X-Total-Count / X-List-Truncated），响应头不进 OpenAPI schema。 */
 export interface ListResult<T> {
   items: T;
   /** 该接口生效的行数上限（响应头 `X-List-Limit`）；缺失为 null */

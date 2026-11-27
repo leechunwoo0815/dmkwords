@@ -14,6 +14,7 @@ from backend.common.notifications import SCENE_MEMBER_EXPIRE_REMIND, Notificatio
 from backend.common.sql_utils import escape_like
 from backend.domain.catalog.audit_events import publish_audit
 from backend.domain.identity.models import Child, Order, Parent
+from backend.domain.identity.repository import ParentRepository
 
 
 def attach_actor_profiles(db: Session, data: dict) -> dict:
@@ -129,9 +130,7 @@ class ParentService:
         return parent
 
     def get(self, parent_id: int) -> Parent:
-        parent = (
-            self.db.query(Parent).filter(Parent.id == parent_id, Parent.is_deleted == 0).first()
-        )
+        parent = ParentRepository(self.db).get_active(parent_id)
         if not parent:
             raise NotFoundError("家长不存在")
         return parent

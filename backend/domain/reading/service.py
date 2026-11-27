@@ -23,6 +23,7 @@ from backend.domain.reading.models import (
     CheckIn,
     ReadingProgress,
 )
+from backend.domain.reading.repository import ReadingProgressRepository
 
 MAX_SPEED = 2.0  # PRD D20：倍速五档上限
 SPEED_TOLERANCE = 1.2  # R-151：容差
@@ -322,15 +323,7 @@ class ReadingService:
         }
 
     def get_progress(self, child: Child, book_id: int) -> dict:
-        p = (
-            self.db.query(ReadingProgress)
-            .filter(
-                ReadingProgress.child_id == child.id,
-                ReadingProgress.book_id == book_id,
-                ReadingProgress.is_deleted == 0,
-            )
-            .first()
-        )
+        p = ReadingProgressRepository(self.db).get_by_child_book(child.id, book_id)
         return (
             self._progress_view(p)
             if p

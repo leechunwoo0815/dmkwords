@@ -42,6 +42,10 @@ ROUTER_VIOLATIONS = [
 ROUTER_PIECES = ("router.py", "miniapp_router.py")
 
 MAX_FILE_LINES = 800
+#: 预警线（不阻断）：B5-3（2026-11-27）——800 是硬红线，但撞线才处理意味着"每次都要
+#: 一次被动拆文件的急救"。700 起打印预警，让下一个改这个文件的人先想清楚要不要拆。
+#: 实测起点：本批之前 wm10_service 826、registry 814 都是"最后一次改动直接撞线"。
+WARN_FILE_LINES = 700
 
 
 def check_four_pieces(errors: list[str]) -> None:
@@ -121,13 +125,19 @@ def check_domain_list(errors: list[str]) -> None:
         errors.append(f"DOMAINS 声明的域 {missing} 在磁盘上不存在（backend/domain/{missing}）")
 
 
-def check_file_length(errors: list[str]) -> None:
+def check_file_length(errors: list[str], warnings: list[str] | None = None) -> None:
+    """god-file 两级：> 800 判红；700~800 只预警（B5-3，2026-11-27）。"""
     for py in BACKEND.rglob("*.py"):
         if "__pycache__" in py.parts:
             continue
         lines = len(py.read_text(encoding="utf-8").splitlines())
         if lines > MAX_FILE_LINES:
             errors.append(f"{py.relative_to(ROOT)}: {lines} 行 > {MAX_FILE_LINES}（god file 禁止）")
+        elif lines > WARN_FILE_LINES and warnings is not None:
+            warnings.append(
+                f"{py.relative_to(ROOT)}: {lines} 行（距 {MAX_FILE_LINES} 红线仅 {MAX_FILE_LINES - lines} 行）"
+                "——下次改动前先抽模块，别等撞线再急救"
+            )
 
 
 def check_sqlite_ban(errors: list[str]) -> None:
@@ -656,63 +666,67 @@ CROSS_DOMAIN_WRITE_WHITELIST: dict[tuple[str, str, str], str] = {
         "backend/domain/circulation/service.py",
         "borrow",
         "catalog",
-    ): "借出：副本 -> BORROWED（同事务行锁内）",
+    ): "借出：副本 -> BORROWED（同事务、副本行已 FOR UPDATE；catalog 没有对应公开写方法，抽出必带锁序）",
     (
         "backend/domain/circulation/service.py",
         "return_book",
         "catalog",
-    ): "归还：副本 -> AVAILABLE/维护/遗失",
+    ): "归还：副本 -> AVAILABLE/MAINTENANCE/LOST（同事务，锁序 record->copy；报损待办与预约漏斗都在本链内）",
     (
         "backend/domain/reading/reservation_ops.py",
         "handle_copy_unavailable",
         "catalog",
-    ): "副本失效漏斗：改锁他册/转异常",
+    ): "副本退场漏斗：改锁他册时把替换副本写成 RESERVED（必须在 Reservation 锁之后同事务完成）",
     (
         "backend/domain/reading/reservation_service.py",
         "create",
         "catalog",
-    ): "预约：副本 -> RESERVED",
+    ): "预约：副本 -> RESERVED（建单与锁定同一事务，拆开会出现有名额但副本已可借的窗口）",
     (
         "backend/domain/reading/reservation_service.py",
         "cancel",
         "catalog",
-    ): "取消预约：副本 -> AVAILABLE",
+    ): "取消预约：副本 -> AVAILABLE（锁序 Reservation->copy，与核销/超时释放同向）",
     (
         "backend/domain/reading/reservation_service.py",
         "expire_due",
         "catalog",
-    ): "超时释放：副本 -> AVAILABLE",
+    ): "超时释放：副本 -> AVAILABLE（批量扫描与逐个释放一个事务，抽方法会把锁序藏进另一层）",
     (
         "backend/domain/reading/reservation_service.py",
         "checkout",
         "catalog",
-    ): "核销转借阅：副本 -> BORROWED",
+    ): "核销转借阅：副本 -> BORROWED（与建借阅记录、押金/会员闸门同一事务）",
     (
         "backend/domain/identity/wm10_service.py",
         "_finalize_refund",
         "billing",
-    ): "退款执行：押金 -> refunded + DepositLedger",
+    ): "退款执行：押金 -> refunded + 扣可用额 + DepositLedger（资金台账必须与退款单同事务；billing 公开方法自带 commit）",
     (
         "backend/domain/identity/wm10_withdrawal_service.py",
         "ensure_deposit_refund_on_withdrawal",
         "billing",
-    ): "退会联动押金：Deposit -> REFUNDING + 建押金退款单（R11-b 从 _complete_refund_withdrawal 抽出）",
+    ): "退会联动押金：Deposit -> REFUNDING + 建押金退款单（结算事务内；跨事务会出现退会单已推而押金未锁）",
     (
         "backend/domain/identity/wm10_withdrawal_service.py",
         "review",
         "billing",
-    ): "退会复核：押金 -> REFUNDING",
-    ("backend/domain/identity/transfer_service.py", "review", "billing"): "转让结算：押金退款链",
+    ): "退会复核：押金 -> REFUNDING（三笔退款单与押金锁态同一事务，锁序 Child->Withdrawal->Deposit）",
+    (
+        "backend/domain/identity/transfer_service.py",
+        "review",
+        "billing",
+    ): "转让结算：押金 -> REFUNDING + 押金退款单（与退会结算同构，必须落在同一结算事务）",
     (
         "backend/domain/identity/wm10_service.py",
         "_refund_activity_enrollment",
         "activity",
-    ): "活动单退款：报名行状态",
+    ): "活动单退款：报名行 enrolled/refund_pending -> refunded + 同事务回写待办聚合（终态须一起提交）",
     (
         "backend/domain/activity/cancel_flow.py",
         "cancel_activity",
         "identity",
-    ): "活动取消：条件 UPDATE 作废未收款订单（2026-10-12 拍板 P4；待抽 identity 公开方法销项）",
+    ): "活动取消：条件 UPDATE 批量作废未收款订单（整场单事务；OrderService.cancel 逐单 commit + 写 order.cancel 审计，会拆散原子性）",
 }
 
 
@@ -1133,11 +1147,12 @@ def self_test() -> int:
 
 def main() -> int:
     errors: list[str] = []
+    warnings: list[str] = []
     check_domain_list(errors)
     check_four_pieces(errors)
     check_router_violations(errors)
     check_lock_populate(errors)
-    check_file_length(errors)
+    check_file_length(errors, warnings)
     check_sqlite_ban(errors)
     check_import_whitelist(errors)
     check_like_escape(errors)
@@ -1158,6 +1173,13 @@ def main() -> int:
         " / 模块级导入环 0（延迟导入不算）/ 跨域直写全量登记 / 会员状态零直赋"
         f" / 事件契约三向对账（{event_summary}）"
     )
+    # B5-3：700~800 行预警（不拦截，只提醒"这个文件离红线只剩几步"）
+    if warnings:
+        print(f"[B5-3 行数预警] {len(warnings)} 个文件已过 {WARN_FILE_LINES} 行（不阻断）：")
+        for w in warnings:
+            print(f"  ⚠ {w}")
+    else:
+        print(f"[B5-3 行数预警] 无文件超过 {WARN_FILE_LINES} 行 ✓")
     alerts = check_mutation_count_flush()
     if alerts:
         print(

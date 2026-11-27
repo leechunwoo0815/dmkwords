@@ -173,6 +173,20 @@ jobs:
       - name: Run full gate
         run: bash scripts/gate.sh
 
+      # B5-1（2026-11-27）：单测数量基线必须与真实收集数**相等**。
+      # gate.sh 在 PASS 时自动回写 scripts/gate_baseline.json（只升不降、相等不落盘），
+      # 所以这里只要有 diff，就说明仓库里的基线是过期的（有人加了测试但没跑门禁提交基线）。
+      # 严格相等而非"不低于"：不低于会留下空档，空档内的测试可以无声删除。
+      - name: Gate baseline drift check (B5-1)
+        run: |
+          if ! git diff --quiet -- scripts/gate_baseline.json; then
+            echo "✗ 单测数量基线与本次收集数不一致（gate 已自动回写但未提交）："
+            git --no-pager diff -- scripts/gate_baseline.json
+            echo "修复：本地跑一次 bash scripts/gate.sh full，把 scripts/gate_baseline.json 提交上来"
+            exit 1
+          fi
+          echo "单测数量基线一致 ✓"
+
       - name: Upload gate logs (always)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

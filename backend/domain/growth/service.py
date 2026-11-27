@@ -33,6 +33,7 @@ from backend.domain.growth.models import (
     WordsLedger,
 )
 from backend.domain.growth.quiz_events import publish_quiz_result
+from backend.domain.growth.repository import ChildGrowthStateRepository, PointLedgerRepository
 from backend.domain.identity.models import Child
 
 LEVEL_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -69,11 +70,7 @@ class GrowthService:
 
     # ---------- 汇总状态 ----------
     def ensure_state(self, child_id: int) -> ChildGrowthState:
-        state = (
-            self.db.query(ChildGrowthState)
-            .filter(ChildGrowthState.child_id == child_id, ChildGrowthState.is_deleted == 0)
-            .first()
-        )
+        state = ChildGrowthStateRepository(self.db).get_by_child(child_id)
         if not state:
             # B8（2026-10-28）：并发首访会同时通过"先查" → 后到者撞 uq_growth_child 整单 500。
             # 用 SAVEPOINT 兜底（冲突只回滚保存点），失败后重查拿对方插入的行。
@@ -82,11 +79,7 @@ class GrowthService:
             candidate = ChildGrowthState(child_id=child_id)
             if not add_with_unique_fallback(self.db, candidate):
                 self.db.expunge(candidate)
-            state = (
-                self.db.query(ChildGrowthState)
-                .filter(ChildGrowthState.child_id == child_id, ChildGrowthState.is_deleted == 0)
-                .first()
-            )
+            state = ChildGrowthStateRepository(self.db).get_by_child(child_id)
         return state
 
     def _add_points(
@@ -291,13 +284,7 @@ class GrowthService:
         }
 
     def points_list(self, child_id: int, limit: int = POINTS_LIST_LIMIT) -> list[dict]:
-        rows = (
-            self.db.query(PointLedger)
-            .filter(PointLedger.child_id == child_id, PointLedger.is_deleted == 0)
-            .order_by(PointLedger.id.desc())
-            .limit(limit)
-            .all()
-        )
+        rows = PointLedgerRepository(self.db).list_by_child(child_id, limit)
         return [
             {
                 "id": r.id,

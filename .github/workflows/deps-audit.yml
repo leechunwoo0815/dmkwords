@@ -1,0 +1,52 @@
+# .github/workflows/deps-audit.yml — 依赖 CVE 审计（B5-7，2026-11-27）
+# 为什么独立工作流而不是塞进 ci.yml 的门禁：
+#   · pip-audit 要访问 OSV/PyPI，网络抖动会把**代码门禁**拖红（门禁管正确性，这里管供应链）；
+#   · 节奏不同：门禁每次推送都跑，CVE 库按天更新 → 周跑足够，且不会因为"上游今天发了个
+#     无关紧要的公告"就拦住正常交付。
+# fail-closed 纪律（同 B2-2）：审计跑不起来（网络/OSV 不可达）**也判失败**，
+# 不允许把"查不了"显示成"没问题"。脚本里 `exit 2` 就负责这件事。
+name: Deps audit
+
+on:
+  schedule:
+    # 每周一 03:00 UTC（北京时间 11:00）——上班时间能看到红，且不与夜间备份窗口抢资源
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+  push:
+    # 依赖面本身变了就立刻审一次（新锁文件 = 新的供应链面）
+    paths:
+      - "pyproject.toml"
+      - "uv.lock"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # action 一律钉 commit SHA（与 ci.yml 同一条纪律：major tag 可被上游移动）
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      # 审计对象是 `uv export` 出来的**锁定版本**（不是 runner 上现装的 venv）：
+      # 任何一台机器按 uv.lock 装出来的就是这份，审计结论才对生产有意义。
+      - name: Audit locked Python dependencies (pip-audit)
+        run: bash scripts/audit_deps.sh --json deps-audit.json
+
+      # 说明：admin-web 的 `pnpm audit` **在本机走不通**——仓库用 npmmirror 镜像，
+      # 该镜像没有 /-/npm/v1/security/advisories/bulk 端点（实测 ERR_PNPM_AUDIT_ENDPOINT_NOT_EXISTS）。
+      # npm 侧改由 Dependabot（.github/dependabot.yml，npm 生态）覆盖公告与升级 PR。
+
+      - name: Upload audit report (always)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: deps-audit-${{ github.run_id }}
+          path: deps-audit.json
+          if-no-files-found: warn
+          retention-days: 30

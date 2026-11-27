@@ -10,6 +10,8 @@ export type OverdueItem = components["schemas"]["OverdueItemResponse"];
 export type ScanResult = components["schemas"]["ScanResponse"];
 export type BorrowRecordItem = components["schemas"]["RecordItemResponse"];
 
+// B5-8（2026-11-27）：**保留**——`BorrowRecordQuery` 是前端查询参数容器（不是响应体），契约里
+// query 参数只挂在 path 定义上，没有可复用的 schema。
 export interface BorrowRecordQuery {
   page?: number;
   page_size?: number;

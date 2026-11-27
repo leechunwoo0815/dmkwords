@@ -1,6 +1,10 @@
 // activities API（WM9：发布/取消/报名/签到/退款审核）
 import { getToken, ListResult, request, requestList } from "./client";
 
+// B5-8（2026-11-27）：本文件手写类型**保留**——活动相关端点 200 响应在 OpenAPI 里是 `unknown`
+// （后端返 dict），契约无等价 schema；`DetailBlock` 虽有同名 schema，但那边 `type` 是宽松 `string`，
+// 转过去会削掉编辑器的 "paragraph" | "image" 块类型约束（不等价）。
+
 export interface ActivityItem {
   cover_url?: string | null;
   id: number;

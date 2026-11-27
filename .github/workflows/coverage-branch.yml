@@ -1,0 +1,76 @@
+# .github/workflows/coverage-branch.yml — 分支覆盖率月度诊断（B5-6，2026-11-27）
+# 为什么单独一个工作流、而且**报告制**（continue-on-error）：
+#   · 现有门禁的 91% 是**行覆盖率**口径；加 `--cov-branch` 是换口径（同一份代码数字会低），
+#     不能直接替换门禁阈值，否则等于用"没跑过的基线"卡交付；
+#   · 分支覆盖率的价值是**找死角**（"行走到了但分支没走"），不是卡数——
+#     一个月跑一次、把报告留档，人看报告去补用例，比每天红一次有用。
+# 等积累 2–3 个月数据、确认稳定后，再决定要不要把某个下限写进门禁（届时改本文件的
+# continue-on-error 并同步 scripts/gate.sh）。
+name: Coverage (branch, monthly)
+
+on:
+  schedule:
+    - cron: "0 4 1 * *" # 每月 1 日 04:00 UTC（北京时间 12:00）
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  branch-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    continue-on-error: true # 报告制：先看数字，再定阈值
+    services:
+      mysql:
+        image: mysql:8.0.46
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: dmkwords_ci
+          TZ: Asia/Shanghai
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot --silent"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+    env:
+      TZ: Asia/Shanghai
+      DEBUG: "true"
+      SECRET_KEY: "ci-test-key-short"
+      DB_HOST: "127.0.0.1"
+      DB_PORT: "3306"
+      DB_USER: "root"
+      DB_PASSWORD: "root"
+      DB_NAME: "dmkwords_ci"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - name: Install dependencies (uv)
+        run: uv sync --frozen
+      - name: Apply migrations (empty CI database)
+        run: .venv/bin/alembic upgrade head
+
+      # 与门禁同一套隔离口径：xdist 每 worker 自己的库（`tests/unit/conftest.py` 加 `_gwN`）
+      - name: Branch coverage run
+        run: |
+          COVERAGE_BRANCH=1 PYTEST_WORKERS=4 .venv/bin/python -m pytest tests/ -q \
+            -n 4 --dist load --cov=backend --cov-branch \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=xml:coverage-branch.xml \
+            --cov-report=json:coverage-branch.json
+
+      - name: Upload branch coverage report (always)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: branch-coverage-${{ github.run_id }}
+          path: |
+            coverage-branch.xml
+            coverage-branch.json
+          if-no-files-found: warn
+          retention-days: 90

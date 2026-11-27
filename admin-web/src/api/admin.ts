@@ -93,6 +93,8 @@ export function apiDashboardOverview(): Promise<components["schemas"]["Dashboard
 
 // ---------- WM11 通知中心 / 定时任务看板 / 导出 ----------
 
+// B5-8（2026-11-27）：以下手写类型**保留**——通知 / 管理待办 / 任务看板 / 死信看板端点响应在
+// OpenAPI 里是 `unknown`（后端返 dict），契约无等价 schema。
 export interface AdminNotification {
   id: number;
   parent_name: string;

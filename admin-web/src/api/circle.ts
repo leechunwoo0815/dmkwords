@@ -1,6 +1,9 @@
 // circle API（WM14-A：阅读圈帖子管理/馆长赞/置顶/删除/概览）
 import { getToken, request } from "./client";
 
+// B5-8（2026-11-27）：手写类型**保留**——阅读圈端点响应在 OpenAPI 里是 `unknown`（后端返 dict）；
+// `CircleListResp` 与通用 `PaginatedResponse_*` 只是字段名撞脸（items 元素类型与可选性都不同）。
+
 export interface CirclePostItem {
   id: number;
   parent_name: string;

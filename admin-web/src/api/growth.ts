@@ -1,6 +1,9 @@
 // growth API（WM7：成长档案/测验重置/积分调整/等级重算）
 import { request } from "./client";
 
+// B5-8（2026-11-27）：手写类型**保留**——成长域端点响应在 OpenAPI 里是 `unknown`（后端返 dict），
+// 契约无等价 schema。
+
 export interface GrowthSummary {
   child_id: number;
   child_name: string;

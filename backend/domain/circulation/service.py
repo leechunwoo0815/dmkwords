@@ -25,6 +25,7 @@ from backend.domain.circulation.borrow_gate import (
     member_gate,
 )
 from backend.domain.circulation.models import BorrowRecord
+from backend.domain.circulation.repository import BorrowRecordRepository
 from backend.domain.identity.models import Child, Parent
 from backend.domain.reading.reservation_ops import settle_orphans_after_copy_gone_safe
 
@@ -60,15 +61,7 @@ class CirculationService:
             raise NotFoundError("孩子不存在")
         child, parent = child
         now = datetime.now()
-        active = (
-            self.db.query(BorrowRecord)
-            .filter(
-                BorrowRecord.child_id == child_id,
-                BorrowRecord.status.in_([BorrowRecord.STATUS_ACTIVE, BorrowRecord.STATUS_OVERDUE]),
-                BorrowRecord.is_deleted == 0,
-            )
-            .all()
-        )
+        active = BorrowRecordRepository(self.db).list_active_by_child(child_id)
         overdue = [r for r in active if r.due_at < now]
         borrow_limit = int(ConfigService(self.db).get_value("borrow_limit"))
         from backend.domain.billing.models import Deposit

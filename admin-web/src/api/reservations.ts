@@ -1,46 +1,15 @@
 // reservations API（WM6：预约管理 / 核销 / 孩子阅读档案）
 import { ListResult, request, requestList } from "./client";
+import type { components } from "./schema";
 
-export interface ReservationItem {
-  id: number;
-  child_id: number;
-  child_name: string;
-  parent_name: string;
-  parent_phone: string;
-  book_id: number;
-  book_title: string;
-  copy_id: number;
-  status: string;
-  created_at: string;
-  expires_at: string;
-  expired: boolean;
-}
-
-export interface CheckOutResult {
-  reservation_id: number;
-  borrow_record_id: number;
-  due_at: string;
-}
-
-export interface FinishedBook {
-  book_id: number;
-  title: string;
-  author: string | null;
-  word_count: number | null;
-  finished_at: string;
-  reading_minutes: number;
-}
-
-export interface ChildReadingProfile {
-  child_id: number;
-  child_name: string;
-  member_status: string;
-  total_finished: number;
-  total_reading_minutes: number;
-  total_checkin_days: number;
-  current_streak: number;
-  finished_books: FinishedBook[];
-}
+// B5-8：本文件四个类型原先手写，逐一比对后与 OpenAPI 契约**逐字段等价**（字段名/可选性/类型
+// 全一致，且这三个端点 200 响应就声明了这些 schema）→ 改为契约类型，导出名保持不变。
+// 预约列表端点（GET /api/admin/reservations）200 = reading 路由的 ReservationItemResponse
+// （circulation 路由同名 schema 是 miniapp 口径，字段更少，别混用）。
+export type ReservationItem = components["schemas"]["backend__domain__reading__router__ReservationItemResponse"];
+export type CheckOutResult = components["schemas"]["CheckOutResponse"];
+export type FinishedBook = components["schemas"]["FinishedBookItem"];
+export type ChildReadingProfile = components["schemas"]["ChildReadingProfileResponse"];
 
 // P2-44：预约列表后端硬上限 200——返回上限元信息，页面据此提示"可能还有更多"。
 export function apiListReservations(

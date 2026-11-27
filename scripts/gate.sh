@@ -65,7 +65,13 @@ PYTEST_TMP=$(mktemp -t dmkwords-pytest-XXXXXX)
 # 因为 MySQL 命名锁是服务器级、不随库变）。实测 4 worker：全量 24 分钟（串行带覆盖率 88 分钟）。
 # 可用 `PYTEST_WORKERS=8 scripts/gate.sh full` 临时调高；机器核少时调低（不影响正确性，只影响耗时）。
 PYTEST_WORKERS=${PYTEST_WORKERS:-4}
-if ! python -m pytest tests/ -q --tb=short -rs -n "$PYTEST_WORKERS" --dist load \
+# B5-6（2026-11-27）：**分支覆盖率开关**（默认关）。行覆盖率 91% 是既有基线，# 开分支是换口径（同一份代码会显得更低），不能直接替换门禁阈值；# 需要看"行走到了但分支没走"的死角时：`COVERAGE_BRANCH=1 bash scripts/gate.sh full`。
+COV_BRANCH_FLAG=""
+if [ "${COVERAGE_BRANCH:-0}" = "1" ]; then
+  COV_BRANCH_FLAG="--cov-branch"
+  echo "（B5-6：已开启分支覆盖率统计——口径与平时不同，仅用于诊断，不替代既有基线）"
+fi
+if ! python -m pytest tests/ -q --tb=short -rs -n "$PYTEST_WORKERS" --dist load $COV_BRANCH_FLAG \
   --cov=backend --cov-fail-under=85 \
   --cov-report=term-missing:skip-covered --durations=20 2>&1 | tee "$PYTEST_TMP"; then
   echo "✗ 门禁失败: pytest tests/"
@@ -85,6 +91,10 @@ else
     fail "单测数量 ${COLLECTED_COUNT}（passed ${PASSED_COUNT} + skipped ${SKIPPED_COUNT}）< 基线 ${MIN_PASSED}（测试被删/未被收集；确属预期删测时同步下调基线并写明理由）"
   else
     echo "单测数量基线 OK：${COLLECTED_COUNT}（passed ${PASSED_COUNT} + skipped ${SKIPPED_COUNT}）>= ${MIN_PASSED}"
+    # B5-1（2026-11-27）：**自动回写**基线（只升不降 + 相等不落盘）。
+    # 手工维护让基线与实际收集数长期漂移（实测 1337 vs 1455 = 118 个空档，删 118 个测试照样绿）；
+    # CI 侧 `git diff --exit-code -- scripts/gate_baseline.json` 保证基线只能来自一次真实门禁。
+    run python scripts/gate_baseline_update.py "$COLLECTED_COUNT"
   fi
 fi
 # W8-D11（2026-10-28 B4）：skip 本身也要受约束——收集数不变时把用例改成 skip 不会红。
@@ -152,6 +162,10 @@ CHECKER_CMDS=(
   "python scripts/check_admin_failure_states.py"
   "python scripts/check_theme_tokens.py"
   "python -m scripts.check_gate_selftest"
+  # B5-9（2026-11-27）：错误记忆库「滚动最新 10 条」恒等式 + LEDGER 教训行必须入库
+  "python scripts/check_error_memory.py"
+  # B5-3（2026-11-27）：前端行数检查（>800 判红、>700 预警；排除自动生成的 schema.d.ts）
+  "python scripts/check_frontend_size.py"
 )
 for checker_cmd in "${CHECKER_CMDS[@]}"; do
   run $checker_cmd --self-test

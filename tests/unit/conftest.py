@@ -14,10 +14,23 @@ from collections.abc import Generator
 # B5-2（2026-11-27）：**必须先于任何 backend import**——`backend/database.py` 在 import 时
 # 就用 settings 建 engine，之后再改 DB_NAME 无效。xdist 下每 worker 一个库，避免并行清表互殴；
 # 库名白名单（只放 dmkwords_test / _bdd / _ci）与建库+迁移在 `tests/db_env.py`。
-os.environ.setdefault(
-    "DB_NAME",
-    "dmkwords_test"
-    + (f"_{os.environ['PYTEST_XDIST_WORKER']}" if os.environ.get("PYTEST_XDIST_WORKER") else ""),
+#
+# **2026-11-27 CI 实测（必须记住的坑）**：原先用 `setdefault`，于是 CI 里
+# `DB_NAME=dmkwords_ci` 已经存在 → 4 个 worker **共用一个库** → 各自 TRUNCATE + 重播种子，
+# 并发插 `admin` 直接 1062（`Duplicate entry 'admin' for key 'admin_users.ix_admin_users_username'`）。
+# 本地跑不出这个红，因为本地没设 DB_NAME。正确口径：**只要在 xdist 下，就一律加 worker 后缀**
+# （无论 DB_NAME 是默认的还是外部给的）；CI 的 `dmkwords_ci` → `dmkwords_ci_gwN`，仍在白名单内。
+#
+# **写法约束（ruff E402）**：这里只能用顶格的 `os.environ[...] = ...` / `os.environ.setdefault(...)`
+# 语句。曾经写成 `_WORKER = ...` + `if _WORKER:` 块 → 后面 6 个 import 全部 E402
+# （ruff 只对 `os.environ` 形态的"必须早于 import 的赋值"开白名单，对 if 块不开）。
+os.environ["DB_NAME"] = os.environ.get("DB_NAME") or "dmkwords_test"
+os.environ["DB_NAME"] = (
+    os.environ["DB_NAME"]
+    if not os.environ.get("PYTEST_XDIST_WORKER")
+    or os.environ["DB_NAME"].endswith("-" + os.environ["PYTEST_XDIST_WORKER"])
+    or os.environ["DB_NAME"].endswith("_" + os.environ["PYTEST_XDIST_WORKER"])
+    else os.environ["DB_NAME"] + "_" + os.environ["PYTEST_XDIST_WORKER"]
 )
 
 # MySQL 命名锁（`dmkwords:scheduler` / `dmkwords:task:<name>`）是**服务器级**的，不随库变：
