@@ -45,7 +45,7 @@ jobs:
           # `git show --check` 需要父提交；浅克隆 depth=1 时该提交会被当成 root，
           # 把整棵树都算成新增行 → 历史 LEDGER 的尾随空格全部误报（2026-11-10 实测）。
           fetch-depth: 2
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
           python-version: "3.13"
           enable-cache: true
