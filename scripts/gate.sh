@@ -60,7 +60,13 @@ step 2 "单测 + 覆盖率（真实 MySQL 同构环境，单次跑全量）"
 # 2026-10-27 CI 实证：`test_media_health` 按运行机本地时钟在 UTC 凌晨走 skip 分支，
 # 只数 `passed` 会让同一份代码在 CI 比本地少 1 → 必须用收集数（skip 也是被收集的）。
 PYTEST_TMP=$(mktemp -t dmkwords-pytest-XXXXXX)
-if ! python -m pytest tests/ -q --tb=short -rs --cov=backend --cov-fail-under=85 \
+# B5-2（2026-11-27）：**并行跑**（pytest-xdist）。前置已由 `tests/db_env.py` 保证隔离——
+# 每个 worker 一个独立测试库（`dmkwords_test_gwN`）+ 独立锁名后缀（`DMK_LOCK_SUFFIX=-gwN`，
+# 因为 MySQL 命名锁是服务器级、不随库变）。实测 4 worker：全量 24 分钟（串行带覆盖率 88 分钟）。
+# 可用 `PYTEST_WORKERS=8 scripts/gate.sh full` 临时调高；机器核少时调低（不影响正确性，只影响耗时）。
+PYTEST_WORKERS=${PYTEST_WORKERS:-4}
+if ! python -m pytest tests/ -q --tb=short -rs -n "$PYTEST_WORKERS" --dist load \
+  --cov=backend --cov-fail-under=85 \
   --cov-report=term-missing:skip-covered --durations=20 2>&1 | tee "$PYTEST_TMP"; then
   echo "✗ 门禁失败: pytest tests/"
   FAILED=1

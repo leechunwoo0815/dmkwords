@@ -12,12 +12,23 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
 #: 任务级锁名前缀
 TASK_LOCK_PREFIX = "dmkwords:task:"
+
+#: 锁名后缀（B5-2，2026-11-27）：与调度器锁同源——MySQL 命名锁是**服务器级**的，
+#: xdist 多 worker 共用一个服务器时必须各自一把。生产不设该变量 → 后缀为空。
+_TASK_LOCK_SUFFIX = os.environ.get("DMK_LOCK_SUFFIX", "")
+
+
+def task_lock_name(task_name: str) -> str:
+    """本进程实际使用的任务锁名（GET_LOCK / RELEASE_LOCK 都走这里）。"""
+    return f"{TASK_LOCK_PREFIX}{task_name}{_TASK_LOCK_SUFFIX}"
+
 
 #: 自动调度失败后的重试退避（秒）。退避走"排一个 date 任务"而不是 sleep——
 #: 调度线程不被占住（否则同进程其它任务被推迟）。
@@ -37,7 +48,7 @@ def try_task_lock(task_name: str) -> tuple[bool, object]:
     try:
         conn = engine.connect()
         got = conn.execute(
-            text("SELECT GET_LOCK(:n, 0)"), {"n": TASK_LOCK_PREFIX + task_name}
+            text("SELECT GET_LOCK(:n, 0)"), {"n": task_lock_name(task_name)}
         ).scalar()
         conn.commit()  # 结束隐式事务（命名锁是会话级，提交不影响持有）
     except Exception as exc:  # noqa: BLE001
@@ -60,7 +71,7 @@ def release_task_lock(task_name: str, conn) -> None:
     from sqlalchemy import text
 
     try:
-        conn.execute(text("SELECT RELEASE_LOCK(:n)"), {"n": TASK_LOCK_PREFIX + task_name})
+        conn.execute(text("SELECT RELEASE_LOCK(:n)"), {"n": task_lock_name(task_name)})
         conn.commit()
     except Exception:  # noqa: BLE001 — 释放失败不影响收尾（连接关闭后由 MySQL 自解）
         logger.warning("任务级锁释放失败（连接关闭后由 MySQL 自解）: %s", task_name)

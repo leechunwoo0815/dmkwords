@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -412,6 +413,21 @@ def _run_task_locked(task_name: str, spec, *, manual: bool, admin) -> dict:
 #: 护栏 = 「骑锁」：谁拿到锁谁调度；拿不到就不注册任务（该进程照常提供 API）。
 SCHEDULER_LOCK_NAME = "dmkwords:scheduler"
 
+#: 锁名**后缀**（B5-2，2026-11-27）：MySQL 命名锁是**服务器级**的，不随库变——
+#: 多个 pytest xdist worker 共用一个 MySQL 服务器时必须各自一把，否则互相抢锁
+#: （实测症状：任务手动触发被别的 worker 抢到锁后返回 409「任务正在运行中」、
+#: 接管用例前置断言拿不到锁）。**生产不设该变量 → 后缀为空 → 锁名与文档完全一致**；
+#: 测试由 `tests/unit/conftest.py` 设成 `-gwN`。**绝不把数据库名拼进锁名**：
+#: 那样滚动发布期新旧进程会各持一把 → 定时任务双跑（正是本锁要防的事）。
+_LOCK_SUFFIX = os.environ.get("DMK_LOCK_SUFFIX", "")
+
+
+def scheduler_lock_name() -> str:
+    """本进程**实际使用**的调度器锁名（契约名 + 测试后缀）。凡 GET_LOCK/IS_USED_LOCK/RELEASE_LOCK
+    都走这里，不许各处直接引用常量。"""
+    return SCHEDULER_LOCK_NAME + _LOCK_SUFFIX
+
+
 #: 持有命名锁的连接（**保持打开 = 保持锁**；进程退出/被杀时由 MySQL 自动释放）
 _lock_conn = None
 
@@ -448,7 +464,7 @@ def _acquire_scheduler_lock_locked(text, engine) -> bool:
     global _lock_conn
     try:
         conn = engine.connect()
-        got = conn.execute(text("SELECT GET_LOCK(:n, 0)"), {"n": SCHEDULER_LOCK_NAME}).scalar()
+        got = conn.execute(text("SELECT GET_LOCK(:n, 0)"), {"n": scheduler_lock_name()}).scalar()
         conn.commit()  # 结束隐式事务（命名锁是会话级，提交不影响持有）
     except Exception as exc:  # noqa: BLE001
         logger.warning("调度器单实例锁不可用（%s），按单进程纪律放行", exc)
@@ -473,7 +489,7 @@ def _holds_scheduler_lock() -> bool:
 
         try:
             holder = _lock_conn.execute(
-                text("SELECT IS_USED_LOCK(:n)"), {"n": SCHEDULER_LOCK_NAME}
+                text("SELECT IS_USED_LOCK(:n)"), {"n": scheduler_lock_name()}
             ).scalar()
             mine = _lock_conn.execute(text("SELECT CONNECTION_ID()")).scalar()
             _lock_conn.commit()
@@ -496,7 +512,7 @@ def release_scheduler_lock() -> None:
     from sqlalchemy import text
 
     try:
-        conn.execute(text("SELECT RELEASE_LOCK(:n)"), {"n": SCHEDULER_LOCK_NAME})
+        conn.execute(text("SELECT RELEASE_LOCK(:n)"), {"n": scheduler_lock_name()})
         conn.commit()
     except Exception:  # noqa: BLE001 — 释放失败不影响收尾（连接关闭后由 MySQL 自解）
         logger.warning("调度器单实例锁释放失败（连接关闭后由 MySQL 自解）")
@@ -588,7 +604,7 @@ def _watchdog_loop() -> None:
             if _acquire_scheduler_lock():
                 logger.warning(
                     "调度器单实例锁 %s 已接管（原持锁副本已退出）——本进程开始调度全部任务",
-                    SCHEDULER_LOCK_NAME,
+                    scheduler_lock_name(),
                 )
                 _start_jobs_now()
                 return
@@ -627,7 +643,7 @@ def start_scheduler() -> bool:
         logger.warning(
             "调度器单实例锁 %s 被其它进程持有——本进程先不注册定时任务（API 照常服务），"
             "已启动抢锁看护（每 %d 秒重试，持锁副本退出后自动接管）",
-            SCHEDULER_LOCK_NAME,
+            scheduler_lock_name(),
             SCHEDULER_LOCK_RETRY_SECONDS,
         )
         _start_lock_watchdog()

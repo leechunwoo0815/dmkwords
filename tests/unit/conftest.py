@@ -1,11 +1,31 @@
 # tests/unit/conftest.py — WM1 测试夹具（真实 MySQL + 真实 HTTP 层）
-"""反假绿纪律：测试走真实 MySQL（TRUNCATE 隔离）+ TestClient（真实 ASGI/HTTP 栈）。"""
+"""反假绿纪律：测试走真实 MySQL（TRUNCATE 隔离）+ TestClient（真实 ASGI/HTTP 栈）。
+
+**B5-2（2026-11-27）**：测试改跑**专用库**（`dmkwords_test`；xdist 下每 worker 再带 `_gwN`
+后缀），不再与 `dev.sh` 后端共库。建库 + 迁移 + 库名白名单硬拦截都在 `tests/db_env.py`。
+"""
 
 from __future__ import annotations
 
 import os
 import tempfile
 from collections.abc import Generator
+
+# B5-2（2026-11-27）：**必须先于任何 backend import**——`backend/database.py` 在 import 时
+# 就用 settings 建 engine，之后再改 DB_NAME 无效。xdist 下每 worker 一个库，避免并行清表互殴；
+# 库名白名单（只放 dmkwords_test / _bdd / _ci）与建库+迁移在 `tests/db_env.py`。
+os.environ.setdefault(
+    "DB_NAME",
+    "dmkwords_test"
+    + (f"_{os.environ['PYTEST_XDIST_WORKER']}" if os.environ.get("PYTEST_XDIST_WORKER") else ""),
+)
+
+# MySQL 命名锁（`dmkwords:scheduler` / `dmkwords:task:<name>`）是**服务器级**的，不随库变：
+# xdist 多 worker 共用一个服务器时必须各自一把（见 `backend/tasks/registry._LOCK_SUFFIX`）。
+os.environ.setdefault(
+    "DMK_LOCK_SUFFIX",
+    f"-{os.environ['PYTEST_XDIST_WORKER']}" if os.environ.get("PYTEST_XDIST_WORKER") else "",
+)
 
 # G-12/T34（域G）：测试上传隔离到临时目录—— uploads 与 dev 库同源共写
 # （pytest 与 dev 后端共库，TRUNCATE 清业务表；上传文件此前 311MB/4136 个
@@ -116,6 +136,18 @@ def books_on_shelf_by_default(monkeypatch, request):
         return
     monkeypatch.setattr(BookService, "create_book", _create_book)
     yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _test_database_ready():
+    """B5-2：整个会话开始前把专用测试库建好并迁到 head（幂等，每进程一次）。
+
+    为什么用 alembic 而不是 `create_all`：与 CI 同口径——表结构必须由**迁移**产出，
+    否则"迁移漏了某个列"这类问题在测试里永远发现不了。
+    """
+    from tests.db_env import ensure_database
+
+    assert ensure_database() == os.environ["DB_NAME"]
 
 
 @pytest.fixture(autouse=True)

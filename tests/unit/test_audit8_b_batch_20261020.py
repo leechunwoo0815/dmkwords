@@ -281,7 +281,7 @@ def test_scheduler_takes_over_after_holder_exits(client: TestClient):
     monkeypatch_retry = 1  # 秒：看护周期改短，用例不必等 60 秒
     with engine.connect() as holder:
         got = holder.execute(
-            text("SELECT GET_LOCK(:n, 0)"), {"n": reg.SCHEDULER_LOCK_NAME}
+            text("SELECT GET_LOCK(:n, 0)"), {"n": reg.scheduler_lock_name()}
         ).scalar()
         # 前置失败的可诊断化（2026-10-21 第一百零九批实测踩到）：本机**已有持锁者**时
         # GET_LOCK 返回 0，最常见原因是"跑 pytest 时 dev 后端还开着"（它的调度器持着这把锁，
@@ -301,7 +301,7 @@ def test_scheduler_takes_over_after_holder_exits(client: TestClient):
                     "非持锁副本必须启动抢锁看护（原先什么都不做）"
                 )
         finally:
-            holder.execute(text("SELECT RELEASE_LOCK(:n)"), {"n": reg.SCHEDULER_LOCK_NAME})
+            holder.execute(text("SELECT RELEASE_LOCK(:n)"), {"n": reg.scheduler_lock_name()})
             holder.commit()
 
         deadline = time.time() + 10

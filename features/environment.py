@@ -1,4 +1,10 @@
 # features/environment.py — behave 测试环境（真实 MySQL + 真实 HTTP 层）
+import os
+
+# B5-2（2026-11-27）：BDD 跑专用库（`dmkwords_bdd`），不再清开发库的表。
+# 与 pytest 同口径，必须**先于任何 backend import**（engine 在建在 import 时）。
+os.environ.setdefault("DB_NAME", "dmkwords_bdd")
+
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
@@ -12,6 +18,13 @@ from tests.unit.conftest import ADMIN_TABLES
 # feature 时会踩跨场景残留；改清单须改 conftest 一处）。
 # W8-D9（2026-10-28）：原 `ADMIN_TABLES + BDD_TABLES` 每场景重复 37 条 TRUNCATE
 # （BDD_TABLES 是 ADMIN_TABLES 去掉三张种子表的子集——少清那三张会破坏种子，故必须清全量）。
+
+
+def before_all(context):
+    """B5-2：整轮 BDD 开始前把专用库建好并迁到 head（幂等）。"""
+    from tests.db_env import ensure_database
+
+    ensure_database()
 
 
 def before_scenario(context, scenario):

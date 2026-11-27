@@ -61,9 +61,13 @@ def lock_name(monkeypatch):
     真实锁名（`dmkwords:scheduler`）在跑单测时可能正被 dev 后端持有（pytest 与 dev 共用库），
     机制测试不该受它影响；真实锁名本身另有断言钉住（见 `test_lock_name_is_stable`）。
     """
-    name = f"{registry.SCHEDULER_LOCK_NAME}:test"
     registry.stop_scheduler()
-    monkeypatch.setattr(registry, "SCHEDULER_LOCK_NAME", name)
+    monkeypatch.setattr(registry, "SCHEDULER_LOCK_NAME", f"{registry.SCHEDULER_LOCK_NAME}:test")
+    # B5-2（2026-11-27）：**取打完桩之后的有效锁名**（`scheduler_lock_name()` 还会拼上
+    # `DMK_LOCK_SUFFIX`，xdist 下每 worker 不同）。原先这里返回的是"常量 + :test"，
+    # 与被测代码实际 GET_LOCK 的名字差一个后缀 → 外部持锁者与代码不是同一把锁，
+    # `_acquire_scheduler_lock()` 恒为 True（并行下 3 条机制用例齐红，实测）。
+    name = registry.scheduler_lock_name()
     try:
         yield name
     finally:
