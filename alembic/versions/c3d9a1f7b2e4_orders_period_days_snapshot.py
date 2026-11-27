@@ -42,8 +42,10 @@ def upgrade() -> None:
     conn = op.get_bind()
     config = dict(
         conn.execute(
-            sa.text("SELECT config_key, config_value FROM system_configs WHERE config_key IN "
-                    "('observation_period_days', 'formal_period_days')")
+            sa.text(
+                "SELECT config_key, config_value FROM system_configs WHERE config_key IN "
+                "('observation_period_days', 'formal_period_days')"
+            )
         ).all()
     )
     observation = int(config.get("observation_period_days", 30))

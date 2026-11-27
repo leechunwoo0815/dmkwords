@@ -24,9 +24,28 @@ from sqlalchemy.orm import Session
 
 from backend.common.exceptions import NotFoundError
 from backend.domain.catalog.audit_events import publish_audit
+from backend.domain.identity import lock_order
 from backend.domain.identity.models import Order, RefundRequest
 
 logger = logging.getLogger(__name__)
+
+
+def _lock_child_then_refund(db: Session, request_id: int, *, not_found: str):
+    """按全局锁序（`lock_order.py`）取退款单：**Child → RefundRequest**。
+
+    为什么这三个入口也要锁 Child（2026-11-27 B1-1/B1-2）：它们只锁退款单行就去改
+    订单/孩子/退会/押金的终态，而 `RefundService.execute` 是 `Child → Order → RefundRequest`。
+    两边相对顺序相反时，回调路径与人工执行路径并发会成环（1213）——回调方被选为受害者 =
+    微信重发 24 小时、本地状态停滞。统一到同一锁序后，谁先谁后都不会成环。
+    """
+    head = lock_order.lock_refund_head(db, request_id)
+    if head is None:
+        raise NotFoundError(not_found)
+    lock_order.lock_child(db, head.child_id)
+    req = lock_order.lock_refund_request(db, request_id)
+    if req is None:
+        raise NotFoundError(not_found)
+    return req
 
 
 def refund_id_of(out_refund_no: str) -> int | None:
@@ -213,14 +232,8 @@ def submit_gateway_refund(
         gateway_error = True
 
     # Phase 3
-    fresh = (
-        db.query(RefundRequest)
-        .filter(RefundRequest.id == req.id, RefundRequest.is_deleted == 0)
-        .with_for_update()
-        .populate_existing()
-        .first()
-    )
-    if fresh is None or fresh.status == RefundRequest.STATUS_REFUNDED:
+    fresh = _lock_child_then_refund(db, req.id, not_found="退款申请不存在")
+    if fresh.status == RefundRequest.STATUS_REFUNDED:
         return  # 回调赢了（或单被删）：认回调结果，不再改
     if gateway_error:
         # WM12-C（审查 P0-1）：超时/异常的窗口里微信**可能已受理**——留在"执行中" + 打未知态标记。
@@ -320,15 +333,7 @@ def resolve_unknown(
     from backend.common.exceptions import ValidationError
     from backend.integrations.payment import get_payment_gateway
 
-    req = (
-        db.query(RefundRequest)
-        .filter(RefundRequest.id == request_id, RefundRequest.is_deleted == 0)
-        .with_for_update()
-        .populate_existing()
-        .first()
-    )
-    if not req:
-        raise NotFoundError("退款申请不存在")
+    req = _lock_child_then_refund(db, request_id, not_found="退款申请不存在")
     if not (req.out_refund_no or "").strip():
         raise ValidationError("该退款单没有商户退款单号（没走过网关），无需查单")
     if req.gateway_unknown_at is None and req.status != RefundRequest.STATUS_PROCESSING:
@@ -510,15 +515,7 @@ def finalize_gateway_result(
     """
     import types
 
-    req = (
-        db.query(RefundRequest)
-        .filter(RefundRequest.id == request_id, RefundRequest.is_deleted == 0)
-        .with_for_update()
-        .populate_existing()
-        .first()
-    )
-    if not req:
-        raise NotFoundError("退款申请不存在")
+    req = _lock_child_then_refund(db, request_id, not_found="退款申请不存在")
     actor = types.SimpleNamespace(id=0, display_name="微信退款回调")
     if req.status == RefundRequest.STATUS_REFUNDED:
         return {"id": req.id, "status": req.status, "ignored": True}

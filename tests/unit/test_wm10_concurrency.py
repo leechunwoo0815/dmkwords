@@ -575,8 +575,13 @@ def test_refund_apply_concurrent_single_request(client: TestClient, session_pair
 
 
 def test_execute_advance_failure_rolls_back_all(client: TestClient, session_pair, monkeypatch):
-    """P1-F9：execute 主流程与 _advance_withdrawal 同事务——聚合推进抛异常时
-    主流程整体回滚（退款单不落 refunded 终态）；修复前双 commit 半提交（RED）。"""
+    """P1-F9：execute 主流程与聚合推进同事务——聚合推进抛异常时
+    主流程整体回滚（退款单不落 refunded 终态）；修复前双 commit 半提交（RED）。
+
+    2026-11-27（B1-2）：聚合推进从 `RefundService._advance_withdrawal` 迁为
+    `wm10_withdrawal_service.advance_withdrawal(db, id)`（god-file 红线 + 退会域归位），
+    打桩点跟着改到 `wm10_service` 里的引用名——**被测性质不变**：推进抛错，主流程必须整体回滚。
+    """
     h = _h(client)
     p, c, mini = _family(client, h, "13800002312", "事务边界孩")
     order = _pay(client, h, c["id"], "formal_fee")  # formal 触发联动退会链
@@ -596,7 +601,8 @@ def test_execute_advance_failure_rolls_back_all(client: TestClient, session_pair
     def _boom(db, request_id):
         raise RuntimeError("模拟推进崩溃")
 
-    monkeypatch.setattr(RefundService, "_advance_withdrawal", _boom)
+    # 打桩点必须是 `wm10_service` 里**实际被调用**的那个名字（模块级 import 的绑定）
+    monkeypatch.setattr("backend.domain.identity.wm10_service.advance_withdrawal", _boom)
     with pytest.raises(RuntimeError):
         RefundService(s2).execute(
             type("A", (), {"id": 1, "display_name": "超管"})(), rr["id"], True, "执行"

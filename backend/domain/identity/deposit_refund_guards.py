@@ -45,6 +45,10 @@ def assert_deposit_refund_executable(db: Session, req) -> None:
     第二张 1200 过闸）→ 押金余额可被打成负数。订单侧早有同款累计闸
     （`assert_order_refund_executable`，2026-10-12），押金侧一直缺。
 
+    **2026-11-27（B1-1 同族收口）**：统计原来是普通读（REPEATABLE READ 旧快照），改成**锁定读**
+    （逐行 `FOR UPDATE` 后求和）。押金侧本来就有押金行锁串行化，锁定读是补"锁内读到的必须是
+    最新已提交状态"这一条：否则拿旧快照照样能把两笔在途都判成"对方不存在"。
+
     **为什么只数 `PROCESSING`**：三种状态的钱在哪里不同——
       · `PENDING` / `APPROVED` 只是**申请**，钱没动，也不占余额（两笔都批准、只执行其中一笔是
         正常运营动作；把它们算进来会把第一笔也拦死，P0-D 老用例实测即如此）；
@@ -61,21 +65,29 @@ def assert_deposit_refund_executable(db: Session, req) -> None:
             f"押金可退金额不足（可退 {dep.available_amount}，本次申请 {req.amount}）——"
             "疑似重复退款单，请人工核对后再执行"
         )
-    from sqlalchemy import func
+    from decimal import Decimal
 
     from backend.domain.identity.models import RefundRequest
 
-    in_flight = (
-        db.query(func.coalesce(func.sum(RefundRequest.amount), 0))
-        .filter(
-            RefundRequest.deposit_id == req.deposit_id,
-            RefundRequest.id != req.id,
-            RefundRequest.is_deleted == 0,
-            RefundRequest.status == RefundRequest.STATUS_PROCESSING,
-        )
-        .scalar()
+    in_flight = sum(
+        (
+            row[0]
+            for row in db.query(RefundRequest.amount)
+            .filter(
+                RefundRequest.deposit_id == req.deposit_id,
+                RefundRequest.id != req.id,
+                RefundRequest.is_deleted == 0,
+                RefundRequest.status == RefundRequest.STATUS_PROCESSING,
+            )
+            # 裸列锁定读（不加载实体，populate_existing 语义上是无操作，但架构关要求显式声明——
+            # 它同时是"这是锁定读、不是普通读"的标记，防日后被当成普通聚合随手改回去）
+            .with_for_update()
+            .populate_existing()
+            .all()
+        ),
+        Decimal("0"),
     )
-    if (in_flight or 0) + req.amount > dep.available_amount:
+    if in_flight + req.amount > dep.available_amount:
         raise ValidationError(
             f"该押金退款将超额（可用 {dep.available_amount}，"
             f"其它已提交网关的在途 {in_flight}，本次 {req.amount}）"
@@ -92,36 +104,50 @@ def assert_order_refund_executable(db: Session, req) -> None:
     押金侧早有同款闸（`assert_deposit_refund_executable`），订单侧一直缺。
 
     口径：本次金额 + 该订单**已成功/在途**的其它退款单合计 ≤ 订单金额，超出即拒（422，状态不流转）。
+
+    **B1-1（2026-11-27，双审查 P1-1）：这道闸原来自己就有个重复出款的洞。**
+    两笔 `failed` 的退款单**同时**重试时：统计刻意不含 `failed`（含了会把合法重试也拦死），
+    而普通读吃的是事务开始时的快照 —— 两笔互相看不见对方（对方还没提交），各自算出
+    "0 + 本单金额 ≤ 订单金额" → **两笔都放行**，同一订单出款两倍。
+    修法不是改统计口径（那样会把"两笔失败、只重试一笔"的合法路径拦死），而是**串行化**：
+    调用方（`RefundService.execute`）现在按全局锁序先锁 `Child → Order`，订单行锁就是
+    "同一订单退款"的串行化点；本函数在锁内用**锁定读**统计（`FOR UPDATE`，绕过 REPEATABLE READ
+    快照，读到的必是最新已提交状态）→ 第二笔进闸时第一笔必然已是 `processing/refunded`，被计入。
+    锁序见 `backend/domain/identity/lock_order.py`。
     """
-    from sqlalchemy import func
+    from decimal import Decimal
 
     from backend.domain.identity.models import Order, RefundRequest
 
-    # 注意：这里**不锁订单行**（2026-10-12 实测）：本闸在"已持有退款单锁"的事务里执行，
-    # 再锁订单行会与"先锁订单再建退款单"的路径（结算/确认收款）形成锁序反转 → 死锁（1213）。
-    # 因此只做聚合读。残留竞态：两笔退款单**同时**执行时可能各自读到对方未提交的累计值，
-    # 但两条路径各有退款单状态机把关，且对账 L5/L6 事后必报超额（口径见 docs/09 第四十九轮 §二）。
     order = db.query(Order).filter(Order.id == req.order_id).first()
     if order is None:
         return
-    in_flight_or_paid = (
-        db.query(func.coalesce(func.sum(RefundRequest.amount), 0))
-        .filter(
-            RefundRequest.order_id == req.order_id,
-            RefundRequest.id != req.id,
-            RefundRequest.is_deleted == 0,
-            RefundRequest.status.in_(
-                [
-                    RefundRequest.STATUS_PENDING,
-                    RefundRequest.STATUS_APPROVED,
-                    RefundRequest.STATUS_PROCESSING,
-                    RefundRequest.STATUS_REFUNDED,
-                ]
-            ),
-        )
-        .scalar()
+    in_flight_or_paid = sum(
+        (
+            row[0]
+            for row in db.query(RefundRequest.amount)
+            .filter(
+                RefundRequest.order_id == req.order_id,
+                RefundRequest.id != req.id,
+                RefundRequest.is_deleted == 0,
+                RefundRequest.status.in_(
+                    [
+                        RefundRequest.STATUS_PENDING,
+                        RefundRequest.STATUS_APPROVED,
+                        RefundRequest.STATUS_PROCESSING,
+                        RefundRequest.STATUS_REFUNDED,
+                    ]
+                ),
+            )
+            # 裸列锁定读（不加载实体，populate_existing 语义上是无操作，但架构关要求显式声明——
+            # 它同时是"这是锁定读、不是普通读"的标记，防日后被当成普通聚合随手改回去）
+            .with_for_update()
+            .populate_existing()
+            .all()
+        ),
+        Decimal("0"),
     )
-    total = (in_flight_or_paid or 0) + req.amount
+    total = in_flight_or_paid + req.amount
     if total > order.amount:
         raise ValidationError(
             f"该订单退款将超额（订单 {order.amount}，已退/在途 {in_flight_or_paid}，"

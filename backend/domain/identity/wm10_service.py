@@ -13,13 +13,14 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.common.admin_notification_models import AdminNotification
 from backend.common.admin_notifications import AdminNotifyService
 from backend.common.exceptions import ConflictError, NotFoundError, ValidationError
 from backend.domain.catalog.audit_events import publish_audit
-from backend.domain.identity import refund_online, refund_rules
+from backend.domain.identity import lock_order, refund_online, refund_rules
 from backend.domain.identity.guards import ensure_not_locked as _ensure_not_locked
 from backend.domain.identity.member_status import write_member_status
 from backend.domain.identity.models import (
@@ -28,6 +29,10 @@ from backend.domain.identity.models import (
     Parent,
     RefundRequest,
     WithdrawalRequest,
+)
+from backend.domain.identity.wm10_withdrawal_service import (
+    advance_withdrawal,
+    settle_withdrawal_on_terminal,
 )
 from backend.domain.identity.wm_notify import (
     notify_refund_executed,
@@ -111,6 +116,12 @@ class RefundService:
         commit，单失败整体回滚无半程（家长主动单笔路径默认 False 即时提交）。"""
         if not reason or not reason.strip():
             raise ValidationError("必须填写退款原因")
+        # 全局锁序（lock_order.py）第一级：**先锁 Child 再锁 Order**。
+        # B1-2（2026-11-27 双审查 P1-2）：原先只锁订单行，R-309 联动建退会单的"已有进行中退会"
+        # 判重是普通读，与家长侧 `WithdrawalService.apply`（锁 Child → 判重 → 建单）互相看不见
+        # 对方的未提交行 → 同一孩子可同时存在两张活跃退会单（押金随后退两遍）。
+        # 两边都以 Child 为串行化点后，第二方必然看见第一方已提交的那张。
+        child = lock_order.lock_child(self.db, child.id) or child
         order = self._paid_order(child, order_id)
         # H-4/T30（PRD §9.3 单一事实源）：活动订单必须过活动退款矩阵——
         # 「我的订单」通用入口此前可绕过（已签到活动也能建退款单）。
@@ -180,7 +191,14 @@ class RefundService:
                 reason=f"会员服务费退款联动退会：{reason.strip()}",
             )
             self.db.add(withdrawal)
-            self.db.flush()
+            try:
+                self.db.flush()
+            except IntegrityError:
+                # B1-2 第三层防线：活跃退会唯一索引兜底（正常路径已由 Child 行锁串行化）
+                self.db.rollback()
+                raise ConflictError(
+                    "该孩子已有进行中的退会流程，会员服务费退款请走退会申请"
+                ) from None
             child.operation_locked = 1
 
         req = RefundRequest(
@@ -258,7 +276,7 @@ class RefundService:
                 WithdrawalRequest.STATUS_PENDING_SETTLE,
             ):
                 # T5/B-13：结算退款单终态推进（全部撤销）——全撤退会失败、部分成功 completed
-                self._settle_withdrawal_on_terminal(req, w, child)
+                settle_withdrawal_on_terminal(self.db, req, w, child)
         # WM13 L2 回写：家长撤销 → 该单管理待办审计标注来源（幂等）
         AdminNotifyService(self.db).mark_handled(
             ref_type=AdminNotification.REF_REFUND_REQUEST,
@@ -272,14 +290,20 @@ class RefundService:
 
     def review(self, admin, request_id: int, approve: bool, remark: str) -> dict:
         """超管审核（R-308）：approve → approved（待执行）；拒绝 → rejected。
-        执行（线下打款登记/线上原路）走 execute。"""
-        req = (
-            self.db.query(RefundRequest)
-            .filter(RefundRequest.id == request_id, RefundRequest.is_deleted == 0)
-            .with_for_update()
-            .populate_existing()  # P1-F1：锁定读，并发 review/execute 串行化
-            .first()
-        )
+        执行（线下打款登记/线上原路）走 execute。
+
+        **锁序（2026-11-27 B1-1/B1-2 统一）**：原先是 `RefundRequest → Order`（锁退款单后再锁
+        订单行）——与 execute 的 `Child → Order → RefundRequest` **正好成环**：执行方持订单锁等
+        退款单锁、审核方持退款单锁等订单锁，InnoDB 必选一个当受害者（1213）。现在同样走
+        `Child → Order → RefundRequest`：先无锁定位读拿键，再按序加锁，最后锁定读刷新。
+        """
+        head = lock_order.lock_refund_head(self.db, request_id)
+        if head is None:
+            raise ValidationError("退款申请不存在或已处理")
+        lock_order.lock_child(self.db, head.child_id)
+        if head.kind == RefundRequest.KIND_ORDER and head.order_id:
+            lock_order.lock_order(self.db, head.order_id)
+        req = lock_order.lock_refund_request(self.db, request_id)
         if not req or req.status != RefundRequest.STATUS_PENDING:
             raise ValidationError("退款申请不存在或已处理")
         if approve:
@@ -350,7 +374,7 @@ class RefundService:
                     WithdrawalRequest.STATUS_PENDING_SETTLE,
                 ):
                     # T5/B-13：结算退款单终态推进（全部拒绝）——全拒退会失败、部分成功 completed
-                    self._settle_withdrawal_on_terminal(req, w, child)
+                    settle_withdrawal_on_terminal(self.db, req, w, child)
         req.review_remark = remark or None
         req.reviewed_by = admin.id
         req.reviewed_at = datetime.now()
@@ -375,14 +399,23 @@ class RefundService:
         return {"id": req.id, "status": req.status}
 
     def execute(self, admin, request_id: int, success: bool, remark: str) -> dict:
-        """执行退款（R-308：approved/failed → processing → refunded/failed）；线上单自动原路退回。"""
-        req = (
-            self.db.query(RefundRequest)
-            .filter(RefundRequest.id == request_id, RefundRequest.is_deleted == 0)
-            .with_for_update()
-            .populate_existing()  # P1-F1：锁定读，双超管并发执行串行化（防双台账/双押金退款单）
-            .first()
-        )
+        """执行退款（R-308：approved/failed → processing → refunded/failed）；线上单自动原路退回。
+
+        **锁序（B1-1，2026-11-27 双审查 P1-1）**：`Child → Order → RefundRequest →（Deposit）`。
+        两段式：先无锁定位读拿加锁键（不据此做任何业务判断），再按锁序逐级加锁，最后锁定读刷新。
+        **订单行锁就是"同一订单退款"的串行化点**——原实现只锁退款单行，同一订单的两笔退款
+        （典型：两笔都 failed 的单**同时**重试）可以各自穿透累计闸 → 一单出款两次。
+        订单行锁与结算/确认收款/退款申请（都是 `Order → RefundRequest`）同向，不成环；
+        从 Phase 1 提交（`submit_gateway_refund`）起订单锁释放，但此时本单已提交为 `processing`，
+        后到者的锁定读累计闸必把它算进去。
+        """
+        head = lock_order.lock_refund_head(self.db, request_id)
+        if head is None:
+            raise ValidationError("退款申请不存在")
+        lock_order.lock_child(self.db, head.child_id)
+        if head.kind == RefundRequest.KIND_ORDER and head.order_id:
+            lock_order.lock_order(self.db, head.order_id)
+        req = lock_order.lock_refund_request(self.db, request_id)
         if not req:
             raise ValidationError("退款申请不存在")
         if req.gateway_unknown_at is not None:
@@ -598,7 +631,7 @@ class RefundService:
         # 推进失败 → 整体回滚（退款单不落 refunded），不再半提交。
         if success:
             self.db.flush()  # P1-F9：autoflush=False——先刷本事务修改（refunded），聚合推进的查询才可见
-            self._advance_withdrawal(req.id)
+            advance_withdrawal(self.db, req.id)
         self.db.commit()
 
     def _complete_refund_withdrawal(self, admin, req: RefundRequest, order: Order) -> None:
@@ -636,95 +669,6 @@ class RefundService:
         )
 
         ensure_deposit_refund_on_withdrawal(self.db, child)
-
-    def _advance_withdrawal(self, refund_request_id: int) -> None:
-        """退款执行成功后聚合推进关联退会流程：
-        全部关联退款单 refunded → withdrawal completed（退会正式生效已由各路径落）。
-        applying 态命中 = refund_linked 联动退会（会员费单成功即完成）。"""
-        req = self.db.query(RefundRequest).filter(RefundRequest.id == refund_request_id).first()
-        if not req or not req.withdrawal_id:
-            return
-        w = (
-            self.db.query(WithdrawalRequest)
-            .filter(WithdrawalRequest.id == req.withdrawal_id)
-            .first()
-        )
-        if not w or w.status not in (
-            WithdrawalRequest.STATUS_REFUNDING,
-            WithdrawalRequest.STATUS_APPLYING,
-            WithdrawalRequest.STATUS_PENDING_SETTLE,
-        ):
-            return
-        open_cnt = (
-            self.db.query(func.count(RefundRequest.id))
-            .filter(
-                RefundRequest.withdrawal_id == w.id,
-                RefundRequest.status.in_(
-                    [
-                        RefundRequest.STATUS_PENDING,
-                        RefundRequest.STATUS_APPROVED,
-                        RefundRequest.STATUS_PROCESSING,
-                        RefundRequest.STATUS_FAILED,
-                    ]
-                ),
-                RefundRequest.is_deleted == 0,
-            )
-            .scalar()
-        )
-        if open_cnt == 0:
-            w.assert_transition(WithdrawalRequest.STATUS_COMPLETED)
-            w.status = WithdrawalRequest.STATUS_COMPLETED
-            child = self.db.query(Child).filter(Child.id == w.child_id).first()
-            if child:
-                if child.member_status != Child.MEMBER_WITHDRAWN:
-                    # B4/P2-6：唯一写口（同上；幂等守卫保留，避免重复触发连带动作查询）
-                    write_member_status(self.db, child, Child.MEMBER_WITHDRAWN)
-                    child.withdraw_reason = "user_withdrawal"
-                child.operation_locked = 0
-
-    def _settle_withdrawal_on_terminal(
-        self, req: RefundRequest, w: WithdrawalRequest, child: Child | None
-    ) -> None:
-        """结算退款单全部 reject/cancel 时推进退会状态（T5/B-13 20260903）。
-
-        业务语义（用户确认）：全拒/全撤 = 退会整体失败（钱没退，会员资格不剥夺）
-        → REJECTED + 解锁；部分成功（refunded_cnt > 0）→ _advance_withdrawal
-        语义 completed（幂等）。"""
-        self.db.flush()  # 调用方已将本单改终态（rejected/cancelled）落库，open_cnt 才不含自身
-        open_cnt = (
-            self.db.query(func.count(RefundRequest.id))
-            .filter(
-                RefundRequest.withdrawal_id == w.id,
-                RefundRequest.status.in_(
-                    [
-                        RefundRequest.STATUS_PENDING,
-                        RefundRequest.STATUS_APPROVED,
-                        RefundRequest.STATUS_PROCESSING,
-                        RefundRequest.STATUS_FAILED,
-                    ]
-                ),
-                RefundRequest.is_deleted == 0,
-            )
-            .scalar()
-        )
-        if open_cnt:
-            return
-        refunded_cnt = (
-            self.db.query(func.count(RefundRequest.id))
-            .filter(
-                RefundRequest.withdrawal_id == w.id,
-                RefundRequest.status == RefundRequest.STATUS_REFUNDED,
-                RefundRequest.is_deleted == 0,
-            )
-            .scalar()
-        )
-        if refunded_cnt > 0:
-            self._advance_withdrawal(req.id)  # completed（幂等）
-        else:
-            w.assert_transition(WithdrawalRequest.STATUS_REJECTED)
-            w.status = WithdrawalRequest.STATUS_REJECTED
-            if child:
-                child.operation_locked = 0
 
     def _restore_deposit_if_refund_terminal(self, req: RefundRequest) -> None:
         """押金退款单走到「钱没出去」的终态（rejected/cancelled）→ 押金账户从 `refunding` 复位。

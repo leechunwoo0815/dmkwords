@@ -19,12 +19,18 @@ from tests.unit.test_p1_audit_20261015 import _db
 
 
 def test_refund_amount_rounds_half_up():
-    """观察期 99.75 元、已用 29/30 天 → 3.325 元；HALF_UP = 3.33（HALF_EVEN 会得 3.32）。"""
+    """观察期 99.75 元、已用 29/30 天 → 3.325 元；HALF_UP = 3.33（HALF_EVEN 会得 3.32）。
+
+    2026-11-27（B1-3）：`refundable_amount` 的分母改成读订单快照 `order.period_days`
+    （历史单为 NULL 才回退当前配置）。假订单必须带上这一列——`None` = 历史单口径，
+    顺带覆盖"无快照回退配置"的路径。
+    """
     with _db() as db:
         order = SimpleNamespace(
             order_type=Order.TYPE_OBSERVATION,
             amount=Decimal("99.75"),
             paid_at=datetime.now() - timedelta(days=29),
+            period_days=None,
         )
         assert refundable_amount(db, order) == Decimal("3.33")
 

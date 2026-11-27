@@ -4,6 +4,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     Column,
+    Computed,
     Date,
     DateTime,
     Index,
@@ -17,6 +18,13 @@ from sqlalchemy import (
 
 from backend.common.base_model import BaseModel
 from backend.domain.identity.member_code import generate_member_code
+
+#: 退会单"活跃"条件唯一键表达式（B1-2，2026-11-27）。
+#: **必须与迁移 `e7c4d1a9b3f6` 里的 `ACTIVE_WITHDRAWAL_KEY_SQL` 逐字一致**——两侧同步，
+#: 照活动报名 P2-9 的规矩：用例从 `information_schema` 读回真实表达式比对，防漂移。
+ACTIVE_WITHDRAWAL_KEY_SQL = (
+    "IF(is_deleted = 0 AND status IN ('applying','pending_settle','refunding'), child_id, NULL)"
+)
 
 
 class Parent(BaseModel):
@@ -314,6 +322,12 @@ class WithdrawalRequest(BaseModel):
     """退会申请（审核期间孩子操作冻结）。R-311 六态。"""
 
     __tablename__ = "withdrawal_requests"
+    # B1-2（2026-11-27 双审查 P1-2）：同一孩子**只能有一张活跃退会单**（applying/pending_settle/
+    # refunding）。两条建单路径（家长申请 / 会员费退款 R-309 联动）原先判重都是普通读，并发即可
+    # 建出两张 → 押金退款单各建一笔、押金退两遍。应用层已用全局锁序（`lock_order.py`）串行化，
+    # 这里是数据库层最后一道：唯一约束落在生成列 `active_uniq_key`（只约束活跃三态），
+    # 做法与活动报名 P2-9（迁移 `a1b8c4d9e2f3`）一致。
+    __table_args__ = (Index("uq_withdrawal_active_child", "active_uniq_key", unique=True),)
 
     STATUS_APPLYING = "applying"  # 家长已提交，待审核
     STATUS_PENDING_SETTLE = "pending_settle"  # 审核通过，待结算（计算可退金额并生成退款单）
@@ -321,6 +335,10 @@ class WithdrawalRequest(BaseModel):
     STATUS_COMPLETED = "completed"  # 全部退款完成，退会生效
     STATUS_REJECTED = "rejected"
     STATUS_CANCELLED = "cancelled"
+
+    #: 活跃三态（条件唯一键的作用域）。**必须与 `ACTIVE_WITHDRAWAL_KEY_SQL` 里的字面量一致**：
+    #: 用例从 `information_schema` 读回真实表达式比对，改一处忘另一处会红。
+    ACTIVE_STATUSES = (STATUS_APPLYING, STATUS_PENDING_SETTLE, STATUS_REFUNDING)
 
     # B-3/T33：R-311 六态显式转换矩阵（防御性声明，接入主链转换点）
     ALLOWED_TRANSITIONS = {
@@ -363,6 +381,14 @@ class WithdrawalRequest(BaseModel):
     reviewed_by = Column(Integer, nullable=True)
     reviewed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.now)
+    #: 条件唯一键（DB 生成，应用只读；表达式见模块级 `ACTIVE_WITHDRAWAL_KEY_SQL`）：
+    #: 活跃三态 → child_id，其余 → NULL（唯一索引不比较 NULL，可反复申请）。
+    active_uniq_key = Column(
+        Integer,
+        Computed(ACTIVE_WITHDRAWAL_KEY_SQL, persisted=True),
+        nullable=True,
+        comment="活跃退会唯一键（生成列：活跃态=child_id，其余 NULL）",
+    )
 
 
 class TransferRequest(BaseModel):
