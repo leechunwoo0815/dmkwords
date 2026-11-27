@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -20,6 +19,8 @@ from sqlalchemy.orm import Session
 
 from backend.common.notification_models import TaskRunLog
 from backend.domain.admin.monitor_sampler import register_metrics_job
+from backend.tasks.failure_marker import append_failure_marker
+from backend.tasks.lock_names import with_suffix
 from backend.tasks.run_log import finalize_failed_run
 from backend.tasks.task_guard import run_with_task_lock, schedule_retry
 
@@ -396,7 +397,7 @@ def _run_task_locked(task_name: str, spec, *, manual: bool, admin) -> dict:
         except Exception:
             session.rollback()
             logger.error("failed to persist task failure log for %s", task_name)
-            _append_failure_marker(task_name, exc)  # P2-15：DB 挂了也要留痕（文件兜底）
+            append_failure_marker(task_name, exc)  # P2-15：DB 挂了也要留痕（文件兜底）
         return {
             "task": task_name,
             "display_name": spec.display_name,
@@ -413,19 +414,13 @@ def _run_task_locked(task_name: str, spec, *, manual: bool, admin) -> dict:
 #: 护栏 = 「骑锁」：谁拿到锁谁调度；拿不到就不注册任务（该进程照常提供 API）。
 SCHEDULER_LOCK_NAME = "dmkwords:scheduler"
 
-#: 锁名**后缀**（B5-2，2026-11-27）：MySQL 命名锁是**服务器级**的，不随库变——
-#: 多个 pytest xdist worker 共用一个 MySQL 服务器时必须各自一把，否则互相抢锁
-#: （实测症状：任务手动触发被别的 worker 抢到锁后返回 409「任务正在运行中」、
-#: 接管用例前置断言拿不到锁）。**生产不设该变量 → 后缀为空 → 锁名与文档完全一致**；
-#: 测试由 `tests/unit/conftest.py` 设成 `-gwN`。**绝不把数据库名拼进锁名**：
-#: 那样滚动发布期新旧进程会各持一把 → 定时任务双跑（正是本锁要防的事）。
-_LOCK_SUFFIX = os.environ.get("DMK_LOCK_SUFFIX", "")
-
 
 def scheduler_lock_name() -> str:
-    """本进程**实际使用**的调度器锁名（契约名 + 测试后缀）。凡 GET_LOCK/IS_USED_LOCK/RELEASE_LOCK
-    都走这里，不许各处直接引用常量。"""
-    return SCHEDULER_LOCK_NAME + _LOCK_SUFFIX
+    """本进程**实际使用**的锁名 = 契约名 + 测试后缀（B5-2；后缀见 `lock_names`）。
+
+    凡 GET_LOCK / IS_USED_LOCK / RELEASE_LOCK 都走这里。常量留在**本模块**（可被测试打桩）。
+    """
+    return with_suffix(SCHEDULER_LOCK_NAME)
 
 
 #: 持有命名锁的连接（**保持打开 = 保持锁**；进程退出/被杀时由 MySQL 自动释放）
@@ -790,25 +785,3 @@ def list_task_specs() -> list[dict]:
         }
         for s in TASKS.values()
     ]
-
-
-def _append_failure_marker(task_name: str, exc: Exception) -> None:
-    """任务失败日志**写不进 DB** 时的文件兜底（P2-15，2026-10-11）。
-
-    为什么需要：同一 DB 故障会让"失败日志"也写不进去，看板上就永远看不到这条失败——
-    进程日志之外再落一份可 grep 的标记（路径可用 `TASK_FAILURE_LOG` 覆盖；
-    `.dev-logs/` 已在 .gitignore）。
-    """
-    import os
-    from pathlib import Path
-
-    path = Path(os.environ.get("TASK_FAILURE_LOG", ".dev-logs/task-failures.log"))
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(
-                f"{datetime.now().isoformat(timespec='seconds')}\t{task_name}\t"
-                f"{type(exc).__name__}: {str(exc)[:500]}\n"
-            )
-    except OSError:
-        logger.error("任务失败兜底落盘也失败（只能靠进程日志）: %s", path)

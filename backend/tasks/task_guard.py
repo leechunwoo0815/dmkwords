@@ -12,22 +12,19 @@
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime, timedelta
+
+from backend.tasks.lock_names import with_suffix
 
 logger = logging.getLogger(__name__)
 
 #: 任务级锁名前缀
 TASK_LOCK_PREFIX = "dmkwords:task:"
 
-#: 锁名后缀（B5-2，2026-11-27）：与调度器锁同源——MySQL 命名锁是**服务器级**的，
-#: xdist 多 worker 共用一个服务器时必须各自一把。生产不设该变量 → 后缀为空。
-_TASK_LOCK_SUFFIX = os.environ.get("DMK_LOCK_SUFFIX", "")
-
 
 def task_lock_name(task_name: str) -> str:
-    """本进程实际使用的任务锁名（GET_LOCK / RELEASE_LOCK 都走这里）。"""
-    return f"{TASK_LOCK_PREFIX}{task_name}{_TASK_LOCK_SUFFIX}"
+    """本进程实际使用的任务锁名 = 前缀 + 任务名 + 测试后缀。"""
+    return with_suffix(f"{TASK_LOCK_PREFIX}{task_name}")
 
 
 #: 自动调度失败后的重试退避（秒）。退避走"排一个 date 任务"而不是 sleep——
