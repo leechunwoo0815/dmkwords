@@ -438,7 +438,10 @@ class DepositService:
                     raise ValidationError("重复请求：该幂等键已使用") from None
                 return dep
             self.db.flush()
-            return dep
+            # B1-5 回归修复（2026-11-29 专家复审 R1）：原先这里直接 `return dep`，
+            # 把下面的 `publish_audit("deposit.deduct")` 整段跳过 —— 带 client_request_id 的
+            # 赔偿扣款（前端现在**总是**传 key）成功了却**没有资金审计行**。
+            # 重放分支（上面的 IntegrityError）仍不回审计：那一次没有扣款。
         publish_audit(
             self.db,
             admin=admin,

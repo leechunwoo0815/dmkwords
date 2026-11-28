@@ -97,6 +97,20 @@ server {
         access_log off;
     }
 
+    # 2026-11-29 专家复审 R6：**`/ready` 与 `/health` 同命**。就绪探针是 `/ready`（返回 JSON：
+    # db / scheduler / sampler 三项），但 vhost 只反代了 `/api/` 与 `= /health` → 公网 `/ready`
+    # 落到下面的 SPA 回退，返回 **index.html 200**（实测 `200 text/html 679B`）——
+    # 外部拨测"绿"的其实是前端页面，后端没就绪也看不出来。探针请打 `/ready` 并断言 `status=ready`。
+    location = /ready {
+        proxy_pass http://__BACKEND_ADDR__;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        access_log off;
+    }
+
     location / {
         try_files $uri /index.html;
     }

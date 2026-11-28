@@ -777,14 +777,11 @@ class PaymentService(PaymentNotifyMixin):
         return order
 
     def _locked_by_order_no(self, order_no: str) -> Order:
-        order = (
-            self.db.query(Order)
-            .filter(Order.order_no == order_no, Order.is_deleted == 0)
-            .with_for_update()
-            .populate_existing()
-            .first()
-        )
-        if not order:
+        """按订单号取已加锁订单：`Child → Order` 两段式（R3；序的定义见 `lock_order.py`）。"""
+        from backend.domain.identity import lock_order
+
+        _, order = lock_order.lock_child_then_order_by_no(self.db, order_no)
+        if order is None:
             raise NotFoundError("订单不存在")
         return order
 

@@ -231,7 +231,17 @@ class RefundService:
         return req
 
     def cancel(self, child: Child, request_id: int) -> RefundRequest:
-        """家长撤销待审核退款申请（BDD：状态 cancelled、订单恢复）。"""
+        """家长撤销待审核退款申请（BDD：状态 cancelled、订单恢复）。
+
+        **2026-11-29 专家复审 R4**：`child` 是调用方用普通读拿到的（`child_of_parent`），
+        原先这里只锁退款单就去复位押金、撤销联动退会（= 解除孩子的转让/退会冻结）。
+        冻结的写入方（退会 apply / 转让 create）都在 **Child 行锁内**，撤销不持该锁就能与其交错
+        → 冻结被撤销方"凭空解开"，孩子可继续借书/下单。改成两段式 `Child → RefundRequest`
+        （与 review/execute 同序）。
+        """
+        head = lock_order.lock_refund_head(self.db, request_id)
+        if head is not None:
+            lock_order.lock_child(self.db, head.child_id)
         req = (
             self.db.query(RefundRequest)
             .filter(

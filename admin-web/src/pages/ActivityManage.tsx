@@ -12,7 +12,7 @@ import PreviewImage from "../components/PreviewImage";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert, App as AntdApp, Button, DatePicker, Descriptions, Divider, Drawer, Form, Input,
-  InputNumber, Modal, Select, Space, Switch, Table, Tabs, Tag, Typography, Upload,
+  InputNumber, Modal, Select, Space, Switch, Table, Tabs, Tag, Tooltip, Typography, Upload,
 } from "antd";
 
 import {
@@ -24,6 +24,15 @@ import {
 import { usePaintPagination } from "../hooks/usePaintPagination";
 import { PaintHScrollbar } from "../components/PaintHScrollbar";
 import ScanCheckin from "../components/ScanCheckin";
+
+/**
+ * 活动「可编辑」判据——与后端 `AdminActivityService.update` **同源**：
+ * 仅 `status === "published"` 且 `start_at > now` 可编辑，否则后端返回 422「活动已开始，不可编辑」。
+ * 2026-11-29 甲方真机反馈：已结束的活动仍显示「编辑」，点了必报错（失败被画成可用）。
+ */
+function canEditActivity(a: { status: string; start_at: string }): boolean {
+  return a.status === "published" && dayjs(a.start_at).isAfter(dayjs());
+}
 
 const TYPE_OPTIONS = [
   { value: "lecture", label: "宣讲会" },
@@ -347,7 +356,16 @@ export default function ActivityManage() {
                     {
                       title: "操作", key: "op", width: 220, fixed: "right" as const, render: (_, r) => (
                         <Space>
-                          <Button type="link" size="small" onClick={() => openEdit(r)}>编辑</Button>
+                          <Tooltip title={canEditActivity(r) ? "" : "已结束/已开始的活动只能查看详情"}>
+                            <Button
+                              type="link"
+                              size="small"
+                              disabled={!canEditActivity(r)}
+                              onClick={() => openEdit(r)}
+                            >
+                              编辑
+                            </Button>
+                          </Tooltip>
                           <Button type="link" size="small" onClick={() => openEnrollments(r)}>报名名单</Button>
                           {r.status === "published" && (
                             <Button type="link" size="small" danger onClick={() => onCancelActivity(r)}>取消活动</Button>
@@ -409,9 +427,15 @@ export default function ActivityManage() {
             <Button size="small" onClick={() => { const d = detailView; setDetailView(null); openEnrollments(d); }}>
               报名名单
             </Button>
-            <Button size="small" onClick={() => { const d = detailView; setDetailView(null); openEdit(d); }}>
-              编辑
-            </Button>
+            <Tooltip title={canEditActivity(detailView) ? "" : "已结束/已开始的活动只能查看详情"}>
+              <Button
+                size="small"
+                disabled={!canEditActivity(detailView)}
+                onClick={() => { const d = detailView; setDetailView(null); openEdit(d); }}
+              >
+                编辑
+              </Button>
+            </Tooltip>
           </Space>
         )}
       >

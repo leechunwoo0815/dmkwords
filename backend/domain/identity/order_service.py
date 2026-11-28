@@ -370,14 +370,14 @@ class OrderService(OrderGuardMixin):
         return order.voucher_path
 
     def confirm_payment(self, admin, order_id: int, req) -> Order:
-        """人工收款确认 → paid → 联动会员开通。"""
-        order = (
-            self.db.query(Order)
-            .filter(Order.id == order_id, Order.is_deleted == 0)
-            .with_for_update()
-            .populate_existing()  # P1-F2：锁定读，双管理员并发确认串行化（防双押金记账/到期日覆盖/双事件）
-            .first()
-        )
+        """人工收款确认 → paid → 联动会员开通。
+
+        加锁序 `Child → Order`（R3）：`_settle_paid → prepare_settle` 还要锁 Child，
+        先锁 Order 就与退款回调的 `Child → Order` 成环（1213）。详见 `lock_order.py`。
+        """
+        from backend.domain.identity import lock_order
+
+        _, order = lock_order.lock_child_then_order(self.db, order_id)
         if not order:
             raise NotFoundError("订单不存在")
         if not order.can_transition(Order.STATUS_PAID):

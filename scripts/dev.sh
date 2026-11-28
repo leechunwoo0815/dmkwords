@@ -67,7 +67,11 @@ start() {
   # 端口防呆：8002 被"非 pid 文件管理"的进程占用时，新进程会绑定失败退出，
   # 而健康检查会打到旧进程上假装 OK（假绿）——必须先暴露出来
   if [ ! -s "$BACKEND_PID_FILE" ] || ! is_running "$BACKEND_PID_FILE"; then
-    port_pid=$(lsof -ti :8002 2>/dev/null | head -1)
+    # **只认 LISTEN 套接字**（2026-11-29）：原先是 `lsof -ti :8002`，它连**客户端**的
+    # ESTABLISHED 连接一起列出来——本机管理端/小程序调试工具/编辑器只要开着到 8002 的
+    # 连接，就会被误判成"端口被别的进程占用"，于是 dev.sh 拒绝启动、门禁尾部的自动恢复
+    # 直接 FAIL（实测：占位进程是 ZCode 自己的网络服务，根本没有监听者）。
+    port_pid=$(lsof -ti tcp:8002 -sTCP:LISTEN 2>/dev/null | head -1)
     if [ -n "$port_pid" ]; then
       echo "✗ 端口 8002 被进程 ${port_pid} 占用（不是 dev.sh 管理的后端，代码可能是旧的）"
       echo "  这会导致新代码不生效、接口 404。处理方式："

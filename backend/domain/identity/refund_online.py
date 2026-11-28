@@ -42,6 +42,12 @@ def _lock_child_then_refund(db: Session, request_id: int, *, not_found: str):
     if head is None:
         raise NotFoundError(not_found)
     lock_order.lock_child(db, head.child_id)
+    # 2026-11-29 专家复审 R3（同域内的第二个环）：本函数随后会 UPDATE Order（refund_status/status），
+    # 而 `RefundService.execute` 的序是 `Child → Order → RefundRequest`。若这里只锁到 RefundRequest
+    # 就隐式升级去等 Order，两条退款路径（执行 × 回调）会 `Order→RefundRequest` vs
+    # `RefundRequest→Order` 成环。显式按全局序补上 Order（订单类退款才有），消除隐式升级。
+    if head.kind == RefundRequest.KIND_ORDER and head.order_id:
+        lock_order.lock_order(db, head.order_id)
     req = lock_order.lock_refund_request(db, request_id)
     if req is None:
         raise NotFoundError(not_found)
